@@ -2198,46 +2198,102 @@ function saveNewPeriod() {
   showToast('Calendar period saved', 'success');
 }
 
+// ── ACADEMIC TERMS TAB STATE ──
+let _atSessions = [];
+let _atFiltered = [];
+let _atPage = 1;
+
 async function loadAcademicTermsTab() {
   try {
     const data = await apiFetch('/api/admin/academic-sessions');
-    const sessions = data.sessions || [];
-    const active = sessions.find(s => s.isActive);
-    // info card
+    _atSessions = data.sessions || [];
+    _atFiltered = [..._atSessions];
+    _atPage = 1;
+
+    const active = _atSessions.find(s => s.isActive);
     const atSess = document.getElementById('at-sess-label');
     const atYear = document.getElementById('at-year-label');
     const atTerm = document.getElementById('at-term-label');
     if (atSess) atSess.textContent = active ? active.sessionLabel : '—';
     if (atYear) atYear.textContent = active ? (active.sessionLabel || '').split('-')[0] || '—' : '—';
     if (atTerm) atTerm.textContent = active ? (active.termLabel || '—') : '—';
-    // sessions table (new IDs)
-    const tbody = document.getElementById('at-sessions-tbody');
-    if (!tbody) return;
-    if (!sessions.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">No academic sessions found.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = sessions.map((s, i) => {
-      const [startY, endY] = (s.sessionLabel || '').split('-');
-      const statusBadge = s.isActive
-        ? '<span style="background:#16a34a22;color:#16a34a;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">Active</span>'
-        : '<span style="background:var(--surface-2);color:var(--text-3);padding:2px 10px;border-radius:20px;font-size:11px">Inactive</span>';
-      return `<tr>
-        <td>${i+1}</td>
-        <td style="font-weight:600">${escapeHtml(s.sessionLabel)}</td>
-        <td>${escapeHtml(startY || '—')}</td>
-        <td>${escapeHtml(endY || '—')}</td>
-        <td>${statusBadge}</td>
-        <td style="display:flex;gap:6px;align-items:center;">
-          ${!s.isActive ? `<button class="post-btn" style="padding:4px 12px;font-size:11px" onclick="setActiveSession(${s.id})">Set Active</button>` : ''}
-          ${!s.isActive ? `<button class="del-btn" style="padding:4px 12px;font-size:11px" onclick="deleteAcademicSession(${s.id})">Delete</button>` : ''}
-        </td>
-      </tr>`;
-    }).join('');
+
+    atRenderSessions();
   } catch(e) {
     const tbody = document.getElementById('at-sessions-tbody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;text-align:center;color:#f87171">${e.message}</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:#dc2626">${e.message}</td></tr>`;
   }
+}
+
+function atSearchSessions(q) {
+  const query = (q || '').toLowerCase();
+  _atFiltered = !query ? [..._atSessions] : _atSessions.filter(s =>
+    (s.sessionLabel || '').toLowerCase().includes(query)
+  );
+  _atPage = 1;
+  atRenderSessions();
+}
+
+function atRenderSessions() {
+  const tbody = document.getElementById('at-sessions-tbody');
+  const info  = document.getElementById('at-sessions-info');
+  const pages = document.getElementById('at-sessions-pages');
+  if (!tbody) return;
+
+  const perPage = Number(document.getElementById('at-per-page')?.value || 20);
+  const total   = _atFiltered.length;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (_atPage > totalPages) _atPage = totalPages;
+
+  const start = (_atPage - 1) * perPage;
+  const slice = _atFiltered.slice(start, start + perPage);
+
+  if (!total) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">No academic sessions found.</td></tr>';
+    if (info) info.textContent = 'Showing 0 to 0 of 0 entries';
+    if (pages) pages.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = slice.map((s, idx) => {
+    const [startY, endY] = (s.sessionLabel || '').split('-');
+    const statusBadge = s.isActive
+      ? '<span style="background:#dbeafe;color:#1d4ed8;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #bfdbfe;">Active Academic Session</span>'
+      : '';
+    const actionBtn = !s.isActive
+      ? `<button title="Set as active" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border-2);background:var(--black-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s" onclick="setActiveSession(${s.id})" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border-2)'">&#9998;</button>`
+      : '';
+    return `<tr>
+      <td style="color:var(--text-3);font-family:'DM Mono',monospace;">${start + idx + 1}</td>
+      <td style="font-weight:600">${escapeHtml(s.sessionLabel)}</td>
+      <td>${escapeHtml(startY || '—')}</td>
+      <td>${escapeHtml(endY || '—')}</td>
+      <td>${statusBadge}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('');
+
+  if (info) info.textContent = `Showing ${start + 1} to ${Math.min(start + perPage, total)} of ${total} entries`;
+
+  // Pagination buttons
+  if (pages) {
+    const btnStyle = (active) => `style="min-width:30px;height:30px;border-radius:4px;border:1px solid var(--border-2);background:${active ? 'var(--blue)' : 'var(--black-3)'};color:${active ? '#fff' : 'var(--text-2)'};cursor:pointer;font-size:12px;font-family:'DM Mono',monospace;transition:all .15s"`;
+    let html = `<button ${btnStyle(false)} onclick="atGoPage(1)" ${_atPage===1?'disabled':''}>&#171;</button>`;
+    html += `<button ${btnStyle(false)} onclick="atGoPage(${_atPage-1})" ${_atPage===1?'disabled':''}>&#8249;</button>`;
+    for (let p = Math.max(1, _atPage-2); p <= Math.min(totalPages, _atPage+2); p++) {
+      html += `<button ${btnStyle(p===_atPage)} onclick="atGoPage(${p})">${p}</button>`;
+    }
+    html += `<button ${btnStyle(false)} onclick="atGoPage(${_atPage+1})" ${_atPage===totalPages?'disabled':''}>&#8250;</button>`;
+    html += `<button ${btnStyle(false)} onclick="atGoPage(${totalPages})" ${_atPage===totalPages?'disabled':''}>&#187;</button>`;
+    pages.innerHTML = html;
+  }
+}
+
+function atGoPage(p) {
+  const perPage = Number(document.getElementById('at-per-page')?.value || 20);
+  const totalPages = Math.max(1, Math.ceil(_atFiltered.length / perPage));
+  _atPage = Math.max(1, Math.min(p, totalPages));
+  atRenderSessions();
 }
 
 const SS_KEY = 'lsSystemSettings';

@@ -3045,19 +3045,40 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 
         <!-- Academic Sessions List -->
         <div class="card" style="margin-bottom:16px;">
-          <div class="card-head">
+          <div class="card-head" style="flex-wrap:wrap;gap:10px;">
             <span class="card-title">Academic Sessions List</span>
-            <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-              <input class="bs-search-input" placeholder="Search…" oninput="atFilterTable('at-sessions-tbody',this.value)" style="width:180px;">
-              <button class="post-btn" onclick="openCreateSessionModal()">+ Create New Academic Session</button>
-            </div>
+            <button class="post-btn" onclick="openCreateSessionModal()" style="margin-left:auto;">&#xff0b; Create New Academic Session</button>
           </div>
           <div class="card-body" style="padding:0;">
-            <div style="overflow-x:auto;padding:0 18px 14px;">
-              <table class="data-table">
-                <thead><tr><th>#</th><th>Session</th><th>Start Year</th><th>End Year</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody id="at-sessions-tbody"><tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+            <!-- Controls bar -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
+                <select id="at-per-page" class="ctrl-select" style="width:72px;" onchange="atRenderSessions()">
+                  <option value="10">10</option>
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                </select>
+                records per page
+              </div>
+              <input class="bs-search-input" placeholder="Search" oninput="atSearchSessions(this.value)" style="width:220px;">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table" style="width:100%;">
+                <thead><tr>
+                  <th style="width:40px;">#</th>
+                  <th>Session</th>
+                  <th>Start Year</th>
+                  <th>End Year</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr></thead>
+                <tbody id="at-sessions-tbody"><tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
               </table>
+            </div>
+            <!-- Pagination -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px;">
+              <span id="at-sessions-info" style="font-size:11px;color:var(--text-3)">Showing 0 to 0 of 0 entries</span>
+              <div style="display:flex;gap:4px;" id="at-sessions-pages"></div>
             </div>
           </div>
         </div>
