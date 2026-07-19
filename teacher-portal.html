@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Scholars — Teacher Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:    #0a0a0a;
+  --black-2:  #111111;
+  --black-3:  #1a1a1a;
+  --black-4:  #222222;
+  --border:   #2a2a2a;
+  --border-2: #333333;
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,0.08);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,0.10);
+  --amber:    #fbbf24;
+  --amber-bg: rgba(251,191,36,0.10);
+  --blue:     #a5b4fc;
+  --blue-bg:  rgba(99,102,241,0.12);
+  --text-1:   #f5f5f5;
+  --text-2:   #a3a3a3;
+  --text-3:   #555555;
+  --radius-sm: 6px;
+  --radius:    10px;
+  --transition: 0.18s ease;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--text-1); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+.portal-wrap { display:flex; min-height:100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar { width:240px; min-height:100vh; background:var(--black-2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; animation:slideIn 0.35s ease both; }
+@keyframes slideIn { from{transform:translateX(-240px);opacity:0} to{transform:translateX(0);opacity:1} }
+.sidebar-logo { padding:22px 20px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.logo-mark-sm { width:30px; height:30px; background:var(--green); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px; color:var(--black); font-weight:900; }
+.logo-name-sm { font-size:13px; font-weight:700; color:var(--text-1); letter-spacing:-0.2px; line-height:1.2; }
+.logo-sub-sm  { font-size:9px; color:var(--text-3); font-weight:500; letter-spacing:0.6px; text-transform:uppercase; margin-top:1px; }
+.user-pill { margin:14px 12px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px; display:flex; align-items:center; gap:10px; }
+.avatar { width:32px; height:32px; border-radius:50%; background:var(--amber-bg); border:1.5px solid var(--amber); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--amber); font-family:'DM Mono',monospace; flex-shrink:0; }
+.u-name  { font-size:12px; font-weight:600; color:var(--text-1); line-height:1.2; }
+.u-sub   { font-size:10px; color:var(--text-3); margin-top:1px; }
+.u-badge { display:inline-block; margin-top:3px; background:var(--amber-bg); border:1px solid rgba(251,191,36,0.2); color:var(--amber); font-size:9px; font-weight:700; padding:1px 7px; border-radius:3px; font-family:'DM Mono',monospace; }
+.nav-group { padding:6px 12px 0; }
+.nav-label { font-size:9px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-3); padding:10px 8px 5px; }
+.nav-item { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:var(--radius-sm); color:var(--text-2); cursor:pointer; font-size:13px; font-weight:500; transition:all var(--transition); margin-bottom:1px; border:1px solid transparent; user-select:none; }
+.nav-item:hover  { background:var(--black-3); color:var(--text-1); }
+.nav-item.active { background:var(--green-bg); color:var(--green); border-color:rgba(34,197,94,0.2); }
+.nav-icon { width:15px; text-align:center; font-size:13px; opacity:0.85; }
+.nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700; font-family:'DM Mono',monospace; padding:1px 6px; border-radius:20px; line-height:1.6; }
+.nav-badge-amber { margin-left:auto; background:var(--amber-bg); color:var(--amber); font-size:10px; font-weight:700; font-family:'DM Mono',monospace; padding:1px 6px; border-radius:20px; line-height:1.6; border:1px solid rgba(251,191,36,0.2); }
+.sidebar-footer { margin-top:auto; padding:13px 12px; border-top:1px solid var(--border); }
+.signout-btn { width:100%; background:transparent; border:1px solid var(--border-2); border-radius:var(--radius-sm); color:var(--text-3); padding:8px 12px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; cursor:pointer; transition:all var(--transition); display:flex; align-items:center; justify-content:center; gap:6px; }
+.signout-btn:hover { border-color:var(--red); color:var(--red); }
+
+/* ── MAIN ── */
+.main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.topbar { height:54px; border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 26px; gap:12px; position:sticky; top:0; background:rgba(10,10,10,0.94); backdrop-filter:blur(12px); z-index:40; }
+.topbar-title { font-size:13px; font-weight:600; color:var(--text-1); }
+.topbar-sep   { color:var(--border-2); }
+.topbar-sub   { font-size:12px; color:var(--text-3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.chip-green { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--green-bg); border:1px solid rgba(34,197,94,0.22); color:var(--green); }
+.chip-amber { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--amber-bg); border:1px solid rgba(251,191,36,0.22); color:var(--amber); }
+.icon-btn { width:30px; height:30px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all var(--transition); position:relative; }
+.icon-btn:hover { border-color:var(--border-2); }
+.notif-dot { position:absolute; top:5px; right:5px; width:5px; height:5px; background:var(--red); border-radius:50%; border:1px solid var(--black-3); }
+.content { padding:26px; flex:1; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation:tabIn 0.2s ease both; }
+@keyframes tabIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── SHARED COMPONENTS ── */
+.page-header { margin-bottom:22px; }
+.page-header h2 { font-size:20px; font-weight:700; letter-spacing:-0.4px; }
+.page-header p  { font-size:12px; color:var(--text-3); margin-top:3px; }
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+.stat-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; transition:border-color var(--transition); }
+.stat-card:hover { border-color:var(--border-2); }
+.stat-card.ac-green { border-color:rgba(34,197,94,0.28); }
+.stat-card.ac-amber { border-color:rgba(251,191,36,0.28); }
+.stat-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.stat-icon-wrap { width:28px; height:28px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:13px; }
+.stat-delta { font-size:10px; font-weight:600; font-family:'DM Mono',monospace; padding:2px 6px; border-radius:4px; }
+.delta-up    { background:var(--green-bg); color:var(--green); }
+.delta-amber { background:var(--amber-bg); color:var(--amber); }
+.stat-value { font-size:25px; font-weight:700; letter-spacing:-1px; line-height:1; font-family:'DM Mono',monospace; }
+.stat-label { font-size:10px; color:var(--text-3); margin-top:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+.card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.card-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.card-title  { font-size:12px; font-weight:600; color:var(--text-1); }
+.card-body   { padding:14px 18px; }
+.grid-2   { display:grid; grid-template-columns:1fr 1fr;    gap:14px; }
+.grid-3-1 { display:grid; grid-template-columns:1.5fr 1fr; gap:14px; }
+.perf-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.perf-row:last-child { border-bottom:none; }
+.perf-key { color:var(--text-2); font-weight:500; }
+.perf-val { font-weight:700; font-family:'DM Mono',monospace; }
+.pv-green { color:var(--green); } .pv-red { color:var(--red); } .pv-amber { color:var(--amber); }
+.progress-track { height:3px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:6px; }
+.progress-fill  { height:100%; border-radius:99px; background:var(--green); }
+
+/* ── DASHBOARD SPECIFICS ── */
+.class-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.class-item:last-child { border-bottom:none; }
+.class-icon { width:32px; height:32px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.class-name { font-size:13px; font-weight:600; }
+.class-sub  { font-size:11px; color:var(--text-3); margin-top:1px; }
+.class-meta { margin-left:auto; text-align:right; }
+.class-avg  { font-family:'DM Mono',monospace; font-size:13px; font-weight:700; }
+.class-count{ font-size:10px; color:var(--text-3); margin-top:1px; }
+.activity-item { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.activity-item:last-child { border-bottom:none; }
+.act-dot  { width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.act-text { font-size:12px; color:var(--text-2); line-height:1.5; flex:1; }
+.act-text strong { color:var(--text-1); font-weight:600; }
+.act-time { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:2px; }
+
+/* ── STUDENTS TABLE ── */
+.search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; transition:all var(--transition); width:220px; }
+.search-input:focus { border-color:rgba(34,197,94,0.45); }
+.search-input::placeholder { color:var(--text-3); }
+.data-table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-table thead tr { border-bottom:1px solid var(--border); }
+.data-table th { padding:9px 13px; text-align:left; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; }
+.data-table td { padding:10px 13px; border-bottom:1px solid var(--border); font-weight:500; vertical-align:middle; }
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tbody tr:hover td { background:var(--black-3); }
+.stu-av { width:26px; height:26px; border-radius:50%; background:var(--green-bg); border:1px solid rgba(34,197,94,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+.grade-pill { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; }
+.gp-a{background:var(--green-bg);color:var(--green);} .gp-b{background:var(--blue-bg);color:var(--blue);} .gp-c{background:var(--amber-bg);color:var(--amber);} .gp-d{background:var(--red-bg);color:var(--red);}
+.att-bar   { display:inline-flex; align-items:center; gap:6px; }
+.att-track { width:60px; height:4px; background:var(--black-4); border-radius:99px; overflow:hidden; }
+.att-fill  { height:100%; border-radius:99px; }
+
+/* ── RESULTS ENTRY ── */
+.ctrl-row   { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
+.ctrl-group { display:flex; flex-direction:column; gap:5px; }
+.ctrl-label { font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; font-family:'DM Mono',monospace; }
+.ctrl-select { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; font-family:'DM Sans',sans-serif; font-size:12px; color:var(--text-1); outline:none; cursor:pointer; transition:all var(--transition); min-width:160px; }
+.ctrl-select:focus { border-color:rgba(34,197,94,0.45); }
+.ctrl-select option { background:var(--black-3); }
+.load-btn { background:var(--green); color:var(--black); border:none; border-radius:var(--radius-sm); padding:9px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all var(--transition); align-self:flex-end; }
+.load-btn:hover { background:#16a34a; }
+
+/* ── CONTEXT BANNER ── */
+.ctx-banner { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.ctx-label  { font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; font-family:'DM Mono',monospace; margin-right:2px; }
+.ctx-chip   { display:inline-flex; align-items:center; gap:5px; background:var(--black-3); border:1px solid var(--border-2); border-radius:4px; padding:4px 10px; font-size:11px; font-weight:600; color:var(--text-2); font-family:'DM Mono',monospace; }
+.ctx-chip.locked { color:var(--text-3); border-style:dashed; }
+.ctx-sep    { color:var(--border-2); font-size:14px; }
+.ctx-editable-wrap { display:flex; align-items:center; gap:6px; margin-left:auto; }
+
+/* ── PROGRESS BAR ── */
+.prog-wrap  { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 18px; margin-bottom:18px; }
+.prog-top   { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.prog-title { font-size:11px; font-weight:600; color:var(--text-2); }
+.prog-count { font-size:11px; font-family:'DM Mono',monospace; color:var(--text-3); }
+.prog-track { height:4px; background:var(--black-4); border-radius:99px; overflow:hidden; }
+.prog-fill  { height:100%; border-radius:99px; background:var(--green); transition:width 0.4s ease; }
+
+/* ── STUDENT GRID ── */
+.stu-grid   { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-bottom:16px; }
+.stu-card   { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px; cursor:pointer; transition:all var(--transition); position:relative; }
+.stu-card:hover { border-color:rgba(34,197,94,0.35); background:var(--black-3); transform:translateY(-1px); }
+.stu-card.sc-saved   { border-color:rgba(34,197,94,0.28); }
+.stu-card.sc-unsaved { border-color:rgba(251,191,36,0.28); }
+.sc-avatar  { width:36px; height:36px; border-radius:50%; background:var(--green-bg); border:1.5px solid rgba(34,197,94,0.3); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; margin-bottom:9px; }
+.sc-name    { font-size:12px; font-weight:600; color:var(--text-1); margin-bottom:2px; }
+.sc-id      { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-bottom:8px; }
+.sc-status  { display:flex; align-items:center; gap:5px; font-size:10px; font-family:'DM Mono',monospace; }
+.sc-score   { position:absolute; top:10px; right:10px; font-family:'DM Mono',monospace; font-size:13px; font-weight:700; }
+
+/* ── PER-STUDENT ENTRY PANEL ── */
+.entry-panel { animation:tabIn 0.2s ease both; }
+.ep-nav      { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.ep-back-btn { background:transparent; border:1px solid var(--border-2); border-radius:var(--radius-sm); padding:7px 13px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer; transition:all var(--transition); display:flex; align-items:center; gap:5px; }
+.ep-back-btn:hover { border-color:var(--green); color:var(--green); }
+.ep-nav-arrows { margin-left:auto; display:flex; gap:6px; }
+.ep-arr-btn  { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; color:var(--text-2); transition:all var(--transition); }
+.ep-arr-btn:hover { border-color:var(--green); color:var(--green); }
+.ep-arr-btn:disabled { opacity:0.3; cursor:not-allowed; }
+.ep-who      { display:flex; align-items:center; gap:14px; background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:18px; }
+.ep-who-av   { width:44px; height:44px; border-radius:50%; background:var(--green-bg); border:2px solid rgba(34,197,94,0.35); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; flex-shrink:0; }
+.ep-who-name { font-size:16px; font-weight:700; letter-spacing:-0.3px; }
+.ep-who-id   { font-size:11px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:2px; }
+.ep-who-pos  { margin-left:auto; text-align:right; }
+.ep-pos-num  { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-3); }
+.ep-score-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+.ep-score-box { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+.ep-score-lbl { font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; font-family:'DM Mono',monospace; margin-bottom:10px; }
+.ep-input-big { width:100%; background:var(--black-3); border:1.5px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; font-family:'DM Mono',monospace; font-size:26px; font-weight:700; color:var(--text-1); outline:none; transition:all var(--transition); text-align:center; }
+.ep-input-big:focus   { border-color:rgba(34,197,94,0.6); background:var(--black); box-shadow:0 0 0 3px rgba(34,197,94,0.08); }
+.ep-input-big.has-val { border-color:rgba(34,197,94,0.3); }
+.ep-input-big.err-val { border-color:rgba(239,68,68,0.5); background:rgba(239,68,68,0.04); }
+.ep-max-lbl { text-align:center; font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:5px; }
+.ep-result-box { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:18px; display:flex; align-items:center; gap:20px; }
+.ep-total-block { text-align:center; }
+.ep-total-num   { font-family:'DM Mono',monospace; font-size:36px; font-weight:700; line-height:1; }
+.ep-total-lbl   { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:4px; text-transform:uppercase; letter-spacing:0.5px; }
+.ep-grade-block { text-align:center; }
+.ep-grade-lbl2  { font-size:9px; color:var(--text-3); font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+.ep-grade-big   { font-family:'DM Mono',monospace; font-size:28px; font-weight:700; }
+.ep-remark      { flex:1; }
+.ep-remark-tag  { display:inline-block; padding:5px 12px; border-radius:5px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; }
+.ep-actions     { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.ep-save-btn    { background:var(--green); color:var(--black); border:none; border-radius:var(--radius-sm); padding:10px 24px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:all var(--transition); }
+.ep-save-btn:hover  { background:#16a34a; }
+.ep-clear-btn   { background:transparent; border:1px solid var(--border-2); border-radius:var(--radius-sm); padding:10px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer; transition:all var(--transition); }
+.ep-clear-btn:hover { border-color:var(--red); color:var(--red); }
+.view-toggle    { margin-left:auto; display:flex; align-items:center; gap:6px; }
+.vt-btn         { background:transparent; border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 12px; font-family:'DM Mono',monospace; font-size:10px; font-weight:600; color:var(--text-3); cursor:pointer; transition:all var(--transition); }
+.vt-btn.active  { background:var(--green-bg); border-color:rgba(34,197,94,0.3); color:var(--green); }
+.grid-search    { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 12px; font-family:'DM Sans',sans-serif; font-size:12px; color:var(--text-1); outline:none; transition:all var(--transition); width:180px; }
+.grid-search:focus { border-color:rgba(34,197,94,0.45); }
+.grid-search::placeholder { color:var(--text-3); }
+
+.grade-scale { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:18px; }
+.gs-title { font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px; font-family:'DM Mono',monospace; }
+.gs-row   { display:flex; gap:6px; flex-wrap:wrap; }
+.gs-item  { display:flex; align-items:center; gap:5px; background:var(--black-4); border:1px solid var(--border); border-radius:4px; padding:3px 9px; }
+.gs-grade { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; }
+.gs-range { font-size:10px; color:var(--text-3); }
+
+.entry-table { width:100%; border-collapse:collapse; }
+.entry-table thead tr { border-bottom:2px solid var(--border-2); }
+.entry-table th { padding:10px 12px; text-align:left; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; white-space:nowrap; }
+.entry-table th.c { text-align:center; }
+.entry-table td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.entry-table tr:last-child td { border-bottom:none; }
+.entry-table tbody tr:hover td { background:rgba(34,197,94,0.02); }
+.stu-cell { display:flex; align-items:center; gap:8px; padding:2px 4px; }
+.stu-full  { font-size:12px; font-weight:600; }
+.stu-id    { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; }
+.score-wrap { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.score-input { width:68px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:7px 8px; text-align:center; font-family:'DM Mono',monospace; font-size:12px; font-weight:600; color:var(--text-1); outline:none; transition:all var(--transition); }
+.score-input:focus   { border-color:rgba(34,197,94,0.45); background:var(--black); box-shadow:0 0 0 3px rgba(34,197,94,0.07); }
+.score-input.has-val { border-color:rgba(34,197,94,0.25); }
+.score-input.err-val { border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.04); }
+.max-lbl { font-size:9px; color:var(--text-3); font-family:'DM Mono',monospace; }
+.tot-cell   { font-family:'DM Mono',monospace; font-size:13px; font-weight:700; text-align:center; padding:6px 12px; }
+.grade-cell { text-align:center; padding:6px 12px; }
+.stat-cell  { text-align:center; padding:6px 12px; }
+.rs-dot   { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.rs-saved   { background:var(--green); }
+.rs-unsaved { background:var(--amber); }
+.rs-missing { background:var(--text-3); }
+.rs-lbl { font-size:10px; font-family:'DM Mono',monospace; margin-left:4px; }
+
+.tbl-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+.act-btn { padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all var(--transition); border:1px solid transparent; }
+.btn-save  { background:var(--green); color:var(--black); }
+.btn-save:hover { background:#16a34a; }
+.btn-clear { background:transparent; border-color:var(--border-2); color:var(--text-3); }
+.btn-clear:hover { border-color:var(--red); color:var(--red); }
+.btn-exp   { background:transparent; border-color:var(--border-2); color:var(--text-2); }
+.btn-exp:hover { color:var(--text-1); }
+
+.summary-bar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.sb-item { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 14px; }
+.sb-val  { font-size:16px; font-weight:700; font-family:'DM Mono',monospace; }
+.sb-lbl  { font-size:9px; color:var(--text-3); font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.5px; }
+
+.ep-wrap  { padding:48px 20px; text-align:center; }
+.ep-icon  { font-size:28px; margin-bottom:12px; filter:grayscale(1) opacity(0.3); }
+.ep-title { font-size:15px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
+.ep-desc  { font-size:12px; line-height:1.6; color:var(--text-3); }
+
+/* ── PUBLISHED RESULTS TABLE ── */
+.pub-table-wrap { overflow-x:auto; }
+.pub-table { width:100%; border-collapse:collapse; font-size:12px; min-width:660px; }
+.pub-table thead tr { border-bottom:1px solid var(--border); }
+.pub-table th { padding:9px 13px; text-align:left; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; }
+.pub-table td { padding:10px 13px; border-bottom:1px solid var(--border); font-weight:500; }
+.pub-table tr:last-child td { border-bottom:none; }
+.pub-table tbody tr:hover td { background:var(--black-3); }
+.pub-table tfoot td { background:var(--black-3); font-weight:700; border-top:1px solid var(--border-2); }
+.remark-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.3px; }
+.rm-ex{background:var(--green-bg);color:var(--green);} .rm-vg{background:var(--blue-bg);color:var(--blue);} .rm-gd{background:var(--amber-bg);color:#ca8a04;} .rm-av{background:var(--red-bg);color:var(--red);}
+
+/* ── ANNOUNCEMENTS ── */
+.ann-item { display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border); }
+.ann-item:last-child { border-bottom:none; padding-bottom:0; }
+.ann-item:first-child { padding-top:0; }
+.ann-line  { width:2px; border-radius:2px; flex-shrink:0; align-self:stretch; }
+.ann-title { font-size:12px; font-weight:600; color:var(--text-1); }
+.ann-desc  { font-size:11px; color:var(--text-2); margin-top:2px; line-height:1.4; }
+.ann-date  { font-size:10px; color:var(--text-3); margin-top:4px; font-family:'DM Mono',monospace; }
+
+/* ── TOAST ── */
+.toast { display:none; position:fixed; bottom:24px; right:24px; background:var(--black-2); border:1px solid var(--green); border-radius:var(--radius); padding:12px 18px; font-size:13px; font-weight:600; color:var(--green); z-index:999; font-family:'DM Mono',monospace; box-shadow:0 8px 32px rgba(0,0,0,0.5); animation:toastUp 0.3s ease; }
+@keyframes toastUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
+</style>
+</head>
+<body>
+<div class="portal-wrap">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark-sm">LS</div>
+      <div><div class="logo-name-sm">Little Scholars</div><div class="logo-sub-sm">Teacher Portal</div></div>
+    </div>
+    <div class="user-pill">
+      <div class="avatar" id="t-avatar">AA</div>
+      <div>
+        <div class="u-name" id="t-name">Loading…</div>
+        <div class="u-sub"  id="t-subj"></div>
+        <div class="u-badge">TEACHER</div>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Main</div>
+      <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon">▣</span> Dashboard</div>
+      <div class="nav-item" onclick="switchTab('students',this)"><span class="nav-icon">◎</span> Students</div>
+      <div class="nav-item" onclick="switchTab('results',this)"><span class="nav-icon">◳</span> Results Entry <span class="nav-badge-amber" id="pending-badge">0</span></div>
+      <div class="nav-item" onclick="switchTab('published',this)"><span class="nav-icon">◉</span> Published Results</div>
+      <div class="nav-label" style="margin-top:8px;">School</div>
+      <div class="nav-item" onclick="switchTab('announcements',this)"><span class="nav-icon">◌</span> Announcements <span class="nav-badge">4</span></div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="signout-btn" onclick="signOut()">→ Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-sub"  id="topbar-sub">Wednesday, 13 May 2026</span>
+      <div class="topbar-right">
+        <span class="chip-amber" id="t-chip">TEACHER</span>
+        <span class="chip-green">TERM 2</span>
+        <div class="icon-btn">🔔<span class="notif-dot"></span></div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ━━━ DASHBOARD ━━━ -->
+      <div class="tab-panel active" id="tab-dashboard">
+        <div class="page-header">
+          <h2 id="t-greeting">Good morning.</h2>
+          <p>Term 2, 2025/2026 · Wednesday, 13 May 2026</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card ac-green"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">👥</div><span class="stat-delta delta-up">2 classes</span></div><div class="stat-value" id="d-students">0</div><div class="stat-label">Total Students</div></div>
+          <div class="stat-card"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);">📊</div></div><div class="stat-value" id="d-avg" style="color:var(--blue);">—</div><div class="stat-label">Class Average</div></div>
+          <div class="stat-card ac-amber"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">📝</div><span class="stat-delta delta-amber">needs entry</span></div><div class="stat-value" id="d-pending" style="color:var(--amber);">0</div><div class="stat-label">Pending Results</div></div>
+          <div class="stat-card"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">✅</div><span class="stat-delta delta-up">saved</span></div><div class="stat-value" id="d-pub" style="color:var(--green);">0</div><div class="stat-label">Published Exams</div></div>
+        </div>
+        <div class="grid-3-1">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="card"><div class="card-head"><span class="card-title">My Classes</span></div><div class="card-body" id="d-classes"></div></div>
+            <div class="card"><div class="card-head"><span class="card-title">Recent Activity</span></div><div class="card-body" id="d-activity"></div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="card"><div class="card-head"><span class="card-title">Quick Stats</span></div><div class="card-body" id="d-stats"></div></div>
+            <div class="card"><div class="card-head"><span class="card-title">Grade Distribution</span></div><div class="card-body" id="d-grades"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ STUDENTS ━━━ -->
+      <div class="tab-panel" id="tab-students">
+        <div class="page-header"><h2>Students</h2><p id="stu-subtitle">Class Roster</p></div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title" id="stu-card-title">Student Roster</span>
+            <input class="search-input" id="stu-search" placeholder="Search by name or ID…" oninput="filterStudents()">
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>ID</th><th>Gender</th><th>Avg Score</th><th>Grade</th><th>Attendance</th><th>Position</th></tr></thead>
+                <tbody id="stu-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ RESULTS ENTRY ━━━ -->
+      <div class="tab-panel" id="tab-results">
+        <div class="page-header"><h2>Results Entry</h2><p>Enter and save student examination scores</p></div>
+
+        <!-- Context Banner: locked fields pre-filled by admin -->
+        <div class="ctx-banner" id="ctx-banner">
+          <span class="ctx-label">Session</span>
+          <span class="ctx-chip locked" id="ctx-session">2025/2026 · Term 2</span>
+          <span class="ctx-sep">·</span>
+          <span class="ctx-label">Class</span>
+          <select class="ctrl-select" id="re-class" style="min-width:120px;" onchange="onContextChange()"><option value="">Select…</option></select>
+          <span class="ctx-sep">·</span>
+          <span class="ctx-label">Subject</span>
+          <select class="ctrl-select" id="re-subject" style="min-width:160px;" onchange="onContextChange()"><option value="">Select…</option></select>
+          <span class="ctx-sep">·</span>
+          <div class="ctrl-group" style="flex-direction:row;align-items:center;gap:8px;margin:0;">
+            <span class="ctx-label">Exam</span>
+            <select class="ctrl-select" id="re-examtype" style="min-width:180px;" onchange="onContextChange()">
+              <option value="">Select Exam Type…</option>
+              <option>Continuous Assessment</option>
+              <option>Mid-Term Exam</option>
+              <option>Final Exam</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grade scale reference -->
+        <div class="grade-scale">
+          <div class="gs-title">Grade Scale Reference</div>
+          <div class="gs-row">
+            <div class="gs-item"><span class="gs-grade" style="color:var(--green);">A</span><span class="gs-range">80–100</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--green);">A-</span><span class="gs-range">75–79</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--blue);">B+</span><span class="gs-range">70–74</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--blue);">B</span><span class="gs-range">65–69</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--blue);">B-</span><span class="gs-range">60–64</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--amber);">C+</span><span class="gs-range">55–59</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--amber);">C</span><span class="gs-range">50–54</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--red);">D</span><span class="gs-range">40–49</span></div>
+            <div class="gs-item"><span class="gs-grade" style="color:var(--red);">F</span><span class="gs-range">0–39</span></div>
+          </div>
+        </div>
+
+        <!-- Main results area: student grid or single-student panel -->
+        <div id="results-main">
+          <div class="ep-wrap"><div class="ep-icon">📋</div><div class="ep-title">No Context Selected</div><div class="ep-desc">Choose a class, subject, and exam type above to begin entering scores.</div></div>
+        </div>
+      </div>
+
+      <!-- ━━━ PUBLISHED ━━━ -->
+      <div class="tab-panel" id="tab-published">
+        <div class="page-header"><h2>Published Results</h2><p>All saved examination results for your classes</p></div>
+        <div id="pub-content"></div>
+      </div>
+
+      <!-- ━━━ ANNOUNCEMENTS ━━━ -->
+      <div class="tab-panel" id="tab-announcements">
+        <div class="page-header"><h2>Announcements</h2><p>School-wide notices and updates</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Latest Announcements</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">4 new</span></div>
+          <div class="card-body">
+            <div class="ann-item"><div class="ann-line" style="background:var(--red);"></div><div><div class="ann-title">Results Submission Deadline</div><div class="ann-desc">All teachers must submit Term 2 results by Friday 30 May 2026. Contact the Registrar if you need an extension.</div><div class="ann-date">13 MAY 2026</div></div></div>
+            <div class="ann-item"><div class="ann-line" style="background:var(--green);"></div><div><div class="ann-title">Inter-School Sports Day</div><div class="ann-desc">All staff are required to be on duty on Friday 17 May. PE teachers to report by 7:00 AM.</div><div class="ann-date">12 MAY 2026</div></div></div>
+            <div class="ann-item"><div class="ann-line" style="background:var(--amber);"></div><div><div class="ann-title">Staff Development Meeting</div><div class="ann-desc">Mandatory professional development session: Saturday 24 May, 9 AM – 12 PM in the Assembly Hall.</div><div class="ann-date">11 MAY 2026</div></div></div>
+            <div class="ann-item"><div class="ann-line" style="background:var(--border-2);"></div><div><div class="ann-title">Mid-Term Break Notice</div><div class="ann-desc">School closes Friday 23 May. Resumes Monday 2 June.</div><div class="ann-date">10 MAY 2026</div></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="teacher-api.js"></script>
+</body>
+</html>

@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Scholars — Student Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:    #0a0a0a;
+  --black-2:  #111111;
+  --black-3:  #1a1a1a;
+  --black-4:  #222222;
+  --border:   #2a2a2a;
+  --border-2: #333333;
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,0.08);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,0.10);
+  --amber:    #fbbf24;
+  --amber-bg: rgba(251,191,36,0.10);
+  --blue:     #a5b4fc;
+  --blue-bg:  rgba(99,102,241,0.12);
+  --cyan-bg:  rgba(6,182,212,0.10);
+  --text-1:   #f5f5f5;
+  --text-2:   #a3a3a3;
+  --text-3:   #555555;
+  --radius-sm: 6px;
+  --radius:    10px;
+  --transition: 0.18s ease;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body {
+  font-family:'DM Sans',sans-serif;
+  background:var(--black);
+  color:var(--text-1);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── LAYOUT ── */
+.portal-wrap { display:flex; min-height:100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width:240px; min-height:100vh;
+  background:var(--black-2); border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:fixed; top:0; left:0; bottom:0; z-index:50;
+  animation:slideIn 0.35s ease both;
+}
+@keyframes slideIn { from{transform:translateX(-240px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+.sidebar-logo {
+  padding:22px 20px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.logo-mark-sm {
+  width:30px; height:30px; background:var(--green);
+  border-radius:var(--radius-sm); display:flex; align-items:center;
+  justify-content:center; flex-shrink:0;
+  font-size:14px; color:var(--black); font-weight:900;
+}
+.logo-name-sm { font-size:13px; font-weight:700; color:var(--text-1); letter-spacing:-0.2px; line-height:1.2; }
+.logo-sub-sm  { font-size:9px; color:var(--text-3); font-weight:500; letter-spacing:0.6px; text-transform:uppercase; margin-top:1px; }
+
+.user-pill {
+  margin:14px 12px;
+  background:var(--black-3); border:1px solid var(--border);
+  border-radius:var(--radius); padding:11px 13px;
+  display:flex; align-items:center; gap:10px;
+}
+.avatar {
+  width:32px; height:32px; border-radius:50%;
+  background:var(--green-bg); border:1.5px solid var(--green);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:var(--green);
+  font-family:'DM Mono',monospace; flex-shrink:0;
+}
+.u-name  { font-size:12px; font-weight:600; color:var(--text-1); line-height:1.2; }
+.u-sub   { font-size:10px; color:var(--text-3); margin-top:1px; }
+.u-badge {
+  display:inline-block; margin-top:3px;
+  background:var(--green-bg); border:1px solid rgba(34,197,94,0.2);
+  color:var(--green); font-size:9px; font-weight:700;
+  padding:1px 7px; border-radius:3px; font-family:'DM Mono',monospace;
+}
+
+.nav-group { padding:6px 12px 0; }
+.nav-label { font-size:9px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-3); padding:10px 8px 5px; }
+.nav-item {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 10px; border-radius:var(--radius-sm);
+  color:var(--text-2); cursor:pointer;
+  font-size:13px; font-weight:500;
+  transition:all var(--transition); margin-bottom:1px;
+  border:1px solid transparent; user-select:none;
+}
+.nav-item:hover { background:var(--black-3); color:var(--text-1); }
+.nav-item.active { background:var(--green-bg); color:var(--green); border-color:rgba(34,197,94,0.2); }
+.nav-icon { width:15px; text-align:center; font-size:13px; opacity:0.85; }
+.nav-badge {
+  margin-left:auto; background:var(--red); color:#fff;
+  font-size:10px; font-weight:700; font-family:'DM Mono',monospace;
+  padding:1px 6px; border-radius:20px; line-height:1.6;
+}
+
+.sidebar-footer { margin-top:auto; padding:13px 12px; border-top:1px solid var(--border); }
+.signout-btn {
+  width:100%; background:transparent; border:1px solid var(--border-2);
+  border-radius:var(--radius-sm); color:var(--text-3);
+  padding:8px 12px; font-family:'DM Sans',sans-serif;
+  font-size:12px; font-weight:500; cursor:pointer;
+  transition:all var(--transition);
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.signout-btn:hover { border-color:var(--red); color:var(--red); }
+
+/* ── MAIN ── */
+.main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.topbar {
+  height:54px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; padding:0 26px; gap:12px;
+  position:sticky; top:0;
+  background:rgba(10,10,10,0.94); backdrop-filter:blur(12px); z-index:40;
+}
+.topbar-title { font-size:13px; font-weight:600; color:var(--text-1); }
+.topbar-sep   { color:var(--border-2); }
+.topbar-sub   { font-size:12px; color:var(--text-3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.chip {
+  font-size:10px; font-weight:600; padding:3px 9px;
+  border-radius:20px; font-family:'DM Mono',monospace;
+  background:var(--green-bg); border:1px solid rgba(34,197,94,0.22); color:var(--green);
+}
+.icon-btn {
+  width:30px; height:30px; background:var(--black-3);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:13px;
+  transition:all var(--transition); position:relative; color:var(--text-2);
+}
+.icon-btn:hover { border-color:var(--border-2); color:var(--text-1); }
+.notif-dot {
+  position:absolute; top:5px; right:5px;
+  width:5px; height:5px; background:var(--red);
+  border-radius:50%; border:1px solid var(--black-3);
+}
+
+.content { padding:26px; flex:1; }
+
+/* ── TABS ── */
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation:tabIn 0.2s ease both; }
+@keyframes tabIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── SHARED COMPONENTS ── */
+.page-header { margin-bottom:22px; }
+.page-header h2 { font-size:20px; font-weight:700; letter-spacing:-0.4px; }
+.page-header p  { font-size:12px; color:var(--text-3); margin-top:3px; }
+
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+.stat-card {
+  background:var(--black-2); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px 18px;
+  transition:border-color var(--transition);
+}
+.stat-card:hover { border-color:var(--border-2); }
+.stat-card.ac-green { border-color:rgba(34,197,94,0.28); }
+.stat-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.stat-icon-wrap { width:28px; height:28px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:13px; }
+.stat-delta { font-size:10px; font-weight:600; font-family:'DM Mono',monospace; padding:2px 6px; border-radius:4px; }
+.delta-up { background:var(--green-bg); color:var(--green); }
+.delta-dn { background:var(--red-bg);   color:var(--red); }
+.stat-value { font-size:25px; font-weight:700; letter-spacing:-1px; line-height:1; font-family:'DM Mono',monospace; }
+.stat-label { font-size:10px; color:var(--text-3); margin-top:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+
+.card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.card-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.card-title { font-size:12px; font-weight:600; color:var(--text-1); }
+.card-action { font-size:11px; font-weight:600; color:var(--green); cursor:pointer; transition:opacity var(--transition); background:none; border:none; font-family:'DM Sans',sans-serif; }
+.card-action:hover { opacity:0.7; }
+.card-body { padding:14px 18px; }
+
+.grid-2   { display:grid; grid-template-columns:1fr 1fr;     gap:14px; }
+.grid-3-1 { display:grid; grid-template-columns:1.5fr 1fr;  gap:14px; }
+
+.perf-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.perf-row:last-child { border-bottom:none; }
+.perf-key { color:var(--text-2); font-weight:500; }
+.perf-val { font-weight:700; font-family:'DM Mono',monospace; }
+.pv-green { color:var(--green); } .pv-red { color:var(--red); } .pv-amber { color:var(--amber); }
+
+.progress-track { height:3px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:6px; }
+.progress-fill  { height:100%; border-radius:99px; background:var(--green); }
+.pf-blue{background:#818cf8;} .pf-cyan{background:#22d3ee;} .pf-teal{background:#2dd4bf;}
+.pf-amber{background:#fbbf24;} .pf-orange{background:#fb923c;} .pf-purple{background:#c084fc;} .pf-pink{background:#f472b6;}
+
+/* ── ANNOUNCEMENTS ── */
+.ann-item { display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border); }
+.ann-item:last-child { border-bottom:none; padding-bottom:0; }
+.ann-item:first-child { padding-top:0; }
+.ann-line { width:2px; border-radius:2px; flex-shrink:0; align-self:stretch; }
+.ann-title { font-size:12px; font-weight:600; color:var(--text-1); }
+.ann-desc  { font-size:11px; color:var(--text-2); margin-top:2px; line-height:1.4; }
+.ann-date  { font-size:10px; color:var(--text-3); margin-top:4px; font-family:'DM Mono',monospace; }
+
+/* ── TODAY'S SCHEDULE ── */
+.sch-item { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); }
+.sch-item:last-child { border-bottom:none; }
+.sch-time    { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; width:48px; flex-shrink:0; }
+.sch-subject { font-size:12px; font-weight:600; flex:1; }
+.sch-teacher { font-size:11px; color:var(--text-3); }
+.now-badge   { font-size:9px; font-weight:700; background:var(--green); color:var(--black); padding:2px 6px; border-radius:3px; text-transform:uppercase; letter-spacing:0.4px; font-family:'DM Mono',monospace; }
+.break-row .sch-subject { color:var(--text-3); font-weight:400; font-style:italic; }
+.now-row { background:var(--green-bg); margin:0 -18px; padding:7px 18px; border-radius:4px; }
+
+/* ── ATTENDANCE CHART ── */
+.attend-week { display:flex; gap:5px; margin:4px 0 8px; }
+.attend-col  { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.attend-day-lbl { font-size:9px; font-weight:600; color:var(--text-3); font-family:'DM Mono',monospace; }
+.attend-bar-wrap { width:100%; height:44px; background:var(--black-3); border-radius:4px; overflow:hidden; display:flex; align-items:flex-end; }
+.attend-bar-fill { width:100%; border-radius:4px; }
+.attend-legend { display:flex; gap:12px; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--text-3); }
+.legend-dot  { width:6px; height:6px; border-radius:2px; }
+
+/* ── UPCOMING ASSIGNMENTS (MINI) ── */
+.assign-mini { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--border); }
+.assign-mini:last-child { border-bottom:none; }
+.assign-dot { width:3px; height:30px; border-radius:2px; flex-shrink:0; }
+.assign-mini-name { font-size:12px; font-weight:600; }
+.assign-mini-sub  { font-size:10px; color:var(--text-3); margin-top:1px; }
+.due-chip { font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; font-family:'DM Mono',monospace; white-space:nowrap; }
+.due-urgent { background:var(--red-bg);   color:var(--red); }
+.due-soon   { background:var(--amber-bg); color:#ca8a04; }
+.due-ok     { background:var(--green-bg); color:var(--green); }
+
+/* ── TIMETABLE ── */
+.tt-wrap  { overflow-x:auto; }
+.tt-table { width:100%; border-collapse:collapse; font-size:12px; min-width:660px; }
+.tt-table thead tr { border-bottom:1px solid var(--border); }
+.tt-table th { padding:10px; text-align:center; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; }
+.tt-table th:first-child { text-align:left; }
+.tt-table td { padding:8px; text-align:center; border-bottom:1px solid var(--border); vertical-align:middle; }
+.tt-table td:first-child { text-align:left; color:var(--text-3); font-size:10px; font-family:'DM Mono',monospace; width:95px; }
+.tt-table tr:last-child td { border-bottom:none; }
+.tt-table tr:hover td { background:var(--black-3); }
+.tt-tag { display:inline-block; padding:4px 9px; border-radius:4px; font-size:11px; font-weight:600; }
+.tt-math   {background:rgba(34,197,94,0.10);color:#4ade80;}
+.tt-english{background:rgba(99,102,241,0.12);color:#a5b4fc;}
+.tt-science{background:rgba(6,182,212,0.10);color:#67e8f9;}
+.tt-arts   {background:rgba(234,179,8,0.10);color:#fcd34d;}
+.tt-pe     {background:rgba(239,68,68,0.10);color:#fca5a5;}
+.tt-social {background:rgba(20,184,166,0.10);color:#5eead4;}
+.tt-ict    {background:rgba(168,85,247,0.10);color:#d8b4fe;}
+.tt-french {background:rgba(251,146,60,0.10);color:#fdba74;}
+.tt-break  {background:transparent;color:var(--text-3);font-style:italic;font-weight:400;}
+
+/* ── ASSIGNMENTS FULL PAGE ── */
+.filter-bar { display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+.filter-btn { padding:5px 13px; border:1px solid var(--border); border-radius:var(--radius-sm); background:transparent; color:var(--text-3); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); }
+.filter-btn:hover  { border-color:var(--border-2); color:var(--text-1); }
+.filter-btn.active { background:var(--green); border-color:var(--green); color:var(--black); }
+
+.assign-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:9px; display:flex; gap:12px; transition:border-color var(--transition); }
+.assign-card:hover { border-color:var(--border-2); }
+.assign-bar  { width:3px; min-height:48px; border-radius:2px; flex-shrink:0; align-self:stretch; }
+.assign-card-info  { flex:1; }
+.assign-card-title { font-size:13px; font-weight:600; margin-bottom:3px; }
+.assign-card-desc  { font-size:12px; color:var(--text-2); line-height:1.5; margin-bottom:9px; }
+.assign-card-meta  { display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+.meta-pill    { font-size:10px; font-weight:600; color:var(--text-3); background:var(--black-3); border:1px solid var(--border); padding:2px 8px; border-radius:4px; }
+.status-pill  { font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.3px; font-family:'DM Mono',monospace; }
+.sp-pending { background:var(--amber-bg); color:#ca8a04; }
+.sp-done    { background:var(--green-bg); color:var(--green); }
+.sp-overdue { background:var(--red-bg);   color:var(--red); }
+
+/* ── COURSES ── */
+.course-row { padding:13px 0; border-bottom:1px solid var(--border); }
+.course-row:last-child  { border-bottom:none; }
+.course-row:first-child { padding-top:0; }
+.course-top  { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.course-name { font-size:13px; font-weight:600; }
+.course-sub  { font-size:11px; color:var(--text-3); margin-top:1px; }
+.course-foot { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; }
+.grade-tag { font-family:'DM Mono',monospace; font-size:12px; font-weight:500; padding:3px 10px; border-radius:4px; }
+.gt-a { background:var(--green-bg); color:var(--green); }
+.gt-b { background:var(--blue-bg);  color:var(--blue); }
+.gt-c { background:var(--amber-bg); color:var(--amber); }
+
+.teacher-note { font-size:12px; color:var(--text-2); line-height:1.7; font-style:italic; padding:12px 14px; background:var(--black-3); border-left:2px solid var(--green); border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin-bottom:10px; }
+.teacher-sig  { font-size:10px; color:var(--text-3); font-style:normal; font-family:'DM Mono',monospace; }
+.summary-big   { font-family:'DM Mono',monospace; font-size:34px; font-weight:700; color:var(--green); line-height:1; }
+.summary-label { font-size:11px; color:var(--text-3); margin-top:3px; }
+
+/* ── RESULTS ── */
+.result-tabs { display:flex; gap:6px; margin-bottom:18px; }
+.result-tab  { padding:6px 14px; border:1px solid var(--border); border-radius:var(--radius-sm); background:transparent; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer; transition:all var(--transition); }
+.result-tab.active { background:var(--black-3); border-color:var(--green); color:var(--green); }
+
+.results-table { width:100%; border-collapse:collapse; font-size:12px; }
+.results-table thead tr { border-bottom:1px solid var(--border); }
+.results-table th { padding:9px 13px; text-align:left; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; }
+.results-table td { padding:11px 13px; border-bottom:1px solid var(--border); font-weight:500; }
+.results-table tr:last-child td { border-bottom:none; }
+.results-table tbody tr:hover td { background:var(--black-3); }
+.total-row td { background:var(--black-3); font-weight:700; border-top:1px solid var(--border-2); }
+.score-mono { font-family:'DM Mono',monospace; font-size:12px; }
+.grade-mono { font-family:'DM Mono',monospace; font-size:12px; font-weight:700; }
+.remark-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.3px; }
+.rm-ex { background:var(--green-bg); color:var(--green); }
+.rm-vg { background:var(--blue-bg);  color:var(--blue); }
+.rm-gd { background:var(--amber-bg); color:#ca8a04; }
+.rm-av { background:var(--red-bg);   color:var(--red); }
+
+.empty-state { padding:56px 20px; text-align:center; }
+.empty-icon  { font-size:28px; margin-bottom:12px; filter:grayscale(1) opacity(0.3); }
+.empty-title { font-size:15px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
+.empty-desc  { font-size:12px; line-height:1.6; color:var(--text-3); max-width:280px; margin:0 auto; }
+
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
+</style>
+</head>
+<body>
+
+<div class="portal-wrap">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark-sm">LS</div>
+      <div>
+        <div class="logo-name-sm">Little Scholars</div>
+        <div class="logo-sub-sm">Student Portal</div>
+      </div>
+    </div>
+
+    <div class="user-pill">
+      <div class="avatar" id="s-avatar">AO</div>
+      <div>
+        <div class="u-name"  id="s-name">Loading…</div>
+        <div class="u-sub"   id="s-grade"></div>
+        <div class="u-badge">STUDENT</div>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Main</div>
+      <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon">▣</span> Dashboard</div>
+      <div class="nav-item" onclick="switchTab('timetable',this)"><span class="nav-icon">◫</span> Timetable</div>
+      <div class="nav-item" onclick="switchTab('assignments',this)"><span class="nav-icon">◳</span> Assignments <span class="nav-badge">4</span></div>
+      <div class="nav-item" onclick="switchTab('courses',this)"><span class="nav-icon">◈</span> Courses &amp; Grades</div>
+      <div class="nav-item" onclick="switchTab('results',this)"><span class="nav-icon">◉</span> Exam Results</div>
+      <div class="nav-label" style="margin-top:8px;">Account</div>
+      <div class="nav-item"><span class="nav-icon">○</span> Profile</div>
+      <div class="nav-item"><span class="nav-icon">◌</span> Settings</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="signout-btn" onclick="signOut()">→ Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-sub"  id="topbar-sub">Wednesday, 13 May 2026</span>
+      <div class="topbar-right">
+        <span class="chip">TERM 2</span>
+        <div class="icon-btn">🔔<span class="notif-dot"></span></div>
+        <div class="icon-btn">✉</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ━━━ DASHBOARD ━━━ -->
+      <div class="tab-panel active" id="tab-dashboard">
+        <div class="page-header">
+          <h2 id="s-greeting">Good morning.</h2>
+          <p>Here's a summary of your academic activity for today.</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card ac-green">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">📅</div><span class="stat-delta delta-up">↑ 2%</span></div>
+            <div class="stat-value">94%</div><div class="stat-label">Attendance Rate</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);">📚</div></div>
+            <div class="stat-value">8</div><div class="stat-label">Subjects · Term 2</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);">📝</div><span class="stat-delta delta-dn">4 pending</span></div>
+            <div class="stat-value" style="color:var(--red);">4</div><div class="stat-label">Assignments Due</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">⭐</div><span class="stat-delta delta-up">5th / 32</span></div>
+            <div class="stat-value" style="color:var(--amber);">B+</div><div class="stat-label">Overall Grade</div>
+          </div>
+        </div>
+
+        <div class="grid-3-1" style="margin-bottom:14px;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Announcements</span><button class="card-action">View all →</button></div>
+            <div class="card-body">
+              <div class="ann-item"><div class="ann-line" style="background:var(--red);"></div><div><div class="ann-title">Inter-School Sports Day</div><div class="ann-desc">All students wear PE kits on Friday. Parents are invited to attend.</div><div class="ann-date">17 MAY 2026</div></div></div>
+              <div class="ann-item"><div class="ann-line" style="background:var(--green);"></div><div><div class="ann-title">Mid-Term Break Notice</div><div class="ann-desc">School closes Friday 23 May. Resumes Monday 2 June.</div><div class="ann-date">12 MAY 2026</div></div></div>
+              <div class="ann-item"><div class="ann-line" style="background:var(--border-2);"></div><div><div class="ann-title">Library Books Return</div><div class="ann-desc">All borrowed books must be returned by 20 May.</div><div class="ann-date">10 MAY 2026</div></div></div>
+              <div class="ann-item"><div class="ann-line" style="background:var(--border-2);"></div><div><div class="ann-title">Science Fair Projects Due</div><div class="ann-desc">Submit project boards to your class teacher by May 19.</div><div class="ann-date">09 MAY 2026</div></div></div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Today's Schedule</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">WED · 13 MAY</span></div>
+              <div class="card-body">
+                <div class="sch-item"><span class="sch-time">08:00</span><span class="sch-subject">English</span><span class="sch-teacher">Mrs. Eze</span></div>
+                <div class="sch-item"><span class="sch-time">09:00</span><span class="sch-subject">Mathematics</span><span class="sch-teacher">Mr. Adeyemi</span></div>
+                <div class="sch-item break-row"><span class="sch-time">10:00</span><span class="sch-subject">Break</span></div>
+                <div class="sch-item now-row"><span class="sch-time" style="color:var(--green);">10:30</span><span class="sch-subject" style="color:var(--green);">ICT</span><span class="now-badge">Now</span></div>
+                <div class="sch-item"><span class="sch-time">11:30</span><span class="sch-subject">French</span><span class="sch-teacher">Mme. Akpan</span></div>
+                <div class="sch-item break-row"><span class="sch-time">12:30</span><span class="sch-subject">Lunch</span></div>
+                <div class="sch-item"><span class="sch-time">13:30</span><span class="sch-subject">P.E.</span><span class="sch-teacher">Mr. Salisu</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><span class="card-title">Attendance · This Week</span></div>
+              <div class="card-body">
+                <div class="attend-week">
+                  <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:100%;background:var(--green);"></div></div><span class="attend-day-lbl">MON</span></div>
+                  <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:100%;background:var(--green);"></div></div><span class="attend-day-lbl">TUE</span></div>
+                  <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:100%;background:var(--green);"></div></div><span class="attend-day-lbl">WED</span></div>
+                  <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:35%;background:var(--border-2);opacity:0.5;"></div></div><span class="attend-day-lbl">THU</span></div>
+                  <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:35%;background:var(--border-2);opacity:0.5;"></div></div><span class="attend-day-lbl">FRI</span></div>
+                </div>
+                <div class="attend-legend">
+                  <span class="legend-item"><span class="legend-dot" style="background:var(--green);"></span>Present</span>
+                  <span class="legend-item"><span class="legend-dot" style="background:var(--red);"></span>Absent</span>
+                  <span class="legend-item"><span class="legend-dot" style="background:var(--border-2);"></span>Ongoing</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Upcoming Assignments</span><button class="card-action" onclick="switchTab('assignments',null)">View all →</button></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px;">
+              <div>
+                <div class="assign-mini"><div class="assign-dot" style="background:#4ade80;"></div><div><div class="assign-mini-name">Fractions Worksheet</div><div class="assign-mini-sub">Mathematics · Mr. Adeyemi</div></div><span class="due-chip due-urgent">Today</span></div>
+                <div class="assign-mini"><div class="assign-dot" style="background:#a5b4fc;"></div><div><div class="assign-mini-name">Essay: My Hero</div><div class="assign-mini-sub">English · Mrs. Eze</div></div><span class="due-chip due-soon">May 15</span></div>
+              </div>
+              <div>
+                <div class="assign-mini"><div class="assign-dot" style="background:#67e8f9;"></div><div><div class="assign-mini-name">Plant Growth Chart</div><div class="assign-mini-sub">Science · Mr. Okafor</div></div><span class="due-chip due-soon">May 16</span></div>
+                <div class="assign-mini"><div class="assign-dot" style="background:#fcd34d;"></div><div><div class="assign-mini-name">Flag Drawing</div><div class="assign-mini-sub">Creative Arts · Mrs. Lawal</div></div><span class="due-chip due-ok">May 20</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ TIMETABLE ━━━ -->
+      <div class="tab-panel" id="tab-timetable">
+        <div class="page-header"><h2>Weekly Timetable</h2><p>Grade 4B · Term 2 · 2025/2026 Academic Year</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Class Schedule</span><span style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;">● Live: Wednesday</span></div>
+          <div class="card-body" style="padding:0;">
+            <div class="tt-wrap" style="padding:14px 18px 18px;">
+              <table class="tt-table">
+                <thead><tr><th>Time</th><th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th></tr></thead>
+                <tbody>
+                  <tr><td>08:00–09:00</td><td><span class="tt-tag tt-math">Mathematics</span></td><td><span class="tt-tag tt-math">Mathematics</span></td><td><span class="tt-tag tt-english">English</span></td><td><span class="tt-tag tt-science">Science</span></td><td><span class="tt-tag tt-math">Mathematics</span></td></tr>
+                  <tr><td>09:00–10:00</td><td><span class="tt-tag tt-english">English</span></td><td><span class="tt-tag tt-english">English</span></td><td><span class="tt-tag tt-math">Mathematics</span></td><td><span class="tt-tag tt-english">English</span></td><td><span class="tt-tag tt-pe">P.E.</span></td></tr>
+                  <tr><td>10:00–10:30</td><td colspan="5" style="text-align:center;"><span class="tt-tag tt-break">— Break —</span></td></tr>
+                  <tr><td>10:30–11:30</td><td><span class="tt-tag tt-social">Social Studies</span></td><td><span class="tt-tag tt-science">Science</span></td><td><span class="tt-tag tt-ict" style="outline:1px solid var(--green);outline-offset:2px;">ICT</span></td><td><span class="tt-tag tt-math">Mathematics</span></td><td><span class="tt-tag tt-science">Science</span></td></tr>
+                  <tr><td>11:30–12:30</td><td><span class="tt-tag tt-science">Science</span></td><td><span class="tt-tag tt-social">Social Studies</span></td><td><span class="tt-tag tt-french">French</span></td><td><span class="tt-tag tt-arts">Creative Arts</span></td><td><span class="tt-tag tt-social">Social Studies</span></td></tr>
+                  <tr><td>12:30–13:30</td><td colspan="5" style="text-align:center;"><span class="tt-tag tt-break">— Lunch —</span></td></tr>
+                  <tr><td>13:30–14:30</td><td><span class="tt-tag tt-arts">Creative Arts</span></td><td><span class="tt-tag tt-arts">Creative Arts</span></td><td><span class="tt-tag tt-pe">P.E.</span></td><td><span class="tt-tag tt-french">French</span></td><td><span class="tt-tag tt-ict">ICT</span></td></tr>
+                  <tr><td>14:30–15:00</td><td><span class="tt-tag tt-french">French</span></td><td><span class="tt-tag tt-ict">ICT</span></td><td><span class="tt-tag tt-arts">Creative Arts</span></td><td><span class="tt-tag tt-social">Social Studies</span></td><td><span class="tt-tag tt-english">Reading Club</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ ASSIGNMENTS ━━━ -->
+      <div class="tab-panel" id="tab-assignments">
+        <div class="page-header"><h2>Assignments</h2><p>4 pending · 2 submitted · 0 overdue</p></div>
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="filterAssign('all',this)">All (6)</button>
+          <button class="filter-btn" onclick="filterAssign('pending',this)">Pending (4)</button>
+          <button class="filter-btn" onclick="filterAssign('done',this)">Submitted (2)</button>
+          <button class="filter-btn" onclick="filterAssign('overdue',this)">Overdue (0)</button>
+        </div>
+        <div id="assign-list">
+          <div class="assign-card" data-status="pending"><div class="assign-bar" style="background:#4ade80;"></div><div class="assign-card-info"><div class="assign-card-title">Fractions &amp; Decimals Worksheet</div><div class="assign-card-desc">Complete pages 34–36 of the Mathematics workbook. Show all working clearly.</div><div class="assign-card-meta"><span class="meta-pill">Mathematics</span><span class="meta-pill">Mr. Adeyemi</span><span class="status-pill sp-pending">Pending</span><span class="due-chip due-urgent">Due: May 13</span></div></div></div>
+          <div class="assign-card" data-status="pending"><div class="assign-bar" style="background:#a5b4fc;"></div><div class="assign-card-info"><div class="assign-card-title">Creative Essay: My Hero</div><div class="assign-card-desc">Write a 2-page essay about your personal hero and why they inspire you.</div><div class="assign-card-meta"><span class="meta-pill">English</span><span class="meta-pill">Mrs. Eze</span><span class="status-pill sp-pending">Pending</span><span class="due-chip due-soon">Due: May 15</span></div></div></div>
+          <div class="assign-card" data-status="pending"><div class="assign-bar" style="background:#67e8f9;"></div><div class="assign-card-info"><div class="assign-card-title">Plant Growth Observation Chart</div><div class="assign-card-desc">Record and chart the growth of your bean plant over 2 weeks. Include diagrams.</div><div class="assign-card-meta"><span class="meta-pill">Science</span><span class="meta-pill">Mr. Okafor</span><span class="status-pill sp-pending">Pending</span><span class="due-chip due-soon">Due: May 16</span></div></div></div>
+          <div class="assign-card" data-status="pending"><div class="assign-bar" style="background:#fcd34d;"></div><div class="assign-card-info"><div class="assign-card-title">African Flags Drawing Project</div><div class="assign-card-desc">Draw and colour 5 African country flags with their names and capital cities.</div><div class="assign-card-meta"><span class="meta-pill">Creative Arts</span><span class="meta-pill">Mrs. Lawal</span><span class="status-pill sp-pending">Pending</span><span class="due-chip due-ok">Due: May 20</span></div></div></div>
+          <div class="assign-card" data-status="done"><div class="assign-bar" style="background:#2dd4bf;"></div><div class="assign-card-info"><div class="assign-card-title">Map of West Africa</div><div class="assign-card-desc">Label all West African countries on a blank map with correct capitals.</div><div class="assign-card-meta"><span class="meta-pill">Social Studies</span><span class="meta-pill">Mr. Balogun</span><span class="status-pill sp-done">Submitted</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">08 MAY 2026</span></div></div></div>
+          <div class="assign-card" data-status="done"><div class="assign-bar" style="background:#c084fc;"></div><div class="assign-card-info"><div class="assign-card-title">Introduction to Scratch — Animation</div><div class="assign-card-desc">Create a simple animation using Scratch Jr. Save and submit your project file.</div><div class="assign-card-meta"><span class="meta-pill">ICT</span><span class="meta-pill">Mrs. Dada</span><span class="status-pill sp-done">Submitted</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">06 MAY 2026</span></div></div></div>
+        </div>
+      </div>
+
+      <!-- ━━━ COURSES ━━━ -->
+      <div class="tab-panel" id="tab-courses">
+        <div class="page-header"><h2>Courses &amp; Grades</h2><p>Term 2 · 2025/2026 Academic Year</p></div>
+        <div class="grid-2" style="align-items:start;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">All Subjects</span></div>
+            <div class="card-body">
+              <div class="course-row"><div class="course-top"><div><div class="course-name">Mathematics</div><div class="course-sub">Mr. Adeyemi</div></div><span class="grade-tag gt-b">B+ · 78%</span></div><div class="progress-track"><div class="progress-fill" style="width:78%;"></div></div><div class="course-foot"><span>Classwork 80%</span><span>Tests 76%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">English Language</div><div class="course-sub">Mrs. Eze</div></div><span class="grade-tag gt-a">A · 88%</span></div><div class="progress-track"><div class="progress-fill pf-blue" style="width:88%;"></div></div><div class="course-foot"><span>Reading 90%</span><span>Writing 86%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">Basic Science</div><div class="course-sub">Mr. Okafor</div></div><span class="grade-tag gt-a">A- · 84%</span></div><div class="progress-track"><div class="progress-fill pf-cyan" style="width:84%;"></div></div><div class="course-foot"><span>Theory 82%</span><span>Practical 86%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">Social Studies</div><div class="course-sub">Mr. Balogun</div></div><span class="grade-tag gt-b">B · 74%</span></div><div class="progress-track"><div class="progress-fill pf-teal" style="width:74%;"></div></div><div class="course-foot"><span>Classwork 70%</span><span>Tests 78%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">Creative Arts</div><div class="course-sub">Mrs. Lawal</div></div><span class="grade-tag gt-a">A · 92%</span></div><div class="progress-track"><div class="progress-fill pf-amber" style="width:92%;"></div></div><div class="course-foot"><span>Projects 95%</span><span>Portfolio 89%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">French</div><div class="course-sub">Mme. Akpan</div></div><span class="grade-tag gt-c">C+ · 65%</span></div><div class="progress-track"><div class="progress-fill pf-orange" style="width:65%;"></div></div><div class="course-foot"><span>Speaking 68%</span><span>Written 62%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">ICT</div><div class="course-sub">Mrs. Dada</div></div><span class="grade-tag gt-b">B+ · 80%</span></div><div class="progress-track"><div class="progress-fill pf-purple" style="width:80%;"></div></div><div class="course-foot"><span>Practical 85%</span><span>Theory 75%</span></div></div>
+              <div class="course-row"><div class="course-top"><div><div class="course-name">Physical Education</div><div class="course-sub">Mr. Salisu</div></div><span class="grade-tag gt-a">A · 90%</span></div><div class="progress-track"><div class="progress-fill pf-pink" style="width:90%;"></div></div><div class="course-foot"><span>Participation 95%</span><span>Skills 85%</span></div></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Performance Summary</span></div>
+              <div class="card-body">
+                <div style="margin-bottom:14px;"><div class="summary-big">81%</div><div class="summary-label">Overall average · Term 2</div></div>
+                <div class="perf-row"><span class="perf-key">Class Position</span><span class="perf-val pv-green">5th / 32</span></div>
+                <div class="perf-row"><span class="perf-key">Best Subject</span><span class="perf-val pv-amber">Creative Arts</span></div>
+                <div class="perf-row"><span class="perf-key">Needs Attention</span><span class="perf-val pv-red">French</span></div>
+                <div class="perf-row"><span class="perf-key">Subjects Passed</span><span class="perf-val">8 / 8</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title">Form Teacher's Note</span></div>
+              <div class="card-body">
+                <div class="teacher-note" id="teacher-note-text">Amara is a bright and enthusiastic learner. She excels in creative subjects and shows great curiosity in Science. We encourage more practice in French vocabulary this term.</div>
+                <span class="teacher-sig">— Mrs. Chukwu, Form Teacher · Grade 4B</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ RESULTS ━━━ -->
+      <div class="tab-panel" id="tab-results">
+        <div class="page-header"><h2>Examination Results</h2><p>Mid-Term &amp; Final Exams · Term 2 · 2025/2026</p></div>
+        <div class="result-tabs">
+          <button class="result-tab active" onclick="switchResult('midterm',this)">Mid-Term Exam</button>
+          <button class="result-tab" onclick="switchResult('final',this)">Final Exam</button>
+        </div>
+        <div id="result-midterm">
+          <div class="grid-2" style="align-items:start;">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Mid-Term Examination</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">MARCH 2026</span></div>
+              <div class="card-body" style="padding:0;"><div style="overflow-x:auto;padding:0 18px 18px;">
+                <table class="results-table">
+                  <thead><tr><th>Subject</th><th>Max</th><th>Score</th><th>%</th><th>Grade</th><th>Remark</th></tr></thead>
+                  <tbody>
+                    <tr><td>Mathematics</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">74</td><td class="score-mono">74%</td><td><span class="grade-mono" style="color:var(--blue);">B</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
+                    <tr><td>English Language</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">86</td><td class="score-mono">86%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
+                    <tr><td>Basic Science</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">82</td><td class="score-mono">82%</td><td><span class="grade-mono" style="color:var(--green);">A-</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
+                    <tr><td>Social Studies</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">71</td><td class="score-mono">71%</td><td><span class="grade-mono" style="color:var(--blue);">B</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
+                    <tr><td>Creative Arts</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">90</td><td class="score-mono">90%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
+                    <tr><td>French</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">62</td><td class="score-mono">62%</td><td><span class="grade-mono" style="color:var(--amber);">C</span></td><td><span class="remark-tag rm-gd">Good</span></td></tr>
+                    <tr><td>ICT</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">78</td><td class="score-mono">78%</td><td><span class="grade-mono" style="color:var(--blue);">B+</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
+                    <tr><td>Physical Education</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">88</td><td class="score-mono">88%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
+                    <tr class="total-row"><td>Total / Average</td><td class="score-mono">800</td><td class="score-mono" style="color:var(--green);">631</td><td class="score-mono" style="color:var(--green);">78.9%</td><td><span class="grade-mono" style="color:var(--blue);">B+</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
+                  </tbody>
+                </table>
+              </div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="card">
+                <div class="card-head"><span class="card-title">Summary</span></div>
+                <div class="card-body">
+                  <div style="margin-bottom:14px;"><div class="summary-big">78.9%</div><div class="summary-label">Mid-Term Average</div></div>
+                  <div class="perf-row"><span class="perf-key">Total Score</span><span class="perf-val">631 / 800</span></div>
+                  <div class="perf-row"><span class="perf-key">Class Position</span><span class="perf-val pv-green">6th / 32</span></div>
+                  <div class="perf-row"><span class="perf-key">Highest Score</span><span class="perf-val pv-amber">Creative Arts · 90</span></div>
+                  <div class="perf-row"><span class="perf-key">Promoted</span><span class="perf-val pv-green">Yes ✓</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><span class="card-title">Principal's Remark</span></div>
+                <div class="card-body">
+                  <div class="teacher-note">Amara has performed commendably. Her scores in Creative Arts and English demonstrate strong natural ability. We encourage dedicating more time to French before the Final Examinations.</div>
+                  <span class="teacher-sig">— Principal, Little Scholars Academy</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="result-final" style="display:none;">
+          <div class="card"><div class="card-body">
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <div class="empty-title">Results Not Yet Available</div>
+              <div class="empty-desc">Final examinations are scheduled for <strong style="color:var(--text-1);">16–20 June 2026</strong>. Results will be published within two weeks of the last exam date.</div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /portal-wrap -->
+
+<script src="student-api.js"></script>
+</body>
+</html>

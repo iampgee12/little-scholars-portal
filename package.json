@@ -1,0 +1,13 @@
+{
+  "name": "little-scholars-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend-backed Little Scholars portal with SQLite result uploads.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

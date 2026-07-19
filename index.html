@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Scholars — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:    #0a0a0a;
+  --black-2:  #111111;
+  --black-3:  #1a1a1a;
+  --border:   #2a2a2a;
+  --border-2: #333333;
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,0.08);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,0.10);
+  --amber:    #fbbf24;
+  --amber-bg: rgba(251,191,36,0.10);
+  --blue:     #a5b4fc;
+  --blue-bg:  rgba(99,102,241,0.12);
+  --text-1:   #f5f5f5;
+  --text-2:   #a3a3a3;
+  --text-3:   #555555;
+  --radius-sm: 6px;
+  --radius:    10px;
+  --transition: 0.18s ease;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body {
+  font-family:'DM Sans',sans-serif;
+  background:var(--black);
+  color:var(--text-1);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+}
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:40px 40px;
+  opacity:0.25;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── CARD ── */
+.login-card {
+  position:relative;
+  z-index:1;
+  width:100%;
+  max-width:420px;
+  background:var(--black-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  animation:fadeUp 0.35s ease both;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── CARD TOP ── */
+.card-top {
+  padding:32px 32px 24px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+.logo-mark {
+  width:52px; height:52px;
+  background:var(--green);
+  border-radius:var(--radius);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:900;
+  color:var(--black); letter-spacing:-1px;
+}
+.logo-name { font-size:15px; font-weight:700; color:var(--text-1); letter-spacing:-0.3px; }
+.logo-sub  { font-size:10px; color:var(--text-3); font-weight:500; letter-spacing:0.7px; text-transform:uppercase; font-family:'DM Mono',monospace; margin-top:-4px; }
+.role-chips { display:flex; gap:6px; margin-top:4px; }
+.rc {
+  display:inline-flex; align-items:center;
+  background:var(--black-3); border:1px solid var(--border);
+  border-radius:20px; padding:3px 10px;
+  font-size:10px; font-weight:600;
+  font-family:'DM Mono',monospace; color:var(--text-3);
+}
+.rc-student { color:var(--green); border-color:rgba(34,197,94,0.25); background:var(--green-bg); }
+.rc-teacher { color:var(--amber); border-color:rgba(251,191,36,0.25); background:var(--amber-bg); }
+.rc-admin   { color:var(--blue);  border-color:rgba(99,102,241,0.25);  background:var(--blue-bg); }
+
+/* ── CARD BODY ── */
+.card-body { padding:26px 32px 32px; }
+
+.id-hint {
+  display:none;
+  background:var(--black-3); border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:8px 12px; margin-bottom:14px;
+  font-size:11px; font-family:'DM Mono',monospace;
+  align-items:center; gap:8px;
+}
+.id-hint.show { display:flex; }
+.hint-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+.alert {
+  background:var(--red-bg); border:1px solid rgba(239,68,68,0.2);
+  border-radius:var(--radius-sm);
+  padding:9px 12px; margin-bottom:18px;
+  font-size:12px; color:var(--red);
+  font-family:'DM Mono',monospace;
+  display:none;
+}
+.alert.show { display:block; }
+
+.field { margin-bottom:14px; }
+.field-label {
+  display:block; font-size:11px; font-weight:600;
+  color:var(--text-2); text-transform:uppercase;
+  letter-spacing:0.3px; margin-bottom:6px;
+}
+.input-wrap { position:relative; display:flex; align-items:center; }
+.field-input {
+  width:100%; background:var(--black-3);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:11px 38px 11px 13px;
+  font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1);
+  outline:none; transition:all var(--transition);
+}
+.field-input::placeholder { color:var(--text-3); }
+.field-input:focus {
+  border-color:rgba(34,197,94,0.45); background:var(--black);
+  box-shadow:0 0 0 3px rgba(34,197,94,0.07);
+}
+.field-input.error { border-color:rgba(239,68,68,0.45); }
+.field-error { font-size:11px; color:var(--red); margin-top:5px; font-family:'DM Mono',monospace; display:none; }
+.field-error.show { display:block; }
+
+.pw-toggle {
+  position:absolute; right:10px; background:transparent; border:none;
+  cursor:pointer; color:var(--text-3); padding:0;
+  display:flex; align-items:center; transition:color var(--transition);
+}
+.pw-toggle:hover { color:var(--text-1); }
+.pw-toggle svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+
+.row { display:flex; align-items:center; justify-content:space-between; margin:6px 0 20px; }
+.remember { display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
+.remember input { display:none; }
+.cb {
+  width:15px; height:15px; border:1px solid var(--border-2);
+  border-radius:3px; display:flex; align-items:center; justify-content:center;
+  font-size:9px; color:transparent; background:transparent;
+  transition:all var(--transition); flex-shrink:0;
+}
+.remember input:checked ~ .cb { background:var(--green); border-color:var(--green); color:var(--black); }
+.remember span { font-size:12px; color:var(--text-2); }
+.forgot { font-size:12px; color:var(--green); text-decoration:none; font-weight:500; transition:opacity var(--transition); }
+.forgot:hover { opacity:0.7; }
+
+.signin-btn {
+  width:100%; background:var(--green); color:var(--black);
+  border:none; border-radius:var(--radius-sm); padding:12px;
+  font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:all var(--transition);
+}
+.signin-btn:hover { background:#16a34a; }
+.signin-btn:active { transform:scale(0.99); }
+.signin-btn:disabled { opacity:0.65; cursor:not-allowed; transform:none; }
+
+.spinner {
+  width:13px; height:13px;
+  border:2px solid rgba(0,0,0,0.25); border-top-color:var(--black);
+  border-radius:50%; animation:spin 0.6s linear infinite; display:none;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── CARD FOOTER / DEMO ── */
+.card-footer { padding:14px 32px 18px; border-top:1px solid var(--border); }
+.demo-label {
+  font-size:9px; font-weight:600; color:var(--text-3);
+  text-transform:uppercase; letter-spacing:0.8px;
+  font-family:'DM Mono',monospace; margin-bottom:8px;
+}
+.demo-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+.demo-item {
+  background:var(--black-3); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:8px 10px;
+  cursor:pointer; transition:border-color var(--transition);
+}
+.demo-item:hover { border-color:var(--border-2); }
+.demo-role { font-size:9px; font-weight:700; letter-spacing:0.5px; font-family:'DM Mono',monospace; margin-bottom:4px; }
+.demo-cred { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; line-height:1.5; }
+.demo-cred strong { color:var(--text-2); }
+
+/* ── REDIRECT OVERLAY ── */
+.redirect-overlay {
+  display:none;
+  position:fixed; inset:0; z-index:100;
+  background:var(--black);
+  align-items:center; justify-content:center;
+  flex-direction:column; gap:14px;
+}
+.redirect-overlay.show { display:flex; animation:fadeIn 0.25s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.redirect-spinner {
+  width:28px; height:28px;
+  border:2px solid var(--border-2); border-top-color:var(--green);
+  border-radius:50%; animation:spin 0.7s linear infinite;
+}
+.redirect-text { font-size:12px; color:var(--text-3); font-family:'DM Mono',monospace; }
+.redirect-role { font-size:11px; font-weight:700; font-family:'DM Mono',monospace; }
+
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="card-top">
+    <div class="logo-mark">LS</div>
+    <div class="logo-name">Little Scholars Academy</div>
+    <div class="logo-sub">Unified Portal Access</div>
+    <div class="role-chips">
+      <span class="rc rc-student">Students</span>
+      <span class="rc rc-teacher">Teachers</span>
+      <span class="rc rc-admin">Admin</span>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="id-hint" id="id-hint">
+      <span class="hint-dot" id="hint-dot"></span>
+      <span id="hint-text"></span>
+    </div>
+
+    <div class="alert" id="alert">Incorrect ID or password. Please try again.</div>
+
+    <div class="field">
+      <label class="field-label" for="sid">Student / Staff ID</label>
+      <div class="input-wrap">
+        <input
+          type="text" id="sid" class="field-input"
+          placeholder="e.g. STU-2024-0421 or TCH-001"
+          oninput="detectRole(this.value)"
+          autocomplete="username"
+        >
+      </div>
+      <div class="field-error" id="sid-err">Please enter your ID.</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="pw">Password</label>
+      <div class="input-wrap">
+        <input type="password" id="pw" class="field-input" placeholder="Enter your password" autocomplete="current-password">
+        <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Toggle password visibility">
+          <svg id="eye-icon" viewBox="0 0 24 24">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="field-error" id="pw-err">Please enter your password.</div>
+    </div>
+
+    <div class="row">
+      <label class="remember">
+        <input type="checkbox" id="rem">
+        <span class="cb">✓</span>
+        <span>Remember me</span>
+      </label>
+      <a href="#" class="forgot">Forgot Password?</a>
+    </div>
+
+    <button class="signin-btn" id="btn" onclick="handleLogin()">
+      <span id="btn-txt">Sign In</span>
+      <span id="btn-arr">→</span>
+      <div class="spinner" id="spin"></div>
+    </button>
+  </div>
+
+  <div class="card-footer">
+    <div class="demo-label">Quick demo access — click to fill</div>
+    <div class="demo-grid">
+      <div class="demo-item" onclick="fillDemo('STU-2024-0421','amara123')">
+        <div class="demo-role" style="color:var(--green);">STUDENT</div>
+        <div class="demo-cred"><strong>STU-2024-0421</strong><br>amara123</div>
+      </div>
+      <div class="demo-item" onclick="fillDemo('TCH-001','teach123')">
+        <div class="demo-role" style="color:var(--amber);">TEACHER</div>
+        <div class="demo-cred"><strong>TCH-001</strong><br>teach123</div>
+      </div>
+      <div class="demo-item" onclick="fillDemo('ADM-001','admin123')">
+        <div class="demo-role" style="color:var(--blue);">ADMIN</div>
+        <div class="demo-cred"><strong>ADM-001</strong><br>admin123</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Redirect overlay shown before navigation -->
+<div class="redirect-overlay" id="redirect-overlay">
+  <div class="redirect-spinner"></div>
+  <div class="redirect-role" id="redirect-role"></div>
+  <div class="redirect-text">Redirecting to your portal…</div>
+</div>
+
+<script src="login.js"></script>
+</body>
+</html>

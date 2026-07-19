@@ -1,0 +1,17 @@
+node_modules/
+
+# Secrets
+email-settings.env
+
+# Database
+school.sqlite
+
+# User-uploaded / generated content
+uploads/
+published_reports/
+
+# Editor backup files
+*.codex-backup-*
+
+# Local Claude settings
+.claude/settings.local.json

@@ -1,0 +1,3622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Scholars — Admin Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:    #0a0a0a;
+  --black-2:  #111111;
+  --black-3:  #1a1a1a;
+  --black-4:  #222222;
+  --border:   #2a2a2a;
+  --border-2: #333333;
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,0.08);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,0.10);
+  --amber:    #fbbf24;
+  --amber-bg: rgba(251,191,36,0.10);
+  --blue:     #a5b4fc;
+  --blue-bg:  rgba(99,102,241,0.12);
+  --cyan:     #67e8f9;
+  --cyan-bg:  rgba(6,182,212,0.10);
+  --text-1:   #f5f5f5;
+  --text-2:   #a3a3a3;
+  --text-3:   #555555;
+  --radius-sm: 6px;
+  --radius:    10px;
+  --transition: 0.18s ease;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--text-1); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+.portal-wrap { display:flex; min-height:100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar { width:240px; min-height:100vh; background:var(--black-2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; animation:slideIn 0.35s ease both; }
+@keyframes slideIn { from{transform:translateX(-240px);opacity:0} to{transform:translateX(0);opacity:1} }
+.sidebar-logo { padding:22px 20px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.logo-mark-sm { width:30px; height:30px; background:var(--green); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px; color:var(--black); font-weight:900; }
+.logo-name-sm { font-size:13px; font-weight:700; color:var(--text-1); letter-spacing:-0.2px; line-height:1.2; }
+.logo-sub-sm  { font-size:9px; color:var(--text-3); font-weight:500; letter-spacing:0.6px; text-transform:uppercase; margin-top:1px; }
+.user-pill { margin:14px 12px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px; display:flex; align-items:center; gap:10px; }
+.avatar { width:32px; height:32px; border-radius:50%; background:var(--blue-bg); border:1.5px solid var(--blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--blue); font-family:'DM Mono',monospace; flex-shrink:0; }
+.u-name  { font-size:12px; font-weight:600; color:var(--text-1); line-height:1.2; }
+.u-sub   { font-size:10px; color:var(--text-3); margin-top:1px; }
+.u-badge { display:inline-block; margin-top:3px; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.2); color:var(--blue); font-size:9px; font-weight:700; padding:1px 7px; border-radius:3px; font-family:'DM Mono',monospace; }
+.nav-group { padding:6px 12px 0; }
+.nav-label { font-size:9px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--text-3); padding:10px 8px 5px; }
+.nav-item { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:var(--radius-sm); color:var(--text-2); cursor:pointer; font-size:13px; font-weight:500; transition:all var(--transition); margin-bottom:1px; border:1px solid transparent; user-select:none; }
+.nav-item:hover  { background:var(--black-3); color:var(--text-1); }
+.nav-item.active { background:var(--green-bg); color:var(--green); border-color:rgba(34,197,94,0.2); }
+.nav-icon { width:15px; text-align:center; font-size:13px; opacity:0.85; }
+.nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700; font-family:'DM Mono',monospace; padding:1px 6px; border-radius:20px; line-height:1.6; }
+.sidebar-footer { margin-top:auto; padding:13px 12px; border-top:1px solid var(--border); }
+.signout-btn { width:100%; background:transparent; border:1px solid var(--border-2); border-radius:var(--radius-sm); color:var(--text-3); padding:8px 12px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; cursor:pointer; transition:all var(--transition); display:flex; align-items:center; justify-content:center; gap:6px; }
+.signout-btn:hover { border-color:var(--red); color:var(--red); }
+
+/* ── MAIN ── */
+.main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.topbar { height:54px; border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 26px; gap:12px; position:sticky; top:0; background:rgba(10,10,10,0.94); backdrop-filter:blur(12px); z-index:40; }
+.topbar-title { font-size:13px; font-weight:600; color:var(--text-1); }
+.topbar-sep   { color:var(--border-2); }
+.topbar-sub   { font-size:12px; color:var(--text-3); }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.chip-green { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--green-bg); border:1px solid rgba(34,197,94,0.22); color:var(--green); }
+.chip-blue  { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.22); color:var(--blue); }
+.icon-btn { width:30px; height:30px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all var(--transition); position:relative; }
+.icon-btn:hover { border-color:var(--border-2); }
+.notif-dot { position:absolute; top:5px; right:5px; width:5px; height:5px; background:var(--red); border-radius:50%; border:1px solid var(--black-3); }
+.content { padding:26px; flex:1; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation:tabIn 0.2s ease both; }
+@keyframes tabIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── SHARED COMPONENTS ── */
+.page-header { margin-bottom:22px; }
+.page-header h2 { font-size:20px; font-weight:700; letter-spacing:-0.4px; }
+.page-header p  { font-size:12px; color:var(--text-3); margin-top:3px; }
+.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+.stat-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; transition:border-color var(--transition); }
+.stat-card:hover    { border-color:var(--border-2); }
+.stat-card.ac-green { border-color:rgba(34,197,94,0.28); }
+.stat-card.ac-amber { border-color:rgba(251,191,36,0.28); }
+.stat-card.ac-blue  { border-color:rgba(99,102,241,0.28); }
+.stat-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.stat-icon-wrap { width:28px; height:28px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; font-size:13px; }
+.stat-delta { font-size:10px; font-weight:600; font-family:'DM Mono',monospace; padding:2px 6px; border-radius:4px; }
+.delta-up    { background:var(--green-bg); color:var(--green); }
+.delta-amber { background:var(--amber-bg); color:var(--amber); }
+.stat-value { font-size:25px; font-weight:700; letter-spacing:-1px; line-height:1; font-family:'DM Mono',monospace; }
+.stat-label { font-size:10px; color:var(--text-3); margin-top:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+.card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.card-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.card-title { font-size:12px; font-weight:600; color:var(--text-1); }
+.card-body  { padding:14px 18px; }
+.grid-2   { display:grid; grid-template-columns:1fr 1fr;    gap:14px; }
+.grid-3-1 { display:grid; grid-template-columns:1.5fr 1fr; gap:14px; }
+.perf-row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.perf-row:last-child { border-bottom:none; }
+.perf-key { color:var(--text-2); font-weight:500; }
+.perf-val { font-weight:700; font-family:'DM Mono',monospace; }
+.pv-green { color:var(--green); } .pv-red { color:var(--red); } .pv-amber { color:var(--amber); }
+.progress-track { height:3px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:6px; }
+.progress-fill  { height:100%; border-radius:99px; background:var(--green); }
+
+/* ── ACTIVITY ── */
+.activity-item { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.activity-item:last-child { border-bottom:none; }
+.act-dot  { width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.act-text { font-size:12px; color:var(--text-2); line-height:1.5; flex:1; }
+.act-text strong { color:var(--text-1); font-weight:600; }
+.act-time { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; margin-top:2px; }
+
+/* ── SEARCH + TABLES ── */
+.search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; transition:all var(--transition); width:220px; }
+.search-input:focus { border-color:rgba(34,197,94,0.45); }
+.search-input::placeholder { color:var(--text-3); }
+.data-table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-table thead tr { border-bottom:1px solid var(--border); }
+.data-table th { padding:9px 13px; text-align:left; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.8px; font-family:'DM Mono',monospace; }
+.data-table td { padding:10px 13px; border-bottom:1px solid var(--border); font-weight:500; vertical-align:middle; }
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tbody tr:hover td { background:var(--black-3); }
+.stu-av { width:26px; height:26px; border-radius:50%; background:var(--green-bg); border:1px solid rgba(34,197,94,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+.staff-av { width:26px; height:26px; border-radius:50%; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--blue); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+.grade-pill { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; }
+.gp-a{background:var(--green-bg);color:var(--green);} .gp-b{background:var(--blue-bg);color:var(--blue);} .gp-c{background:var(--amber-bg);color:var(--amber);} .gp-d{background:var(--red-bg);color:var(--red);}
+.att-bar   { display:inline-flex; align-items:center; gap:6px; }
+.att-track { width:60px; height:4px; background:var(--black-4); border-radius:99px; overflow:hidden; }
+.att-fill  { height:100%; border-radius:99px; }
+.dept-pill { font-size:10px; font-weight:600; padding:2px 9px; border-radius:4px; font-family:'DM Mono',monospace; }
+.dp-academic { background:var(--green-bg); color:var(--green); }
+.dp-admin    { background:var(--blue-bg);  color:var(--blue); }
+.dp-support  { background:var(--amber-bg); color:var(--amber); }
+.status-on { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-family:'DM Mono',monospace; color:var(--green); }
+
+/* ── ANNOUNCEMENTS ── */
+.ann-item  { display:flex; gap:11px; padding:11px 0; border-bottom:1px solid var(--border); }
+.ann-item:last-child  { border-bottom:none; padding-bottom:0; }
+.ann-item:first-child { padding-top:0; }
+.ann-line  { width:2px; border-radius:2px; flex-shrink:0; align-self:stretch; }
+.ann-title { font-size:12px; font-weight:600; color:var(--text-1); }
+.ann-desc  { font-size:11px; color:var(--text-2); margin-top:2px; line-height:1.4; }
+.ann-date  { font-size:10px; color:var(--text-3); margin-top:4px; font-family:'DM Mono',monospace; }
+.ann-del   { background:none; border:none; color:var(--text-3); cursor:pointer; font-size:12px; padding:0; transition:color var(--transition); flex-shrink:0; }
+.ann-del:hover { color:var(--red); }
+
+/* ── FORM FIELDS ── */
+.field-label { display:block; font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; font-family:'DM Mono',monospace; }
+.field-input { width:100%; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; transition:all var(--transition); }
+.field-input:focus { border-color:rgba(34,197,94,0.45); background:var(--black); }
+.field-input::placeholder { color:var(--text-3); }
+.ctrl-select { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; font-family:'DM Sans',sans-serif; font-size:12px; color:var(--text-1); outline:none; cursor:pointer; transition:all var(--transition); width:100%; }
+.ctrl-select:focus { border-color:rgba(34,197,94,0.45); }
+.ctrl-select option { background:var(--black-3); }
+.post-btn { background:var(--green); color:var(--black); border:none; border-radius:var(--radius-sm); padding:9px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all var(--transition); }
+.post-btn:hover { background:#16a34a; }
+
+/* ── BROADSHEET ── */
+.bs-filter-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.bs-filter-bar .ctrl-select { width:auto; min-width:160px; }
+.bs-view-btn { background:var(--green); color:var(--black); border:none; border-radius:var(--radius-sm); padding:8px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:background var(--transition); }
+.bs-view-btn:hover { background:#16a34a; }
+.bs-export-btn { background:none; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); }
+.bs-export-btn:hover { border-color:var(--blue); color:var(--blue); }
+.bs-subject-pills { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.bs-pill { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; background:#2563eb; color:#fff; font-family:'DM Mono',monospace; cursor:default; }
+.bs-view-toggle { display:flex; gap:6px; margin-left:auto; }
+.bs-toggle-btn { background:none; border:1px solid var(--border-2); color:var(--text-3); border-radius:var(--radius-sm); padding:6px 14px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); }
+.bs-toggle-btn.active { background:#2563eb; border-color:#2563eb; color:#fff; }
+.bs-search-wrap { margin-bottom:12px; }
+.bs-search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; width:420px; max-width:100%; transition:border-color var(--transition); }
+.bs-search-input:focus { border-color:rgba(37,99,235,0.5); }
+.bs-search-input::placeholder { color:var(--text-3); }
+.bs-table-outer { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px; }
+.bs-table { border-collapse:collapse; font-size:11px; white-space:nowrap; }
+.bs-table th, .bs-table td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:7px 10px; vertical-align:middle; text-align:center; }
+.bs-table th { background:var(--black-3); color:var(--text-2); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:0.4px; }
+.bs-table td { background:var(--black-2); color:var(--text-1); }
+.bs-table tbody tr:hover td { background:var(--black-3); }
+.bs-th-group { background:var(--black-4) !important; color:var(--text-1) !important; font-size:11px !important; text-transform:none !important; letter-spacing:0 !important; border-bottom:2px solid var(--border-2) !important; }
+.bs-sticky { position:sticky; z-index:3; background:var(--black-2); }
+.bs-sticky-h { position:sticky; z-index:4; background:var(--black-3); }
+.bs-col-num  { left:0;    min-width:36px;  width:36px; }
+.bs-col-name { left:36px; min-width:170px; width:170px; text-align:left !important; }
+.bs-col-reg  { left:206px;min-width:90px;  width:90px; }
+.bs-td-name  { text-align:left; font-weight:600; }
+.bs-td-reg   { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-3); }
+.bs-score-total { font-weight:800; font-size:12px; color:var(--text-1); }
+.bs-score-grade { font-size:9px; color:var(--green); font-weight:700; font-family:'DM Mono',monospace; display:block; }
+.bs-score-rank  { font-size:9px; color:var(--text-3); font-family:'DM Mono',monospace; display:block; }
+.bs-avg-bar-wrap { min-width:130px; padding:6px 10px; }
+.bs-avg-pct  { font-size:12px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-avg-grade { font-size:10px; color:var(--text-3); }
+.bs-avg-track { height:6px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:4px; width:100%; }
+.bs-avg-fill  { height:100%; background:#2563eb; border-radius:99px; }
+.bs-pos-badge { display:inline-block; font-size:11px; font-weight:800; font-family:'DM Mono',monospace; color:var(--text-1); }
+.bs-pos-badge.top1 { color:#fbbf24; } .bs-pos-badge.top2 { color:#94a3b8; } .bs-pos-badge.top3 { color:#b45309; }
+.bs-remark-td { max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
+.bs-preview-btn { background:none; border:1px solid var(--border-2); color:var(--text-3); border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer; transition:all var(--transition); }
+.bs-preview-btn:hover { border-color:var(--green); color:var(--green); }
+.bs-excluded { color:var(--text-3); font-size:11px; font-style:italic; }
+.bs-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px; }
+.bs-summary-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
+.bs-summary-label { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; font-family:'DM Mono',monospace; margin-bottom:4px; }
+.bs-summary-val   { font-size:18px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-subject-stats-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.bs-subject-stats-table th { padding:8px 12px; text-align:left; font-size:9.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; }
+.bs-subject-stats-table td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+.bs-subject-stats-table tr:last-child td { border-bottom:none; }
+.bs-print-row { text-align:center; margin-top:18px; }
+.bs-print-btn { background:#2563eb; color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 24px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:background var(--transition); }
+.bs-print-btn:hover { background:#1d4ed8; }
+.bs-publish-section { margin-top:22px; }
+.bs-publish-toggle { display:flex; align-items:center; gap:10px; padding:12px 18px; background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; color:var(--text-2); user-select:none; }
+.bs-publish-toggle:hover { color:var(--text-1); }
+.bs-publish-body { border:1px solid var(--border); border-top:none; border-radius:0 0 var(--radius) var(--radius); padding:18px; display:none; }
+.bs-publish-body.open { display:block; }
+/* ── TOAST ── */
+/* ── RESULT SETTINGS PAGES ── */
+.rsp-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:20px; gap:0; }
+.rsp-tab { background:none; border:none; border-bottom:2px solid transparent; padding:10px 18px; font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer; transition:color .15s, border-color .15s; white-space:nowrap; }
+.rsp-tab.active { color:#2563eb; border-bottom-color:#2563eb; }
+.rsp-tab:hover:not(.active) { color:var(--text-2); }
+.rsp-body { }
+.rsp-section-head { font-size:12px; font-weight:700; color:var(--text-2); padding:14px 0 6px; border-bottom:1px solid var(--border); margin-bottom:2px; letter-spacing:.04em; text-transform:uppercase; }
+.rsp-row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-1); }
+.rsp-row:last-of-type { border-bottom:none; }
+.rsp-toggle { display:inline-flex; align-items:center; justify-content:center; width:62px; height:26px; border-radius:6px; border:none; font-size:11px; font-weight:700; cursor:pointer; transition:background .15s, color .15s; flex-shrink:0; }
+.rsp-toggle.on { background:#2563eb; color:#fff; }
+.rsp-toggle.off { background:var(--surface-2); color:var(--text-3); border:1px solid var(--border); }
+.rsp-color { width:52px; height:30px; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; padding:2px; }
+.rsp-note { background:#2563eb11; border:1px solid #2563eb33; border-radius:8px; padding:14px 18px; font-size:12px; color:var(--text-2); line-height:1.7; margin-top:24px; }
+.rsp-comment-card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:16px; }
+.rsp-comment-head { display:flex; align-items:flex-start; margin-bottom:16px; }
+.rsp-type-badge { background:var(--surface-2); color:var(--text-3); font-size:10px; font-weight:600; padding:2px 8px; border-radius:20px; border:1px solid var(--border); }
+/* Comments Bank */
+.cb-score-range { font-size:11px; color:var(--text-3); font-family:'DM Mono',monospace; }
+/* Score Divisions */
+.sd-enabled { background:#16a34a22; color:#16a34a; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600; border:1px solid #16a34a44; }
+.sd-disabled { background:var(--surface-2); color:var(--text-3); padding:2px 10px; border-radius:20px; font-size:11px; border:1px solid var(--border); }
+.toast { display:none; position:fixed; bottom:24px; right:24px; background:var(--black-2); border:1px solid var(--green); border-radius:var(--radius); padding:12px 18px; font-size:13px; font-weight:600; color:var(--green); z-index:999; font-family:'DM Mono',monospace; box-shadow:0 8px 32px rgba(0,0,0,0.5); animation:toastUp 0.3s ease; }
+@keyframes toastUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* CODEX ADMIN SIDEBAR */
+.admin-layout-sidebar {
+  width:300px;
+  background:#ffffff;
+  border-right:1px solid #d8e0eb;
+  color:#3f4652;
+  overflow:hidden;
+}
+.admin-layout-sidebar .sidebar-logo {
+  background:#ffffff;
+  border-bottom:1px solid #d8e0eb;
+  color:#1f2937;
+}
+.admin-layout-sidebar .logo-mark-sm {
+  background:#2563eb;
+  color:#ffffff;
+}
+.admin-layout-sidebar .logo-name-sm { color:#1f2937; }
+.admin-layout-sidebar .logo-sub-sm { color:#7b8798; }
+.admin-layout-sidebar .user-pill {
+  margin:12px;
+  background:#ffffff;
+  border:1px solid #d8e0eb;
+  color:#1f2937;
+}
+.admin-layout-sidebar .avatar {
+  background:#eaf3ff;
+  border-color:#2f6fb3;
+  color:#2f6fb3;
+}
+.admin-layout-sidebar .u-name { color:#1f2937; }
+.admin-layout-sidebar .u-sub { color:#7b8798; }
+.admin-quick-search {
+  margin:0 12px 12px;
+  height:36px;
+  border:1px solid #d8e0eb;
+  background:#fafbfc;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 10px;
+}
+.admin-search-icon {
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  color:#94a3b8;
+  font-size:11px;
+  font-weight:800;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.admin-quick-search input {
+  width:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#334155;
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+}
+.admin-quick-search input::placeholder { color:#b3bcc8; }
+.admin-sidebar-body {
+  padding:0;
+  display:grid;
+  grid-template-columns:92px 1fr;
+  flex:1;
+  min-height:0;
+  border-top:1px solid #d8e0eb;
+}
+.admin-rail {
+  background:#f8fafc;
+  border-right:1px solid #d8e0eb;
+  overflow-y:auto;
+}
+.rail-item {
+  width:100%;
+  min-height:72px;
+  border:0;
+  border-bottom:1px solid #d8e0eb;
+  background:#ffffff;
+  color:#71839a;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  font-weight:700;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all var(--transition);
+}
+.rail-item:hover {
+  background:#f1f6ff;
+  color:#2f6fb3;
+}
+.rail-item.active {
+  background:#eaf3ff;
+  color:#2563eb;
+  box-shadow:inset 3px 0 0 #2563eb;
+}
+.rail-icon {
+  min-width:24px;
+  height:24px;
+  border:1px solid currentColor;
+  border-radius:4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  line-height:1;
+}
+.admin-subnav {
+  background:#ffffff;
+  overflow-y:auto;
+  padding:18px 0;
+}
+.sub-menu { display:none; }
+.sub-menu.active { display:block; }
+.sub-nav-item {
+  width:100%;
+  min-height:56px;
+  border:0;
+  background:#ffffff;
+  color:#3f4652;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 12px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  font-weight:500;
+  text-align:left;
+  cursor:pointer;
+  transition:all var(--transition);
+}
+.sub-nav-item:hover,
+.sub-nav-item.active {
+  background:#f4f8ff;
+  color:#1d4ed8;
+}
+.sub-nav-icon {
+  width:22px;
+  color:#3f4652;
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  font-weight:700;
+  text-align:center;
+}
+.sub-chev {
+  margin-left:auto;
+  color:#8a94a3;
+  font-size:12px;
+}
+.result-gradebook-parent {
+  color:#0b63ff;
+  background:#f4f8ff;
+}
+.result-gradebook-children {
+  padding:3px 0 9px 38px;
+  border-bottom:1px solid #edf2f7;
+}
+.result-child {
+  min-height:43px;
+  padding:0 12px 0 10px;
+  color:#64748b;
+  font-size:13.5px;
+}
+.result-child.active {
+  color:#0b63ff;
+  background:#ffffff;
+}
+.admin-layout-sidebar .nav-badge {
+  margin-left:auto;
+  background:#ef4444;
+  color:#ffffff;
+}
+.admin-layout-sidebar .sidebar-footer {
+  background:#ffffff;
+  border-top:1px solid #d8e0eb;
+}
+.admin-layout-sidebar .signout-btn {
+  color:#64748b;
+  border-color:#d8e0eb;
+}
+.admin-layout-sidebar .signout-btn:hover {
+  color:#ef4444;
+  border-color:#ef4444;
+}
+.main { margin-left:300px; }
+@media (max-width: 920px) {
+  .portal-wrap { flex-direction:column; }
+  .admin-layout-sidebar {
+    position:relative;
+    width:100%;
+    min-height:auto;
+    bottom:auto;
+  }
+  .main { margin-left:0; }
+  .admin-sidebar-body { grid-template-columns:1fr; }
+  .admin-rail {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
+    border-right:0;
+  }
+  .rail-item { min-height:64px; }
+  .admin-subnav {
+    border-top:1px solid #d8e0eb;
+    padding:8px 0;
+  }
+}
+.staff-employee-page {
+  background:#eef2f6;
+  color:#172033;
+  margin:-26px;
+  min-height:calc(100vh - 54px);
+  padding:0 24px 34px;
+}
+.staff-breadcrumb-row {
+  height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  color:#7b8798;
+  font-size:13px;
+  border-bottom:1px solid #dbe3eb;
+}
+.staff-session-box {
+  margin-left:auto;
+  display:grid;
+  grid-template-columns:150px 110px;
+  gap:0;
+  font-size:12px;
+  text-align:right;
+}
+.staff-session-box div {
+  padding:3px 10px;
+  border-bottom:1px solid #d2dbe6;
+}
+.staff-summary-row {
+  display:grid;
+  grid-template-columns:repeat(6,minmax(130px,1fr));
+  gap:14px;
+  margin:30px 0 16px;
+  overflow-x:auto;
+  padding-bottom:10px;
+}
+.staff-summary-card {
+  min-width:150px;
+  height:90px;
+  background:#ffffff;
+  border-radius:8px;
+  box-shadow:0 8px 22px rgba(15,23,42,0.07);
+  border-left:4px solid #94a3b8;
+  display:flex;
+  align-items:center;
+  gap:15px;
+  padding:18px 20px;
+}
+.staff-summary-card.active { background:#eef6ff; border-color:#2f80ed; box-shadow:inset 0 -3px 0 #b5d9ff, 0 8px 22px rgba(15,23,42,0.06); }
+.staff-summary-card.teacher { border-color:#1783e8; }
+.staff-summary-card.accountant { border-color:#27ae60; }
+.staff-summary-card.librarian { border-color:#22a6b3; }
+.staff-summary-card.registrar { border-color:#f2b705; }
+.staff-summary-card.transport { border-color:#a8b4bf; }
+.staff-summary-icon {
+  width:28px;
+  height:28px;
+  border:1px solid #aab6c4;
+  color:#697584;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:4px;
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  font-weight:700;
+}
+.staff-summary-count {
+  font-size:26px;
+  font-weight:800;
+  line-height:1;
+  color:#30343b;
+}
+.staff-summary-label {
+  margin-top:5px;
+  color:#77808b;
+  font-size:12px;
+  white-space:nowrap;
+}
+.staff-filter-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:9px;
+  margin:8px 0 28px;
+}
+.staff-filter-pill {
+  border:1px solid #c9d4df;
+  color:#334155;
+  background:#f8fafc;
+  border-radius:999px;
+  padding:9px 18px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  transition:all var(--transition);
+}
+.staff-filter-pill span {
+  width:18px;
+  height:18px;
+  border:1px solid currentColor;
+  border-radius:4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+}
+.staff-filter-pill.active {
+  background:#0b84ee;
+  border-color:#0b84ee;
+  color:#ffffff;
+  box-shadow:0 8px 18px rgba(11,132,238,0.22);
+}
+.staff-directory-shell {
+  background:#ffffff;
+  border-radius:4px;
+  padding:40px 22px 22px;
+  box-shadow:0 1px 2px rgba(15,23,42,0.06);
+}
+.staff-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  flex-wrap:wrap;
+  margin-bottom:34px;
+}
+.staff-export-btn {
+  border:1px solid #cfd6de;
+  background:#ffffff;
+  color:#1f2937;
+  padding:10px 14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+.staff-search-light {
+  width:min(360px,100%);
+  border:1px solid #cfd6de;
+  border-radius:12px;
+  padding:13px 16px;
+  font-family:'DM Sans',sans-serif;
+  font-size:16px;
+  color:#1f2937;
+  outline:none;
+}
+.staff-page-size {
+  display:inline-flex;
+  align-items:center;
+  gap:14px;
+  color:#172033;
+  font-size:15px;
+}
+.staff-page-size select {
+  width:90px;
+  border:1px solid #cfd6de;
+  border-radius:12px;
+  padding:11px 14px;
+  background:#ffffff;
+  color:#334155;
+  font-size:15px;
+}
+.staff-table {
+  width:100%;
+  border-collapse:collapse;
+  color:#162033;
+  font-size:15px;
+}
+.staff-table th {
+  text-align:left;
+  padding:12px 12px 16px;
+  border-bottom:2px solid #d6dce3;
+  color:#172033;
+  font-size:14px;
+  font-weight:800;
+}
+.staff-table td {
+  padding:16px 12px;
+  border-bottom:1px solid #e0e5eb;
+  vertical-align:middle;
+}
+.staff-index,
+.staff-phone {
+  color:#172033;
+  font-weight:600;
+}
+.staff-table-name {
+  font-size:16px;
+  font-weight:700;
+  text-transform:uppercase;
+}
+.staff-table-sub {
+  margin-top:3px;
+  color:#8792a0;
+  font-size:12px;
+  font-style:italic;
+}
+.staff-main-pill {
+  display:inline-flex;
+  margin-top:8px;
+  border:1px solid #0b63ff;
+  color:#0b63ff;
+  border-radius:999px;
+  padding:3px 10px;
+  font-size:11px;
+  font-weight:700;
+}
+.staff-type-pill {
+  border:1px solid #34a853;
+  color:#249344;
+  border-radius:999px;
+  padding:5px 12px;
+  font-size:12px;
+  font-weight:800;
+}
+.staff-designation {
+  color:#172033;
+  font-size:15px;
+  line-height:1.35;
+}
+.staff-profile-btn {
+  width:38px;
+  height:38px;
+  border:1px solid #d8dee6;
+  background:#ffffff;
+  color:#8894a3;
+  font-size:18px;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 2px 4px rgba(15,23,42,0.08);
+}
+.staff-status-on {
+  display:inline-flex;
+  min-width:48px;
+  height:28px;
+  align-items:center;
+  justify-content:center;
+  background:#096eea;
+  color:#ffffff;
+  border-radius:4px 0 0 4px;
+  font-size:13px;
+  font-weight:800;
+}
+.staff-form-light {
+  margin-top:28px;
+  background:#ffffff;
+  border:1px solid #dbe3eb;
+  border-radius:8px;
+  overflow:hidden;
+}
+.staff-form-light .card-head {
+  border-color:#dbe3eb;
+}
+.staff-form-light .card-title,
+.staff-form-light .field-label {
+  color:#334155;
+}
+.staff-form-light .field-input,
+.staff-form-light .ctrl-select {
+  background:#ffffff;
+  border-color:#cfd6de;
+  color:#172033;
+}
+/* Unified dark portal theme overrides */
+.admin-layout-sidebar {
+  background:var(--black-2);
+  border-right:1px solid var(--border);
+  color:var(--text-2);
+}
+.admin-layout-sidebar .sidebar-logo,
+.admin-layout-sidebar .user-pill,
+.admin-layout-sidebar .sidebar-footer {
+  background:var(--black-2);
+  border-color:var(--border);
+}
+.admin-layout-sidebar .logo-mark-sm {
+  background:var(--green);
+  color:var(--black);
+}
+.admin-layout-sidebar .logo-name-sm,
+.admin-layout-sidebar .u-name {
+  color:var(--text-1);
+}
+.admin-layout-sidebar .logo-sub-sm,
+.admin-layout-sidebar .u-sub {
+  color:var(--text-3);
+}
+.admin-layout-sidebar .avatar {
+  background:var(--green-bg);
+  border-color:rgba(34,197,94,0.35);
+  color:var(--green);
+}
+.admin-quick-search {
+  background:var(--black-3);
+  border-color:var(--border);
+}
+.admin-search-icon {
+  color:var(--text-3);
+}
+.admin-quick-search input {
+  color:var(--text-1);
+}
+.admin-quick-search input::placeholder {
+  color:var(--text-3);
+}
+.admin-sidebar-body {
+  border-top-color:var(--border);
+}
+.admin-rail,
+.admin-subnav {
+  background:var(--black-2);
+}
+.admin-rail {
+  border-right-color:var(--border);
+}
+.rail-item,
+.sub-nav-item {
+  background:transparent;
+  color:var(--text-2);
+  border-color:var(--border);
+}
+.rail-item {
+  border-bottom-color:var(--border);
+}
+.rail-item:hover,
+.sub-nav-item:hover {
+  background:var(--black-3);
+  color:var(--text-1);
+}
+.rail-item.active,
+.sub-nav-item.active,
+.result-gradebook-parent {
+  background:var(--green-bg);
+  color:var(--green);
+  box-shadow:inset 3px 0 0 var(--green);
+}
+.sub-nav-icon,
+.sub-chev {
+  color:currentColor;
+}
+.result-gradebook-children {
+  border-bottom-color:var(--border);
+}
+.result-child {
+  color:var(--text-2);
+}
+.result-child.active {
+  color:var(--green);
+  background:var(--black-3);
+}
+.admin-layout-sidebar .signout-btn {
+  color:var(--text-2);
+  border-color:var(--border);
+}
+.staff-employee-page {
+  background:var(--black);
+  color:var(--text-1);
+}
+.staff-breadcrumb-row {
+  color:var(--text-3);
+  border-bottom-color:var(--border);
+}
+.staff-session-box div {
+  border-bottom-color:var(--border);
+}
+.staff-summary-card,
+.staff-directory-shell,
+.staff-form-light {
+  background:var(--black-2);
+  border:1px solid var(--border);
+  box-shadow:none;
+}
+.staff-summary-card.active {
+  background:var(--green-bg);
+  border-color:rgba(34,197,94,0.55);
+  box-shadow:inset 0 -3px 0 rgba(34,197,94,0.28);
+}
+.staff-summary-icon {
+  border-color:var(--border-2);
+  color:var(--text-2);
+  background:var(--black-3);
+}
+.staff-summary-count,
+.staff-table,
+.staff-table th,
+.staff-index,
+.staff-phone,
+.staff-table-name,
+.staff-designation,
+.staff-page-size {
+  color:var(--text-1);
+}
+.staff-summary-label,
+.staff-table-sub {
+  color:var(--text-3);
+}
+.staff-filter-pill,
+.staff-export-btn,
+.staff-page-size select,
+.staff-search-light,
+.staff-profile-btn,
+.staff-form-light .field-input,
+.staff-form-light .ctrl-select {
+  background:var(--black-3);
+  border-color:var(--border);
+  color:var(--text-1);
+}
+.staff-filter-pill.active,
+.staff-status-on,
+.gb-manage-btn,
+.cog-view-btn,
+.cog-action-btn {
+  background:var(--green);
+  border-color:var(--green);
+  color:var(--black);
+  box-shadow:none;
+}
+.staff-main-pill,
+.staff-type-pill {
+  border-color:rgba(34,197,94,0.55);
+  color:var(--green);
+  background:var(--green-bg);
+}
+.staff-table th {
+  border-bottom-color:var(--border-2);
+}
+.staff-table td {
+  border-bottom-color:var(--border);
+}
+.staff-profile-btn {
+  box-shadow:none;
+}
+.staff-form-light .card-head {
+  border-color:var(--border);
+}
+.staff-form-light .card-title,
+.staff-form-light .field-label {
+  color:var(--text-2);
+}
+.cog-action-icon.view::before {
+  border-color:var(--black);
+}
+.cog-action-icon.view::after,
+.cog-action-icon.edit::before {
+  background:var(--black);
+}
+.cog-action-icon.edit::after {
+  border-left-color:var(--black);
+}
+.result-gradebook-page {
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.gb-breadcrumb {
+  color:var(--text-3);
+  font-size:12px;
+  margin-bottom:2px;
+}
+.gb-filter-card,
+.gb-entry-card {
+  background:var(--black-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.gb-card-title {
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:var(--text-1);
+  font-size:16px;
+  font-weight:700;
+}
+.gb-filter-grid {
+  padding:18px 22px 10px;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(150px,1fr));
+  gap:14px;
+}
+.gb-filter-actions {
+  padding:12px 22px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.gb-checkline {
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--text-2);
+  font-size:12px;
+}
+.gb-manage-btn {
+  background:#0b63ff;
+  color:#ffffff;
+  border:0;
+  border-radius:var(--radius-sm);
+  padding:12px 22px;
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+}
+.gb-entry-head {
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.gb-entry-title {
+  color:var(--text-1);
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:12px;
+}
+.gb-entry-line {
+  color:var(--text-2);
+  font-size:13px;
+  margin-top:8px;
+}
+.gb-published-btn {
+  display:none;
+  background:var(--amber);
+  color:var(--black);
+  border:0;
+  border-radius:var(--radius-sm);
+  padding:10px 14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  font-weight:800;
+}
+.gb-readonly {
+  display:none;
+  margin:18px 22px 0;
+  background:var(--amber-bg);
+  border:1px solid rgba(251,191,36,0.35);
+  color:var(--amber);
+  border-radius:var(--radius-sm);
+  padding:16px;
+  text-align:center;
+  line-height:1.55;
+}
+.gb-tools {
+  padding:22px;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:18px;
+  align-items:center;
+}
+.gb-offline-btn {
+  justify-self:start;
+  border:1px solid var(--border-2);
+  background:var(--black-3);
+  color:var(--text-1);
+  padding:10px 14px;
+  border-radius:var(--radius-sm);
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  cursor:pointer;
+}
+.gb-toggle-row {
+  padding:0 22px 20px;
+  display:flex;
+  gap:36px;
+  flex-wrap:wrap;
+  color:var(--text-2);
+  font-size:12px;
+}
+.gb-switch {
+  width:44px;
+  height:22px;
+  border-radius:999px;
+  background:var(--black-4);
+  border:1px solid var(--border-2);
+  display:inline-block;
+  vertical-align:middle;
+  margin-right:8px;
+  position:relative;
+}
+.gb-switch::after {
+  content:'';
+  position:absolute;
+  width:18px;
+  height:18px;
+  top:1px;
+  left:2px;
+  border-radius:50%;
+  background:#fff;
+}
+.gb-search {
+  width:min(520px,100%);
+  background:var(--black-3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  color:var(--text-1);
+  padding:13px 16px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  justify-self:center;
+}
+.gb-table-wrap {
+  padding:0 22px 20px;
+  overflow-x:auto;
+}
+.gb-score-table {
+  width:100%;
+  min-width:1050px;
+  border-collapse:collapse;
+  color:var(--text-1);
+  font-size:13px;
+}
+.gb-score-table th {
+  text-align:left;
+  padding:12px 8px;
+  border:1px solid var(--border);
+  color:var(--text-1);
+  vertical-align:bottom;
+  font-weight:800;
+}
+.gb-score-table th small {
+  display:block;
+  color:var(--text-3);
+  font-size:10px;
+  margin-top:4px;
+}
+.gb-score-table td {
+  border:1px solid var(--border);
+  padding:8px;
+  vertical-align:top;
+}
+.gb-student-id {
+  display:inline-block;
+  margin-top:8px;
+  color:var(--text-3);
+  font-size:10px;
+  font-family:'DM Mono',monospace;
+}
+.gb-score-input,
+.gb-comment-input {
+  width:100%;
+  background:var(--black-3);
+  border:1px solid var(--border-2);
+  border-radius:var(--radius-sm);
+  color:var(--text-2);
+  padding:10px 12px;
+  font-family:'DM Sans',sans-serif;
+}
+.gb-comment-input {
+  min-width:150px;
+  height:46px;
+}
+.gb-total {
+  color:var(--text-2);
+  font-size:16px;
+  font-weight:700;
+  padding-top:18px !important;
+}
+.gb-flag {
+  border:1px solid var(--border-2);
+  background:var(--black-3);
+  color:var(--text-2);
+  padding:8px 11px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border-radius:var(--radius-sm);
+}
+.gb-flag span {
+  width:18px;
+  height:18px;
+  display:inline-block;
+  border-radius:3px;
+}
+.gb-flag.absent span { background:var(--red); }
+.gb-flag.exclude span { background:var(--cyan); }
+.gb-important {
+  margin:14px 22px 22px;
+  border:1px solid var(--border);
+  background:var(--black-3);
+  border-radius:var(--radius-sm);
+  color:var(--text-2);
+  padding:15px 18px;
+  line-height:1.55;
+  font-size:12px;
+}
+.result-placeholder-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:14px;
+}
+.cog-page {
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.cog-filter-card,
+.cog-list-card {
+  background:var(--black-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.cog-card-title {
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:var(--text-1);
+  font-size:17px;
+  font-weight:800;
+}
+.cog-filter-grid {
+  padding:22px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:22px;
+}
+.cog-filter-actions {
+  padding:0 22px 22px;
+  display:flex;
+  justify-content:center;
+}
+.cog-view-btn,
+.cog-action-btn {
+  border:0;
+  background:#0b63ff;
+  color:#ffffff;
+  font-family:'DM Sans',sans-serif;
+  font-weight:800;
+  cursor:pointer;
+}
+.cog-view-btn {
+  border-radius:var(--radius-sm);
+  padding:12px 28px;
+  font-size:15px;
+}
+.cog-list-head {
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.cog-list-title {
+  color:var(--text-1);
+  font-size:17px;
+  font-weight:800;
+}
+.cog-list-sub {
+  margin-top:5px;
+  color:var(--text-3);
+  font-size:11px;
+  font-family:'DM Mono',monospace;
+}
+.cog-search {
+  width:min(360px,100%);
+  background:var(--black-3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  color:var(--text-1);
+  padding:13px 16px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+}
+.cog-table-wrap {
+  padding:0 18px 18px;
+  overflow-x:auto;
+}
+.cog-table {
+  width:100%;
+  min-width:980px;
+  border-collapse:collapse;
+  color:var(--text-1);
+  font-size:14px;
+}
+.cog-table th,
+.cog-table td {
+  border-bottom:1px solid var(--border);
+  padding:14px 10px;
+  text-align:left;
+}
+.cog-table th {
+  color:var(--text-1);
+  font-weight:900;
+}
+.cog-table tbody tr:nth-child(even) {
+  background:rgba(255,255,255,0.03);
+}
+.cog-reg {
+  color:var(--text-2);
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+}
+.cog-action-btn {
+  width:44px;
+  height:44px;
+  border-radius:13px;
+  font-size:16px;
+}
+.cog-action-btn.edit {
+  background:#1267f3;
+}
+.cog-action-icon {
+  width:17px;
+  height:17px;
+  display:inline-block;
+  position:relative;
+}
+.cog-action-icon.view::before {
+  content:'';
+  position:absolute;
+  width:9px;
+  height:9px;
+  border:2px solid #ffffff;
+  border-radius:50%;
+  top:1px;
+  left:1px;
+}
+.cog-action-icon.view::after {
+  content:'';
+  position:absolute;
+  width:8px;
+  height:2px;
+  background:#ffffff;
+  border-radius:99px;
+  transform:rotate(45deg);
+  right:1px;
+  bottom:3px;
+}
+.cog-action-icon.edit::before {
+  content:'';
+  position:absolute;
+  width:12px;
+  height:4px;
+  background:#ffffff;
+  border-radius:2px;
+  transform:rotate(-38deg);
+  top:7px;
+  left:2px;
+}
+.cog-action-icon.edit::after {
+  content:'';
+  position:absolute;
+  width:4px;
+  height:4px;
+  border-left:4px solid #ffffff;
+  border-top:2px solid transparent;
+  border-bottom:2px solid transparent;
+  transform:rotate(-38deg);
+  top:4px;
+  right:1px;
+}
+.cog-sort {
+  color:#6d7480;
+  font-size:10px;
+  margin-left:7px;
+}
+.cog-modal {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(0,0,0,0.72);
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.cog-modal-card {
+  width:min(1060px,100%);
+  height:min(88vh,820px);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--black-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:0 22px 70px rgba(0,0,0,0.65);
+}
+.cog-modal-head {
+  padding:14px 20px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-shrink:0;
+}
+.cog-modal-title {
+  color:var(--text-1);
+  font-size:15px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.cog-modal-subtitle,
+.cog-modal-status {
+  color:var(--text-3);
+  font-size:11px;
+  font-family:'DM Mono',monospace;
+  margin-top:4px;
+}
+.cog-modal-close {
+  width:30px;
+  height:30px;
+  border:1px solid var(--border-2);
+  background:var(--black-3);
+  color:var(--text-2);
+  border-radius:50%;
+  cursor:pointer;
+  font-size:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:all var(--transition);
+  flex-shrink:0;
+  line-height:1;
+}
+.cog-modal-close:hover { background:var(--red-bg); border-color:var(--red); color:var(--red); }
+/* ── COGNITIVE MODAL BODY LAYOUT ── */
+.cog-modal-body {
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:row;
+  overflow:hidden;
+}
+
+/* LEFT — student profile panel */
+.cog-student-panel {
+  width:290px;
+  min-width:260px;
+  flex-shrink:0;
+  overflow-y:auto;
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+}
+.cog-photo-wrap {
+  position:relative;
+  width:100%;
+  flex-shrink:0;
+}
+.cog-student-photo {
+  width:100%;
+  height:190px;
+  object-fit:cover;
+  display:block;
+}
+.cog-student-photo-placeholder {
+  width:100%;
+  height:190px;
+  background:var(--black-4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:40px;
+  font-weight:800;
+  color:var(--blue);
+  font-family:'DM Mono',monospace;
+}
+.cog-photo-name-overlay {
+  position:absolute;
+  bottom:0; left:0; right:0;
+  background:rgba(0,0,0,0.80);
+  padding:8px 12px 7px;
+}
+.cog-photo-name-overlay .name {
+  font-size:11.5px;
+  font-weight:800;
+  color:#fff;
+  text-transform:uppercase;
+  line-height:1.3;
+}
+.cog-photo-name-overlay .badge {
+  display:inline-block;
+  margin-top:4px;
+  background:rgba(99,102,241,0.25);
+  border:1px solid rgba(99,102,241,0.45);
+  color:var(--blue);
+  font-size:9px;
+  font-weight:700;
+  padding:1px 9px;
+  border-radius:3px;
+  font-family:'DM Mono',monospace;
+  text-transform:uppercase;
+  letter-spacing:0.4px;
+}
+.cog-student-icons {
+  display:flex;
+  gap:18px;
+  padding:9px 14px;
+  border-bottom:1px solid var(--border);
+}
+.cog-student-icons span {
+  font-size:16px;
+  color:var(--text-3);
+  cursor:pointer;
+  transition:color var(--transition);
+}
+.cog-student-icons span:hover { color:var(--blue); }
+.cog-info-table {
+  width:100%;
+  font-size:11.5px;
+  border-collapse:collapse;
+}
+.cog-info-table td {
+  padding:6px 12px;
+  border-bottom:1px solid var(--border);
+  vertical-align:top;
+  line-height:1.45;
+}
+.cog-info-table td:first-child {
+  color:var(--text-3);
+  font-size:10.5px;
+  width:42%;
+}
+.cog-info-table td:last-child {
+  color:var(--text-1);
+  font-weight:600;
+  font-size:11.5px;
+}
+.cog-panel-actions {
+  padding:12px 14px;
+  border-top:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:auto;
+}
+.cog-profile-btn {
+  background:rgba(37,99,235,0.12);
+  border:1px solid rgba(37,99,235,0.3);
+  color:#60a5fa;
+  border-radius:var(--radius-sm);
+  padding:8px 14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  width:100%;
+  text-align:center;
+  transition:all var(--transition);
+}
+.cog-profile-btn:hover { background:rgba(37,99,235,0.22); }
+.cog-print-btn {
+  background:none;
+  border:1px solid var(--border-2);
+  color:var(--text-3);
+  border-radius:var(--radius-sm);
+  padding:6px 14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:11px;
+  cursor:pointer;
+  align-self:flex-end;
+  transition:all var(--transition);
+}
+.cog-print-btn:hover { color:var(--text-1); border-color:var(--text-2); }
+
+/* RIGHT — skills panel */
+.cog-skills-panel {
+  flex:1;
+  overflow-y:auto;
+  padding:22px 26px;
+  display:flex;
+  flex-direction:column;
+  gap:28px;
+}
+.cog-skill-group-title {
+  font-size:17px;
+  font-weight:800;
+  color:var(--text-1);
+  margin-bottom:14px;
+  letter-spacing:-0.3px;
+}
+.cog-skill-table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:12.5px;
+  table-layout:fixed;
+}
+.cog-skill-table col.col-skill  { width:auto; }
+.cog-skill-table col.col-score  { width:72px; }
+.cog-skill-table col.col-radio  { width:48px; }
+.cog-skill-table thead th {
+  padding:9px 8px;
+  text-align:center;
+  font-size:12px;
+  font-weight:600;
+  color:var(--text-2);
+  border-bottom:1px solid var(--border-2);
+  white-space:nowrap;
+}
+.cog-skill-table thead th.th-skill {
+  text-align:left;
+  padding-left:4px;
+}
+.cog-skill-table thead th.th-score {
+  text-align:left;
+  padding-left:6px;
+}
+.cog-skill-table tbody td {
+  padding:11px 8px;
+  border-bottom:1px solid var(--border);
+  text-align:center;
+  vertical-align:middle;
+}
+.cog-skill-table tbody td.td-skill {
+  text-align:left;
+  color:var(--text-2);
+  padding-left:4px;
+}
+.cog-skill-table tbody tr:last-child td { border-bottom:none; }
+.cog-skill-table tbody tr:hover td { background:var(--black-3); }
+.cog-score-val {
+  font-family:'DM Mono',monospace;
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-1);
+}
+/* custom radio button */
+.cog-radio {
+  -webkit-appearance:none;
+  appearance:none;
+  width:18px;
+  height:18px;
+  border:1.5px solid var(--border-2);
+  border-radius:50%;
+  background:transparent;
+  cursor:pointer;
+  display:inline-block;
+  position:relative;
+  transition:border-color 0.15s;
+  vertical-align:middle;
+  flex-shrink:0;
+}
+.cog-radio:hover { border-color:#2563eb; }
+.cog-radio:checked {
+  border-color:#2563eb;
+  background:#2563eb;
+  box-shadow:inset 0 0 0 4px var(--black-2);
+}
+/* view-only dot */
+.cog-dot {
+  display:inline-block;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  border:1.5px solid var(--border-2);
+  background:transparent;
+  vertical-align:middle;
+}
+.cog-dot.selected {
+  border-color:#2563eb;
+  background:#2563eb;
+  box-shadow:inset 0 0 0 4px var(--black-2);
+}
+/* bar chart icon */
+.cog-bar-icon {
+  display:inline-flex;
+  align-items:flex-end;
+  gap:2px;
+  height:13px;
+  margin-left:5px;
+  vertical-align:middle;
+}
+.cog-bar-icon span {
+  display:inline-block;
+  width:3px;
+  background:currentColor;
+  border-radius:1px;
+  opacity:0.7;
+}
+.cog-history-btn {
+  background:none;
+  border:1px solid var(--border-2);
+  color:var(--text-2);
+  border-radius:var(--radius-sm);
+  padding:8px 16px;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  cursor:pointer;
+  transition:all var(--transition);
+  align-self:flex-start;
+  margin-top:4px;
+}
+.cog-history-btn:hover { border-color:var(--blue); color:var(--blue); }
+/* legacy kept for safety */
+.cog-skill-group { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; }
+.cog-skill-group-head { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:12px; }
+.cog-skill-group-head strong { color:var(--text-1); font-size:13px; }
+.cog-skill-group-head span { color:var(--text-3); font-size:10px; font-family:'DM Mono',monospace; }
+.cog-skill-grid { display:grid; gap:8px; }
+.cog-skill-row { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 11px; color:var(--text-2); font-size:12px; }
+.cog-skill-row strong { width:32px; height:28px; display:inline-flex; align-items:center; justify-content:center; background:var(--black-4); color:var(--blue); border-radius:8px; font-family:'DM Mono',monospace; }
+@media (max-width:800px) {
+  .cog-modal-body { flex-direction:column; }
+  .cog-student-panel { width:100%; max-width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:300px; }
+}
+.cog-modal-foot {
+  padding:16px 22px;
+  border-top:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.staff-filter-pill.active,
+.staff-status-on,
+.gb-manage-btn,
+.cog-view-btn,
+.cog-action-btn {
+  background:var(--green);
+  border-color:var(--green);
+  color:var(--black);
+  box-shadow:none;
+}
+.cog-action-icon.view::before {
+  border-color:var(--black);
+}
+.cog-action-icon.view::after,
+.cog-action-icon.edit::before {
+  background:var(--black);
+}
+.cog-action-icon.edit::after {
+  border-left-color:var(--black);
+}
+@media (max-width: 1100px) {
+  .gb-filter-grid { grid-template-columns:repeat(2,minmax(150px,1fr)); }
+  .gb-tools { grid-template-columns:1fr; }
+  .gb-search { justify-self:stretch; }
+  .cog-filter-grid { grid-template-columns:1fr; }
+}
+@media (max-width: 1100px) {
+  .staff-summary-row { grid-template-columns:repeat(3,minmax(150px,1fr)); }
+}
+@media (max-width: 760px) {
+  .staff-employee-page { margin:-26px -16px; padding:0 14px 24px; }
+  .staff-summary-row { grid-template-columns:1fr; }
+  .staff-session-box { display:none; }
+}
+/* END CODEX ADMIN SIDEBAR */
+</style>
+</head>
+<body>
+<div class="portal-wrap">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar admin-layout-sidebar">
+    <div class="sidebar-logo admin-brand">
+      <div class="logo-mark-sm">UG</div>
+      <div><div class="logo-name-sm">Unique School</div><div class="logo-sub-sm">Admin Portal</div></div>
+    </div>
+    <div class="user-pill admin-user-card">
+      <div class="avatar" id="a-avatar">MC</div>
+      <div>
+        <div class="u-name" id="a-name">Loading...</div>
+        <div class="u-sub">Administration</div>
+      </div>
+    </div>
+    <div class="admin-quick-search">
+      <span class="admin-search-icon">Q</span>
+      <input type="search" placeholder="Quick search" oninput="filterAdminSidebar(this.value)">
+    </div>
+    <div class="nav-group admin-sidebar-body">
+      <div class="admin-rail">
+        <button type="button" class="rail-item active" data-section="dashboard" onclick="showAdminSection('dashboard', this, 'dashboard')"><span class="rail-icon">D</span><span>Dashboard</span></button>
+        <button type="button" class="rail-item" data-section="admission" onclick="showAdminSection('admission', this, 'students')"><span class="rail-icon">+</span><span>Admission</span></button>
+        <button type="button" class="rail-item" data-section="people" onclick="showAdminSection('people', this, 'students')"><span class="rail-icon">P</span><span>People</span></button>
+        <button type="button" class="rail-item" data-section="academics" onclick="showAdminSection('academics', this, 'classes')"><span class="rail-icon">A</span><span>Academics</span></button>
+        <button type="button" class="rail-item" data-section="eclass" onclick="showAdminSection('eclass', this, 'eclass')"><span class="rail-icon">EC</span><span>E-Class</span></button>
+        <button type="button" class="rail-item" data-section="results" onclick="showAdminSection('results', this, 'resultsGradebook')"><span class="rail-icon">R</span><span>Results</span></button>
+        <button type="button" class="rail-item" data-section="finance" onclick="showAdminSection('finance', this, 'finance')"><span class="rail-icon">$</span><span>Finance</span></button>
+        <button type="button" class="rail-item" data-section="attendance" onclick="showAdminSection('attendance', this, 'attendance')"><span class="rail-icon">AT</span><span>Attendance</span></button>
+        <button type="button" class="rail-item" data-section="admin" onclick="showAdminSection('admin', this, 'announcements')"><span class="rail-icon">...</span><span>Admin</span></button>
+      </div>
+      <div class="admin-subnav">
+        <div class="sub-menu active" data-menu="dashboard">
+          <button type="button" class="sub-nav-item active" data-tab="dashboard" onclick="switchTab('dashboard', this)"><span class="sub-nav-icon">D</span><span>Dashboard Overview</span></button>
+        </div>
+
+        <div class="sub-menu" data-menu="admission">
+          <button type="button" class="sub-nav-item" data-tab="students" onclick="switchTab('students', this)"><span class="sub-nav-icon">+</span><span>Student Admission</span></button>
+        </div>
+
+        <div class="sub-menu" data-menu="people">
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('people-children','people-chev',this)"><span class="sub-nav-icon">P</span><span>People</span><span class="sub-chev" id="people-chev">v</span></button>
+          <div id="people-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="students" data-title="Students" data-sub="Student Records" onclick="switchTab('students', this, 'Students', 'Student Records')">Students</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="parents" onclick="switchTab('parents', this)">Parents</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="staff" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')">Staff / Employees</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="selfRegistration" onclick="switchTab('selfRegistration', this)">Self Registration</button>
+          </div>
+        </div>
+
+        <div class="sub-menu" data-menu="academics">
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('academics-children','academics-chev',this)"><span class="sub-nav-icon">A</span><span>Academics</span><span class="sub-chev" id="academics-chev">v</span></button>
+          <div id="academics-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="classes" data-title="Classes" data-sub="Classes and class arms" onclick="switchTab('classes', this, 'Classes', 'Classes and class arms')">Classes</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="subjects" data-title="Subjects" data-sub="Class subjects and subject bank" onclick="switchTab('subjects', this, 'Subjects', 'Class subjects and subject bank')">Subjects</button>
+          </div>
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('exams-children','exams-chev',this)"><span class="sub-nav-icon">?</span><span>Exams</span><span class="sub-chev" id="exams-chev">v</span></button>
+          <div id="exams-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="exams" onclick="switchTab('exams', this)">Exam Activities</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="academicTerms" onclick="switchTab('academicTerms', this)">Academic Terms / Periods</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="sessionExams" onclick="switchTab('sessionExams', this)">Session Exams / Reports</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="scheduleExam" onclick="switchTab('scheduleExam', this)">Schedule Exam: Add to Timetable</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="examTimetable" onclick="switchTab('examTimetable', this)">Exam Timetable</button>
+          </div>
+        </div>
+
+        <div class="sub-menu" data-menu="eclass">
+          <button type="button" class="sub-nav-item" data-tab="eclass" onclick="switchTab('eclass', this)"><span class="sub-nav-icon">EC</span><span>E-Class</span></button>
+        </div>
+
+        <div class="sub-menu" data-menu="results">
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('checker-children','checker-chev',this)"><span class="sub-nav-icon">[]</span><span>Result Checker</span><span class="sub-chev" id="checker-chev">v</span></button>
+          <div id="checker-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="studentResultChecker" onclick="switchTab('studentResultChecker', this)">Student Result Checker</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="classResultChecker" onclick="switchTab('classResultChecker', this)">Class Result Checker</button>
+          </div>
+          <button type="button" class="sub-nav-item result-gradebook-parent" onclick="toggleDropdown('gradebook-children','gradebook-chev',this)"><span class="sub-nav-icon">||</span><span>Results / Grade Book</span><span class="sub-chev" id="gradebook-chev">v</span></button>
+          <div id="gradebook-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="cbtGradebook" onclick="switchTab('cbtGradebook', this)">CBT Grade Book</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="dailyGradebook" onclick="switchTab('dailyGradebook', this)">Daily Grade Book</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="resultsGradebook" data-default="true" onclick="switchTab('resultsGradebook', this)">Results Grade Book</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="cognitiveSkills" onclick="switchTab('cognitiveSkills', this)">Cognitive Skills Assessment</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="publish" onclick="switchTab('publish', this)">Review And Publish Results</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="emailQueue" onclick="switchTab('emailQueue', this)">Results Email Delivery Queue</button>
+          </div>
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('rset-children','rset-chev',this)"><span class="sub-nav-icon">=</span><span>Result Settings</span><span class="sub-chev" id="rset-chev">v</span></button>
+          <div id="rset-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="gradingSystems" onclick="switchTab('gradingSystems', this)">Grading Systems</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="scoreDivisions" onclick="switchTab('scoreDivisions', this)">Templates / Assessments / Score Divisions</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="commentsBank" onclick="switchTab('commentsBank', this)">My Comments Bank</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="configCognitive" onclick="switchTab('configCognitive', this)">Configure Cognitive Skills</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="resultPrefs" onclick="switchTab('resultPrefs', this)">Result Sheet Preferences</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="clearCache" onclick="switchTab('clearCache', this)">Clear Result Cache</button>
+          </div>
+        </div>
+
+        <div class="sub-menu" data-menu="finance">
+          <button type="button" class="sub-nav-item" data-tab="finance" onclick="switchTab('finance', this)"><span class="sub-nav-icon">$</span><span>Finance</span></button>
+        </div>
+
+        <div class="sub-menu" data-menu="attendance">
+          <button type="button" class="sub-nav-item" data-tab="attendance" onclick="switchTab('attendance', this)"><span class="sub-nav-icon">AT</span><span>Attendance</span></button>
+        </div>
+
+        <div class="sub-menu" data-menu="admin">
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('admin-children','admin-chev',this)"><span class="sub-nav-icon">AD</span><span>Admin</span><span class="sub-chev" id="admin-chev">v</span></button>
+          <div id="admin-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="announcements" onclick="switchTab('announcements', this)">Announcements <span class="nav-badge" id="ann-badge" style="margin-left:6px;">4</span></button>
+            <button type="button" class="sub-nav-item result-child" data-tab="systemSettings" onclick="switchTab('systemSettings', this)">System Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="signout-btn" onclick="signOut()">Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-sub"  id="topbar-sub">Wednesday, 13 May 2026</span>
+      <div class="topbar-right">
+        <span class="chip-blue">ADMIN</span>
+        <span class="chip-green">TERM 2</span>
+        <div class="icon-btn">🔔<span class="notif-dot"></span></div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ━━━ DASHBOARD ━━━ -->
+      <div class="tab-panel active" id="tab-dashboard">
+        <div class="page-header">
+          <h2 id="a-greeting">Good morning, Mrs. Chukwu.</h2>
+          <p>School overview · Term 2, 2025/2026 · Wednesday, 13 May 2026</p>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card ac-green">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">🎓</div><span class="stat-delta delta-up">enrolled</span></div>
+            <div class="stat-value">248</div><div class="stat-label">Total Students</div>
+          </div>
+          <div class="stat-card ac-amber">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">👩‍🏫</div><span class="stat-delta delta-amber">active</span></div>
+            <div class="stat-value">18</div><div class="stat-label">Teaching Staff</div>
+          </div>
+          <div class="stat-card ac-blue">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);">🏫</div></div>
+            <div class="stat-value">12</div><div class="stat-label">Active Classes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">📊</div><span class="stat-delta delta-up">term avg</span></div>
+            <div class="stat-value" style="color:var(--green);">76%</div><div class="stat-label">School Average</div>
+          </div>
+        </div>
+
+        <div class="grid-3-1" style="margin-bottom:14px;">
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <!-- Class performance -->
+            <div class="card">
+              <div class="card-head"><span class="card-title">School-Wide Performance by Grade</span></div>
+              <div class="card-body" id="d-class-perf"></div>
+            </div>
+            <!-- Recent activity -->
+            <div class="card">
+              <div class="card-head"><span class="card-title">Recent System Activity</span></div>
+              <div class="card-body">
+                <div class="activity-item"><span class="act-dot" style="background:var(--green);"></span><div><div class="act-text"><strong>Mr. Adeyemi</strong> saved Mid-Term results for Class 4B — Mathematics</div><div class="act-time">10 MAY 2026 · 14:32</div></div></div>
+                <div class="activity-item"><span class="act-dot" style="background:var(--blue);"></span><div><div class="act-text"><strong>Mrs. Eze</strong> updated CA scores for Class 4B — English Language</div><div class="act-time">09 MAY 2026 · 11:15</div></div></div>
+                <div class="activity-item"><span class="act-dot" style="background:var(--amber);"></span><div><div class="act-text"><strong>3 teachers</strong> have pending result entries for Mid-Term Exam</div><div class="act-time">TODAY</div></div></div>
+                <div class="activity-item"><span class="act-dot" style="background:var(--border-2);"></span><div><div class="act-text"><strong>New student</strong> Zainab Yusuf enrolled in Grade 3B</div><div class="act-time">07 MAY 2026 · 09:45</div></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <!-- Quick summary -->
+            <div class="card">
+              <div class="card-head"><span class="card-title">Term Overview</span></div>
+              <div class="card-body">
+                <div class="perf-row"><span class="perf-key">Term 2 Progress</span><span class="perf-val pv-green">Week 9 / 14</span></div>
+                <div class="perf-row"><span class="perf-key">Mid-Term Results</span><span class="perf-val pv-amber">8 / 18 pending</span></div>
+                <div class="perf-row"><span class="perf-key">School Attendance</span><span class="perf-val pv-green">91%</span></div>
+                <div class="perf-row"><span class="perf-key">Next Examination</span><span class="perf-val">16 Jun 2026</span></div>
+                <div class="perf-row"><span class="perf-key">Mid-Term Break</span><span class="perf-val">23 May 2026</span></div>
+              </div>
+            </div>
+            <!-- Attendance by grade -->
+            <div class="card">
+              <div class="card-head"><span class="card-title">Attendance by Grade</span></div>
+              <div class="card-body" id="d-attendance"></div>
+            </div>
+            <!-- Staff breakdown -->
+            <div class="card">
+              <div class="card-head"><span class="card-title">Staff Breakdown</span></div>
+              <div class="card-body">
+                <div class="perf-row"><span class="perf-key">Academic Staff</span><span class="perf-val">13</span></div>
+                <div class="perf-row"><span class="perf-key">Admin Staff</span><span class="perf-val">3</span></div>
+                <div class="perf-row"><span class="perf-key">Support Staff</span><span class="perf-val">2</span></div>
+                <div class="perf-row"><span class="perf-key">On Leave</span><span class="perf-val pv-amber">1</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ ALL STUDENTS ━━━ -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <!-- ALL STUDENTS -->
+      <div class="tab-panel" id="tab-students">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
+          <div>
+            <h2 id="student-page-title">All Students</h2>
+            <p id="student-page-sub">Complete student directory - Term 2, 2025/2026</p>
+          </div>
+          <button class="ann-del" id="student-back-btn" onclick="clearStudentForm()" style="display:none;font-size:12px;">Back to Student Directory</button>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title" id="student-form-title">Add Student</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="field-label">Student ID</label>
+                <input class="field-input" id="new-student-id" placeholder="STU-2026-0001">
+              </div>
+              <div>
+                <label class="field-label">Password</label>
+                <input class="field-input" id="new-student-password" value="1234" placeholder="Auto password: 1234" readonly>
+              </div>
+              <div>
+                <label class="field-label">Full Name</label>
+                <input class="field-input" id="new-student-name" placeholder="Student name">
+              </div>
+              <div>
+                <label class="field-label">Initials</label>
+                <input class="field-input" id="new-student-initials" placeholder="Optional">
+              </div>
+              <div>
+                <label class="field-label">Parent Email</label>
+                <input class="field-input" id="new-student-parent-email" type="email" placeholder="parent@example.com">
+              </div>
+              <div>
+                <label class="field-label">Gender</label>
+                <select class="ctrl-select" id="new-student-gender">
+                  <option value="F">Female</option>
+                  <option value="M">Male</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Class</label>
+                <select class="ctrl-select" id="new-student-class"></select>
+              </div>
+              <div>
+                <label class="field-label">Current Avg</label>
+                <input class="field-input" id="new-student-avg" type="number" min="0" max="100" placeholder="0">
+              </div>
+              <div>
+                <label class="field-label">Attendance</label>
+                <input class="field-input" id="new-student-att" type="number" min="0" max="100" placeholder="100">
+              </div>
+              <div style="grid-column:1 / -1;">
+                <label class="field-label">Student Photo</label>
+                <input class="field-input" id="new-student-photo" type="file" accept="image/png,image/jpeg">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="ann-del" onclick="clearStudentForm()" id="student-cancel-label" style="font-size:12px;">Clear</button>
+              <button class="ann-del" onclick="openStudentDeleteModal()" id="student-delete-btn" style="display:none;font-size:12px;color:var(--red);">Delete Student</button>
+              <button class="post-btn" onclick="saveStudent()" id="student-save-label">Add Student</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="student-directory-card">
+          <div class="card-head">
+            <span class="card-title" id="stu-count-label">Student Directory</span>
+            <input class="search-input" id="stu-search" placeholder="Search by name or ID..." oninput="filterStudents()">
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>ID</th><th>Class</th><th>Gender</th><th>Avg Score</th><th>Grade</th><th>Attendance</th><th>Parent Email</th><th>Action</th></tr></thead>
+                <tbody id="stu-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="student-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+          <div role="dialog" aria-modal="true" aria-labelledby="student-delete-title" style="width:min(420px,100%);background:var(--black-2);border:1px solid rgba(239,68,68,0.35);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
+            <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+              <div id="student-delete-title" style="font-size:15px;font-weight:700;color:var(--red);">Delete this student?</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:3px;font-family:'DM Mono',monospace;">This action cannot be undone.</div>
+            </div>
+            <div style="padding:16px 18px;">
+              <p id="student-delete-body" style="font-size:13px;color:var(--text-2);line-height:1.5;"></p>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+                <button class="ann-del" onclick="closeStudentDeleteModal()" style="font-size:12px;">Cancel</button>
+                <button class="post-btn" id="student-delete-confirm" onclick="confirmDeleteStudent()" style="background:var(--red);color:#fff;">Delete Student</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- ALL STAFF -->
+      <div class="tab-panel" id="tab-staff">
+        <div class="staff-employee-page">
+          <div class="staff-breadcrumb-row">
+            <div>Dashboard <span style="padding:0 8px;">&gt;</span> Staff / Employees</div>
+            <div class="staff-session-box">
+              <div>Academic Session</div><div>2025-2026</div>
+              <div>Active Term</div><div>THIRD TERM</div>
+            </div>
+          </div>
+
+          <div class="staff-summary-row">
+            <div class="staff-summary-card active">
+              <span class="staff-summary-icon">G</span>
+              <div><div class="staff-summary-count" id="staff-count-all">0</div><div class="staff-summary-label">All Staff</div></div>
+            </div>
+            <div class="staff-summary-card teacher">
+              <span class="staff-summary-icon">T</span>
+              <div><div class="staff-summary-count" id="staff-count-teacher">0</div><div class="staff-summary-label">Teacher</div></div>
+            </div>
+            <div class="staff-summary-card accountant">
+              <span class="staff-summary-icon">B</span>
+              <div><div class="staff-summary-count" id="staff-count-accountant">0</div><div class="staff-summary-label">Accountant/Bu...</div></div>
+            </div>
+            <div class="staff-summary-card librarian">
+              <span class="staff-summary-icon">L</span>
+              <div><div class="staff-summary-count" id="staff-count-librarian">0</div><div class="staff-summary-label">Librarian</div></div>
+            </div>
+            <div class="staff-summary-card registrar">
+              <span class="staff-summary-icon">R</span>
+              <div><div class="staff-summary-count" id="staff-count-registrar">0</div><div class="staff-summary-label">Registrar</div></div>
+            </div>
+            <div class="staff-summary-card transport">
+              <span class="staff-summary-icon">M</span>
+              <div><div class="staff-summary-count" id="staff-count-transport">0</div><div class="staff-summary-label">Transport Man...</div></div>
+            </div>
+          </div>
+
+          <div class="staff-filter-row" id="staff-role-filters"></div>
+
+          <div class="staff-directory-shell">
+            <div class="staff-toolbar">
+              <button type="button" class="staff-export-btn" onclick="exportStaffList()">Export List ▾</button>
+              <input class="staff-search-light" id="staff-search" placeholder="Search" oninput="filterStaff()">
+            </div>
+            <div class="staff-toolbar" style="margin-bottom:28px;">
+              <label class="staff-page-size">
+                <select>
+                  <option>50</option>
+                  <option>25</option>
+                  <option>10</option>
+                </select>
+                records per page
+              </label>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="staff-table">
+                <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Designation</th><th>Phone</th><th>Profile</th><th>Account<br>Status</th></tr></thead>
+                <tbody id="staff-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="staff-form-light" id="staff-form-card">
+            <div class="card-head"><span class="card-title" id="staff-form-title">Add Staff / Employee</span></div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;">
+                <div>
+                  <label class="field-label">Staff ID</label>
+                  <input class="field-input" id="new-staff-id" placeholder="TCH-009 or ADM-002">
+                </div>
+                <div>
+                  <label class="field-label">Password</label>
+                  <input class="field-input" id="new-staff-password" placeholder="Temporary password">
+                </div>
+                <div>
+                  <label class="field-label">Full Name</label>
+                  <input class="field-input" id="new-staff-name" placeholder="Staff name">
+                </div>
+                <div>
+                  <label class="field-label">Initials</label>
+                  <input class="field-input" id="new-staff-initials" placeholder="Optional">
+                </div>
+                <div>
+                  <label class="field-label">Role</label>
+                  <select class="ctrl-select" id="new-staff-role" onchange="syncStaffRoleFields()">
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Teacher Type</label>
+                  <select class="ctrl-select" id="new-staff-teacher-type">
+                    <option value="class_teacher">Class Teacher</option>
+                    <option value="subject_teacher">Subject Teacher</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="ann-del" onclick="clearStaffForm()" style="font-size:12px;color:#64748b;">Clear</button>
+                <button class="post-btn" onclick="saveStaff()" id="staff-save-label">Add Staff</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-announcements">
+        <div class="page-header"><h2>Announcements</h2><p>Post and manage school-wide notices</p></div>
+
+        <!-- Post form -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Post New Announcement</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="field-label">Title</label>
+                <input type="text" class="field-input" id="ann-title-in" placeholder="Announcement title…">
+              </div>
+              <div>
+                <label class="field-label">Audience</label>
+                <select class="ctrl-select" id="ann-audience">
+                  <option value="all">All — Students &amp; Staff</option>
+                  <option value="students">Students Only</option>
+                  <option value="staff">Staff Only</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="field-label">Priority</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-2);">
+                  <input type="radio" name="priority" value="normal" checked style="accent-color:var(--green);"> Normal
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--amber);">
+                  <input type="radio" name="priority" value="important" style="accent-color:var(--amber);"> Important
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--red);">
+                  <input type="radio" name="priority" value="urgent" style="accent-color:var(--red);"> Urgent
+                </label>
+              </div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="field-label">Message</label>
+              <textarea class="field-input" id="ann-body-in" placeholder="Write your announcement here…" style="height:90px;resize:vertical;font-family:'DM Sans',sans-serif;line-height:1.5;"></textarea>
+            </div>
+            <button class="post-btn" onclick="postAnnouncement()">Post Announcement →</button>
+          </div>
+        </div>
+
+        <!-- Existing announcements -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">All Announcements</span>
+            <span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;" id="ann-count-label">4 active</span>
+          </div>
+          <div class="card-body" id="ann-list">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- RESULTS SETUP -->
+      <!-- SYSTEM SETTINGS -->
+      <div class="tab-panel" id="tab-systemSettings">
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div><h2>System Settings</h2><p>Configure school information, contact details, and system preferences.</p></div>
+          <input class="bs-search-input" placeholder="Search Settings…" style="width:220px;" oninput="sysFilterSettings(this.value)">
+        </div>
+
+        <!-- School Information -->
+        <div class="card sys-section" data-label="school information" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">School Information</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label class="field-label">School Name</label><input class="field-input" id="sys-school-name" value="Little Scholars"></div>
+              <div><label class="field-label">School Motto / Slogan / Tagline</label><input class="field-input" id="sys-motto" placeholder="-"></div>
+              <div><label class="field-label">Our Mission</label><input class="field-input" id="sys-mission" placeholder=""></div>
+              <div><label class="field-label">Our Vision</label><input class="field-input" id="sys-vision" placeholder=""></div>
+              <div><label class="field-label">Our Core Values</label><input class="field-input" id="sys-values" placeholder=""></div>
+              <div><label class="field-label">School Head Staff Title</label><input class="field-input" id="sys-head-title" value="Head of School"></div>
+              <div><label class="field-label">Student Naming Terminology</label><input class="field-input" id="sys-student-term" value="student"></div>
+              <div><label class="field-label">Students' Admission / Registration Number Prefix</label><input class="field-input" id="sys-reg-prefix" value="LS/{ADMISSION_YEAR}/"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="card sys-section" data-label="contact information" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Contact Information</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label class="field-label">School Address</label><input class="field-input" id="sys-address" placeholder="Street address"></div>
+              <div><label class="field-label">City / State</label><input class="field-input" id="sys-city" placeholder="Lagos"></div>
+              <div><label class="field-label">Country</label><select class="ctrl-select" id="sys-country"><option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>South Africa</option><option>United Kingdom</option><option>United States</option></select></div>
+              <div><label class="field-label">School Email <span style="font-size:10px;color:var(--text-3)">(main)</span></label><input class="field-input" id="sys-email" type="email" placeholder="info@school.com"></div>
+              <div><label class="field-label">Alternate Email(s) <span style="font-size:10px;color:var(--text-3)">(comma separated)</span></label><input class="field-input" id="sys-email-alt" placeholder=""></div>
+              <div><label class="field-label">School Phone <span style="font-size:10px;color:var(--text-3)">(main)</span></label><input class="field-input" id="sys-phone" placeholder="08034106866"></div>
+              <div><label class="field-label">Alternate Phone(s) <span style="font-size:10px;color:var(--text-3)">(comma separated)</span></label><input class="field-input" id="sys-phone-alt" placeholder=""></div>
+              <div><label class="field-label">School WhatsApp Number</label><input class="field-input" id="sys-whatsapp" placeholder="08012345678"></div>
+              <div style="grid-column:span 2;display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:flex-end;">
+                <div><label class="field-label">Embed WhatsApp Chat</label><select class="ctrl-select" id="sys-wa-btn"><option>Enable</option><option>Disable</option></select></div>
+                <div><label class="field-label">Chat Button Message</label><input class="field-input" id="sys-wa-msg" value="Hello! Chat with us on WhatsApp. We're here to help!"></div>
+              </div>
+              <div><label class="field-label">Fees Payment Support Contact Desk <span style="font-size:10px;color:var(--text-3)">[phone(s) | email(s)]</span></label><input class="field-input" id="sys-fees-desk" placeholder="E.g. 08012345678 | payment-support@example.com"></div>
+              <div><label class="field-label">Admission Support Contact Desk <span style="font-size:10px;color:var(--text-3)">[phone(s) | email(s)]</span></label><input class="field-input" id="sys-admission-desk" placeholder="E.g. 08023456789 | admission-support@example.com"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Online Presence & Website -->
+        <div class="card sys-section" data-label="online presence website" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Online Presence &amp; Website</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label class="field-label">Active Services</label><select class="ctrl-select" id="sys-services"><option>School Portal Only</option><option>School Portal + Website</option><option>Website Only</option></select></div>
+              <div><label class="field-label">Google Analytics Tag ID</label><input class="field-input" id="sys-ga" placeholder="G-XXXXXXXXXX"></div>
+              <div><label class="field-label">Main School Website Homepage URL</label><input class="field-input" id="sys-website" placeholder="https://www.school.com/"></div>
+              <div><label class="field-label">Website Contact Page URL</label><input class="field-input" id="sys-contact-url" placeholder="https://www.school.com/contact.html"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Localization -->
+        <div class="card sys-section" data-label="localization currency timezone" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Localization</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label class="field-label">Currency</label><select class="ctrl-select" id="sys-currency"><option>Nigerian naira (₦)</option><option>US Dollar ($)</option><option>British Pound (£)</option><option>Ghanaian Cedi (₵)</option><option>Kenyan Shilling (KSh)</option></select></div>
+              <div><label class="field-label">Timezone</label><select class="ctrl-select" id="sys-timezone"><option>(GMT+1:00) Africa/Lagos (Western African Time)</option><option>(GMT+0:00) UTC</option><option>(GMT+3:00) Africa/Nairobi</option><option>(GMT-5:00) America/New_York</option><option>(GMT+0:00) Europe/London</option></select></div>
+              <div style="grid-column:span 2;"><label class="field-label">Multi-Timezone Timetable / Schedules</label><select class="ctrl-select" id="sys-multitz" style="max-width:260px;"><option>Disabled</option><option>Enabled</option></select><div style="font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;">When enabled, each user can view timetables/schedules converted to their local timezone. Recommended only for schools running online programmes (with a global audience).</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications & Alerts -->
+        <div class="card sys-section" data-label="notifications alerts attendance email" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Notifications &amp; Alerts</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div><label class="field-label">Absence on Attendance Alert to Parent</label><select class="ctrl-select" id="sys-att-alert"><option>Disable</option><option>Enable</option></select></div>
+              <div><label class="field-label">Attendance Notification Channels</label><select class="ctrl-select" id="sys-att-channel"><option>Email</option><option>SMS</option><option>Email + SMS</option><option>WhatsApp</option></select></div>
+              <div><label class="field-label">Send New User Account Details Email</label><select class="ctrl-select" id="sys-new-user-email"><option>Yes</option><option>No</option></select></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;padding-bottom:20px;">
+          <button class="post-btn" style="padding:11px 36px;font-size:13px;" onclick="saveSystemSettings()">&#x1F4BE; Save Settings</button>
+        </div>
+      </div>
+
+      <!-- Create Session Modal -->
+      <div id="ss-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;" onclick="if(event.target===this)closeSessionModal()">
+        <div style="background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);padding:26px;width:420px;max-width:94vw;" onclick="event.stopPropagation()">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+            <span style="font-size:14px;font-weight:700;">New Academic Session</span>
+            <button onclick="closeSessionModal()" style="background:none;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:0;">✕</button>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="field-label">Session Label</label>
+            <input class="field-input" id="ss-modal-session" placeholder="e.g. 2026/2027">
+          </div>
+          <div style="margin-bottom:18px;">
+            <label class="field-label">Term / Period Name</label>
+            <input class="field-input" id="ss-modal-term" placeholder="e.g. First Term">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="closeSessionModal()" style="background:none;border:1px solid var(--border-2);color:var(--text-3);border-radius:var(--radius-sm);padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;">Cancel</button>
+            <button class="post-btn" onclick="createSessionFromModal()">Create Session</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS SETUP -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="page-header"><h2>Setup</h2><p id="setup-summary">Loading teacher assignments...</p></div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Assign Teachers to Classes and Subjects</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1.2fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="field-label">Teacher</label>
+                <select class="ctrl-select" id="assign-teacher"></select>
+              </div>
+              <div>
+                <label class="field-label">Teacher Type</label>
+                <select class="ctrl-select" id="assign-type">
+                  <option value="class_teacher">Class Teacher</option>
+                  <option value="subject_teacher">Subject Teacher</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Class</label>
+                <select class="ctrl-select" id="assign-class"></select>
+              </div>
+              <div>
+                <label class="field-label">Subject</label>
+                <select class="ctrl-select" id="assign-subject"></select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="ann-del" onclick="clearAssignmentForm()" style="font-size:12px;">Clear</button>
+              <button class="post-btn" onclick="saveAssignment()" id="assign-save-label">Save Assignment</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Current Result Upload Assignments</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Teacher</th><th>Type</th><th>Class</th><th>Subject</th><th>Actions</th></tr></thead>
+                <tbody id="assignment-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- GRADING SYSTEMS -->
+      <div class="tab-panel" id="tab-gradingSystems">
+        <div class="page-header"><h2>Grading Systems</h2><p>Configure grade boundaries and remarks for result sheets.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Grade Scale</span><button class="post-btn" style="margin-left:auto" onclick="showToast('Save grading system coming soon','info')">Save Changes</button></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table" id="grading-table">
+                <thead><tr><th>#</th><th>Grade</th><th>Min Score (%)</th><th>Max Score (%)</th><th>Remark</th><th>Grade Point</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td><input class="field-input" value="A" style="width:50px"></td><td><input class="field-input" value="80" style="width:70px" type="number"></td><td><input class="field-input" value="100" style="width:70px" type="number"></td><td><input class="field-input" value="Excellent"></td><td><input class="field-input" value="5.0" style="width:70px"></td></tr>
+                  <tr><td>2</td><td><input class="field-input" value="B" style="width:50px"></td><td><input class="field-input" value="65" style="width:70px" type="number"></td><td><input class="field-input" value="79" style="width:70px" type="number"></td><td><input class="field-input" value="Very Good"></td><td><input class="field-input" value="4.0" style="width:70px"></td></tr>
+                  <tr><td>3</td><td><input class="field-input" value="C" style="width:50px"></td><td><input class="field-input" value="55" style="width:70px" type="number"></td><td><input class="field-input" value="64" style="width:70px" type="number"></td><td><input class="field-input" value="Good"></td><td><input class="field-input" value="3.0" style="width:70px"></td></tr>
+                  <tr><td>4</td><td><input class="field-input" value="D" style="width:50px"></td><td><input class="field-input" value="45" style="width:70px" type="number"></td><td><input class="field-input" value="54" style="width:70px" type="number"></td><td><input class="field-input" value="Fair"></td><td><input class="field-input" value="2.0" style="width:70px"></td></tr>
+                  <tr><td>5</td><td><input class="field-input" value="F" style="width:50px"></td><td><input class="field-input" value="0" style="width:70px" type="number"></td><td><input class="field-input" value="44" style="width:70px" type="number"></td><td><input class="field-input" value="Fail"></td><td><input class="field-input" value="0.0" style="width:70px"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TEMPLATES / ASSESSMENTS / SCORE DIVISIONS -->
+      <div class="tab-panel" id="tab-scoreDivisions">
+        <div class="page-header"><h2>Templates / Assessments / Score Divisions</h2><p>Configure assessment score divisions per class and exam type.</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Select Options</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:flex-end;">
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="sd-class"></select></div>
+              <div><label class="field-label">Exam Session</label><select class="ctrl-select" id="sd-session"></select></div>
+              <div><label class="field-label">Exam</label><select class="ctrl-select" id="sd-exam"></select></div>
+              <button class="post-btn" onclick="sdViewDivisions()">View Score Divisions</button>
+            </div>
+          </div>
+        </div>
+        <div id="sd-format-card" style="display:none;" class="card" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Report Format</span></div>
+          <div class="card-body">
+            <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">Report Format for this Result</div>
+            <div id="sd-format-label" style="font-size:12px;color:var(--text-2);margin-bottom:12px;"></div>
+            <select class="ctrl-select" style="max-width:260px;" id="sd-format-select">
+              <option>Score-based Report</option>
+              <option>Grade-based Report</option>
+              <option>Percentage Report</option>
+            </select>
+          </div>
+        </div>
+        <div id="sd-divisions-card" style="display:none;" class="card">
+          <div class="card-head">
+            <span class="card-title" id="sd-divisions-title">Assessments / Score Divisions</span>
+            <button class="post-btn" style="margin-left:auto" onclick="showToast('Edit score divisions coming soon','info')">&#x270E; Edit Score Divisions</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table" id="sd-table">
+                <thead><tr><th>#</th><th>Assessment / Score Division Name</th><th>Max Obtainable Mark</th><th>Status</th></tr></thead>
+                <tbody id="sd-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MY COMMENTS BANK -->
+      <div class="tab-panel" id="tab-commentsBank">
+        <div class="page-header"><h2>My Comments Bank</h2><p>Manage pre-written teacher remarks applied automatically by score range.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Result Comments Bank</span>
+            <button class="post-btn" style="margin-left:auto" onclick="openAddCommentModal()">+ Add Comment</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="padding:12px 18px 0;"><input class="bs-search-input" placeholder="Search comments…" oninput="cbFilterComments(this.value)" style="width:100%;max-width:340px;margin-left:auto;display:block;"></div>
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table" id="cb-table">
+                <thead><tr><th>#</th><th>Comment / Remark</th><th>Applies to Total Score Averages Between</th><th>Options</th></tr></thead>
+                <tbody id="cb-tbody"><tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- Add/Edit Comment Modal -->
+        <div id="cb-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;">
+          <div class="card" style="width:min(560px,95%);padding:0;">
+            <div class="card-head"><span class="card-title" id="cb-modal-title">Add Comment</span><button class="cog-modal-close" onclick="closeCbModal()">&#x2715;</button></div>
+            <div class="card-body" style="padding:20px;">
+              <div style="margin-bottom:14px;"><label class="field-label">Comment / Remark</label><textarea class="field-input" id="cb-text" rows="3" placeholder="Enter teacher remark…" style="resize:vertical;"></textarea></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                <div><label class="field-label">Min Score (%)</label><input class="field-input" id="cb-min" type="number" min="0" max="100" placeholder="e.g. 80"></div>
+                <div><label class="field-label">Max Score (%)</label><input class="field-input" id="cb-max" type="number" min="0" max="100" placeholder="e.g. 100"></div>
+              </div>
+              <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="ann-del" onclick="closeCbModal()">Cancel</button>
+                <button class="post-btn" onclick="saveCbComment()">Save Comment</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONFIGURE COGNITIVE SKILLS -->
+      <div class="tab-panel" id="tab-configCognitive">
+        <div class="page-header"><h2>Configure Cognitive / Other Skills</h2><p>Manage the list of affective and psychomotor skills assessed on student reports.</p></div>
+        <div class="card">
+          <div class="card-body" style="padding:0 18px 14px;">
+            <div style="margin:16px 0 8px;display:flex;align-items:center;gap:10px;">
+              <span style="font-size:13px;font-weight:700;color:#2563eb;">Affective Skills</span>
+              <button class="post-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="showToast('Edit skills set coming soon','info')">&#x270E; Edit Skills Set</button>
+            </div>
+            <table class="data-table" style="margin-bottom:20px;">
+              <thead><tr><th>#</th><th>Skill Name</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>Punctuality</td><td></td></tr>
+                <tr><td>2</td><td>Attentiveness</td><td></td></tr>
+                <tr><td>3</td><td>Neatness</td><td></td></tr>
+                <tr><td>4</td><td>Honesty</td><td></td></tr>
+                <tr><td>5</td><td>Politeness</td><td></td></tr>
+                <tr><td>6</td><td>Perseverance</td><td></td></tr>
+                <tr><td>7</td><td>Relationship with Others</td><td></td></tr>
+                <tr><td>8</td><td>Organization Ability</td><td></td></tr>
+              </tbody>
+            </table>
+            <div style="margin:16px 0 8px;display:flex;align-items:center;gap:10px;">
+              <span style="font-size:13px;font-weight:700;color:#e88c2e;">Psychomotor Skills</span>
+              <button class="post-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="showToast('Edit skills set coming soon','info')">&#x270E; Edit Skills Set</button>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>#</th><th>Skill Name</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td>9</td><td>Hand Writing</td><td></td></tr>
+                <tr><td>10</td><td>Drawing and Painting</td><td></td></tr>
+                <tr><td>11</td><td>Speech / Verbal Fluency</td><td></td></tr>
+                <tr><td>12</td><td>Quantitative Reasoning</td><td></td></tr>
+                <tr><td>13</td><td>Processing Speed</td><td></td></tr>
+                <tr><td>14</td><td>Retentiveness</td><td></td></tr>
+                <tr><td>15</td><td>Visual Memory</td><td></td></tr>
+                <tr><td>16</td><td>Public Speaking</td><td></td></tr>
+                <tr><td>17</td><td>Sports and Games</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULT SHEET PREFERENCES -->
+      <div class="tab-panel" id="tab-resultPrefs">
+        <div class="page-header"><h2>Result Sheet Preferences</h2><p>Control what appears on student report sheets.</p></div>
+        <!-- 3 sub-tabs -->
+        <div class="rsp-tabs">
+          <button class="rsp-tab active" id="rsp-btn-sheet" onclick="switchRspTab('sheet')">&#x1F4CB; Report Sheet Preferences</button>
+          <button class="rsp-tab" id="rsp-btn-comments" onclick="switchRspTab('comments')">&#x1F4AC; Report Comments Settings</button>
+          <button class="rsp-tab" id="rsp-btn-promo" onclick="switchRspTab('promo')">&#x2191; Promotion Criteria Settings</button>
+        </div>
+
+        <!-- Sheet Preferences -->
+        <div id="rsp-sheet" class="rsp-body">
+          <div style="margin-bottom:14px;"><input class="bs-search-input" placeholder="Search settings…" oninput="rspFilter(this.value)" style="width:100%;max-width:340px;margin:0 auto;display:block;"></div>
+          <div id="rsp-prefs-list">
+            <div class="rsp-section-head">School Info</div>
+            <div class="rsp-row" data-key="motto"><span>Display School Motto</span><button class="rsp-toggle off" onclick="rspToggle(this,'motto')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="mission"><span>Display School Mission Statement</span><button class="rsp-toggle off" onclick="rspToggle(this,'mission')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="vision"><span>Display School Vision Statement</span><button class="rsp-toggle off" onclick="rspToggle(this,'vision')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="coreValues"><span>Display School Core Values Statement</span><button class="rsp-toggle off" onclick="rspToggle(this,'coreValues')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="watermark"><span>Logo Background Watermark</span><button class="rsp-toggle on" onclick="rspToggle(this,'watermark')"><span>ON</span></button></div>
+
+            <div class="rsp-section-head">Student Biodata</div>
+            <div class="rsp-row" data-key="passportPhoto"><span>Student Passport Photo</span><button class="rsp-toggle on" onclick="rspToggle(this,'passportPhoto')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="gender"><span>Display Student Gender</span><button class="rsp-toggle on" onclick="rspToggle(this,'gender')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="age"><span>Display Student Age</span><button class="rsp-toggle on" onclick="rspToggle(this,'age')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="dob"><span>Display Student Date of Birth</span><button class="rsp-toggle on" onclick="rspToggle(this,'dob')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="hostel"><span>Display Student House / Hostel</span><button class="rsp-toggle off" onclick="rspToggle(this,'hostel')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Performance Summary</div>
+            <div class="rsp-row" data-key="perfPos"><span>Student Performance Position</span><button class="rsp-toggle off" onclick="rspToggle(this,'perfPos')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="classSize"><span>Number of Students in Class</span><button class="rsp-toggle on" onclick="rspToggle(this,'classSize')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="gpa"><span>Grade Point Average</span><button class="rsp-toggle off" onclick="rspToggle(this,'gpa')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="perfGrade"><span>Student Performance Grade of Total Score Average</span><button class="rsp-toggle on" onclick="rspToggle(this,'perfGrade')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="classAvg"><span>Class Grand Average</span><button class="rsp-toggle off" onclick="rspToggle(this,'classAvg')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Subjects Scores</div>
+            <div class="rsp-row" data-key="groupSubjects"><span>Group Subjects By Types</span><button class="rsp-toggle off" onclick="rspToggle(this,'groupSubjects')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="scoreDivCols"><span>Show Score Divisions Columns</span><button class="rsp-toggle on" onclick="rspToggle(this,'scoreDivCols')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="scoreDecimal"><span>Score Decimal Formatting</span><button class="rsp-toggle off" onclick="rspToggle(this,'scoreDecimal')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjectCode"><span>Subject Code Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjectCode')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjectUnits"><span>Subject Units Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjectUnits')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="scoreGrade"><span>Score Grade Column</span><button class="rsp-toggle on" onclick="rspToggle(this,'scoreGrade')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="scoreGradePoint"><span>Score Grade Point Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'scoreGradePoint')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="scoreRemark"><span>Score Grade Remark Column</span><button class="rsp-toggle on" onclick="rspToggle(this,'scoreRemark')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="subjPos"><span>Subject Performance Position Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjPos')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjAvg"><span>Subject Average Score Obtained Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjAvg')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjHighest"><span>Subject Highest Score Obtained Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjHighest')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjLowest"><span>Subject Lowest Score Obtained Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjLowest')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjTeacher"><span>Subject Teacher Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjTeacher')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="subjTeacherComment"><span>Subject Teacher Comment / Progress Report Column</span><button class="rsp-toggle off" onclick="rspToggle(this,'subjTeacherComment')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="failRed"><span>Show Failed Scores (Less Than Subject Pass Mark) in Red</span><button class="rsp-toggle off" onclick="rspToggle(this,'failRed')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="passBlue"><span>Show Passed Scores in Blue</span><button class="rsp-toggle off" onclick="rspToggle(this,'passBlue')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="scoreComparison"><span>Score Comparison Columns (From Other Results of Same Session)</span><button class="rsp-toggle off" onclick="rspToggle(this,'scoreComparison')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="excludedSubjects"><span>Show Students Excluded Subjects in Their Result Sheet</span><button class="rsp-toggle off" onclick="rspToggle(this,'excludedSubjects')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="cumAvg"><span>Display Average Calculations on Cummulative Report</span><button class="rsp-toggle off" onclick="rspToggle(this,'cumAvg')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="cumTotal"><span>Subject Cummulative Total Column on Cummulative Report</span><button class="rsp-toggle off" onclick="rspToggle(this,'cumTotal')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Fees Info</div>
+            <div class="rsp-row" data-key="nextTermFees"><span>Next Term Fees Info</span><button class="rsp-toggle off" onclick="rspToggle(this,'nextTermFees')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="unpaidFees"><span>This Term Student Unpaid Fees Info</span><button class="rsp-toggle off" onclick="rspToggle(this,'unpaidFees')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Skills Assessment</div>
+            <div class="rsp-row" data-key="affective"><span>Student Affective Skills Assessment</span><button class="rsp-toggle on" onclick="rspToggle(this,'affective')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="psychomotor"><span>Student Psychomotor Skills Assessment</span><button class="rsp-toggle on" onclick="rspToggle(this,'psychomotor')"><span>ON</span></button></div>
+
+            <div class="rsp-section-head">Attendance Report</div>
+            <div class="rsp-row" data-key="attendance"><span>Attendance Report</span><button class="rsp-toggle on" onclick="rspToggle(this,'attendance')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="lessonAtt"><span>Lesson Attendance Report</span><button class="rsp-toggle off" onclick="rspToggle(this,'lessonAtt')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Comments and Signatures</div>
+            <div class="rsp-row" data-key="ftComment"><span>Form Teacher Comment</span><button class="rsp-toggle on" onclick="rspToggle(this,'ftComment')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="ftSig"><span>Form Teacher Signature</span><button class="rsp-toggle on" onclick="rspToggle(this,'ftSig')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="hosComment"><span>Head of School Comment</span><button class="rsp-toggle on" onclick="rspToggle(this,'hosComment')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="hosSig"><span>Head of School Signature</span><button class="rsp-toggle on" onclick="rspToggle(this,'hosSig')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="extComments"><span>Extended Comments and Progress Reports</span><button class="rsp-toggle off" onclick="rspToggle(this,'extComments')"><span>OFF</span></button></div>
+            <div class="rsp-row" data-key="promoStatus"><span>Promoted Status Indicator on Cummulative Reports</span><button class="rsp-toggle off" onclick="rspToggle(this,'promoStatus')"><span>OFF</span></button></div>
+
+            <div class="rsp-section-head">Additional Info</div>
+            <div class="rsp-row" data-key="summaryChart"><span>Result Summary Chart</span><button class="rsp-toggle on" onclick="rspToggle(this,'summaryChart')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="nextTermName"><span>Next Term Name</span><button class="rsp-toggle on" onclick="rspToggle(this,'nextTermName')"><span>ON</span></button></div>
+            <div class="rsp-row" data-key="nextTermDate"><span>Next Term Resumption Date</span><button class="rsp-toggle on" onclick="rspToggle(this,'nextTermDate')"><span>ON</span></button></div>
+
+            <div class="rsp-section-head">Colors</div>
+            <div class="rsp-row"><span>Result Sheet Main Color</span><input type="color" class="rsp-color" id="rsp-color-main" value="#1e3a5f"></div>
+            <div class="rsp-row"><span>Result Sheet Text on Main Color</span><input type="color" class="rsp-color" id="rsp-color-text" value="#ffffff"></div>
+            <div class="rsp-row"><span>Result Sheet Table Border Color</span><input type="color" class="rsp-color" id="rsp-color-border" value="#9ca3af"></div>
+          </div>
+          <div class="rsp-note">
+            <strong>NOTE:</strong> Changes made here will reflect on new results when published, but may not reflect instantly on already published results. After making changes here, you may need to clear the results cache to allow them to pick up the new changes.
+          </div>
+        </div>
+
+        <!-- Report Comments Settings -->
+        <div id="rsp-comments" class="rsp-body" style="display:none;">
+          <h3 style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:16px;">Extended Result Comments Settings</h3>
+          <div class="rsp-comment-card">
+            <div class="rsp-comment-head">
+              <div><div style="font-size:14px;font-weight:700">Subjects Progress Report</div><div style="margin-top:4px;"><span class="rsp-type-badge">Subject Teacher Comment</span></div></div>
+              <div style="display:flex;align-items:center;gap:10px;margin-left:auto;"><span style="font-size:12px;color:var(--text-3)">Status</span><button class="rsp-toggle on" onclick="rspToggle(this,'extSubjProgress')"><span>ON</span></button></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div><label class="field-label">Comment Title</label><input class="field-input" value="Subjects Progress Report"></div>
+              <div><label class="field-label">Commenter Staff Title</label><input class="field-input" value="Subject Teacher"></div>
+            </div>
+            <table class="data-table"><thead><tr><th>Option</th><th style="width:120px">Show</th></tr></thead><tbody>
+              <tr><td>Comment</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_comment')"><span>ON</span></button></td></tr>
+              <tr><td>Recommendation</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_rec')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Name</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_name')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Signature</td><td><button class="rsp-toggle off" onclick="rspToggle(this,'ec_subj_sig')"><span>OFF</span></button></td></tr>
+              <tr><td>Subject Name</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_sname')"><span>ON</span></button></td></tr>
+              <tr><td>Subject Unit</td><td><button class="rsp-toggle off" onclick="rspToggle(this,'ec_subj_unit')"><span>OFF</span></button></td></tr>
+              <tr><td>Total Score</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_total')"><span>ON</span></button></td></tr>
+              <tr><td>Letter Grade</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_grade')"><span>ON</span></button></td></tr>
+              <tr><td>Grade Remark</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_remark')"><span>ON</span></button></td></tr>
+              <tr><td>Grade Descriptor</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_subj_desc')"><span>ON</span></button></td></tr>
+              <tr><td>Grade Point</td><td><button class="rsp-toggle off" onclick="rspToggle(this,'ec_subj_point')"><span>OFF</span></button></td></tr>
+            </tbody></table>
+          </div>
+          <div class="rsp-comment-card">
+            <div class="rsp-comment-head">
+              <div><div style="font-size:14px;font-weight:700">Class Progress Report</div><div style="margin-top:4px;"><span class="rsp-type-badge">Form Teacher Comment</span></div></div>
+              <div style="display:flex;align-items:center;gap:10px;margin-left:auto;"><span style="font-size:12px;color:var(--text-3)">Status</span><button class="rsp-toggle on" onclick="rspToggle(this,'extClassProgress')"><span>ON</span></button></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div><label class="field-label">Comment Title</label><input class="field-input" value="Class Progress Report"></div>
+              <div><label class="field-label">Commenter Staff Title</label><input class="field-input" value="Form Teacher"></div>
+            </div>
+            <table class="data-table"><thead><tr><th>Option</th><th style="width:120px">Show</th></tr></thead><tbody>
+              <tr><td>Comment</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_cls_comment')"><span>ON</span></button></td></tr>
+              <tr><td>Recommendation</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_cls_rec')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Name</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_cls_name')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Signature</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_cls_sig')"><span>ON</span></button></td></tr>
+            </tbody></table>
+          </div>
+          <div class="rsp-comment-card">
+            <div class="rsp-comment-head">
+              <div><div style="font-size:14px;font-weight:700">Hostel Report</div><div style="margin-top:4px;"><span class="rsp-type-badge">Hostel Manager Comment</span></div></div>
+              <div style="display:flex;align-items:center;gap:10px;margin-left:auto;"><span style="font-size:12px;color:var(--text-3)">Status</span><button class="rsp-toggle on" onclick="rspToggle(this,'extHostel')"><span>ON</span></button></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div><label class="field-label">Comment Title</label><input class="field-input" value="Hostel Report"></div>
+              <div><label class="field-label">Commenter Staff Title</label><input class="field-input" value="Housemaster/Housemistress"></div>
+            </div>
+            <table class="data-table"><thead><tr><th>Option</th><th style="width:120px">Show</th></tr></thead><tbody>
+              <tr><td>Comment</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_hos_comment')"><span>ON</span></button></td></tr>
+              <tr><td>Recommendation</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_hos_rec')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Name</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_hos_name')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Signature</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_hos_sig')"><span>ON</span></button></td></tr>
+            </tbody></table>
+          </div>
+          <div class="rsp-comment-card">
+            <div class="rsp-comment-head">
+              <div><div style="font-size:14px;font-weight:700">Academic and General Report</div><div style="margin-top:4px;"><span class="rsp-type-badge">Head of School Comment</span></div></div>
+              <div style="display:flex;align-items:center;gap:10px;margin-left:auto;"><span style="font-size:12px;color:var(--text-3)">Status</span><button class="rsp-toggle on" onclick="rspToggle(this,'extAcademic')"><span>ON</span></button></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div><label class="field-label">Comment Title</label><input class="field-input" value="Academic and General Report"></div>
+              <div><label class="field-label">Commenter Staff Title</label><input class="field-input" value="Head of School"></div>
+            </div>
+            <table class="data-table"><thead><tr><th>Option</th><th style="width:120px">Show</th></tr></thead><tbody>
+              <tr><td>Comment</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_acad_comment')"><span>ON</span></button></td></tr>
+              <tr><td>Recommendation</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_acad_rec')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Name</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_acad_name')"><span>ON</span></button></td></tr>
+              <tr><td>Commenter Signature</td><td><button class="rsp-toggle on" onclick="rspToggle(this,'ec_acad_sig')"><span>ON</span></button></td></tr>
+            </tbody></table>
+          </div>
+          <div style="text-align:center;margin-top:20px;"><button class="post-btn" style="padding:10px 32px" onclick="showToast('Preferences saved','success')">Update Preferences</button></div>
+        </div>
+
+        <!-- Promotion Criteria Settings -->
+        <div id="rsp-promo" class="rsp-body" style="display:none;">
+          <h3 style="font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:16px;">For Annual / Promotional Results</h3>
+          <div class="card" style="max-width:680px;margin:0 auto;">
+            <div class="card-body" style="padding:24px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <span style="font-size:13px;">Automatically set students' promotion status (for annual reports)</span>
+                <button class="rsp-toggle on" style="margin-left:auto" onclick="rspToggle(this,'autoPromo')"><span>ON</span></button>
+              </div>
+              <div style="margin-bottom:20px;">
+                <label class="field-label">Set promotion status to "Promoted" when student's "Total Score Average" is up to:</label>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                  <input class="field-input" id="promo-threshold" type="number" value="50" min="0" max="100" style="width:80px;">
+                  <span style="color:var(--text-2)">%</span>
+                </div>
+              </div>
+              <div style="margin-bottom:24px;">
+                <label class="field-label" style="margin-bottom:12px;display:block;">Student promoted / not-promoted display images</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                  <div style="text-align:center;">
+                    <div style="font-weight:600;margin-bottom:10px;color:var(--green)">Promoted</div>
+                    <div style="width:80px;height:80px;border-radius:50%;background:#16a34a22;border:2px dashed #16a34a;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;">✓</div>
+                    <button class="ann-del" style="font-size:11px;" onclick="showToast('Image upload coming soon','info')">Select image</button>
+                  </div>
+                  <div style="text-align:center;">
+                    <div style="font-weight:600;margin-bottom:10px;color:#f87171">Not-promoted</div>
+                    <div style="width:80px;height:80px;border-radius:50%;background:#f8717122;border:2px dashed #f87171;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;">✗</div>
+                    <button class="ann-del" style="font-size:11px;" onclick="showToast('Image upload coming soon','info')">Select image</button>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align:center;"><button class="post-btn" style="padding:10px 32px" onclick="showToast('Promotion criteria saved','success')">Save Changes</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLEAR RESULT CACHE -->
+      <div class="tab-panel" id="tab-clearCache">
+        <div class="page-header"><h2>Clear Result Cache</h2><p>Force all result sheets to regenerate with the latest settings and scores.</p></div>
+        <div class="card" style="max-width:560px;">
+          <div class="card-head"><span class="card-title">Clear Cached Results</span></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:18px;">Clearing the result cache forces all previously generated report sheets to be regenerated from scratch the next time they are accessed. Use this after making changes to Result Sheet Preferences, Grading Systems, or Score Divisions.</p>
+            <div style="background:#f8717122;border:1px solid #f8717144;border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#f87171;line-height:1.6;">
+              <strong>Warning:</strong> This may temporarily slow down result access while sheets are being regenerated.
+            </div>
+            <button class="post-btn" style="background:#dc2626;" onclick="showToast('Result cache cleared successfully','success')">&#x1F5D1; Clear All Result Cache</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUBLISH RESULTS -->
+      <div class="tab-panel" id="tab-publish">
+        <div class="page-header"><h2>Review &amp; Publish Results</h2><p>Broadsheet overview of class performance — filter by class and term, then publish reports to parents.</p></div>
+
+        <!-- Filter bar -->
+        <div class="bs-filter-bar">
+          <select class="ctrl-select" id="bs-class-sel" onchange="loadBroadsheet()"></select>
+          <select class="ctrl-select" id="bs-exam-sel" onchange="loadBroadsheet()"></select>
+          <div class="bs-view-toggle">
+            <button class="bs-toggle-btn active" id="bs-btn-full" onclick="setBsView('full')">Full View</button>
+            <button class="bs-toggle-btn" id="bs-btn-min" onclick="setBsView('minimal')">Minimal View</button>
+          </div>
+          <button class="bs-export-btn" onclick="exportBroadsheetCSV()">&#x2193; Export List</button>
+        </div>
+
+        <!-- Subject pills -->
+        <div class="bs-subject-pills" id="bs-pills"></div>
+
+        <!-- Search -->
+        <div class="bs-search-wrap">
+          <input class="bs-search-input" id="bs-search" placeholder="Search student name or reg. no…" oninput="filterBroadsheetTable()">
+        </div>
+
+        <!-- Table -->
+        <div class="bs-table-outer" id="bs-table-outer">
+          <div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;">Select a class and exam to load the broadsheet.</div>
+        </div>
+
+        <!-- Summary -->
+        <div id="bs-summary" style="display:none;">
+          <div class="bs-summary-grid" id="bs-summary-grid"></div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Subject Statistics</span></div>
+            <div class="card-body" style="padding:0 0 2px;">
+              <table class="bs-subject-stats-table" id="bs-stats-table">
+                <thead><tr><th>Subject</th><th>Teacher</th><th>Avg Score</th><th>Top Students</th><th>2nd Place</th><th>Entries</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="bs-print-row">
+            <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print Broadsheet</button>
+          </div>
+        </div>
+
+        <!-- Vetting / Publishing (collapsed) -->
+        <div class="bs-publish-section">
+          <div class="bs-publish-toggle" onclick="togglePublishBody()">
+            <span>&#9881;</span>
+            <span>Vetting &amp; Publishing Controls</span>
+            <span id="pub-chev" style="margin-left:auto;font-size:12px;">&#9660;</span>
+          </div>
+          <div class="bs-publish-body" id="pub-body">
+            <div class="card" style="margin-bottom:14px;border:none;padding:0;">
+              <div class="card-head"><span class="card-title">Result Batches Awaiting Admin Vetting</span></div>
+              <div class="card-body" style="padding:0;">
+                <div style="overflow-x:auto;padding:0 0 14px;">
+                  <table class="data-table">
+                    <thead><tr><th>Class</th><th>Exam</th><th>Subject</th><th>Teacher</th><th>Entries</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody id="vetting-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="card" id="batch-review-panel" style="margin-bottom:14px;border:none;padding:0;"></div>
+            <div class="grid-2" style="align-items:start;margin-bottom:14px;">
+              <div class="card">
+                <div class="card-head"><span class="card-title">Publish Class Reports</span></div>
+                <div class="card-body">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div><label class="field-label">Class</label><select class="ctrl-select" id="publish-class"></select></div>
+                    <div><label class="field-label">Exam</label><select class="ctrl-select" id="publish-exam"></select></div>
+                  </div>
+                  <button class="post-btn" onclick="publishReports()">Publish PDFs and Email Parents</button>
+                  <div id="email-config-status" style="margin-top:12px;"></div>
+                  <div style="font-size:10px;color:var(--text-3);line-height:1.5;margin-top:10px;">Email sending uses email-settings.env in the project folder, or SMTP_* environment variables.</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><span class="card-title">Report Signatures</span></div>
+                <div class="card-body">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div><label class="field-label">Head of School</label><input class="field-input" id="head-name" placeholder="Head of school name"></div>
+                    <div><label class="field-label">Head Signature</label><input class="field-input" id="head-signature-file" type="file" accept="image/png,image/jpeg"></div>
+                  </div>
+                  <button class="post-btn" onclick="uploadHeadSignature()" style="margin-bottom:14px;">Upload Head Signature</button>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div><label class="field-label">Teacher</label><select class="ctrl-select" id="signature-teacher"></select></div>
+                    <div><label class="field-label">Teacher Signature</label><input class="field-input" id="teacher-signature-file" type="file" accept="image/png,image/jpeg"></div>
+                  </div>
+                  <button class="post-btn" onclick="uploadTeacherSignature()">Upload Teacher Signature</button>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title">Published Reports</span></div>
+              <div class="card-body" style="padding:0;">
+                <div style="overflow-x:auto;padding:0 0 14px;">
+                  <table class="data-table">
+                    <thead><tr><th>Student</th><th>Class</th><th>Exam</th><th>Parent Email</th><th>Email Status</th><th>Published</th><th>PDF</th></tr></thead>
+                    <tbody id="publications-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-exams">
+        <div class="page-header"><h2>Exams</h2><p>Exam activities and academic calendar controls</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Exam Activities</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">Use Result Settings for exam result setup and Results / Grade Book for uploaded scores.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-academicTerms">
+        <div class="page-header"><h2>Academic Terms / Periods</h2><p>Manage academic sessions, term periods, and calendar dates.</p></div>
+
+        <!-- Active session info card -->
+        <div class="card" style="margin-bottom:16px;border-color:rgba(34,197,94,.3);">
+          <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div id="at-active-session" style="font-size:13px;color:var(--text-2);line-height:1.9;">
+                <span style="color:var(--text-3)">Active Academic Session :</span> <strong id="at-sess-label">—</strong><br>
+                <span style="color:var(--text-3)">Active Year :</span> <strong id="at-year-label">—</strong><br>
+                <span style="color:var(--text-3)">Active Term :</span> <strong id="at-term-label" style="color:var(--green)">—</strong>
+              </div>
+            </div>
+            <button class="post-btn" onclick="openCreateSessionModal()" style="flex-shrink:0;">&#x21C4; Switch Session / Term</button>
+          </div>
+        </div>
+
+        <!-- Academic Sessions List -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head">
+            <span class="card-title">Academic Sessions List</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <input class="bs-search-input" placeholder="Search…" oninput="atFilterTable('at-sessions-tbody',this.value)" style="width:180px;">
+              <button class="post-btn" onclick="openCreateSessionModal()">+ Create New Academic Session</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Session</th><th>Start Year</th><th>End Year</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="at-sessions-tbody"><tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Academic Terms / Periods -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head">
+            <span class="card-title">Academic Terms / Periods</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <input class="bs-search-input" placeholder="Search…" oninput="atFilterTable('at-terms-tbody',this.value)" style="width:180px;">
+              <button class="post-btn" onclick="openCreateTermModal()">+ Create New Academic Term / Period</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Name</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="at-terms-tbody">
+                  <tr><td>1</td><td>FIRST TERM</td><td></td><td></td></tr>
+                  <tr><td>2</td><td>SECOND TERM</td><td></td><td></td></tr>
+                  <tr><td>3</td><td style="font-weight:600">THIRD TERM</td><td><span style="background:#e0f2fe;color:#0369a1;padding:2px 10px;border-radius:20px;font-size:11px;border:1px solid #bae6fd;">Active Term / Period</span></td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding:0 18px 8px;font-size:11px;color:var(--text-3)">Showing 1 to 3 of 3 entries</div>
+          </div>
+        </div>
+
+        <!-- Academic Calendar Periods -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Academic Calendar Periods</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+              <input class="bs-search-input" placeholder="Search…" oninput="atFilterTable('at-calendar-tbody',this.value)" style="width:180px;">
+              <button class="post-btn" onclick="openNewPeriodModal()">+ New Period</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Session</th><th>Term</th><th>Start Date</th><th>End Date</th><th>Actions</th></tr></thead>
+                <tbody id="at-calendar-tbody">
+                  <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">No data available in table</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding:0 18px 8px;font-size:11px;color:var(--text-3)">Showing 0 to 0 of 0 entries</div>
+          </div>
+        </div>
+
+        <!-- New Period Modal -->
+        <div id="at-period-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;">
+          <div class="card" style="width:min(500px,95%);padding:0;">
+            <div class="card-head"><span class="card-title">New Calendar Period</span><button class="cog-modal-close" onclick="closeNewPeriodModal()">&#x2715;</button></div>
+            <div class="card-body" style="padding:20px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                <div><label class="field-label">Session</label><select class="ctrl-select" id="at-period-session"></select></div>
+                <div><label class="field-label">Term</label><select class="ctrl-select" id="at-period-term"><option>FIRST TERM</option><option>SECOND TERM</option><option>THIRD TERM</option></select></div>
+                <div><label class="field-label">Start Date</label><input class="field-input" id="at-period-start" type="date"></div>
+                <div><label class="field-label">End Date</label><input class="field-input" id="at-period-end" type="date"></div>
+              </div>
+              <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="ann-del" onclick="closeNewPeriodModal()">Cancel</button>
+                <button class="post-btn" onclick="saveNewPeriod()">Save Period</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-sessionExams">
+        <div class="page-header"><h2>Session Exams / Reports</h2><p>View and manage exam reports by academic session.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Session Exam Reports</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.8;">Select a session and term to view exam report summaries and statistics for each class.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-scheduleExam">
+        <div class="page-header"><h2>Schedule Exam: Add to Timetable</h2><p>Schedule an exam and add it to the school timetable.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Schedule an Exam</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+              <div><label class="field-label">Exam Title</label><input class="field-input" id="sched-exam-title" placeholder="e.g. First Term Mid-Term Exam"></div>
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="sched-exam-class"></select></div>
+              <div><label class="field-label">Subject</label><select class="ctrl-select" id="sched-exam-subject"></select></div>
+              <div><label class="field-label">Date</label><input class="field-input" id="sched-exam-date" type="date"></div>
+              <div><label class="field-label">Start Time</label><input class="field-input" id="sched-exam-start" type="time"></div>
+              <div><label class="field-label">End Time</label><input class="field-input" id="sched-exam-end" type="time"></div>
+            </div>
+            <div style="margin-bottom:14px;"><label class="field-label">Venue / Room</label><input class="field-input" id="sched-exam-venue" placeholder="e.g. Main Hall, Room 3A"></div>
+            <button class="post-btn" onclick="showToast('Exam scheduling coming soon','info')">Add to Timetable</button>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-examTimetable">
+        <div class="page-header"><h2>Exam Timetable</h2><p>Full timetable of scheduled exams across all classes.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Exam Timetable</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Date</th><th>Time</th><th>Exam Title</th><th>Class</th><th>Subject</th><th>Venue</th></tr></thead>
+                <tbody><tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">No exams scheduled yet.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-eclass">
+        <div class="page-header"><h2>E-Class</h2><p>Digital classroom activities</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">E-Class</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">E-Class records can be added here when the school is ready to use them.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-finance">
+        <div class="page-header"><h2>Finance</h2><p>School finance activities</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Finance</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">Finance records can be connected here when needed.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-attendance">
+        <div class="page-header"><h2>Attendance</h2><p>Attendance activities</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Attendance</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">Attendance records are still calculated from each student profile.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-classes">
+        <div class="page-header"><h2>Classes</h2><p>Manage classes, class arms / divisions, and class categories</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head" style="gap:0;padding:0;">
+            <button type="button" class="academics-subtab active" data-view="classes" onclick="switchClassesView('classes', this)" style="flex:1;padding:14px 18px;background:none;border:0;border-bottom:2px solid var(--blue,#2563eb);color:var(--blue,#2563eb);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#9776; Classes</button>
+            <button type="button" class="academics-subtab" data-view="categories" onclick="switchClassesView('categories', this)" style="flex:1;padding:14px 18px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#9638; Class Categories</button>
+          </div>
+        </div>
+        <div id="classes-view-classes">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Classes</span></div>
+              <div class="card-body">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                  <button class="post-btn" onclick="openClassModal()">+ Add Class</button>
+                </div>
+                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+                  <select class="ctrl-select" id="class-category-filter" style="width:auto;min-width:170px;" onchange="renderClassesTable()">
+                    <option value="">All Class Categories</option>
+                  </select>
+                  <input class="search-input" id="class-search" placeholder="Search classes..." oninput="renderClassesTable()" style="margin-left:auto;">
+                </div>
+                <div style="overflow-x:auto;">
+                  <table class="data-table">
+                    <thead><tr><th>#</th><th>Class</th><th>Current Students</th><th>Action</th></tr></thead>
+                    <tbody id="classes-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title">Class Arms / Divisions</span></div>
+              <div class="card-body">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                  <button class="post-btn" onclick="openClassArmModal()">+ Add Class Arm</button>
+                </div>
+                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+                  <select class="ctrl-select" id="class-arm-class-filter" style="width:auto;min-width:170px;" onchange="renderClassArmsTable()">
+                    <option value="">All Classes</option>
+                  </select>
+                  <input class="search-input" id="class-arm-search" placeholder="Search class arms..." oninput="renderClassArmsTable()" style="margin-left:auto;">
+                </div>
+                <div style="overflow-x:auto;">
+                  <table class="data-table">
+                    <thead><tr><th>#</th><th>Class</th><th>Class Arm</th><th>Form Teacher</th><th>Current Students</th><th>Action</th></tr></thead>
+                    <tbody id="class-arms-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="classes-view-categories" style="display:none;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Class Categories</span></div>
+            <div class="card-body">
+              <div style="display:flex;gap:8px;margin-bottom:14px;">
+                <input class="field-input" id="new-class-category-name" placeholder="New category name (e.g. Nursery)" style="max-width:280px;">
+                <button class="post-btn" onclick="saveClassCategory()">+ Add Category</button>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Category Name</th><th>Classes Using It</th><th>Action</th></tr></thead>
+                  <tbody id="class-categories-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-subjects">
+        <div class="page-header"><h2>Subjects</h2><p>Manage class subjects, subject teachers, the subject bank, and subject types</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head" style="gap:0;padding:0;flex-wrap:wrap;">
+            <button type="button" class="academics-subtab active" data-view="classSubjects" onclick="switchSubjectsView('classSubjects', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid var(--blue,#2563eb);color:var(--blue,#2563eb);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#9776; Class Subjects</button>
+            <button type="button" class="academics-subtab" data-view="subjectTeachers" onclick="switchSubjectsView('subjectTeachers', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#128100; Subject Teachers</button>
+            <button type="button" class="academics-subtab" data-view="subjectBank" onclick="switchSubjectsView('subjectBank', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#9638; Subject Bank</button>
+            <button type="button" class="academics-subtab" data-view="subjectTypes" onclick="switchSubjectsView('subjectTypes', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;">&#9638; Subject Types</button>
+          </div>
+        </div>
+        <div id="subjects-view-classSubjects">
+          <div class="card">
+            <div class="card-body">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                <div style="min-width:180px;">
+                  <label class="field-label">Class</label>
+                  <select class="ctrl-select" id="cs-filter-class" onchange="populateClassArmFilterOptions('cs-filter-arm', this.value); renderClassSubjectsTable();"><option value="">Select Class</option></select>
+                </div>
+                <div style="min-width:160px;">
+                  <label class="field-label">Class Arm</label>
+                  <select class="ctrl-select" id="cs-filter-arm" onchange="renderClassSubjectsTable()"><option value="">All</option></select>
+                </div>
+                <div style="min-width:160px;">
+                  <label class="field-label">Term</label>
+                  <select class="ctrl-select" id="cs-filter-term" onchange="renderClassSubjectsTable()">
+                    <option value="">All</option>
+                    <option>Term 1</option>
+                    <option>Term 2</option>
+                    <option>Term 3</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                <button class="post-btn" onclick="openClassSubjectModal()">+ Add Subject</button>
+                <button class="post-btn" style="background:#2563eb;color:#fff;" onclick="switchSubjectsView('subjectTeachers', document.querySelector('.academics-subtab[data-view=subjectTeachers]'))">Manage / Assign Subject Teachers</button>
+              </div>
+              <input class="search-input" id="cs-search" placeholder="Search subjects..." oninput="renderClassSubjectsTable()" style="margin-bottom:10px;width:260px;">
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Subject Name</th><th>Subject Code</th><th>Class</th><th>Class Arm</th><th>Term</th><th>Pass / Full Mark</th><th>Attributes</th><th>Teacher in Charge</th><th>Assisting Teacher(s)</th><th>Action</th></tr></thead>
+                  <tbody id="class-subjects-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="subjects-view-subjectTeachers" style="display:none;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Subject Teachers</span></div>
+            <div class="card-body">
+              <input class="search-input" id="st-search" placeholder="Search teachers or subjects..." oninput="renderSubjectTeachersTable()" style="margin-bottom:10px;width:260px;">
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Teacher</th><th>Role</th><th>Subject</th><th>Class</th><th>Class Arm</th></tr></thead>
+                  <tbody id="subject-teachers-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="subjects-view-subjectBank" style="display:none;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Subject Bank</span></div>
+            <div class="card-body">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                <button class="post-btn" onclick="openSubjectModal()">+ Add Subject</button>
+              </div>
+              <input class="search-input" id="sb-search" placeholder="Search subject bank..." oninput="renderSubjectBankTable()" style="margin-bottom:10px;width:260px;">
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Subject Name</th><th>Code</th><th>Type</th><th>Action</th></tr></thead>
+                  <tbody id="subject-bank-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="subjects-view-subjectTypes" style="display:none;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Subject Types</span></div>
+            <div class="card-body">
+              <div style="display:flex;gap:8px;margin-bottom:14px;">
+                <input class="field-input" id="new-subject-type-name" placeholder="New subject type (e.g. Core)" style="max-width:280px;">
+                <button class="post-btn" onclick="saveSubjectType()">+ Add Type</button>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Type Name</th><th>Subjects Using It</th><th>Action</th></tr></thead>
+                  <tbody id="subject-types-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-parents">
+        <div class="page-header"><h2>Parents</h2><p>Parent and guardian records</p></div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Parent Contacts - <span id="parents-count-label">0 contacts</span></span>
+            <input class="search-input" id="parents-search" placeholder="Search parents or students..." oninput="filterParents()">
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Parent Email</th><th>Student</th><th>Student ID</th><th>Class</th><th>Status</th></tr></thead>
+                <tbody id="parents-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-selfRegistration">
+        <div class="page-header"><h2>Self Registration</h2><p>Registration requests</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Self Registration</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">Self-registration requests can be reviewed here when the school starts using online applications.</div>
+        </div>
+      </div>
+      <!-- Student Result Checker -->
+      <div class="tab-panel" id="tab-studentResultChecker">
+        <div class="page-header"><h2>Student Result Checker</h2><p>Select a class to load the student list, then view individual results.</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Select Class List to View Result</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+              <div>
+                <label class="field-label">Class</label>
+                <select class="ctrl-select" id="src-class" onchange="srcPopulateArms()"></select>
+              </div>
+              <div>
+                <label class="field-label">Class Arm</label>
+                <select class="ctrl-select" id="src-arm"></select>
+              </div>
+            </div>
+            <button class="post-btn" onclick="srcLoadList()">Load List</button>
+          </div>
+        </div>
+        <div class="card" id="src-list-card" style="display:none;">
+          <div class="card-head"><span class="card-title">Individual Result Checker</span>
+            <input class="bs-search-input" id="src-search" placeholder="Search student…" oninput="srcFilterList()" style="margin-left:auto;width:220px;">
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Class</th><th>View Result</th></tr></thead>
+                <tbody id="src-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Class Result Checker -->
+      <div class="tab-panel" id="tab-classResultChecker">
+        <div class="page-header"><h2>Class Result Checker</h2><p>View bulk results for an entire class by session and exam.</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">Class Bulk Result Checker</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
+              <div>
+                <label class="field-label">Exam Session</label>
+                <select class="ctrl-select" id="crc-session"></select>
+              </div>
+              <div>
+                <label class="field-label">Exam</label>
+                <select class="ctrl-select" id="crc-exam"></select>
+              </div>
+              <div>
+                <label class="field-label">Exam Class</label>
+                <select class="ctrl-select" id="crc-class" onchange="crcCheckAvailability()"></select>
+              </div>
+            </div>
+            <div id="crc-availability" style="margin-bottom:14px;display:none;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
+            <button class="post-btn" id="crc-view-btn" onclick="crcBulkView()" style="display:none;">Bulk View Result</button>
+          </div>
+        </div>
+        <div id="crc-results-area"></div>
+      </div>
+      <div class="tab-panel" id="tab-cbtGradebook">
+        <div class="page-header"><h2>CBT Grade Book</h2><p>Computer-based test scores</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">CBT Grade Book</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">CBT scores can be connected here when CBT assessments are active.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-dailyGradebook">
+        <div class="page-header"><h2>Daily Grade Book</h2><p>Daily assessment scores</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Daily Grade Book</span></div>
+          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;">Daily scores can be recorded here when continuous daily assessment is enabled.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-resultsGradebook">
+        <div class="result-gradebook-page">
+          <div class="gb-breadcrumb">Dashboard <span style="padding:0 8px;">&gt;</span> Result Score Entry</div>
+
+          <div class="gb-filter-card">
+            <div class="gb-card-title"><span>F</span> Select Class List for Score Input</div>
+            <div class="gb-filter-grid">
+              <div>
+                <label class="field-label">Exam Session *</label>
+                <select class="ctrl-select" id="gb-session"></select>
+              </div>
+              <div>
+                <label class="field-label">Exam *</label>
+                <select class="ctrl-select" id="gb-exam"></select>
+              </div>
+              <div>
+                <label class="field-label">Class *</label>
+                <select class="ctrl-select" id="gb-class"></select>
+              </div>
+              <div>
+                <label class="field-label">Class Division *</label>
+                <select class="ctrl-select" id="gb-division"></select>
+              </div>
+              <div>
+                <label class="field-label">Subject *</label>
+                <select class="ctrl-select" id="gb-subject"></select>
+              </div>
+            </div>
+            <div class="gb-filter-actions">
+              <label class="gb-checkline"><input type="checkbox" id="gb-archived"> Include Archived Students</label>
+              <button type="button" class="gb-manage-btn" onclick="manageGradebookScores()">Manage Students Scores</button>
+            </div>
+          </div>
+
+          <div class="gb-entry-card">
+            <div class="gb-entry-head">
+              <div>
+                <div class="gb-entry-title" id="gb-selected-class">Selected Class Students</div>
+                <div class="gb-entry-line" id="gb-selected-subject">Score Entry for Subject : <strong>-</strong></div>
+                <div class="gb-entry-line" id="gb-selected-exam">Exam : -</div>
+                <div class="gb-entry-line" id="gb-batch-status">Choose a class, exam, and subject, then manage student scores.</div>
+              </div>
+              <button class="gb-published-btn" id="gb-unpublish-btn" type="button">Published Result</button>
+            </div>
+            <div class="gb-readonly" id="gb-readonly-box"></div>
+            <div class="gb-tools">
+              <button type="button" class="gb-offline-btn" onclick="exportGradebookCsv()">Work Offline (Using Excel) ▾</button>
+              <input class="gb-search" id="gb-search" placeholder="Search" oninput="filterGradebookRows()">
+              <span></span>
+            </div>
+            <div class="gb-toggle-row">
+              <label><span class="gb-switch"></span>Percentage Score Input Mode</label>
+              <label><span class="gb-switch"></span>View Grade Column</label>
+            </div>
+            <div class="gb-table-wrap">
+              <table class="gb-score-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Student</th>
+                    <th>Mid Term Test (40%)<small>Max Score : 40</small></th>
+                    <th>Examination (60%)<small>Max Score : 60</small></th>
+                    <th>Total Score<small>Max Total Score : 100</small></th>
+                    <th>Subject Teacher's Comment / Progress Report</th>
+                    <th>Subject Teacher's Recommendation</th>
+                    <th>Absent</th>
+                    <th>Exclude</th>
+                  </tr>
+                </thead>
+                <tbody id="gb-score-tbody">
+                  <tr><td colspan="9" style="padding:18px;color:var(--text-3);">Choose a class, exam, and subject, then click Manage Students Scores.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="gb-important">
+              <strong>Important!</strong><br>
+              To avoid cases of incomplete results, ensure each student's score is entered by the teacher, or the student is marked absent/excluded where applicable.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-cognitiveSkills">
+        <div class="cog-page">
+          <div class="gb-breadcrumb">Dashboard <span style="padding:0 8px;">&gt;</span> Cognitive Skills Assessment</div>
+
+          <div class="cog-filter-card">
+            <div class="cog-card-title"><span>F</span> Select Class List</div>
+            <div class="cog-filter-grid">
+              <div>
+                <label class="field-label">Class *</label>
+                <select class="ctrl-select" id="cog-class" onchange="resetCognitiveView()"></select>
+              </div>
+              <div>
+                <label class="field-label">Class Arm *</label>
+                <select class="ctrl-select" id="cog-arm" onchange="resetCognitiveView()"></select>
+              </div>
+            </div>
+            <div class="cog-filter-actions">
+              <button type="button" class="cog-view-btn" onclick="viewCognitiveClass()">View</button>
+            </div>
+          </div>
+
+          <div class="cog-list-card">
+            <div class="cog-list-head">
+              <div>
+                <div class="cog-list-title"><span>&#128100;</span> <span id="cog-list-title">Students Cognitive Skills Assessment</span></div>
+                <div class="cog-list-sub" id="cog-count-label">Choose a class and click View</div>
+              </div>
+              <input class="cog-search" id="cog-search" placeholder="Search" oninput="filterCognitiveRows()">
+            </div>
+            <div class="cog-table-wrap">
+              <table class="cog-table">
+                <thead>
+                  <tr>
+                    <th># <span class="cog-sort">^</span></th>
+                    <th>Name <span class="cog-sort">v</span></th>
+                    <th>Reg No. <span class="cog-sort">v</span></th>
+                    <th>Class <span class="cog-sort">v</span></th>
+                    <th>View<br>Skills</th>
+                    <th>Update</th>
+                  </tr>
+                </thead>
+                <tbody id="cog-tbody">
+                  <tr><td colspan="6" style="padding:18px;color:var(--text-3);">Choose a class and click View.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="cog-modal" id="cog-modal">
+            <div class="cog-modal-card" role="dialog" aria-modal="true" aria-labelledby="cog-modal-title">
+              <div class="cog-modal-head">
+                <div>
+                  <div class="cog-modal-title" id="cog-modal-title">Student Cognitive Skills</div>
+                  <div class="cog-modal-subtitle" id="cog-modal-subtitle"></div>
+                </div>
+                <button type="button" class="cog-modal-close" onclick="closeCognitiveModal()" aria-label="Close" title="Close">&#x2715;</button>
+              </div>
+              <div class="cog-modal-body" id="cog-modal-body"></div>
+              <div class="cog-modal-foot">
+                <div class="cog-modal-status" id="cog-modal-status">No saved skill rating yet.</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                  <button type="button" class="post-btn" onclick="closeCognitiveModal()">Close</button>
+                  <button type="button" class="cog-view-btn" id="cog-modal-save" onclick="saveCognitiveSkills()">Save Skills</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-emailQueue">
+        <div class="page-header"><h2>Results Email Delivery Queue</h2><p>Email delivery status for published reports</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Email Delivery Queue</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Class</th><th>Exam</th><th>Parent Email</th><th>Status</th><th>Published</th></tr></thead>
+                <tbody id="email-queue-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /portal-wrap -->
+
+<div id="class-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div role="dialog" aria-modal="true" style="width:min(440px,100%);background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+      <div id="class-modal-title" style="font-size:15px;font-weight:700;color:var(--text-1);">Add Class</div>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="field-label">Class Code</label>
+        <input class="field-input" id="class-form-code" placeholder="e.g. 4A">
+      </div>
+      <div>
+        <label class="field-label">Class Name / Label</label>
+        <input class="field-input" id="class-form-label" placeholder="e.g. Class 4A">
+      </div>
+      <div>
+        <label class="field-label">Class Category</label>
+        <select class="ctrl-select" id="class-form-category"><option value="">Select Category</option></select>
+      </div>
+    </div>
+    <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="ann-del" onclick="closeClassModal()" style="font-size:12px;">Cancel</button>
+      <button class="post-btn" onclick="saveClass()">Save Class</button>
+    </div>
+  </div>
+</div>
+
+<div id="class-arm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div role="dialog" aria-modal="true" style="width:min(440px,100%);background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+      <div id="class-arm-modal-title" style="font-size:15px;font-weight:700;color:var(--text-1);">Add Class Arm</div>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="field-label">Class</label>
+        <select class="ctrl-select" id="class-arm-form-class"><option value="">Select Class</option></select>
+      </div>
+      <div>
+        <label class="field-label">Class Arm Name</label>
+        <input class="field-input" id="class-arm-form-name" placeholder="e.g. Blue Bell">
+      </div>
+      <div>
+        <label class="field-label">Form Teacher</label>
+        <select class="ctrl-select" id="class-arm-form-teacher"><option value="">No form teacher</option></select>
+      </div>
+    </div>
+    <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="ann-del" onclick="closeClassArmModal()" style="font-size:12px;">Cancel</button>
+      <button class="post-btn" onclick="saveClassArm()">Save Class Arm</button>
+    </div>
+  </div>
+</div>
+
+<div id="subject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div role="dialog" aria-modal="true" style="width:min(440px,100%);background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+      <div id="subject-modal-title" style="font-size:15px;font-weight:700;color:var(--text-1);">Add Subject</div>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="field-label">Subject Name</label>
+        <input class="field-input" id="subject-form-name" placeholder="e.g. Mathematics">
+      </div>
+      <div>
+        <label class="field-label">Subject Code</label>
+        <input class="field-input" id="subject-form-code" placeholder="e.g. MTH">
+      </div>
+      <div>
+        <label class="field-label">Subject Type</label>
+        <select class="ctrl-select" id="subject-form-type"><option value="">Select Type</option></select>
+      </div>
+    </div>
+    <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="ann-del" onclick="closeSubjectModal()" style="font-size:12px;">Cancel</button>
+      <button class="post-btn" onclick="saveSubject()">Save Subject</button>
+    </div>
+  </div>
+</div>
+
+<div id="class-subject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div role="dialog" aria-modal="true" style="width:min(560px,100%);background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;max-height:calc(100vh - 60px);overflow-y:auto;">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+      <div id="class-subject-modal-title" style="font-size:15px;font-weight:700;color:var(--text-1);">Add Class Subject</div>
+    </div>
+    <div style="padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label class="field-label">Subject</label>
+        <select class="ctrl-select" id="csm-subject"><option value="">Select Subject</option></select>
+      </div>
+      <div>
+        <label class="field-label">Class</label>
+        <select class="ctrl-select" id="csm-class" onchange="populateClassArmFilterOptions('csm-arm', this.value)"><option value="">Select Class</option></select>
+      </div>
+      <div>
+        <label class="field-label">Class Arm</label>
+        <select class="ctrl-select" id="csm-arm"><option value="">All Arms</option></select>
+      </div>
+      <div>
+        <label class="field-label">Term</label>
+        <select class="ctrl-select" id="csm-term">
+          <option value="">Select Term</option>
+          <option>Term 1</option>
+          <option>Term 2</option>
+          <option>Term 3</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Pass Mark</label>
+        <input class="field-input" id="csm-pass-mark" type="number" min="0" placeholder="40">
+      </div>
+      <div>
+        <label class="field-label">Full Mark</label>
+        <input class="field-input" id="csm-full-mark" type="number" min="0" placeholder="100">
+      </div>
+      <div style="grid-column:1 / -1;">
+        <label class="field-label">Attributes</label>
+        <input class="field-input" id="csm-attributes" placeholder="e.g. Compulsory, Examinable">
+      </div>
+      <div>
+        <label class="field-label">Teacher in Charge</label>
+        <select class="ctrl-select" id="csm-teacher-in-charge"><option value="">No teacher assigned</option></select>
+      </div>
+      <div>
+        <label class="field-label">Assisting Teacher(s)</label>
+        <select class="ctrl-select" id="csm-assisting-teachers" multiple size="3"></select>
+      </div>
+    </div>
+    <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="ann-del" onclick="closeClassSubjectModal()" style="font-size:12px;">Cancel</button>
+      <button class="post-btn" onclick="saveClassSubject()">Save Subject</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="admin-api.js"></script>
+</body>
+</html>
