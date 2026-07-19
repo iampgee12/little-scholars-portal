@@ -1638,9 +1638,32 @@ function toggleDropdown(childId, chevId, btn) {
   const children = document.getElementById(childId);
   const chev = document.getElementById(chevId);
   if (!children) return;
-  const open = children.style.display !== 'none';
-  children.style.display = open ? 'none' : 'block';
-  if (chev) chev.textContent = open ? 'v' : '^';
+  const open = children.classList.contains('open');
+  // close all siblings first
+  const parent = btn.closest('.sub-menu');
+  if (parent) {
+    parent.querySelectorAll('.result-gradebook-children').forEach(el => {
+      if (el !== children) {
+        el.classList.remove('open');
+        el.style.display = '';
+      }
+    });
+    parent.querySelectorAll('.sub-chev').forEach(el => {
+      if (el.id !== chevId) el.classList.remove('open');
+    });
+    parent.querySelectorAll('.sub-nav-item').forEach(el => {
+      if (el !== btn) el.classList.remove('active');
+    });
+  }
+  if (open) {
+    children.classList.remove('open');
+    if (chev) chev.classList.remove('open');
+  } else {
+    // must be display:block for max-height transition to work
+    children.style.display = 'block';
+    requestAnimationFrame(() => children.classList.add('open'));
+    if (chev) chev.classList.add('open');
+  }
   btn.classList.toggle('active', !open);
 }
 

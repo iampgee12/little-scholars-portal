@@ -247,6 +247,142 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .toast { display:none; position:fixed; bottom:24px; right:24px; background:var(--black-2); border:1px solid var(--green); border-radius:var(--radius); padding:12px 18px; font-size:13px; font-weight:600; color:var(--green); z-index:999; font-family:'DM Mono',monospace; box-shadow:0 8px 32px rgba(0,0,0,0.5); animation:toastUp 0.3s ease; }
 @keyframes toastUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
+/* ── ANIMATION ENHANCEMENTS ── */
+
+/* Button press ripple feel */
+.post-btn, .del-btn, .bs-print-btn, .bs-view-btn, .bs-export-btn,
+.bs-toggle-btn, .bs-preview-btn, .icon-btn, .signout-btn,
+.rsp-toggle, .sub-nav-item {
+  transition: all 0.15s ease;
+}
+.post-btn:active, .del-btn:active, .bs-print-btn:active,
+.bs-view-btn:active, .bs-export-btn:active, .bs-toggle-btn:active,
+.bs-preview-btn:active, .icon-btn:active, .signout-btn:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+/* Sidebar nav item selection pop */
+.nav-item {
+  transition: background 0.15s ease, color 0.15s ease,
+              border-color 0.15s ease, transform 0.12s ease,
+              box-shadow 0.15s ease;
+}
+.nav-item:active { transform: scale(0.97); }
+.nav-item.active {
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.18),
+              0 2px 8px rgba(34,197,94,0.08);
+}
+
+/* Sub-nav items */
+.sub-nav-item {
+  transition: background 0.15s ease, color 0.15s ease,
+              padding-left 0.18s ease, transform 0.12s ease;
+}
+.sub-nav-item:active { transform: scale(0.97); }
+.result-child:hover { padding-left: 44px !important; }
+
+/* Dropdown chevron spin */
+.sub-chev {
+  display: inline-block;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sub-chev.open { transform: rotate(180deg); }
+
+/* Dropdown children slide-in */
+.result-gradebook-children {
+  overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  max-height: 0;
+  opacity: 0;
+}
+.result-gradebook-children.open {
+  max-height: 400px;
+  opacity: 1;
+}
+
+/* Tab panel entrance */
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-panel.active { animation: tabIn 0.22s ease both; }
+
+/* Stat card hover lift */
+.stat-card {
+  transition: border-color 0.18s ease, transform 0.18s ease,
+              box-shadow 0.18s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+/* Table row hover highlight */
+.data-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+/* RSP toggle bounce */
+.rsp-toggle {
+  transition: background 0.18s ease, color 0.18s ease,
+              transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.rsp-toggle:active { transform: scale(0.9); }
+
+/* Modal fade+scale in */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+[id$="-modal"] > div,
+.modal-box {
+  animation: modalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+[id$="-modal"] {
+  transition: opacity 0.18s ease;
+}
+
+/* Input focus glow */
+.field-input, .search-input, .ctrl-select, .bs-search-input {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+              background 0.18s ease;
+}
+.field-input:focus, .search-input:focus, .bs-search-input:focus {
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+}
+.ctrl-select:focus {
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+/* Topbar icon btn hover */
+.icon-btn { transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease; }
+.icon-btn:hover { transform: translateY(-1px); }
+
+/* Green publish/action buttons pulse on hover */
+.post-btn:hover {
+  box-shadow: 0 4px 14px rgba(34,197,94,0.3);
+  transform: translateY(-1px);
+}
+.post-btn:active { transform: scale(0.96) translateY(0); box-shadow: none; }
+
+/* Score pill pop */
+@keyframes pillPop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  70%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.bs-pill { animation: pillPop 0.22s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* Reduced motion: strip animations but keep transitions */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.12s !important;
+  }
+}
+
 ::-webkit-scrollbar { width:4px; height:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
