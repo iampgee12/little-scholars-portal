@@ -163,53 +163,82 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .post-btn:hover { background:#15803d; }
 
 /* ── BROADSHEET ── */
-.bs-filter-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
-.bs-filter-bar .ctrl-select { width:auto; min-width:160px; }
-.bs-view-btn { background:var(--green); color:#ffffff; border:none; border-radius:var(--radius-sm); padding:8px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:background var(--transition); }
-.bs-view-btn:hover { background:#16a34a; }
-.bs-export-btn { background:none; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); }
-.bs-export-btn:hover { border-color:var(--blue); color:var(--blue); }
-.bs-subject-pills { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.bs-filter-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:0; }
+.bs-filter-header { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:14px; }
+.bs-filter-header svg { flex-shrink:0; }
+.bs-filter-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
+.bs-filter-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.bs-filter-foot label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); cursor:pointer; }
+.bs-view-results-btn { background:#2563eb; color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); margin:0 auto; }
+.bs-view-results-btn:hover { background:#1d4ed8; }
+.bs-results-wrap { margin-top:18px; }
+.bs-action-row { display:flex; justify-content:flex-end; gap:8px; margin-bottom:16px; }
+.bs-unpublish-btn { background:#f59e0b; color:#fff; border:none; border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background var(--transition); }
+.bs-unpublish-btn:hover { background:#d97706; }
+.bs-ext-view-btn { background:#fff; color:#2563eb; border:1.5px solid #2563eb; border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all var(--transition); }
+.bs-ext-view-btn:hover { background:#eff6ff; }
+.bs-school-header { text-align:center; padding:18px 0 12px; border-bottom:1px solid var(--border); margin-bottom:14px; }
+.bs-school-logo { width:72px; height:72px; object-fit:contain; margin-bottom:6px; display:block; margin-left:auto; margin-right:auto; }
+.bs-school-logo-placeholder { width:72px; height:72px; border-radius:50%; background:var(--black-4); border:2px dashed var(--border-2); display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:22px; }
+.bs-hdr-name { font-size:16px; font-weight:800; letter-spacing:0.5px; color:var(--text-1); }
+.bs-hdr-address { font-size:11.5px; color:var(--text-2); margin-top:3px; }
+.bs-hdr-contact { font-size:11.5px; color:var(--text-2); }
+.bs-hdr-title { margin-top:10px; font-size:12px; color:#2563eb; font-weight:600; }
+.bs-hdr-teacher { font-size:11px; color:var(--text-3); margin-top:2px; }
+.bs-pills-row { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
 .bs-pill { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; background:#2563eb; color:#fff; font-family:'DM Mono',monospace; cursor:default; }
-.bs-view-toggle { display:flex; gap:6px; margin-left:auto; }
-.bs-toggle-btn { background:none; border:1px solid var(--border-2); color:var(--text-3); border-radius:var(--radius-sm); padding:6px 14px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); }
+.bs-controls-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.bs-toggle-btn { background:#fff; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:7px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); display:flex; align-items:center; gap:5px; }
 .bs-toggle-btn.active { background:#2563eb; border-color:#2563eb; color:#fff; }
-.bs-search-wrap { margin-bottom:12px; }
-.bs-search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; width:420px; max-width:100%; transition:border-color var(--transition); }
+.bs-export-btn { background:none; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:7px 14px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); position:absolute; left:0; }
+.bs-controls-outer { position:relative; display:flex; align-items:center; margin-bottom:12px; }
+.bs-export-side { position:absolute; left:0; }
+.bs-search-wrap { margin-bottom:14px; display:flex; justify-content:center; }
+.bs-search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; width:520px; max-width:100%; transition:border-color var(--transition); }
 .bs-search-input:focus { border-color:rgba(37,99,235,0.5); }
 .bs-search-input::placeholder { color:var(--text-3); }
 .bs-table-outer { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px; }
 .bs-table { border-collapse:collapse; font-size:11px; white-space:nowrap; }
-.bs-table th, .bs-table td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:7px 10px; vertical-align:middle; text-align:center; }
-.bs-table th { background:var(--black-3); color:var(--text-2); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:0.4px; }
+.bs-table th, .bs-table td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px 8px; vertical-align:middle; text-align:center; }
+.bs-table th { background:var(--black-3); color:var(--text-2); font-weight:700; font-size:10px; }
 .bs-table td { background:var(--black-2); color:var(--text-1); }
 .bs-table tbody tr:hover td { background:var(--black-3); }
-.bs-th-group { background:var(--black-4) !important; color:var(--text-1) !important; font-size:11px !important; text-transform:none !important; letter-spacing:0 !important; border-bottom:2px solid var(--border-2) !important; }
-.bs-sticky { position:sticky; z-index:3; background:var(--black-2); }
-.bs-sticky-h { position:sticky; z-index:4; background:var(--black-3); }
-.bs-col-num  { left:0;    min-width:36px;  width:36px; }
-.bs-col-name { left:36px; min-width:170px; width:170px; text-align:left !important; }
-.bs-col-reg  { left:206px;min-width:90px;  width:90px; }
-.bs-td-name  { text-align:left; font-weight:600; }
-.bs-td-reg   { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-3); }
-.bs-score-total { font-weight:800; font-size:12px; color:var(--text-1); }
-.bs-score-grade { font-size:9px; color:var(--green); font-weight:700; font-family:'DM Mono',monospace; display:block; }
-.bs-score-rank  { font-size:9px; color:var(--text-3); font-family:'DM Mono',monospace; display:block; }
-.bs-avg-bar-wrap { min-width:130px; padding:6px 10px; }
-.bs-avg-pct  { font-size:12px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
-.bs-avg-grade { font-size:10px; color:var(--text-3); }
-.bs-avg-track { height:6px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:4px; width:100%; }
-.bs-avg-fill  { height:100%; background:#2563eb; border-radius:99px; }
-.bs-pos-badge { display:inline-block; font-size:11px; font-weight:800; font-family:'DM Mono',monospace; color:var(--text-1); }
-.bs-pos-badge.top1 { color:#fbbf24; } .bs-pos-badge.top2 { color:#94a3b8; } .bs-pos-badge.top3 { color:#b45309; }
-.bs-remark-td { max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; }
-.bs-preview-btn { background:none; border:1px solid var(--border-2); color:var(--text-3); border-radius:4px; padding:3px 8px; font-size:10px; cursor:pointer; transition:all var(--transition); }
-.bs-preview-btn:hover { border-color:var(--green); color:var(--green); }
-.bs-excluded { color:var(--text-3); font-size:11px; font-style:italic; }
-.bs-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px; }
+.bs-th-subj { background:#e8f0fe !important; color:#1a3a6b !important; font-size:11px !important; font-weight:700 !important; border-bottom:2px solid #c7d8fa !important; padding:8px !important; }
+@media (prefers-color-scheme:dark) { .bs-th-subj { background:#1e2d50 !important; color:#93b4f7 !important; border-bottom-color:#2a3f70 !important; } }
+:root[data-theme="light"] .bs-th-subj { background:#e8f0fe !important; color:#1a3a6b !important; }
+:root[data-theme="dark"]  .bs-th-subj { background:#1e2d50 !important; color:#93b4f7 !important; }
+.bs-th-rotated { writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; height:90px; min-width:30px; padding:8px 6px !important; font-size:10px !important; font-weight:600 !important; color:var(--text-2) !important; }
+.bs-sticky { position:sticky; z-index:3; }
+.bs-sticky-h { position:sticky; z-index:4; }
+.bs-col-num  { left:0;    min-width:32px; width:32px; background:var(--black-2); }
+.bs-col-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:var(--black-2); }
+.bs-col-reg  { left:202px;min-width:100px; width:100px; background:var(--black-2); }
+.bs-th-num  { left:0;    min-width:32px; width:32px; background:var(--black-3); }
+.bs-th-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:var(--black-3); }
+.bs-th-reg  { left:202px;min-width:100px; width:100px; background:var(--black-3); }
+.bs-td-name { text-align:left; font-weight:600; font-size:11.5px; }
+.bs-td-reg  { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-3); }
+.bs-score-total { font-weight:800; font-size:12px; }
+.bs-grade-badge { font-size:9px; color:#16a34a; font-weight:700; display:block; margin-top:1px; }
+.bs-avg-cell { min-width:130px; padding:6px 10px !important; }
+.bs-avg-pct { font-size:12px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-avg-sub { font-size:9px; color:#16a34a; font-weight:700; font-family:'DM Mono',monospace; }
+.bs-avg-track { height:6px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:4px; }
+.bs-avg-fill { height:100%; background:#2563eb; border-radius:99px; }
+.bs-summary-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:11px; font-weight:700; color:#fff; background:#16a34a; }
+.bs-summary-badge.fair { background:#d97706; } .bs-summary-badge.poor { background:#dc2626; }
+.bs-pos-badge { font-size:11px; font-weight:800; font-family:'DM Mono',monospace; }
+.bs-pos-badge.top1 { color:#ca8a04; } .bs-pos-badge.top2 { color:#64748b; } .bs-pos-badge.top3 { color:#b45309; }
+.bs-remark-td { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-size:11px; color:var(--text-2); }
+.bs-att-cell { min-width:80px; font-size:10px; line-height:1.7; color:var(--text-2); }
+.bs-att-cell span { display:block; }
+.bs-preview-btn { background:none; border:none; color:var(--text-3); font-size:15px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:color var(--transition); }
+.bs-preview-btn:hover { color:#2563eb; }
+.bs-excluded { color:var(--text-3); font-size:10px; }
+.bs-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
 .bs-summary-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
 .bs-summary-label { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; font-family:'DM Mono',monospace; margin-bottom:4px; }
-.bs-summary-val   { font-size:18px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-summary-val { font-size:18px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
 .bs-subject-stats-table { width:100%; border-collapse:collapse; font-size:11.5px; }
 .bs-subject-stats-table th { padding:8px 12px; text-align:left; font-size:9.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; }
 .bs-subject-stats-table td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
@@ -1191,6 +1220,95 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   font-size:13px;
   cursor:pointer;
 }
+/* Work Offline panel */
+.gb-offline-panel {
+  display:none;
+  margin:0 0 18px;
+  padding:0 22px;
+}
+.gb-offline-panel.open { display:block; }
+.gb-offline-cards {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+.gb-offline-card {
+  border:2px solid var(--border);
+  border-radius:var(--radius);
+  padding:22px 20px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.gb-offline-card.broadsheet { border-color:#16a34a; }
+.gb-offline-card-title {
+  font-size:14px;
+  font-weight:700;
+  color:var(--text-1);
+  text-align:center;
+}
+.gb-offline-card-desc {
+  font-size:12px;
+  color:var(--text-3);
+  text-align:center;
+  line-height:1.5;
+}
+.gb-offline-tip {
+  font-size:11.5px;
+  color:#1d4ed8;
+  background:#eff6ff;
+  border-left:3px solid #3b82f6;
+  padding:8px 12px;
+  border-radius:4px;
+  line-height:1.5;
+}
+.gb-offline-tip.green {
+  color:#15803d;
+  background:#f0fdf4;
+  border-left-color:#16a34a;
+}
+.gb-offline-tip.orange {
+  color:#92400e;
+  background:#fffbeb;
+  border-left-color:#f59e0b;
+}
+.gb-offline-dl-btn {
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:var(--radius-sm);
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  color:#fff;
+  background:#2563eb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+}
+.gb-offline-dl-btn.green { background:#16a34a; }
+.gb-offline-upload-note {
+  font-size:11px;
+  color:var(--text-3);
+  text-align:center;
+}
+.gb-offline-upload-btn {
+  width:100%;
+  padding:10px;
+  border:1px solid var(--border-2);
+  border-radius:var(--radius-sm);
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  color:var(--text-2);
+  background:var(--black);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
 .gb-toggle-row {
   padding:0 22px 20px;
   display:flex;
@@ -1198,6 +1316,87 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   flex-wrap:wrap;
   color:var(--text-2);
   font-size:12px;
+  align-items:center;
+}
+.gb-ios-toggle {
+  position:relative;
+  display:inline-block;
+  width:44px;
+  height:24px;
+  flex-shrink:0;
+}
+.gb-ios-toggle input { opacity:0; width:0; height:0; }
+.gb-ios-toggle .slider {
+  position:absolute;
+  inset:0;
+  background:var(--black-4);
+  border:1px solid var(--border-2);
+  border-radius:999px;
+  cursor:pointer;
+  transition:background 0.2s;
+}
+.gb-ios-toggle .slider::before {
+  content:'';
+  position:absolute;
+  width:18px;
+  height:18px;
+  top:2px;
+  left:2px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  transition:transform 0.2s;
+}
+.gb-ios-toggle input:checked + .slider { background:#2563eb; border-color:#2563eb; }
+.gb-ios-toggle input:checked + .slider::before { transform:translateX(20px); }
+.gb-help-icon {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:15px;
+  height:15px;
+  border-radius:50%;
+  border:1px solid var(--border-2);
+  font-size:10px;
+  color:var(--text-3);
+  cursor:default;
+  position:relative;
+  vertical-align:middle;
+  margin-left:4px;
+  flex-shrink:0;
+}
+.gb-help-icon:hover .gb-tooltip {
+  display:block;
+}
+.gb-tooltip {
+  display:none;
+  position:absolute;
+  bottom:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--black);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  padding:12px 14px;
+  width:280px;
+  z-index:50;
+  font-size:12px;
+  line-height:1.6;
+  color:var(--text-1);
+  font-weight:400;
+  text-align:left;
+  white-space:normal;
+}
+.gb-tooltip strong { color:var(--text-1); }
+.gb-tooltip::after {
+  content:'';
+  position:absolute;
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
+  border:6px solid transparent;
+  border-top-color:var(--border);
 }
 .gb-switch {
   width:44px;
@@ -2913,111 +3112,207 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 
       <!-- PUBLISH RESULTS -->
       <div class="tab-panel" id="tab-publish">
-        <div class="page-header"><h2>Review &amp; Publish Results</h2><p>Broadsheet overview of class performance — filter by class and term, then publish reports to parents.</p></div>
+        <div class="gb-breadcrumb">Dashboard <span style="padding:0 6px;">&gt;</span> Result Broad Sheet</div>
 
-        <!-- Filter bar -->
-        <div class="bs-filter-bar">
-          <select class="ctrl-select" id="bs-class-sel" onchange="loadBroadsheet()"></select>
-          <select class="ctrl-select" id="bs-exam-sel" onchange="loadBroadsheet()"></select>
-          <div class="bs-view-toggle">
-            <button class="bs-toggle-btn active" id="bs-btn-full" onclick="setBsView('full')">Full View</button>
-            <button class="bs-toggle-btn" id="bs-btn-min" onclick="setBsView('minimal')">Minimal View</button>
+        <!-- Filter card -->
+        <div class="bs-filter-card">
+          <div class="bs-filter-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Select Class List to View Result
           </div>
-          <button class="bs-export-btn" onclick="exportBroadsheetCSV()">&#x2193; Export List</button>
-        </div>
-
-        <!-- Subject pills -->
-        <div class="bs-subject-pills" id="bs-pills"></div>
-
-        <!-- Search -->
-        <div class="bs-search-wrap">
-          <input class="bs-search-input" id="bs-search" placeholder="Search student name or reg. no…" oninput="filterBroadsheetTable()">
-        </div>
-
-        <!-- Table -->
-        <div class="bs-table-outer" id="bs-table-outer">
-          <div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;">Select a class and exam to load the broadsheet.</div>
-        </div>
-
-        <!-- Summary -->
-        <div id="bs-summary" style="display:none;">
-          <div class="bs-summary-grid" id="bs-summary-grid"></div>
-          <div class="card">
-            <div class="card-head"><span class="card-title">Subject Statistics</span></div>
-            <div class="card-body" style="padding:0 0 2px;">
-              <table class="bs-subject-stats-table" id="bs-stats-table">
-                <thead><tr><th>Subject</th><th>Teacher</th><th>Avg Score</th><th>Top Students</th><th>2nd Place</th><th>Entries</th></tr></thead>
-                <tbody></tbody>
-              </table>
+          <div class="bs-filter-grid">
+            <div>
+              <label class="field-label">Exam Session *</label>
+              <select class="ctrl-select" id="bs-session-sel"></select>
+            </div>
+            <div>
+              <label class="field-label">Exam *</label>
+              <select class="ctrl-select" id="bs-exam-sel"></select>
+            </div>
+            <div>
+              <label class="field-label">Class *</label>
+              <select class="ctrl-select" id="bs-class-sel"></select>
+            </div>
+            <div>
+              <label class="field-label">Class Division *</label>
+              <select class="ctrl-select" id="bs-division-sel">
+                <option value="main">Main Division</option>
+                <option value="all">All Students</option>
+              </select>
             </div>
           </div>
-          <div class="bs-print-row">
-            <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print Broadsheet</button>
+          <div class="bs-filter-foot" style="justify-content:flex-end;">
+            <label><input type="checkbox" id="bs-archived"> Include Archived Students</label>
+          </div>
+          <div style="text-align:center;margin-top:14px;">
+            <button class="bs-view-results-btn" onclick="viewBroadsheet()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              View Results
+            </button>
           </div>
         </div>
 
-        <!-- Vetting / Publishing (collapsed) -->
-        <div class="bs-publish-section">
-          <div class="bs-publish-toggle" onclick="togglePublishBody()">
-            <span>&#9881;</span>
-            <span>Vetting &amp; Publishing Controls</span>
-            <span id="pub-chev" style="margin-left:auto;font-size:12px;">&#9660;</span>
+        <!-- Results section (hidden until View Results clicked) -->
+        <div id="bs-results-section" class="bs-results-wrap" style="display:none;">
+
+          <!-- Action buttons -->
+          <div class="bs-action-row">
+            <button id="bs-unpublish-btn" class="bs-unpublish-btn" style="display:none;" onclick="unpublishBroadsheet()">
+              &#x270F; Unpublish this Result
+            </button>
+            <button class="bs-ext-view-btn" onclick="previewBroadsheetResults()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              View Results
+            </button>
           </div>
-          <div class="bs-publish-body" id="pub-body">
-            <div class="card" style="margin-bottom:14px;border:none;padding:0;">
-              <div class="card-head"><span class="card-title">Result Batches Awaiting Admin Vetting</span></div>
+
+          <!-- School header -->
+          <div class="bs-school-header">
+            <div class="bs-school-logo-placeholder" id="bs-school-logo-wrap">&#127881;</div>
+            <div class="bs-hdr-name" id="bs-hdr-name">UNIQUE CHILDREN SCHOOL</div>
+            <div class="bs-hdr-address" id="bs-hdr-address"></div>
+            <div class="bs-hdr-contact" id="bs-hdr-contact"></div>
+            <div class="bs-hdr-title" id="bs-hdr-title"></div>
+            <div class="bs-hdr-teacher" id="bs-hdr-teacher"></div>
+          </div>
+
+          <!-- Subject pills -->
+          <div class="bs-pills-row" id="bs-pills"></div>
+
+          <!-- Full / Minimal view toggle + Export -->
+          <div class="bs-controls-outer">
+            <button class="bs-export-btn bs-export-side" onclick="exportBroadsheetCSV()">Export List &#9660;</button>
+            <div class="bs-controls-row" style="flex:1;">
+              <button class="bs-toggle-btn active" id="bs-btn-full" onclick="setBsView('full')">&#10003; Full View</button>
+              <button class="bs-toggle-btn" id="bs-btn-min" onclick="setBsView('minimal')">&#10003; Minimal View</button>
+            </div>
+          </div>
+
+          <!-- Search -->
+          <div class="bs-search-wrap">
+            <input class="bs-search-input" id="bs-search" placeholder="Search student name or reg. no…" oninput="filterBroadsheetTable()">
+          </div>
+
+          <!-- Table -->
+          <div class="bs-table-outer" id="bs-table-outer">
+            <div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;">Select filters and click View Results.</div>
+          </div>
+
+          <!-- Summary (shown after results load) -->
+          <div id="bs-summary" style="display:none;margin-top:18px;">
+            <div class="bs-summary-grid" id="bs-summary-grid"></div>
+            <div class="card" style="margin-bottom:14px;">
+              <div class="card-head"><span class="card-title">Subject Statistics</span></div>
+              <div class="card-body" style="padding:0 0 2px;overflow-x:auto;">
+                <table class="bs-subject-stats-table" id="bs-stats-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Grand Total Score Obtained by all Partaking Students (G)</th>
+                      <th>Number of Partaking Students (N)</th>
+                      <th>Subject Score Average (%)</th>
+                      <th>Best Performing Student(s) in Subject (Highest Scores)</th>
+                      <th>May Need More Attention (Lowest Scores)</th>
+                      <th>Subject Teacher</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bs-stats-tbody"></tbody>
+                </table>
+                <div id="bs-stats-footer" style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:2px solid var(--border);font-size:12px;">
+                  <div style="padding:10px 14px;border-right:1px solid var(--border);">
+                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Grand Total Subject Score Averages</div>
+                    <div id="bs-foot-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                  </div>
+                  <div style="padding:10px 14px;border-right:1px solid var(--border);">
+                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Number of Active Students</div>
+                    <div id="bs-foot-count" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                  </div>
+                  <div style="padding:10px 14px;">
+                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Class Score Average</div>
+                    <div id="bs-foot-class-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:18px;">
               <div class="card-body" style="padding:0;">
-                <div style="overflow-x:auto;padding:0 0 14px;">
-                  <table class="data-table">
-                    <thead><tr><th>Class</th><th>Exam</th><th>Subject</th><th>Teacher</th><th>Entries</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody id="vetting-tbody"></tbody>
-                  </table>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;padding:10px 16px 6px;border-bottom:1px solid var(--border);">
+                  <span>Best Performing Student(s) in Class</span>
+                  <span>Grand Total Score</span>
+                  <span>Student Score Average</span>
                 </div>
+                <div id="bs-best-student-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;font-size:13px;font-weight:700;"></div>
               </div>
             </div>
-            <div class="card" id="batch-review-panel" style="margin-bottom:14px;border:none;padding:0;"></div>
-            <div class="grid-2" style="align-items:start;margin-bottom:14px;">
-              <div class="card">
-                <div class="card-head"><span class="card-title">Publish Class Reports</span></div>
-                <div class="card-body">
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                    <div><label class="field-label">Class</label><select class="ctrl-select" id="publish-class"></select></div>
-                    <div><label class="field-label">Exam</label><select class="ctrl-select" id="publish-exam"></select></div>
-                  </div>
-                  <button class="post-btn" onclick="publishReports()">Publish PDFs and Email Parents</button>
-                  <div id="email-config-status" style="margin-top:12px;"></div>
-                  <div style="font-size:10px;color:var(--text-3);line-height:1.5;margin-top:10px;">Email sending uses email-settings.env in the project folder, or SMTP_* environment variables.</div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-head"><span class="card-title">Report Signatures</span></div>
-                <div class="card-body">
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                    <div><label class="field-label">Head of School</label><input class="field-input" id="head-name" placeholder="Head of school name"></div>
-                    <div><label class="field-label">Head Signature</label><input class="field-input" id="head-signature-file" type="file" accept="image/png,image/jpeg"></div>
-                  </div>
-                  <button class="post-btn" onclick="uploadHeadSignature()" style="margin-bottom:14px;">Upload Head Signature</button>
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-                    <div><label class="field-label">Teacher</label><select class="ctrl-select" id="signature-teacher"></select></div>
-                    <div><label class="field-label">Teacher Signature</label><input class="field-input" id="teacher-signature-file" type="file" accept="image/png,image/jpeg"></div>
-                  </div>
-                  <button class="post-btn" onclick="uploadTeacherSignature()">Upload Teacher Signature</button>
-                </div>
-              </div>
+            <div style="text-align:center;font-size:11px;color:var(--text-3);margin-bottom:14px;">(If hard-copy is needed, result broadsheets are best printed industrially on A0, A1 or A2 paper size, scaled accordingly.)</div>
+            <div class="bs-print-row" style="margin-bottom:24px;">
+              <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print Options &#x2192;</button>
             </div>
-            <div class="card">
-              <div class="card-head"><span class="card-title">Published Reports</span></div>
-              <div class="card-body" style="padding:0;">
-                <div style="overflow-x:auto;padding:0 0 14px;">
-                  <table class="data-table">
-                    <thead><tr><th>Student</th><th>Class</th><th>Exam</th><th>Parent Email</th><th>Email Status</th><th>Published</th><th>PDF</th></tr></thead>
-                    <tbody id="publications-tbody"></tbody>
-                  </table>
+          </div>
+
+          <!-- Vetting & Publishing (collapsed) -->
+          <div class="bs-publish-section">
+            <div class="bs-publish-toggle" onclick="togglePublishBody()">
+              <span>&#9881;</span>
+              <span>Vetting &amp; Publishing Controls</span>
+              <span id="pub-chev" style="margin-left:auto;font-size:12px;">&#9660;</span>
+            </div>
+            <div class="bs-publish-body" id="pub-body">
+              <div class="card" style="margin-bottom:14px;border:none;padding:0;">
+                <div class="card-head"><span class="card-title">Result Batches Awaiting Admin Vetting</span></div>
+                <div class="card-body" style="padding:0;">
+                  <div style="overflow-x:auto;padding:0 0 14px;">
+                    <table class="data-table">
+                      <thead><tr><th>Class</th><th>Exam</th><th>Subject</th><th>Teacher</th><th>Entries</th><th>Status</th><th>Action</th></tr></thead>
+                      <tbody id="vetting-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="card" id="batch-review-panel" style="margin-bottom:14px;border:none;padding:0;"></div>
+              <div class="grid-2" style="align-items:start;margin-bottom:14px;">
+                <div class="card">
+                  <div class="card-head"><span class="card-title">Publish Class Reports</span></div>
+                  <div class="card-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                      <div><label class="field-label">Class</label><select class="ctrl-select" id="publish-class"></select></div>
+                      <div><label class="field-label">Exam</label><select class="ctrl-select" id="publish-exam"></select></div>
+                    </div>
+                    <button class="post-btn" onclick="publishReports()">Publish PDFs and Email Parents</button>
+                    <div id="email-config-status" style="margin-top:12px;"></div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-head"><span class="card-title">Report Signatures</span></div>
+                  <div class="card-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                      <div><label class="field-label">Head of School</label><input class="field-input" id="head-name" placeholder="Head of school name"></div>
+                      <div><label class="field-label">Head Signature</label><input class="field-input" id="head-signature-file" type="file" accept="image/png,image/jpeg"></div>
+                    </div>
+                    <button class="post-btn" onclick="uploadHeadSignature()" style="margin-bottom:14px;">Upload Head Signature</button>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                      <div><label class="field-label">Teacher</label><select class="ctrl-select" id="signature-teacher"></select></div>
+                      <div><label class="field-label">Teacher Signature</label><input class="field-input" id="teacher-signature-file" type="file" accept="image/png,image/jpeg"></div>
+                    </div>
+                    <button class="post-btn" onclick="uploadTeacherSignature()">Upload Teacher Signature</button>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><span class="card-title">Published Reports</span></div>
+                <div class="card-body" style="padding:0;">
+                  <div style="overflow-x:auto;padding:0 0 14px;">
+                    <table class="data-table">
+                      <thead><tr><th>Student</th><th>Class</th><th>Exam</th><th>Parent Email</th><th>Email Status</th><th>Published</th><th>PDF</th></tr></thead>
+                      <tbody id="publications-tbody"></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+
+        </div><!-- /bs-results-section -->
       </div>
       <div class="tab-panel" id="tab-exams">
         <div class="page-header"><h2>Exams</h2><p>Exam activities and academic calendar controls</p></div>
@@ -3505,7 +3800,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             </div>
           </div>
 
-          <div class="gb-entry-card">
+          <div class="gb-entry-card" id="gb-entry-card" style="display:none;">
             <div class="gb-entry-head">
               <div>
                 <div class="gb-entry-title" id="gb-selected-class">Selected Class Students</div>
@@ -3517,13 +3812,56 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             </div>
             <div class="gb-readonly" id="gb-readonly-box"></div>
             <div class="gb-tools">
-              <button type="button" class="gb-offline-btn" onclick="exportGradebookCsv()">Work Offline (Using Excel) ▾</button>
+              <button type="button" class="gb-offline-btn" onclick="toggleOfflinePanel()">Work Offline (Using Excel) &#9660;</button>
               <input class="gb-search" id="gb-search" placeholder="Search" oninput="filterGradebookRows()">
               <span></span>
             </div>
+            <div class="gb-offline-panel" id="gb-offline-panel">
+              <div class="gb-offline-cards">
+                <div class="gb-offline-card">
+                  <div class="gb-offline-card-title">📄 Subject-by-Subject</div>
+                  <div class="gb-offline-card-desc">Download a spreadsheet for <strong>this single Subject</strong>, fill scores offline, then upload when done.</div>
+                  <div class="gb-offline-tip">🔍 <strong>Best for:</strong> When <strong>each Subject teacher</strong> works independently — every teacher downloads only their own Subject's spreadsheet, fills in scores offline at their convenience, and submits their file separately for upload.</div>
+                  <button class="gb-offline-dl-btn" onclick="exportGradebookCsv()">⬇ Download as Spreadsheet File</button>
+                  <div class="gb-offline-upload-note">Scores filled in? Click below to submit your completed file for this Subject.</div>
+                  <button class="gb-offline-upload-btn" onclick="document.getElementById('gb-upload-single').click()">⬆ Upload File</button>
+                  <input type="file" id="gb-upload-single" accept=".csv,.xlsx" style="display:none" onchange="uploadGradebookFile(this,'single')">
+                </div>
+                <div class="gb-offline-card broadsheet">
+                  <div class="gb-offline-card-title">📊 All Subjects — Broadsheet</div>
+                  <div class="gb-offline-card-desc">Download <strong>all Subjects</strong> in one file. Each Subject gets its own sheet tab — fill everything offline, upload once.</div>
+                  <div class="gb-offline-tip green">🔍 <strong>Best for:</strong> When <strong>one staff member</strong> is handling scores for multiple or all Subjects in this Class — they download a single file covering every Subject, fill all scores in one place across the sheet tabs, and upload the whole file at once.</div>
+                  <div class="gb-offline-tip orange">🔒 Only available to the <strong>Admin</strong> or the <strong>Form/Class Teacher</strong> of this Class Arm — to prevent unauthorised changes to Subjects a teacher is not assigned to.</div>
+                  <button class="gb-offline-dl-btn green" onclick="exportBroadsheetCsv()">⬇ Download All Subjects (Broadsheet)</button>
+                  <div class="gb-offline-upload-note">File complete? Click below to import scores for all Subjects at once.</div>
+                  <button class="gb-offline-upload-btn" onclick="document.getElementById('gb-upload-broad').click()">⬆ Upload Broadsheet File</button>
+                  <input type="file" id="gb-upload-broad" accept=".csv,.xlsx" style="display:none" onchange="uploadGradebookFile(this,'broadsheet')">
+                </div>
+              </div>
+            </div>
             <div class="gb-toggle-row">
-              <label><span class="gb-switch"></span>Percentage Score Input Mode</label>
-              <label><span class="gb-switch"></span>View Grade Column</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <span class="gb-ios-toggle"><input type="checkbox" id="gb-pct-mode" onchange="applyGradebookModes()"><span class="slider"></span></span>
+                Percentage Score Input Mode
+                <span class="gb-help-icon">?
+                  <div class="gb-tooltip">
+                    <strong>What does this mean?</strong><br><br>
+                    The <em>Percentage Score Input Mode</em> allows you to directly input scores that were graded 'over 100' and let the result system auto-scale them accordingly, based on the '<strong>max obtainable</strong>' of the score division.<br><br>
+                    E.g. if a student obtained 80/100 in a test, and that test is supposed to make up only 20 marks of the result, you can simply input '80' and let the system handle the re-scaling (down to 16/20).<br><br>
+                    <strong>NOTE:</strong> Max Obtainable Mark must be set for each score division for this mode to work.
+                  </div>
+                </span>
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <span class="gb-ios-toggle"><input type="checkbox" id="gb-grade-col" onchange="applyGradebookModes()"><span class="slider"></span></span>
+                View Grade Column
+                <span class="gb-help-icon">?
+                  <div class="gb-tooltip">
+                    <strong>What does this mean?</strong><br><br>
+                    This shows the <strong>Grade</strong> of the total score obtained.
+                  </div>
+                </span>
+              </label>
             </div>
             <div class="gb-table-wrap">
               <table class="gb-score-table">
@@ -3534,6 +3872,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                     <th>Mid Term Test (40%)<small>Max Score : 40</small></th>
                     <th>Examination (60%)<small>Max Score : 60</small></th>
                     <th>Total Score<small>Max Total Score : 100</small></th>
+                    <th id="gb-grade-th" style="display:none;">Total Score Grade</th>
                     <th>Subject Teacher's Comment / Progress Report</th>
                     <th>Subject Teacher's Recommendation</th>
                     <th>Absent</th>

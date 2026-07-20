@@ -2764,6 +2764,53 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // ── SYSTEM SETTINGS ──
+  const SYS_KEYS = [
+    'school_name','school_motto','school_mission','school_vision','school_values',
+    'head_staff_title','student_term','reg_prefix',
+    'school_address','school_city','school_country','school_email','school_email_alt',
+    'school_phone','school_phone_alt','school_whatsapp','wa_chat_btn','wa_chat_msg',
+    'fees_desk','admission_desk',
+    'active_services','ga_tag','website_url','contact_url',
+    'currency','timezone','multi_timezone',
+    'att_alert','att_channel','new_user_email',
+  ];
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/system-settings') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const settings = {};
+    SYS_KEYS.forEach(k => { settings[k] = valueFromMeta(k, ''); });
+    // defaults for empty fields
+    if (!settings.school_name)    settings.school_name    = 'Little Scholars';
+    if (!settings.head_staff_title) settings.head_staff_title = 'Head of School';
+    if (!settings.student_term)   settings.student_term   = 'student';
+    if (!settings.reg_prefix)     settings.reg_prefix     = 'LS/{ADMISSION_YEAR}/';
+    if (!settings.school_country) settings.school_country = 'Nigeria';
+    if (!settings.active_services) settings.active_services = 'School Portal Only';
+    if (!settings.currency)       settings.currency       = 'Nigerian naira (₦)';
+    if (!settings.timezone)       settings.timezone       = '(GMT+1:00) Africa/Lagos (Western African Time)';
+    if (!settings.multi_timezone) settings.multi_timezone = 'Disabled';
+    if (!settings.att_alert)      settings.att_alert      = 'Disable';
+    if (!settings.att_channel)    settings.att_channel    = 'Email';
+    if (!settings.new_user_email) settings.new_user_email = 'Yes';
+    if (!settings.wa_chat_btn)    settings.wa_chat_btn    = 'Enable';
+    if (!settings.wa_chat_msg)    settings.wa_chat_msg    = "Hello! Chat with us on WhatsApp. We're here to help!";
+    return sendJson(res, 200, { settings });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/system-settings') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    SYS_KEYS.forEach(k => {
+      if (Object.prototype.hasOwnProperty.call(body, k)) {
+        setMeta(k, cleanText(String(body[k] ?? '')));
+      }
+    });
+    return sendJson(res, 200, { ok: true });
+  }
+
   return sendJson(res, 404, { error: 'API route not found' });
 }
 
@@ -2902,8 +2949,15 @@ function adminSetupPayload() {
     headSignaturePath: valueFromMeta('head_signature_path', ''),
     nextTermBegins: valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026'),
   };
+  const schoolInfo = {
+    name: valueFromMeta('school_name', 'UNIQUE CHILDREN SCHOOL'),
+    address: valueFromMeta('school_address', 'Block 12, Plot 350 Norus Close, Omole Estate Phase 1'),
+    phone: valueFromMeta('school_phone', '08034106866'),
+    email: valueFromMeta('school_email', 'info@uniquegroupofschools.com'),
+    website: valueFromMeta('school_website', 'uniquegroupofschools.com'),
+  };
 
-  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, settings, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
+  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
 function serveStatic(req, res, url) {
