@@ -35,7 +35,8 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
-const DB_PATH = path.join(ROOT, 'school.sqlite');
+const DATA_DIR = process.env.DATA_DIR || ROOT;
+const DB_PATH = path.join(DATA_DIR, 'school.sqlite');
 const PORT = Number(process.env.PORT || 3000);
 const COOKIE_NAME = 'ls_session';
 const EXAM_TYPES = ['Continuous Assessment', 'Mid-Term Exam', 'Final Exam'];
@@ -62,9 +63,10 @@ const PSYCHOMOTOR_SKILLS = [
   ['sportsAndGames', 'sports_and_games', 'Sports and Games'],
 ];
 const SKILL_COLUMNS = [...AFFECTIVE_SKILLS, ...PSYCHOMOTOR_SKILLS];
-const UPLOAD_DIR = path.join(ROOT, 'uploads');
-const REPORT_DIR = path.join(ROOT, 'published_reports');
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const REPORT_DIR = path.join(DATA_DIR, 'published_reports');
 
+fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA foreign_keys = ON');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });

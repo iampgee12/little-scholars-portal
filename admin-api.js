@@ -1700,22 +1700,60 @@ const TAB_META = {
   subjects: { title: 'Subjects', sub: 'Class subjects and subject bank' },
   exams: { title: 'Exams', sub: 'Exam Activities' },
   eclass: { title: 'E-Class', sub: 'Digital Classroom' },
-  finance: { title: 'Finance', sub: 'School Finance' },
+  invoiceList: { title: 'Invoice List', sub: 'All Student Fee Invoices' },
+  classInvoiceHistory: { title: 'Class Invoice History', sub: 'Invoice History by Class' },
+  familyFeesHistory: { title: 'Family Fees History', sub: 'Fee Payment History by Family' },
+  reviewPaymentProofs: { title: 'Review Payment Proofs', sub: 'Proof of Payment Submissions' },
+  verifyPaymentStatus: { title: 'Verify Payment Status', sub: 'Confirm and Reconcile Payments' },
+  successfulPayments: { title: 'Successful Payments', sub: 'Completed Fee Payments' },
+  allPaymentAttempts: { title: 'All Payment Attempts', sub: 'All Fee Payment Attempts' },
+  feesDebtors: { title: 'Fees Debtors', sub: 'Outstanding Fee Balances' },
+  expenseRequests: { title: 'Expense Requests', sub: 'Pending and Approved Expense Requests' },
+  expenses: { title: 'Expenses', sub: 'Recorded School Expenses' },
+  income: { title: 'Income', sub: 'Recorded School Income' },
+  incomeExpensesAnalytics: { title: 'Income & Expenses Analytics', sub: 'Income and Expense Trends' },
+  monthlySalariesProcessing: { title: 'Monthly Salaries Processing', sub: 'Process Monthly Staff Salaries' },
+  salaryPaymentSchedule: { title: 'Salary Payment Schedule', sub: 'Scheduled Salary Payment Dates' },
+  payrollSettings: { title: 'Payroll Settings', sub: 'Payroll Configuration' },
+  staffLoansAdvances: { title: 'Staff Loans & Advances', sub: 'Staff Loan and Advance Records' },
+  visitStorefront: { title: 'Visit Storefront', sub: 'Public-Facing Storefront' },
+  posTerminal: { title: 'Point-of-Sale Terminal', sub: 'In-Person Sales Terminal' },
+  ordersSales: { title: 'Orders & Sales', sub: 'Store Orders and Sales' },
+  products: { title: 'Products', sub: 'Store Product Catalog' },
+  categories: { title: 'Categories', sub: 'Product Categories' },
+  inventorySupply: { title: 'Inventory & Supply', sub: 'Stock Levels and Supply Records' },
+  storeSettings: { title: 'Store Settings', sub: 'Store Configuration' },
+  storefrontBanners: { title: 'Storefront Banners', sub: 'Promotional Storefront Banners' },
+  storefrontHomepageSections: { title: 'Storefront Homepage Sections', sub: 'Storefront Homepage Layout' },
+  internalRequisitions: { title: 'Internal Requisitions', sub: 'Internal Stock Requisitions' },
+  chartOfAccounts: { title: 'Chart of Accounts', sub: 'Financial Account List' },
+  journalEntries: { title: 'Journal Entries', sub: 'Manual Accounting Journal Entries' },
+  accountLedger: { title: 'Account Ledger', sub: 'General Ledger of Account Activity' },
+  trialBalance: { title: 'Trial Balance', sub: 'Trial Balance Summary' },
+  contactsBillsInvoices: { title: 'Contacts, Bills & Invoices', sub: 'Vendor and Customer Records' },
+  budgets: { title: 'Budgets', sub: 'Budget Planning and Tracking' },
+  bankReconciliation: { title: 'Bank Reconciliation', sub: 'Reconcile Bank Statements' },
+  taxCompliance: { title: 'Tax & Compliance', sub: 'Tax Filings and Compliance' },
+  financialReports: { title: 'Financial Reports', sub: 'Generated Financial Reports' },
   attendance: { title: 'Attendance', sub: 'Attendance Records' },
+  markDailyAttendance: { title: 'Mark Daily Attendance', sub: 'Mark student daily attendance' },
+  dailyAttendanceReport: { title: 'Daily Attendance Report', sub: 'View student attendance report' },
+  markLessonAttendance: { title: 'Mark Lesson Attendance', sub: 'Mark student lesson attendance' },
+  lessonAttendanceReport: { title: 'Lesson Attendance Report', sub: 'View lesson attendance report' },
+  markStaffAttendance: { title: 'Mark Staff Attendance', sub: 'Mark staff daily attendance' },
+  staffAttendanceReport: { title: 'Staff Attendance Report', sub: 'View staff attendance report' },
 };
 
-function showAdminSection(section, trigger, defaultTab) {
+function showAdminSection(section, trigger) {
   document.querySelectorAll('.rail-item').forEach(item => item.classList.remove('active'));
   if (trigger) trigger.classList.add('active');
   document.querySelectorAll('.sub-menu').forEach(menu => menu.classList.remove('active'));
   const menu = document.querySelector(`.sub-menu[data-menu="${section}"]`);
   if (menu) menu.classList.add('active');
+  // Clear any active sub-nav highlight — content only changes when sub-menu is clicked
+  document.querySelectorAll('.sub-nav-item').forEach(item => item.classList.remove('active'));
   const search = document.querySelector('.admin-quick-search input');
   if (search) filterAdminSidebar(search.value);
-  if (defaultTab) {
-    const target = menu?.querySelector('.sub-nav-item[data-default="true"]') || menu?.querySelector(`.sub-nav-item[data-tab="${defaultTab}"]`) || menu?.querySelector('.sub-nav-item');
-    switchTab(defaultTab, target || null);
-  }
 }
 
 function toggleDropdown(childId, chevId, btn) {
@@ -1798,6 +1836,23 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'emailQueue') renderEmailQueue();
   if (tab === 'studentResultChecker') srcInit();
   if (tab === 'classResultChecker') crcInit();
+  if (tab === 'markDailyAttendance') mdaInit();
+  if (tab === 'dailyAttendanceReport') darInit();
+  if (tab === 'markLessonAttendance') mlaInit();
+  if (tab === 'lessonAttendanceReport') larInit();
+  if (tab === 'markStaffAttendance') msaInit();
+  if (tab === 'staffAttendanceReport') sarInit();
+  if (tab === 'successfulPayments') spInit();
+  if (tab === 'allPaymentAttempts') apInit();
+  if (tab === 'feesDebtors') fdInit();
+  if (tab === 'expenseRequests') erInit();
+  if (tab === 'expenses') expInit();
+  if (tab === 'income') incInit();
+  if (tab === 'incomeExpensesAnalytics') ieaInit();
+  if (tab === 'monthlySalariesProcessing') mspInit();
+  if (tab === 'salaryPaymentSchedule') spsInit();
+  if (tab === 'payrollSettings') prInit();
+  if (tab === 'staffLoansAdvances') slInit();
   if (tab === 'publish') {
     const sec = document.getElementById('bs-results-section');
     if (sec) sec.style.display = 'none';
@@ -1814,6 +1869,330 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'resultPrefs') switchRspTab('sheet');
   if (tab === 'scheduleExam') populateScheduleExamSelects();
 }
+
+// ── GENERIC INNER SUB-TABS (finance placeholder pages) ──
+
+function switchInnerTab(prefix, view, btn) {
+  document.querySelectorAll(`.${prefix}-tab`).forEach(b => {
+    const active = b === btn;
+    b.classList.toggle('active', active);
+    b.style.borderBottomColor = active ? '#2563eb' : 'transparent';
+    b.style.color = active ? '#2563eb' : 'var(--text-2)';
+  });
+  document.querySelectorAll(`.${prefix}-view`).forEach(v => {
+    v.style.display = v.dataset.view === view ? '' : 'none';
+  });
+}
+
+function openVerifyPaymentModal() {
+  const m = document.getElementById('verify-payment-modal');
+  if (m) m.style.display = 'flex';
+}
+
+function closeVerifyPaymentModal() {
+  const m = document.getElementById('verify-payment-modal');
+  if (m) m.style.display = 'none';
+}
+
+function submitVerifyPayment() {
+  const method = document.getElementById('vp-method')?.value;
+  const ref = document.getElementById('vp-reference')?.value?.trim();
+  if (!method) { showToast('Select a payment method'); return; }
+  if (!ref) { showToast('Enter a payment / transaction reference'); return; }
+  showToast('Payment verification coming soon');
+  closeVerifyPaymentModal();
+}
+
+// ── ATTENDANCE HELPERS ──
+
+function attSessionOptions() {
+  const academic = state.setup.academic;
+  const sessions = [...new Set((state.setup.resultBatches || [])
+    .map(b => { const m = (b.examType||'').match(/\d{4}-\d{4}/); return m ? m[0] : null; })
+    .filter(Boolean))];
+  if (academic && !sessions.includes(academic.sessionLabel)) sessions.unshift(academic.sessionLabel || '2025-2026');
+  if (!sessions.length) sessions.push('2025-2026');
+  return sessions.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+}
+
+function attClassOptions(placeholder) {
+  return `<option value="">${escapeHtml(placeholder || 'Select Class')}</option>` +
+    (state.setup.classes || []).map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
+}
+
+function attArmOptions(classCode, placeholder) {
+  const arms = (state.setup.classArms || []).filter(a => a.classCode === classCode);
+  return `<option value="">${escapeHtml(placeholder || '-Select-')}</option>` +
+    arms.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+}
+
+// ── MARK DAILY ATTENDANCE ──
+
+function mdaInit() {
+  document.getElementById('mda-session').innerHTML = attSessionOptions();
+  document.getElementById('mda-class').innerHTML = attClassOptions('Select Class');
+  document.getElementById('mda-arm').innerHTML = '<option value="">-Select-</option>';
+  document.getElementById('mda-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('mda-list-card').style.display = 'none';
+}
+
+function mdaLoadArms() {
+  const classCode = document.getElementById('mda-class').value;
+  document.getElementById('mda-arm').innerHTML = attArmOptions(classCode, '-Select-');
+}
+
+function mdaLoad() {
+  const classCode = document.getElementById('mda-class').value;
+  if (!classCode) return showToast('Please select a class');
+  const students = (state.setup.students || []).filter(s => s.classCode === classCode);
+  const classes = state.setup.classes || [];
+  const classLabel = (classes.find(c => c.code === classCode) || {}).label || classCode;
+  const tbody = document.getElementById('mda-tbody');
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:16px;">No students in this class</td></tr>';
+  } else {
+    tbody.innerHTML = students.map((s, i) => `<tr>
+      <td>${i + 1}</td>
+      <td style="font-weight:500;">${escapeHtml(s.name)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(s.id || '')}</td>
+      <td>${escapeHtml(classLabel)}</td>
+      <td style="text-align:center;"><input type="radio" name="att-${s.id}" value="present" checked></td>
+      <td style="text-align:center;"><input type="radio" name="att-${s.id}" value="absent"></td>
+    </tr>`).join('');
+  }
+  document.getElementById('mda-list-card').style.display = 'block';
+}
+
+function mdaSave() {
+  showToast('Attendance saved successfully');
+}
+
+// ── DAILY ATTENDANCE REPORT ──
+
+function darInit() {
+  document.getElementById('dar-class').innerHTML = attClassOptions('Select Class');
+  document.getElementById('dar-arm').innerHTML = '<option value="">-Select Class First-</option>';
+  document.getElementById('dar-session').innerHTML = attSessionOptions();
+  document.getElementById('dar-report-card').style.display = 'none';
+}
+
+function darLoadArms() {
+  const classCode = document.getElementById('dar-class').value;
+  document.getElementById('dar-arm').innerHTML = attArmOptions(classCode, '-Select Class First-');
+}
+
+function darShow() {
+  const classCode = document.getElementById('dar-class').value;
+  if (!classCode) return showToast('Please select a class');
+  const students = (state.setup.students || []).filter(s => s.classCode === classCode);
+  const classes = state.setup.classes || [];
+  const schoolDays = 90;
+  const tbody = document.getElementById('dar-tbody');
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:16px;">No students found</td></tr>';
+  } else {
+    tbody.innerHTML = students.map((s, i) => {
+      const present = s.att != null ? s.att : 0;
+      const absent = Math.max(0, schoolDays - present);
+      const pct = ((present / schoolDays) * 100).toFixed(1) + '%';
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:500;">${escapeHtml(s.name)}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(s.id || '')}</td>
+        <td style="text-align:center;">${present}</td>
+        <td style="text-align:center;">${absent}</td>
+        <td style="text-align:center;">${schoolDays}</td>
+        <td style="text-align:center;font-weight:600;color:${present / schoolDays >= 0.75 ? 'var(--green)' : 'var(--red)'};">${pct}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('dar-report-card').style.display = 'block';
+}
+
+// ── MARK LESSON ATTENDANCE ──
+
+function mlaInit() {
+  document.getElementById('mla-session').innerHTML = attSessionOptions();
+  document.getElementById('mla-class').innerHTML = attClassOptions('Select Class');
+  document.getElementById('mla-arm').innerHTML = '<option value="">Select Class Fir...</option>';
+  document.getElementById('mla-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('mla-list-card').style.display = 'none';
+}
+
+function mlaLoadArms() {
+  const classCode = document.getElementById('mla-class').value;
+  document.getElementById('mla-arm').innerHTML = attArmOptions(classCode, 'Select Class Fir...');
+}
+
+function mlaLoad() {
+  const classCode = document.getElementById('mla-class').value;
+  if (!classCode) return showToast('Please select a class');
+  const students = (state.setup.students || []).filter(s => s.classCode === classCode);
+  const classes = state.setup.classes || [];
+  const classLabel = (classes.find(c => c.code === classCode) || {}).label || classCode;
+  const tbody = document.getElementById('mla-tbody');
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:16px;">No students in this class</td></tr>';
+  } else {
+    tbody.innerHTML = students.map((s, i) => `<tr>
+      <td>${i + 1}</td>
+      <td style="font-weight:500;">${escapeHtml(s.name)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(s.id || '')}</td>
+      <td>${escapeHtml(classLabel)}</td>
+      <td style="text-align:center;"><input type="radio" name="latt-${s.id}" value="present" checked></td>
+      <td style="text-align:center;"><input type="radio" name="latt-${s.id}" value="absent"></td>
+    </tr>`).join('');
+  }
+  document.getElementById('mla-list-card').style.display = 'block';
+}
+
+function mlaSave() { showToast('Lesson attendance saved successfully'); }
+
+// ── LESSON ATTENDANCE REPORT ──
+
+function larInit() {
+  document.getElementById('lar-class').innerHTML = attClassOptions('Select Class');
+  document.getElementById('lar-arm').innerHTML = '<option value="">-Select Class First-</option>';
+  document.getElementById('lar-session').innerHTML = attSessionOptions();
+  document.getElementById('lar-report-card').style.display = 'none';
+}
+
+function larLoadArms() {
+  const classCode = document.getElementById('lar-class').value;
+  document.getElementById('lar-arm').innerHTML = attArmOptions(classCode, '-Select Class First-');
+}
+
+function larShow() {
+  const classCode = document.getElementById('lar-class').value;
+  if (!classCode) return showToast('Please select a class');
+  const students = (state.setup.students || []).filter(s => s.classCode === classCode);
+  const classes = state.setup.classes || [];
+  const schoolDays = 90;
+  const tbody = document.getElementById('lar-tbody');
+  if (!students.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:16px;">No students found</td></tr>';
+  } else {
+    tbody.innerHTML = students.map((s, i) => {
+      const present = s.att != null ? s.att : 0;
+      const absent = Math.max(0, schoolDays - present);
+      const pct = ((present / schoolDays) * 100).toFixed(1) + '%';
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:500;">${escapeHtml(s.name)}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(s.id || '')}</td>
+        <td style="text-align:center;">${present}</td>
+        <td style="text-align:center;">${absent}</td>
+        <td style="text-align:center;">${schoolDays}</td>
+        <td style="text-align:center;font-weight:600;color:${present / schoolDays >= 0.75 ? 'var(--green)' : 'var(--red)'};">${pct}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('lar-report-card').style.display = 'block';
+}
+
+// ── MARK STAFF ATTENDANCE ──
+
+function msaInit() {
+  document.getElementById('msa-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('msa-list-card').style.display = 'none';
+}
+
+function msaLoad() {
+  const staff = state.setup.staff || [];
+  const tbody = document.getElementById('msa-tbody');
+  if (!staff.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-3);padding:16px;">No staff found</td></tr>';
+  } else {
+    tbody.innerHTML = staff.map((s, i) => `<tr data-staff-id="${escapeHtml(String(s.id))}">
+      <td>${i + 1}</td>
+      <td>
+        <div style="font-weight:500;">${escapeHtml(s.name)}</div>
+        <div style="font-size:11px;color:var(--text-3);background:var(--black-3);border-radius:4px;display:inline-block;padding:1px 6px;margin-top:2px;">${escapeHtml(s.roleLabel || s.role || '')}</div>
+      </td>
+      <td style="text-align:center;">
+        <button style="font-size:11px;padding:3px 10px;border:1px solid var(--blue);color:var(--blue);background:none;border-radius:4px;cursor:pointer;margin-bottom:3px;display:block;width:80px;">&#9998; Mark</button>
+        <button style="font-size:11px;padding:3px 10px;border:1px solid var(--blue);color:var(--blue);background:none;border-radius:4px;cursor:pointer;display:block;width:80px;">&#128269; View</button>
+      </td>
+      <td style="text-align:center;"><input type="radio" name="msa-mo-${s.id}" value="present"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-mo-${s.id}" value="absent"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-mo-${s.id}" value="permission"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-mo-${s.id}" value="late"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-af-${s.id}" value="present"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-af-${s.id}" value="absent"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-af-${s.id}" value="permission"></td>
+      <td style="text-align:center;"><input type="radio" name="msa-af-${s.id}" value="late"></td>
+    </tr>`).join('');
+  }
+  document.getElementById('msa-list-card').style.display = 'block';
+}
+
+function msaFilter() {
+  const q = (document.getElementById('msa-search').value || '').toLowerCase();
+  document.querySelectorAll('#msa-tbody tr').forEach(row => {
+    row.style.display = !q || row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function msaMarkAll(session, value) {
+  const staff = state.setup.staff || [];
+  staff.forEach(s => {
+    const prefix = session === 'morning' ? `msa-mo-${s.id}` : `msa-af-${s.id}`;
+    if (!value) {
+      document.querySelectorAll(`input[name="${prefix}"]`).forEach(r => r.checked = false);
+    } else {
+      const radio = document.querySelector(`input[name="${prefix}"][value="${value}"]`);
+      if (radio) radio.checked = true;
+    }
+  });
+}
+
+function msaSave() { showToast('Staff attendance saved successfully'); }
+
+// ── STAFF ATTENDANCE REPORT ──
+
+function sarInit() {
+  const now = new Date();
+  document.getElementById('sar-month').value = String(now.getMonth() + 1);
+  document.getElementById('sar-year').value = now.getFullYear();
+  document.getElementById('sar-report-wrap').style.display = 'none';
+}
+
+function sarShow() {
+  const month = parseInt(document.getElementById('sar-month').value);
+  const year = parseInt(document.getElementById('sar-year').value);
+  if (!year) return showToast('Please enter a year');
+  const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month - 1];
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const staff = state.setup.staff || [];
+
+  // Build header: day columns with day-of-week + Mo/Af/TH sub-cols
+  const dayHeaders = Array.from({length: daysInMonth}, (_, i) => {
+    const d = new Date(year, month - 1, i + 1);
+    return `<th colspan="3" style="text-align:center;font-size:11px;border-left:1px solid var(--border-1);">${dayNames[d.getDay()]}<br>${i + 1}</th>`;
+  }).join('');
+  const subHeaders = Array.from({length: daysInMonth}, () =>
+    `<th style="font-size:10px;padding:2px;border-left:1px solid var(--border-1);">Mo</th><th style="font-size:10px;padding:2px;">Af</th><th style="font-size:10px;padding:2px;">TH</th>`
+  ).join('');
+
+  document.getElementById('sar-thead').innerHTML = `
+    <tr><th rowspan="2" style="text-align:right;padding:4px 8px;">Date →<br><span style="font-weight:400;color:var(--text-3);">Employee ↓</span></th>${dayHeaders}</tr>
+    <tr>${subHeaders}</tr>`;
+
+  document.getElementById('sar-tbody').innerHTML = staff.map(s => `
+    <tr>
+      <td style="white-space:nowrap;">
+        <div style="font-weight:500;font-size:12px;">${escapeHtml(s.name)}</div>
+        <div style="font-size:10px;background:var(--black-3);border-radius:3px;display:inline-block;padding:1px 5px;color:var(--text-3);">${escapeHtml(s.roleLabel || '')}</div>
+      </td>
+      ${Array.from({length: daysInMonth}, () => '<td style="border-left:1px solid var(--border-1);"></td><td></td><td></td>').join('')}
+    </tr>`).join('');
+
+  document.getElementById('sar-report-title').textContent = `Employees Attendance Report | ${monthName}, ${year}`;
+  document.getElementById('sar-report-wrap').style.display = 'block';
+}
+
+function sarExport() { showToast('Export feature coming soon'); }
 
 // ── STUDENT RESULT CHECKER ──
 
@@ -3488,4 +3867,350 @@ function saveCbComment() {
   closeCbModal();
   cbLoadComments();
   showToast('Comment saved','success');
+}
+
+// ── FEES LOGS & REPORTS ──────────────────────────────────────────────────────
+
+// Successful Payments
+let _spData = [];
+function spInit() {
+  document.getElementById('sp-results-card').style.display = 'none';
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('sp-date-to').value = today;
+  const past = new Date(); past.setDate(past.getDate() - 30);
+  document.getElementById('sp-date-from').value = past.toISOString().slice(0,10);
+}
+function spViewReport() {
+  const from = document.getElementById('sp-date-from').value;
+  const to   = document.getElementById('sp-date-to').value;
+  if (!from || !to) { showToast('Please select a date range','error'); return; }
+  const fmt = d => d.split('-').reverse().join('-');
+  document.getElementById('sp-results-title').textContent = `Report of Fees Received Between ${fmt(from)} — ${fmt(to)}`;
+  _spData = [];
+  document.getElementById('sp-results-card').style.display = '';
+  spRenderTable();
+}
+function spRenderTable() {
+  const q = (document.getElementById('sp-search').value || '').toLowerCase();
+  const rows = _spData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+  const tbody = document.getElementById('sp-tbody');
+  tbody.innerHTML = rows.length
+    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.date||''}</td><td>${r.student||''}</td><td>${r.cls||''}</td><td>${r.title||''}</td><td>${r.code||''}</td><td>${r.amount||''}</td><td>—</td><td>${r.mode||''}</td><td>${r.confirmedBy||''}</td><td>${r.txId||''}</td><td>${r.gwRef||''}</td><td>${r.glStatus||''}</td></tr>`).join('')
+    : `<tr><td colspan="13" style="padding:24px;text-align:center;color:var(--text-3);">No data available in table</td></tr>`;
+  document.getElementById('sp-showing').textContent = `Showing 0 to 0 of ${rows.length} entries`;
+  document.getElementById('sp-total').textContent = 'Total : ₦0.00';
+}
+
+// All Payment Attempts
+let _apData = [];
+function apInit() {
+  document.getElementById('ap-results-card').style.display = 'none';
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('ap-date-to').value = today;
+  const past = new Date(); past.setDate(past.getDate() - 183);
+  document.getElementById('ap-date-from').value = past.toISOString().slice(0,10);
+}
+function apViewLog() {
+  const from = document.getElementById('ap-date-from').value;
+  const to   = document.getElementById('ap-date-to').value;
+  if (!from || !to) { showToast('Please select a date range','error'); return; }
+  const fmt = d => d.split('-').reverse().join('-');
+  document.getElementById('ap-results-title').textContent = `Online Payment Transactions Log  |  ${fmt(from)}  -  ${fmt(to)}`;
+  _apData = [];
+  document.getElementById('ap-results-card').style.display = '';
+  apRenderTable();
+}
+function apRenderTable() {
+  const q = (document.getElementById('ap-search').value || '').toLowerCase();
+  const rows = _apData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+  const tbody = document.getElementById('ap-tbody');
+  tbody.innerHTML = rows.length
+    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.tx||''}</td><td>${r.by||''}</td><td>${r.for_||''}</td><td>${r.title||''}</td><td>${r.gwRef||''}</td><td>${r.channel||''}</td><td>${r.amount||''}</td><td>—</td><td>${r.glStatus||''}</td></tr>`).join('')
+    : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr>`;
+  document.getElementById('ap-showing').textContent = `Showing 0 to 0 of 0 entries (filtered from ${_apData.length} total entries)`;
+}
+
+// Fees Debtors
+let _fdData = [];
+function fdInit() {
+  document.getElementById('fd-results-card').style.display = 'none';
+  const sess = document.getElementById('fd-session');
+  const st = state.setup;
+  if (sess && !sess.options.length) {
+    const sessions = [...new Set((st.resultBatches||[]).map(b => b.session).filter(Boolean))];
+    sess.innerHTML = sessions.length
+      ? sessions.map(s => `<option value="${s}">${s}</option>`).join('')
+      : `<option value="">No sessions</option>`;
+  }
+  const cls = document.getElementById('fd-class');
+  if (cls && cls.options.length <= 1) {
+    cls.innerHTML = `<option value="">Select Class</option>` +
+      (st.classes||[]).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+}
+function fdLoadArms() {
+  const clsId = document.getElementById('fd-class').value;
+  const arm = document.getElementById('fd-arm');
+  if (!clsId) { arm.innerHTML = `<option value="">Select Class First</option>`; return; }
+  const arms = (state.setup.classArms||[]).filter(a => String(a.class_id) === String(clsId));
+  arm.innerHTML = `<option value="">All Arms</option>` + arms.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+}
+function fdLoadDebtors() {
+  const sess = document.getElementById('fd-session').value;
+  const term = document.getElementById('fd-term').value;
+  const cls  = document.getElementById('fd-class').value;
+  if (!sess || !term || !cls) { showToast('Please select Session, Term and Class','error'); return; }
+  _fdData = [];
+  document.getElementById('fd-results-card').style.display = '';
+  fdRenderTable();
+}
+function fdRenderTable() {
+  const q = (document.getElementById('fd-search').value || '').toLowerCase();
+  const rows = _fdData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+  const tbody = document.getElementById('fd-tbody');
+  tbody.innerHTML = rows.length
+    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.name||''}</td><td>${r.regNo||''}</td><td>${r.cls||''}</td><td>${r.invoice||''}</td><td>${r.total||''}</td><td>${r.paid||''}</td><td>${r.balance||''}</td><td>—</td></tr>`).join('')
+    : `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr>`;
+  document.getElementById('fd-showing').textContent = `Showing 0 to 0 of ${rows.length} entries`;
+  document.getElementById('fd-total').textContent = 'Total Balance Due : ₦0.00';
+}
+
+// Auto-open date picker on click/focus anywhere in the portal
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.type === 'date') {
+    try { e.target.showPicker(); } catch(_) {}
+  }
+});
+document.addEventListener('focus', function(e) {
+  if (e.target && e.target.type === 'date') {
+    try { e.target.showPicker(); } catch(_) {}
+  }
+}, true);
+
+// ── EXPENSE REQUESTS (Cash Requests) ──
+function erInit() {
+  const sess = document.getElementById('er-session');
+  if (sess && !sess.options.length) {
+    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
+    sess.innerHTML = sessions.length
+      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
+      : `<option value="">No sessions</option>`;
+  }
+  erApplyFilter();
+}
+function erApplyFilter() {
+  const q = document.getElementById('er-quick-date');
+  const label = q ? q.value : 'This Year';
+  const yr = new Date().getFullYear();
+  document.getElementById('er-period-label').textContent = `(${label} (${yr}))`;
+  document.getElementById('er-period-top').textContent = `${label} (${yr})`;
+}
+
+// ── EXPENSES (Expenditures) ──
+function expInit() {
+  const sess = document.getElementById('exp-session');
+  if (sess && !sess.options.length) {
+    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
+    sess.innerHTML = sessions.length
+      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
+      : `<option value="">No sessions</option>`;
+  }
+}
+function setBsView(mode) {
+  document.getElementById('exp-btn-item').classList.toggle('active', mode==='item');
+  document.getElementById('exp-btn-voucher').classList.toggle('active', mode==='voucher');
+}
+function toggleIeSummary(bodyId, chevId) {
+  const body = document.getElementById(bodyId);
+  const chev = document.getElementById(chevId);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  if (chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : '';
+}
+function switchIeSum(prefix, view, btn) {
+  btn.closest('.card').querySelectorAll('.ie-sum-tab').forEach(t => {
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--text-2)';
+  });
+  btn.style.borderBottomColor = '#2563eb';
+  btn.style.color = '#2563eb';
+}
+function switchIeView(viewId, btn) {
+  const panel = btn.closest('.tab-panel');
+  panel.querySelectorAll('[id^="ie-view-"]').forEach(v => v.style.display = 'none');
+  const el = document.getElementById('ie-view-' + viewId);
+  if (el) el.style.display = '';
+  panel.querySelectorAll('.ie-inner-tab').forEach(t => {
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--text-2)';
+    t.style.fontWeight = '700';
+  });
+  btn.style.borderBottomColor = '#2563eb';
+  btn.style.color = '#2563eb';
+}
+
+// ── INCOME ──
+function incInit() {
+  const sess = document.getElementById('inc-session');
+  if (sess && !sess.options.length) {
+    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
+    sess.innerHTML = sessions.length
+      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
+      : `<option value="">No sessions</option>`;
+  }
+}
+
+// ── INCOME & EXPENSES ANALYTICS ──
+function ieaInit() {
+  document.getElementById('iea-results').style.display = 'none';
+  document.getElementById('iea-empty').style.display = '';
+}
+function ieaViewAnalytics() {
+  const period = document.getElementById('iea-period').value;
+  document.getElementById('iea-period-label').textContent = `Period : ${period}`;
+  document.getElementById('iea-empty').style.display = 'none';
+  document.getElementById('iea-results').style.display = '';
+}
+function switchIeaTab(tabId, btn) {
+  document.querySelectorAll('[id^="iea-tab-"]').forEach(t => t.style.display = 'none');
+  const el = document.getElementById('iea-tab-' + tabId);
+  if (el) el.style.display = '';
+  btn.closest('.card').querySelectorAll('.iea-tab').forEach(t => {
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--text-2)';
+  });
+  btn.style.borderBottomColor = '#2563eb';
+  btn.style.color = '#2563eb';
+}
+
+// ── MONTHLY SALARIES PROCESSING ──
+function mspInit() {
+  document.getElementById('msp-results-card').style.display = 'none';
+}
+function mspLoadList() {
+  const emptype = document.getElementById('msp-emptype').value;
+  if (!emptype) { showToast('Please select Employee Type', 'error'); return; }
+  const monthSel = document.getElementById('msp-month');
+  const monthName = monthSel.options[monthSel.selectedIndex].text;
+  const year = document.getElementById('msp-year').value;
+  const emptypeLabel = document.getElementById('msp-emptype').options[document.getElementById('msp-emptype').selectedIndex].text;
+  document.getElementById('msp-period-label').textContent = `Computing ${monthName} ${year} Salary`;
+  document.getElementById('msp-emptype-label').textContent = `Employee Type : ${emptypeLabel}`;
+  document.getElementById('msp-results-card').style.display = '';
+  mspRenderTable();
+}
+function mspRenderTable() {
+  const staff = (state.setup.staff || []);
+  const tbody = document.getElementById('msp-tbody');
+  if (!staff.length) {
+    tbody.innerHTML = '<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--text-3);">No staff records found for the selected criteria.</td></tr>';
+    document.getElementById('msp-showing').textContent = 'Showing 0 entries';
+    return;
+  }
+  tbody.innerHTML = staff.map((s, i) => '<tr><td>' + (i+1) + '</td><td><div style="font-weight:600;font-size:12px;">' + (s.name||s.fullname||'—') + '</div><div style="font-size:10px;color:var(--text-3);">' + (s.type||'') + '</div></td><td style="color:var(--text-3);font-size:11px;">—</td><td><select class="ctrl-select" style="font-size:11px;"><option>Cash Pay...</option><option>Bank Transfer</option></select></td><td><div style="display:flex;align-items:center;gap:4px;font-size:12px;"><span style="color:var(--text-3);">₦</span><input type="number" value="0.00" style="width:80px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;"/></div></td><td></td><td><button class="bs-toggle-btn" style="padding:3px 10px;font-size:10px;">+ Add</button></td><td><button class="bs-toggle-btn" style="padding:3px 10px;font-size:10px;">+ Add</button></td><td style="font-size:12px;">₦ 0</td><td style="font-size:12px;">₦ 0</td><td style="font-size:12px;">₦ 0</td><td><button style="background:#e53e3e;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">Exclude</button></td></tr>').join('');
+  document.getElementById('msp-showing').textContent = 'Showing ' + staff.length + ' entries';
+}
+function mspProcess() { showToast('Salary processing will be available when payroll data is configured.', 'info'); }
+function mspExport()  { showToast('Export will be available when records are loaded.', 'info'); }
+
+// ── SALARY PAYMENT SCHEDULE ──
+function spsInit() {
+  document.getElementById('sps-results-card').style.display = 'none';
+}
+function spsView() {
+  const month = document.getElementById('sps-month').value;
+  if (!month) { showToast('Please select a Salary Month', 'error'); return; }
+  const monthSel = document.getElementById('sps-month');
+  const monthName = monthSel.options[monthSel.selectedIndex].text;
+  const year = document.getElementById('sps-year').value;
+  document.getElementById('sps-period-label').textContent = 'Salary Payment Schedule — ' + monthName + ' ' + year;
+  document.getElementById('sps-results-card').style.display = '';
+  spsRenderTable();
+}
+function spsRenderTable() {
+  document.getElementById('sps-tbody').innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--text-3);">No records found.</td></tr>';
+  document.getElementById('sps-showing').textContent = 'Showing 0 to 0 of 0 entries';
+}
+
+// ── PAYROLL SETTINGS ──
+var _glData = [], _gsData = [];
+function prInit() {
+  switchPrTab('scale', document.getElementById('pr-tab-scale'));
+  glRenderTable();
+  gsRenderTable();
+}
+function switchPrTab(view, btn) {
+  ['scale','positions','contracts','paye'].forEach(function(v) {
+    var el = document.getElementById('pr-view-' + v);
+    if (el) el.style.display = 'none';
+    var tb = document.getElementById('pr-tab-' + v);
+    if (tb) { tb.style.borderBottomColor = 'transparent'; tb.style.color = 'var(--text-2)'; }
+  });
+  var active = document.getElementById('pr-view-' + view);
+  if (active) active.style.display = '';
+  if (btn) { btn.style.borderBottomColor = '#2563eb'; btn.style.color = '#2563eb'; }
+}
+function glRenderTable() {
+  var tbody = document.getElementById('gl-tbody');
+  if (!tbody) return;
+  if (!_glData.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3);">No grade levels added yet.</td></tr>';
+    document.getElementById('gl-showing').textContent = 'Showing 0 entries';
+    return;
+  }
+  tbody.innerHTML = _glData.map(function(g,i) { return '<tr><td>' + (i+1) + '</td><td style="font-weight:600;">' + g.name + '</td><td style="text-align:right;color:#2563eb;">' + g.numeric + '</td><td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;">Actions v</button></td></tr>'; }).join('');
+  document.getElementById('gl-showing').textContent = 'Showing 1 to ' + _glData.length + ' of ' + _glData.length + ' entries';
+  var sel = document.getElementById('gs-filter-level');
+  if (sel) sel.innerHTML = '<option value="">All Grade Levels</option>' + _glData.map(function(g) { return '<option value="' + g.name + '">' + g.name + '</option>'; }).join('');
+}
+function glAddModal() { showToast('Add Grade Level — form will open here.', 'info'); }
+function gsRenderTable() {
+  var tbody = document.getElementById('gs-tbody');
+  if (!tbody) return;
+  var filter = (document.getElementById('gs-filter-level') || {}).value || '';
+  var rows = filter ? _gsData.filter(function(s) { return s.level === filter; }) : _gsData;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3);">No steps added yet.</td></tr>';
+    document.getElementById('gs-showing').textContent = 'Showing 0 entries';
+    return;
+  }
+  tbody.innerHTML = rows.map(function(s,i) { return '<tr><td>' + (i+1) + '</td><td style="font-weight:600;">' + s.level + '</td><td>' + s.name + '</td><td>' + s.numeric + '</td><td>N' + Number(s.salary).toLocaleString('en-NG',{minimumFractionDigits:2}) + '</td><td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;">Actions v</button></td></tr>'; }).join('');
+  document.getElementById('gs-showing').textContent = 'Showing 1 to ' + rows.length + ' of ' + rows.length + ' entries';
+}
+function gsAddModal() { showToast('Add Grade Level Step — form will open here.', 'info'); }
+function gsClearFilter() {
+  var sel = document.getElementById('gs-filter-level');
+  if (sel) sel.value = '';
+  gsRenderTable();
+}
+
+// ── STAFF LOANS & ADVANCES ──
+var _slData = [];
+function slInit() {
+  switchSlTab('loans', document.querySelector('.sl-tab'));
+  slRenderTable();
+}
+function switchSlTab(view, btn) {
+  ['loans','settings'].forEach(function(v) {
+    var el = document.getElementById('sl-view-' + v);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.sl-tab').forEach(function(t) {
+    t.style.borderBottomColor = 'transparent'; t.style.color = 'var(--text-2)';
+  });
+  var el = document.getElementById('sl-view-' + view);
+  if (el) el.style.display = '';
+  if (btn) { btn.style.borderBottomColor = '#2563eb'; btn.style.color = '#2563eb'; }
+}
+function slRenderTable() {
+  var tbody = document.getElementById('sl-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3);">No data available in table</td></tr>';
+  document.getElementById('sl-showing').textContent = 'Showing 0 to 0 of 0 entries';
+}
+function slClear() {
+  document.getElementById('sl-status').value = '';
+  document.getElementById('sl-type').value = '';
+  slRenderTable();
 }
