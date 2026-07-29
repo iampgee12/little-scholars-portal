@@ -150,6 +150,7 @@ async function init() {
     document.title = `Little Scholars - ${state.user.name}`;
 
     await loadResultSetup();
+    loadTopbarSession();
     populateDashboard();
     populateStudents();
     populateParents();
@@ -159,6 +160,20 @@ async function init() {
   } catch (err) {
     showToast(err.message);
   }
+}
+
+async function loadTopbarSession() {
+  try {
+    const data = await apiFetch('/api/admin/academic-sessions');
+    const active = (data.sessions || []).find(s => s.isActive);
+    if (!active) return;
+    var el = document.getElementById('tsi-session');
+    var el2 = document.getElementById('tsi-term');
+    var box = document.getElementById('topbar-session-info');
+    if (el) el.textContent = active.sessionLabel || '—';
+    if (el2) el2.textContent = active.termLabel || '—';
+    if (box) box.style.display = 'flex';
+  } catch(e) {}
 }
 
 async function loadResultSetup() {
