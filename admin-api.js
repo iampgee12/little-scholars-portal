@@ -4252,6 +4252,10 @@ function mobClearStagger(sidebar) {
     el.style.opacity = '';
   });
 }
+function deskToggleSidebar() {
+  document.body.classList.toggle('sidebar-collapsed');
+}
+
 function mobToggleSidebar() {
   var sidebar = document.getElementById('main-sidebar');
   var overlay = document.getElementById('sidebar-overlay');

@@ -514,7 +514,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 }
 .rail-item {
   width:100%;
-  min-height:72px;
+  min-height:52px;
   border:0;
   border-bottom:1px solid #d8e0eb;
   background:#ffffff;
@@ -639,6 +639,26 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   border-color:#ef4444;
 }
 .main { margin-left:300px; }
+/* ── DESKTOP SIDEBAR TOGGLE ── */
+.desk-toggle {
+  display:flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:var(--radius-sm);
+  background:transparent; border:0; cursor:pointer;
+  color:var(--text-2); flex-shrink:0;
+  transition:background 0.18s, color 0.18s;
+}
+.desk-toggle:hover { background:var(--black-3); color:var(--text-1); }
+
+/* Collapsed sidebar state (desktop only) */
+#main-sidebar { transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); }
+.sidebar-collapsed #main-sidebar { transform:translateX(-100%); }
+.sidebar-collapsed .main { margin-left:0 !important; transition:margin-left 0.35s cubic-bezier(0.4,0,0.2,1); }
+.main { transition:margin-left 0.35s cubic-bezier(0.4,0,0.2,1); }
+
+@media (max-width:768px) {
+  .desk-toggle { display:none; }
+}
+
 /* ── HAMBURGER BUTTON (hidden on desktop) ── */
 .mob-hamburger {
   display:none;
@@ -718,7 +738,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
     border-right:0 !important;
     padding:4px !important;
   }
-  .rail-item { min-height:56px !important; font-size:9px !important; }
+  .rail-item { min-height:44px !important; font-size:9px !important; }
 
   /* cards stack full width */
   .card { border-radius:8px !important; }
@@ -2429,6 +2449,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   <!-- ══ MAIN ══ -->
   <div class="main">
     <div class="topbar">
+      <button class="desk-toggle" id="desk-toggle" onclick="deskToggleSidebar()" aria-label="Toggle sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
       <button class="mob-hamburger" id="mob-hamburger" onclick="mobToggleSidebar()" aria-label="Open menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
