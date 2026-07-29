@@ -32,7 +32,7 @@
 html { font-size:14px; }
 body {
   font-family:'DM Sans',sans-serif;
-  background:var(--black-3);
+  background:var(--black-2);
   color:var(--text-1);
   min-height:100vh;
   display:flex;
@@ -42,16 +42,7 @@ body {
   position:relative;
   padding:20px;
 }
-body::before {
-  content:'';
-  position:fixed; inset:0;
-  background-image:
-    linear-gradient(var(--border) 1px,transparent 1px),
-    linear-gradient(90deg,var(--border) 1px,transparent 1px);
-  background-size:40px 40px;
-  opacity:0.6;
-  pointer-events:none; z-index:0;
-}
+body::before { display:none; }
 
 /* ── CARD SHELL ── */
 .login-card {
@@ -78,7 +69,6 @@ body::before {
 /* ── SHARED CARD TOP ── */
 .card-top {
   padding:30px 32px 24px;
-  border-bottom:1px solid var(--border);
   display:flex; flex-direction:column;
   align-items:center; gap:8px;
   text-align:center;
@@ -289,7 +279,6 @@ body::before {
     <div class="card-top">
       <div class="logo-mark">LS</div>
       <div class="logo-name">Little Scholars Academy</div>
-      <div class="logo-sub">Unified Portal Access</div>
     </div>
     <div class="role-picker">
       <div class="role-picker-title">
