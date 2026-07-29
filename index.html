@@ -23,8 +23,8 @@
   --text-1:   #f5f5f5;
   --text-2:   #a3a3a3;
   --text-3:   #555555;
-  --radius-sm: 6px;
-  --radius:    10px;
+  --radius-sm: 8px;
+  --radius:    14px;
   --transition: 0.18s ease;
 }
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -39,81 +39,151 @@ body {
   justify-content:center;
   -webkit-font-smoothing:antialiased;
   position:relative;
+  padding:20px;
 }
 body::before {
   content:'';
-  position:fixed;
-  inset:0;
+  position:fixed; inset:0;
   background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
   background-size:40px 40px;
-  opacity:0.25;
-  pointer-events:none;
-  z-index:0;
+  opacity:0.2;
+  pointer-events:none; z-index:0;
 }
 
-/* ── CARD ── */
+/* ── CARD SHELL ── */
 .login-card {
-  position:relative;
-  z-index:1;
-  width:100%;
-  max-width:420px;
+  position:relative; z-index:1;
+  width:100%; max-width:420px;
   background:var(--black-2);
   border:1px solid var(--border);
   border-radius:var(--radius);
   overflow:hidden;
-  animation:fadeUp 0.35s ease both;
-}
-@keyframes fadeUp {
-  from { opacity:0; transform:translateY(16px); }
-  to   { opacity:1; transform:translateY(0); }
 }
 
-/* ── CARD TOP ── */
+/* ── STEPS ── */
+.step { width:100%; }
+.step.hidden { display:none; }
+
+@keyframes stepIn  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes stepOut { from{opacity:1;transform:translateY(0)} to{opacity:0;transform:translateY(-14px)} }
+@keyframes cardIn  { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+.login-card { animation:cardIn 0.35s ease both; }
+.step.anim-in  { animation:stepIn  0.32s cubic-bezier(0.4,0,0.2,1) both; }
+
+/* ── SHARED CARD TOP ── */
 .card-top {
-  padding:32px 32px 24px;
+  padding:30px 32px 24px;
   border-bottom:1px solid var(--border);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:10px;
+  display:flex; flex-direction:column;
+  align-items:center; gap:8px;
+  text-align:center;
 }
 .logo-mark {
-  width:52px; height:52px;
+  width:50px; height:50px;
   background:var(--green);
-  border-radius:var(--radius);
+  border-radius:var(--radius-sm);
   display:flex; align-items:center; justify-content:center;
-  font-size:20px; font-weight:900;
+  font-size:18px; font-weight:900;
   color:var(--black); letter-spacing:-1px;
 }
 .logo-name { font-size:15px; font-weight:700; color:var(--text-1); letter-spacing:-0.3px; }
-.logo-sub  { font-size:10px; color:var(--text-3); font-weight:500; letter-spacing:0.7px; text-transform:uppercase; font-family:'DM Mono',monospace; margin-top:-4px; }
-.role-chips { display:flex; gap:6px; margin-top:4px; }
-.rc {
-  display:inline-flex; align-items:center;
-  background:var(--black-3); border:1px solid var(--border);
-  border-radius:20px; padding:3px 10px;
-  font-size:10px; font-weight:600;
-  font-family:'DM Mono',monospace; color:var(--text-3);
+.logo-sub  { font-size:10px; color:var(--text-3); font-weight:500; letter-spacing:0.7px;
+             text-transform:uppercase; font-family:'DM Mono',monospace; margin-top:-2px; }
+
+/* ── STEP 1: ROLE SELECTOR ── */
+.role-picker { padding:28px 28px 32px; display:flex; flex-direction:column; gap:20px; align-items:center; }
+
+.role-picker-title {
+  text-align:center;
 }
-.rc-student { color:var(--green); border-color:rgba(34,197,94,0.25); background:var(--green-bg); }
-.rc-teacher { color:var(--amber); border-color:rgba(251,191,36,0.25); background:var(--amber-bg); }
-.rc-admin   { color:var(--blue);  border-color:rgba(99,102,241,0.25);  background:var(--blue-bg); }
+.role-picker-title h2 { font-size:17px; font-weight:700; color:var(--text-1); }
+.role-picker-title p  { font-size:12px; color:var(--text-3); margin-top:4px; }
 
-/* ── CARD BODY ── */
-.card-body { padding:26px 32px 32px; }
+.role-cards {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  width:100%;
+}
+.role-card {
+  background:var(--black-3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:22px 12px 18px;
+  cursor:pointer;
+  display:flex; flex-direction:column;
+  align-items:center; gap:12px;
+  transition:border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  position:relative;
+  overflow:hidden;
+}
+.role-card:hover {
+  border-color:var(--border-2);
+  background:#1f1f1f;
+  transform:translateY(-2px);
+}
+.role-card:active { transform:scale(0.97); }
 
-.id-hint {
-  display:none;
+.role-card-icon {
+  width:52px; height:52px;
+  border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+}
+.role-card-icon svg { width:26px; height:26px; }
+
+.role-card-label {
+  font-size:12px; font-weight:600;
+  letter-spacing:0.2px;
+}
+
+/* role accent colours */
+.role-card[data-role="admin"]   .role-card-icon { background:var(--blue-bg); color:var(--blue); }
+.role-card[data-role="admin"]   .role-card-label { color:var(--blue); }
+.role-card[data-role="admin"]:hover { border-color:rgba(99,102,241,0.4); }
+
+.role-card[data-role="teacher"] .role-card-icon { background:var(--amber-bg); color:var(--amber); }
+.role-card[data-role="teacher"] .role-card-label { color:var(--amber); }
+.role-card[data-role="teacher"]:hover { border-color:rgba(251,191,36,0.4); }
+
+.role-card[data-role="student"] .role-card-icon { background:var(--green-bg); color:var(--green); }
+.role-card[data-role="student"] .role-card-label { color:var(--green); }
+.role-card[data-role="student"]:hover { border-color:rgba(34,197,94,0.4); }
+
+/* ── STEP 2: LOGIN FORM ── */
+.login-header {
+  padding:26px 32px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:14px;
+}
+.back-btn {
   background:var(--black-3); border:1px solid var(--border);
   border-radius:var(--radius-sm);
-  padding:8px 12px; margin-bottom:14px;
-  font-size:11px; font-family:'DM Mono',monospace;
-  align-items:center; gap:8px;
+  width:34px; height:34px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--text-2);
+  transition:all var(--transition); flex-shrink:0;
 }
-.id-hint.show { display:flex; }
-.hint-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.back-btn:hover { border-color:var(--border-2); color:var(--text-1); }
+.back-btn svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.login-header-text { display:flex; flex-direction:column; gap:2px; }
+.login-header-title { font-size:18px; font-weight:700; color:var(--text-1); letter-spacing:-0.4px; }
+.login-header-sub   { font-size:12px; color:var(--text-3); }
+
+.role-badge {
+  margin-left:auto; flex-shrink:0;
+  display:inline-flex; align-items:center;
+  border-radius:20px; padding:3px 10px;
+  font-size:10px; font-weight:700;
+  font-family:'DM Mono',monospace; letter-spacing:0.4px;
+}
+.role-badge.admin   { color:var(--blue);  background:var(--blue-bg);  border:1px solid rgba(99,102,241,0.25); }
+.role-badge.teacher { color:var(--amber); background:var(--amber-bg); border:1px solid rgba(251,191,36,0.25); }
+.role-badge.student { color:var(--green); background:var(--green-bg); border:1px solid rgba(34,197,94,0.25); }
+
+.card-body { padding:24px 32px 30px; }
 
 .alert {
   background:var(--red-bg); border:1px solid rgba(239,68,68,0.2);
@@ -132,10 +202,15 @@ body::before {
   letter-spacing:0.3px; margin-bottom:6px;
 }
 .input-wrap { position:relative; display:flex; align-items:center; }
+.input-icon {
+  position:absolute; left:12px;
+  display:flex; align-items:center; pointer-events:none; color:var(--text-3);
+}
+.input-icon svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .field-input {
   width:100%; background:var(--black-3);
   border:1px solid var(--border); border-radius:var(--radius-sm);
-  padding:11px 38px 11px 13px;
+  padding:11px 40px 11px 38px;
   font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1);
   outline:none; transition:all var(--transition);
 }
@@ -157,16 +232,6 @@ body::before {
 .pw-toggle svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 
 .row { display:flex; align-items:center; justify-content:space-between; margin:6px 0 20px; }
-.remember { display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
-.remember input { display:none; }
-.cb {
-  width:15px; height:15px; border:1px solid var(--border-2);
-  border-radius:3px; display:flex; align-items:center; justify-content:center;
-  font-size:9px; color:transparent; background:transparent;
-  transition:all var(--transition); flex-shrink:0;
-}
-.remember input:checked ~ .cb { background:var(--green); border-color:var(--green); color:var(--black); }
-.remember span { font-size:12px; color:var(--text-2); }
 .forgot { font-size:12px; color:var(--green); text-decoration:none; font-weight:500; transition:opacity var(--transition); }
 .forgot:hover { opacity:0.7; }
 
@@ -188,28 +253,9 @@ body::before {
 }
 @keyframes spin { to { transform:rotate(360deg); } }
 
-/* ── CARD FOOTER / DEMO ── */
-.card-footer { padding:14px 32px 18px; border-top:1px solid var(--border); }
-.demo-label {
-  font-size:9px; font-weight:600; color:var(--text-3);
-  text-transform:uppercase; letter-spacing:0.8px;
-  font-family:'DM Mono',monospace; margin-bottom:8px;
-}
-.demo-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
-.demo-item {
-  background:var(--black-3); border:1px solid var(--border);
-  border-radius:var(--radius-sm); padding:8px 10px;
-  cursor:pointer; transition:border-color var(--transition);
-}
-.demo-item:hover { border-color:var(--border-2); }
-.demo-role { font-size:9px; font-weight:700; letter-spacing:0.5px; font-family:'DM Mono',monospace; margin-bottom:4px; }
-.demo-cred { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; line-height:1.5; }
-.demo-cred strong { color:var(--text-2); }
-
 /* ── REDIRECT OVERLAY ── */
 .redirect-overlay {
-  display:none;
-  position:fixed; inset:0; z-index:100;
+  display:none; position:fixed; inset:0; z-index:100;
   background:var(--black);
   align-items:center; justify-content:center;
   flex-direction:column; gap:14px;
@@ -232,88 +278,114 @@ body::before {
 <body>
 
 <div class="login-card">
-  <div class="card-top">
-    <div class="logo-mark">LS</div>
-    <div class="logo-name">Little Scholars Academy</div>
-    <div class="logo-sub">Unified Portal Access</div>
-    <div class="role-chips">
-      <span class="rc rc-student">Students</span>
-      <span class="rc rc-teacher">Teachers</span>
-      <span class="rc rc-admin">Admin</span>
+
+  <!-- ── STEP 1: ROLE PICKER ── -->
+  <div class="step" id="step-select">
+    <div class="card-top">
+      <div class="logo-mark">LS</div>
+      <div class="logo-name">Little Scholars Academy</div>
+      <div class="logo-sub">Unified Portal Access</div>
     </div>
-  </div>
-
-  <div class="card-body">
-    <div class="id-hint" id="id-hint">
-      <span class="hint-dot" id="hint-dot"></span>
-      <span id="hint-text"></span>
-    </div>
-
-    <div class="alert" id="alert">Incorrect ID or password. Please try again.</div>
-
-    <div class="field">
-      <label class="field-label" for="sid">Student / Staff ID</label>
-      <div class="input-wrap">
-        <input
-          type="text" id="sid" class="field-input"
-          placeholder="e.g. STU-2024-0421 or TCH-001"
-          oninput="detectRole(this.value)"
-          autocomplete="username"
-        >
+    <div class="role-picker">
+      <div class="role-picker-title">
+        <h2>Welcome back</h2>
+        <p>Select your account type to continue</p>
       </div>
-      <div class="field-error" id="sid-err">Please enter your ID.</div>
-    </div>
+      <div class="role-cards">
 
-    <div class="field">
-      <label class="field-label" for="pw">Password</label>
-      <div class="input-wrap">
-        <input type="password" id="pw" class="field-input" placeholder="Enter your password" autocomplete="current-password">
-        <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Toggle password visibility">
-          <svg id="eye-icon" viewBox="0 0 24 24">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
+        <button class="role-card" data-role="admin" onclick="selectRole('admin')">
+          <div class="role-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l8 4v5c0 4-3.3 7.7-8 9-4.7-1.3-8-5-8-9V7l8-4z"/>
+            </svg>
+          </div>
+          <span class="role-card-label">Admin</span>
         </button>
-      </div>
-      <div class="field-error" id="pw-err">Please enter your password.</div>
-    </div>
 
-    <div class="row">
-      <label class="remember">
-        <input type="checkbox" id="rem">
-        <span class="cb">✓</span>
-        <span>Remember me</span>
-      </label>
-      <a href="#" class="forgot">Forgot Password?</a>
-    </div>
+        <button class="role-card" data-role="teacher" onclick="selectRole('teacher')">
+          <div class="role-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="13" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+            </svg>
+          </div>
+          <span class="role-card-label">Staff</span>
+        </button>
 
-    <button class="signin-btn" id="btn" onclick="handleLogin()">
-      <span id="btn-txt">Sign In</span>
-      <span id="btn-arr">→</span>
-      <div class="spinner" id="spin"></div>
-    </button>
-  </div>
+        <button class="role-card" data-role="student" onclick="selectRole('student')">
+          <div class="role-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 10l-10-6L2 10l10 6 10-6z"/>
+              <path d="M6 12.5v4c0 1.7 2.7 3 6 3s6-1.3 6-3v-4"/>
+            </svg>
+          </div>
+          <span class="role-card-label">Pupil</span>
+        </button>
 
-  <div class="card-footer">
-    <div class="demo-label">Quick demo access — click to fill</div>
-    <div class="demo-grid">
-      <div class="demo-item" onclick="fillDemo('STU-2024-0421','amara123')">
-        <div class="demo-role" style="color:var(--green);">STUDENT</div>
-        <div class="demo-cred"><strong>STU-2024-0421</strong><br>amara123</div>
-      </div>
-      <div class="demo-item" onclick="fillDemo('TCH-001','teach123')">
-        <div class="demo-role" style="color:var(--amber);">TEACHER</div>
-        <div class="demo-cred"><strong>TCH-001</strong><br>teach123</div>
-      </div>
-      <div class="demo-item" onclick="fillDemo('ADM-001','admin123')">
-        <div class="demo-role" style="color:var(--blue);">ADMIN</div>
-        <div class="demo-cred"><strong>ADM-001</strong><br>admin123</div>
       </div>
     </div>
   </div>
+
+  <!-- ── STEP 2: LOGIN FORM ── -->
+  <div class="step hidden" id="step-login">
+    <div class="login-header">
+      <button class="back-btn" onclick="goBack()" aria-label="Back">
+        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+      </button>
+      <div class="login-header-text">
+        <div class="login-header-title" id="login-title">Login</div>
+        <div class="login-header-sub">Sign in to your account</div>
+      </div>
+      <span class="role-badge" id="role-badge"></span>
+    </div>
+
+    <div class="card-body">
+      <div class="alert" id="alert"></div>
+
+      <div class="field">
+        <label class="field-label" id="id-label" for="sid">ID</label>
+        <div class="input-wrap">
+          <span class="input-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          </span>
+          <input type="text" id="sid" class="field-input" autocomplete="username">
+        </div>
+        <div class="field-error" id="sid-err">Please enter your ID.</div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="pw">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">
+            <svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          </span>
+          <input type="password" id="pw" class="field-input" placeholder="Enter your password" autocomplete="current-password">
+          <button type="button" class="pw-toggle" onclick="togglePw()" aria-label="Toggle password visibility">
+            <svg id="eye-icon" viewBox="0 0 24 24">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <div class="field-error" id="pw-err">Please enter your password.</div>
+      </div>
+
+      <div class="row">
+        <span></span>
+        <a href="#" class="forgot">Forgot Password?</a>
+      </div>
+
+      <button class="signin-btn" id="btn" onclick="handleLogin()">
+        <span id="btn-txt">Sign In</span>
+        <span id="btn-arr">→</span>
+        <div class="spinner" id="spin"></div>
+      </button>
+    </div>
+  </div>
+
 </div>
 
-<!-- Redirect overlay shown before navigation -->
+<!-- Redirect overlay -->
 <div class="redirect-overlay" id="redirect-overlay">
   <div class="redirect-spinner"></div>
   <div class="redirect-role" id="redirect-role"></div>
