@@ -4217,14 +4217,14 @@ function slClear() {
 
 // ── MOBILE SIDEBAR TOGGLE ──
 function mobStaggerItems(sidebar) {
-  var els = Array.from(sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item'));
+  var els = Array.from(sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item,.sub-nav-item'));
   els.forEach(function(el) { el.style.opacity = '0'; el.style.animation = 'none'; });
   els.forEach(function(el, i) {
     el.style.animation = 'mobNavIn 0.38s cubic-bezier(0.4,0,0.2,1) ' + (120 + i * 48) + 'ms both';
   });
 }
 function mobClearStagger(sidebar) {
-  sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item').forEach(function(el) {
+  sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item,.sub-nav-item').forEach(function(el) {
     el.style.animation = '';
     el.style.opacity = '';
   });
