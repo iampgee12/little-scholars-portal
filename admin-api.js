@@ -4219,25 +4219,29 @@ function slClear() {
 function mobToggleSidebar() {
   const sidebar = document.getElementById('main-sidebar');
   const overlay = document.getElementById('sidebar-overlay');
+  const btn = document.getElementById('mob-hamburger');
   const isOpen = sidebar.classList.contains('mob-open');
   if (isOpen) {
     sidebar.classList.remove('mob-open');
     overlay.classList.remove('open');
+    if (btn) btn.classList.remove('is-open');
   } else {
     sidebar.classList.add('mob-open');
     overlay.classList.add('open');
+    if (btn) btn.classList.add('is-open');
   }
 }
 function mobCloseSidebar() {
   document.getElementById('main-sidebar').classList.remove('mob-open');
   document.getElementById('sidebar-overlay').classList.remove('open');
+  const btn = document.getElementById('mob-hamburger');
+  if (btn) btn.classList.remove('is-open');
 }
 // Close on overlay click
 document.getElementById('sidebar-overlay').addEventListener('click', mobCloseSidebar);
-// Close sidebar when a nav item is clicked on mobile
+// Only close sidebar when a leaf tab item is clicked (not dropdowns or section headers)
 document.addEventListener('click', function(e) {
-  const link = e.target.closest('[onclick*="switchTab"],[onclick*="showAdminSection"],[onclick*="toggleDropdown"]');
-  if (link && window.innerWidth <= 768) {
-    setTimeout(mobCloseSidebar, 150);
-  }
+  if (window.innerWidth > 768) return;
+  const leafLink = e.target.closest('[onclick*="switchTab"]');
+  if (leafLink) setTimeout(mobCloseSidebar, 180);
 });
