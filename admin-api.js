@@ -4216,26 +4216,43 @@ function slClear() {
 }
 
 // ── MOBILE SIDEBAR TOGGLE ──
+function mobStaggerItems(sidebar) {
+  var els = Array.from(sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item'));
+  els.forEach(function(el) { el.style.opacity = '0'; el.style.animation = 'none'; });
+  els.forEach(function(el, i) {
+    el.style.animation = 'mobNavIn 0.38s cubic-bezier(0.4,0,0.2,1) ' + (120 + i * 48) + 'ms both';
+  });
+}
+function mobClearStagger(sidebar) {
+  sidebar.querySelectorAll('.sidebar-logo,.user-pill,.admin-quick-search,.rail-item').forEach(function(el) {
+    el.style.animation = '';
+    el.style.opacity = '';
+  });
+}
 function mobToggleSidebar() {
-  const sidebar = document.getElementById('main-sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  const btn = document.getElementById('mob-hamburger');
-  const isOpen = sidebar.classList.contains('mob-open');
+  var sidebar = document.getElementById('main-sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var btn = document.getElementById('mob-hamburger');
+  var isOpen = sidebar.classList.contains('mob-open');
   if (isOpen) {
     sidebar.classList.remove('mob-open');
     overlay.classList.remove('open');
     if (btn) btn.classList.remove('is-open');
+    mobClearStagger(sidebar);
   } else {
     sidebar.classList.add('mob-open');
     overlay.classList.add('open');
     if (btn) btn.classList.add('is-open');
+    mobStaggerItems(sidebar);
   }
 }
 function mobCloseSidebar() {
-  document.getElementById('main-sidebar').classList.remove('mob-open');
+  var sidebar = document.getElementById('main-sidebar');
+  sidebar.classList.remove('mob-open');
   document.getElementById('sidebar-overlay').classList.remove('open');
-  const btn = document.getElementById('mob-hamburger');
+  var btn = document.getElementById('mob-hamburger');
   if (btn) btn.classList.remove('is-open');
+  mobClearStagger(sidebar);
 }
 // Close on overlay click
 document.getElementById('sidebar-overlay').addEventListener('click', mobCloseSidebar);
