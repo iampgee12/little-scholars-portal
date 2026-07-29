@@ -2860,6 +2860,14 @@ async function loadAcademicTermsTab() {
     if (atYear) atYear.textContent = active ? (active.sessionLabel || '').split('-')[0] || '—' : '—';
     if (atTerm) atTerm.textContent = active ? (active.termLabel || '—') : '—';
 
+    // Populate topbar session info widget
+    var tsiSession = document.getElementById('tsi-session');
+    var tsiTerm    = document.getElementById('tsi-term');
+    var tsiBox     = document.getElementById('topbar-session-info');
+    if (tsiSession) tsiSession.textContent = active ? active.sessionLabel : '—';
+    if (tsiTerm)    tsiTerm.textContent    = active ? (active.termLabel || '—') : '—';
+    if (tsiBox)     tsiBox.style.display   = 'flex';
+
     atRenderSessions();
   } catch(e) {
     const tbody = document.getElementById('at-sessions-tbody');
