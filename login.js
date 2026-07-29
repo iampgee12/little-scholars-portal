@@ -109,7 +109,7 @@ async function handleLogin() {
     document.getElementById('redirect-overlay').classList.add('show');
 
     setTimeout(() => {
-      window.location.href = `${portal}?uid=${encodeURIComponent(user.id)}`;
+      window.location.href = portal;
     }, 500);
   } catch (err) {
     setLoading(false);
