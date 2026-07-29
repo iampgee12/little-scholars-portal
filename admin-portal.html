@@ -634,25 +634,157 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   border-color:#ef4444;
 }
 .main { margin-left:300px; }
-@media (max-width: 920px) {
-  .portal-wrap { flex-direction:column; }
-  .admin-layout-sidebar {
-    position:relative;
-    width:100%;
-    min-height:auto;
-    bottom:auto;
+/* ── HAMBURGER BUTTON (hidden on desktop) ── */
+.mob-hamburger {
+  display:none;
+  position:fixed;
+  top:12px;
+  left:12px;
+  z-index:1200;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 10px;
+  cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+.mob-hamburger svg { display:block; }
+
+/* ── SIDEBAR OVERLAY (mobile) ── */
+.sidebar-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  z-index:1100;
+}
+.sidebar-overlay.open { display:block; }
+
+/* ── TABLET & MOBILE (≤768px) ── */
+@media (max-width: 768px) {
+  .mob-hamburger { display:flex; align-items:center; justify-content:center; }
+
+  #main-sidebar {
+    position:fixed !important;
+    top:0 !important; left:0 !important; bottom:0 !important;
+    width:280px !important;
+    height:100vh !important;
+    z-index:1150 !important;
+    transform:translateX(-100%) !important;
+    transition:transform .25s ease !important;
+    overflow-y:auto !important;
   }
-  .main { margin-left:0; }
-  .admin-sidebar-body { grid-template-columns:1fr; }
+  #main-sidebar.mob-open {
+    transform:translateX(0) !important;
+  }
+
+  .main {
+    margin-left:0 !important;
+    width:100% !important;
+  }
+
+  /* page header */
+  .page-header {
+    padding:12px 16px !important;
+  }
+  .page-header h2 { font-size:16px !important; }
+
+  /* top breadcrumb bar */
+  .bs-top-bar {
+    padding-left:52px !important;
+  }
+
+  /* rail — wrap into grid on mobile */
   .admin-rail {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
-    border-right:0;
+    display:grid !important;
+    grid-template-columns:repeat(auto-fit,minmax(72px,1fr)) !important;
+    border-right:0 !important;
+    padding:4px !important;
   }
-  .rail-item { min-height:64px; }
-  .admin-subnav {
-    border-top:1px solid #d8e0eb;
-    padding:8px 0;
+  .rail-item { min-height:56px !important; font-size:9px !important; }
+
+  /* cards stack full width */
+  .card { border-radius:8px !important; }
+
+  /* stat card grids → 2 cols on mobile */
+  [style*="grid-template-columns:1fr 1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr 1fr"] {
+    grid-template-columns:1fr 1fr !important;
+  }
+  [style*="grid-template-columns:1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr"] {
+    grid-template-columns:1fr 1fr !important;
+  }
+
+  /* filter rows → single column */
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns:1fr !important;
+  }
+  [style*="grid-template-columns:1fr 1fr 1fr 1fr;gap"],
+  [style*="grid-template-columns:1fr 1fr;gap"] {
+    grid-template-columns:1fr !important;
+  }
+
+  /* all tables scroll horizontally */
+  .data-table { font-size:11px !important; }
+  .card-body { overflow-x:auto; }
+
+  /* by-account side-by-side → stack */
+  #iea-tab-byAccount > div {
+    grid-template-columns:1fr !important;
+  }
+  #iea-tab-byAccount > div > div:first-child {
+    border-right:none !important;
+    border-bottom:1px solid var(--border);
+  }
+
+  /* payroll scale side-by-side → stack */
+  #pr-view-scale {
+    grid-template-columns:1fr !important;
+  }
+  #pr-view-scale > div:first-child {
+    border-right:none !important;
+    border-bottom:1px solid var(--border);
+  }
+
+  /* salary processing table min-width */
+  #msp-results-card .card-body { overflow-x:auto; }
+
+  /* action buttons row wrap */
+  .bs-print-btn, .bs-export-btn, .bs-view-btn, .bs-toggle-btn {
+    font-size:11px !important;
+    padding:6px 10px !important;
+  }
+
+  /* inline filter rows that use flex → wrap */
+  .card-body > div[style*="display:flex"] {
+    flex-wrap:wrap;
+  }
+
+  /* hide long sub-nav text, keep icons */
+  .admin-subnav { padding:4px 0 !important; }
+}
+
+/* ── SMALL PHONES (≤480px) ── */
+@media (max-width: 480px) {
+  /* stat cards → single column */
+  [style*="grid-template-columns:1fr 1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr 1fr"],
+  [style*="grid-template-columns:1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr 1fr"],
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns:1fr !important;
+  }
+
+  .admin-layout-sidebar { width:260px !important; }
+
+  .page-header h2 { font-size:15px !important; }
+
+  /* analytics period/account filter → stack */
+  #iea-results > .card > .card-body > div[style*="grid"] {
+    grid-template-columns:1fr !important;
   }
 }
 .staff-employee-page {
@@ -2089,10 +2221,18 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 </style>
 </head>
 <body>
+<!-- Mobile hamburger + overlay -->
+<button class="mob-hamburger" id="mob-hamburger" onclick="mobToggleSidebar()" aria-label="Open menu">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="mobCloseSidebar()"></div>
+
 <div class="portal-wrap">
 
   <!-- ══ SIDEBAR ══ -->
-  <aside class="sidebar admin-layout-sidebar">
+  <aside class="sidebar admin-layout-sidebar" id="main-sidebar">
     <div class="sidebar-logo admin-brand">
       <div class="logo-mark-sm">UG</div>
       <div><div class="logo-name-sm">Unique School</div><div class="logo-sub-sm">Admin Portal</div></div>

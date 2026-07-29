@@ -4214,3 +4214,30 @@ function slClear() {
   document.getElementById('sl-type').value = '';
   slRenderTable();
 }
+
+// ── MOBILE SIDEBAR TOGGLE ──
+function mobToggleSidebar() {
+  const sidebar = document.getElementById('main-sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.classList.contains('mob-open');
+  if (isOpen) {
+    sidebar.classList.remove('mob-open');
+    overlay.classList.remove('open');
+  } else {
+    sidebar.classList.add('mob-open');
+    overlay.classList.add('open');
+  }
+}
+function mobCloseSidebar() {
+  document.getElementById('main-sidebar').classList.remove('mob-open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+// Close on overlay click
+document.getElementById('sidebar-overlay').addEventListener('click', mobCloseSidebar);
+// Close sidebar when a nav item is clicked on mobile
+document.addEventListener('click', function(e) {
+  const link = e.target.closest('[onclick*="switchTab"],[onclick*="showAdminSection"],[onclick*="toggleDropdown"]');
+  if (link && window.innerWidth <= 768) {
+    setTimeout(mobCloseSidebar, 150);
+  }
+});
