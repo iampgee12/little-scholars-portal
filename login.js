@@ -45,9 +45,6 @@ function selectRole(role) {
 
   // Populate login form for chosen role
   document.getElementById('login-title').textContent  = meta.title;
-  const badge = document.getElementById('role-badge');
-  badge.textContent  = meta.badge;
-  badge.className    = 'role-badge ' + meta.badgeClass;
   document.getElementById('id-label').textContent     = meta.idLabel;
   document.getElementById('sid').placeholder          = meta.placeholder;
   document.getElementById('sid').value                = '';
