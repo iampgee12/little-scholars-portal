@@ -224,6 +224,20 @@ async function refreshAllResults() {
   await Promise.all(calls);
 }
 
+async function loadTopbarSession() {
+  try {
+    const data = await apiFetch('/api/admin/academic-sessions');
+    const active = (data.sessions || []).find(s => s.isActive);
+    if (!active) return;
+    const el  = document.getElementById('tsi-session');
+    const el2 = document.getElementById('tsi-term');
+    const box = document.getElementById('topbar-session-info');
+    if (el)  el.textContent  = active.sessionLabel || '—';
+    if (el2) el2.textContent = active.termLabel    || '—';
+    if (box) box.style.display = 'flex';
+  } catch(e) {}
+}
+
 async function init() {
   try {
     const session = await apiFetch('/api/session');
@@ -243,6 +257,7 @@ async function init() {
     document.getElementById('t-chip').textContent = teacher.chip || teacher.name.toUpperCase();
     document.getElementById('t-greeting').textContent = `${greeting()}, ${teacher.firstName}.`;
     document.title = `Little Scholars - ${teacher.name}`;
+    loadTopbarSession();
 
     const subjects = [...new Set(state.contexts.map(ctx => ctx.subjectName))];
     document.getElementById('t-subj').textContent = subjects.join(', ') || 'No assignments';

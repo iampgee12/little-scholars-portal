@@ -69,6 +69,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .topbar-sep   { color:var(--border-2); }
 .topbar-sub   { font-size:12px; color:var(--text-3); }
 .topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.topbar-session-info { display:flex; flex-direction:column; gap:1px; padding-right:10px; border-right:1px solid var(--border); margin-right:4px; }
+.tsi-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.tsi-label { font-size:10px; color:var(--text-3); font-family:'DM Mono',monospace; white-space:nowrap; }
+.tsi-val   { font-size:10px; font-weight:700; color:var(--text-2); font-family:'DM Mono',monospace; white-space:nowrap; }
+.tsi-term  { color:var(--amber); }
 .chip-green { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--green-bg); border:1px solid rgba(34,197,94,0.22); color:var(--green); }
 .chip-amber { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--amber-bg); border:1px solid rgba(251,191,36,0.22); color:var(--amber); }
 .icon-btn { width:30px; height:30px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all var(--transition); position:relative; }
@@ -343,8 +348,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <span class="topbar-sep">/</span>
       <span class="topbar-sub"  id="topbar-sub">Wednesday, 13 May 2026</span>
       <div class="topbar-right">
+        <div class="topbar-session-info" id="topbar-session-info" style="display:none;">
+          <div class="tsi-row"><span class="tsi-label">Academic Session</span><span class="tsi-val" id="tsi-session">—</span></div>
+          <div class="tsi-row"><span class="tsi-label">Active Term</span><span class="tsi-val tsi-term" id="tsi-term">—</span></div>
+        </div>
         <span class="chip-amber" id="t-chip">TEACHER</span>
-        <span class="chip-green">TERM 2</span>
         <div class="icon-btn">🔔<span class="notif-dot"></span></div>
       </div>
     </div>

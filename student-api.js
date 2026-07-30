@@ -13,6 +13,20 @@ async function apiFetch(url, options = {}) {
   return data;
 }
 
+async function loadTopbarSession() {
+  try {
+    const data = await apiFetch('/api/admin/academic-sessions');
+    const active = (data.sessions || []).find(s => s.isActive);
+    if (!active) return;
+    const el  = document.getElementById('tsi-session');
+    const el2 = document.getElementById('tsi-term');
+    const box = document.getElementById('topbar-session-info');
+    if (el)  el.textContent  = active.sessionLabel || '—';
+    if (el2) el2.textContent = active.termLabel    || '—';
+    if (box) box.style.display = 'flex';
+  } catch(e) {}
+}
+
 async function init() {
   const session = await apiFetch('/api/session');
   if (session.user.role !== 'student') {
@@ -28,6 +42,7 @@ async function init() {
   const hr = new Date().getHours();
   const gr = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
   document.getElementById('s-greeting').textContent = `${gr}, ${acct.firstName}.`;
+  loadTopbarSession();
 }
 
 const TAB_META = {
