@@ -2722,6 +2722,13 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/active-term') {
+    const user = requireUser(req, res);
+    if (!user) return;
+    const active = one(`SELECT session_label AS sessionLabel, term_label AS termLabel FROM academic_terms WHERE is_active = 1 LIMIT 1`);
+    return sendJson(res, 200, active || {});
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/admin/academic-sessions') {
     const admin = requireUser(req, res, 'admin');
     if (!admin) return;

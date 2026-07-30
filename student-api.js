@@ -15,9 +15,8 @@ async function apiFetch(url, options = {}) {
 
 async function loadTopbarSession() {
   try {
-    const data = await apiFetch('/api/admin/academic-sessions');
-    const active = (data.sessions || []).find(s => s.isActive);
-    if (!active) return;
+    const active = await apiFetch('/api/active-term');
+    if (!active || !active.sessionLabel) return;
     const el  = document.getElementById('tsi-session');
     const el2 = document.getElementById('tsi-term');
     const box = document.getElementById('topbar-session-info');
