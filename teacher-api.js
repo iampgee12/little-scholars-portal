@@ -253,7 +253,7 @@ async function init() {
     const teacher = setup.teacher || state.user;
     document.getElementById('t-avatar').textContent = teacher.initials;
     document.getElementById('t-name').textContent = teacher.name;
-    document.getElementById('t-chip').textContent = teacher.chip || teacher.name.toUpperCase();
+    const chipEl = document.getElementById('t-chip'); if (chipEl) chipEl.textContent = teacher.chip || teacher.name.toUpperCase();
     document.getElementById('t-greeting').textContent = `${greeting()}, ${teacher.firstName}.`;
     document.title = `Little Scholars - ${teacher.name}`;
     loadTopbarSession();
