@@ -2756,11 +2756,12 @@ function renderBroadsheetSummary(data) {
         <td style="text-align:center;">${item.total}</td>
         <td style="text-align:center;">${item.cnt}</td>
         <td style="text-align:center;font-weight:700;font-family:'DM Mono',monospace;">${item.avg}</td>
+        <td style="text-align:center;"><button class="bs-rank-btn" title="View ranking for ${escapeHtml(item.s.name)}" onclick="showSubjectRanking(${item.s.id}, '${escapeHtml(item.s.name)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></td>
         <td style="color:#16a34a;font-size:11px;">${best ? `${escapeHtml(best.name)} (${best.score})` : '—'}</td>
         <td style="color:#dc2626;font-size:11px;">${worst && worst !== best ? `${escapeHtml(worst.name)} (${worst.score})` : '—'}</td>
         <td style="color:var(--text-3);">${teacherEntry}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--text-3)">No subject data.</td></tr>`;
+    }).join('') || `<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--text-3)">No subject data.</td></tr>`;
   }
 
   // Footer stats
@@ -2781,6 +2782,45 @@ function renderBroadsheetSummary(data) {
   }
 
   document.getElementById('bs-summary').style.display = '';
+}
+
+function showSubjectRanking(subjectId, subjectName) {
+  if (!_bsData) return;
+  const students = _bsData.students || [];
+  const matrix   = _bsData.scoreMatrix || {};
+
+  const ranked = students
+    .map(st => ({ name: st.name, score: matrix[st.id]?.[subjectId]?.tot ?? null }))
+    .filter(r => r.score !== null)
+    .sort((a, b) => b.score - a.score);
+
+  const rows = ranked.map((r, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    const color = i === 0 ? 'var(--amber)' : i < 3 ? 'var(--text-2)' : 'var(--text-3)';
+    return `<tr>
+      <td class="rank-num" style="color:${color};">${medal || (i + 1)}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td class="rank-score" style="color:${i === 0 ? 'var(--green)' : 'var(--text-1)'};">${r.score}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-3);">No scores recorded.</td></tr>`;
+
+  const modal = document.createElement('div');
+  modal.className = 'rank-modal-overlay';
+  modal.innerHTML = `
+    <div class="rank-modal">
+      <div class="rank-modal-head">
+        <span class="rank-modal-title">Performance Ranking — ${escapeHtml(subjectName)}</span>
+        <button class="rank-modal-close" onclick="this.closest('.rank-modal-overlay').remove()">&#x2715;</button>
+      </div>
+      <div class="rank-modal-body">
+        <table class="rank-table">
+          <thead><tr><th>#</th><th>Student</th><th>Score / 100</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
 }
 
 function exportBroadsheetCSV() {
