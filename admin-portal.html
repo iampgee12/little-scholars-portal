@@ -4637,136 +4637,449 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         </div>
       </div>
       <div class="tab-panel" id="tab-visitStorefront">
-        <div class="page-header"><h2>Visit Storefront</h2><p>Preview the public-facing storefront</p></div>
+        <div class="page-header"><h2>Visit Storefront</h2><p>Live preview of the public-facing storefront, built from real products, categories and banners</p></div>
+        <div class="card" id="vs-banner-card" style="margin-bottom:14px;display:none;">
+          <div class="card-body" id="vs-banner-body" style="padding:22px;background:linear-gradient(135deg,#2563eb,#1e3a8a);border-radius:var(--radius);color:#fff;"></div>
+        </div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Visit Storefront</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title" id="vs-store-name">Storefront</span></div>
+          <div class="card-body">
+            <div id="vs-sections" style="margin-bottom:16px;"></div>
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+              <select class="ctrl-select" id="vs-category-filter" style="width:auto;min-width:170px;" onchange="finVisitStorefrontRender()"><option value="">All Categories</option></select>
+              <input class="search-input" id="vs-search" placeholder="Search products..." oninput="finVisitStorefrontRender()" style="margin-left:auto;">
+            </div>
+            <div id="vs-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;"></div>
+            <div id="vs-empty" style="display:none;padding:40px 20px;text-align:center;color:var(--text-3);font-size:12px;">No active products yet — add some under Products.</div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-posTerminal">
-        <div class="page-header"><h2>Point-of-Sale Terminal</h2><p>In-person sales terminal</p></div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Point-of-Sale Terminal</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+        <div class="page-header"><h2>Point-of-Sale Terminal</h2><p>Record an in-person sale — decrements stock in real time</p></div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Products</span></div>
+            <div class="card-body">
+              <input class="search-input" id="pos-search" placeholder="Search products by name or SKU..." oninput="finPosRenderProducts()" style="width:100%;margin-bottom:12px;">
+              <div id="pos-products-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:520px;overflow-y:auto;"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Cart</span></div>
+            <div class="card-body">
+              <div>
+                <label class="field-label">Customer Name</label>
+                <input class="field-input" id="pos-customer-name" placeholder="Walk-in Customer" style="width:100%;margin-bottom:10px;">
+              </div>
+              <div style="overflow-x:auto;margin-bottom:10px;">
+                <table class="data-table">
+                  <thead><tr><th>Item</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+                  <tbody id="pos-cart-tbody"><tr><td colspan="4" style="padding:14px;color:var(--text-3);">Cart is empty</td></tr></tbody>
+                </table>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><strong id="pos-subtotal">0.00</strong></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;"><span>Discount</span><input class="field-input" id="pos-discount" type="number" min="0" value="0" style="width:100px;text-align:right;" oninput="finPosRenderCart()"></div>
+                <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px solid var(--border);padding-top:8px;"><span>Total</span><span id="pos-total">0.00</span></div>
+              </div>
+              <div style="margin-bottom:10px;">
+                <label class="field-label">Payment Method</label>
+                <select class="ctrl-select" id="pos-payment-method" style="width:100%;">
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="transfer">Bank Transfer</option>
+                </select>
+              </div>
+              <button class="post-btn" style="width:100%;padding:10px;" onclick="finPosCheckout()">Complete Sale</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-ordersSales">
-        <div class="page-header"><h2>Orders &amp; Sales</h2><p>Store orders and sales records</p></div>
+        <div class="page-header"><h2>Orders &amp; Sales</h2><p>All store orders, from the POS terminal or manual entry</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Orders &amp; Sales</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Orders</span>
+            <button class="post-btn" onclick="switchTab('posTerminal', document.querySelector('[data-tab=posTerminal]'))">+ New Sale (POS)</button>
+          </div>
+          <div class="card-body">
+            <input class="search-input" id="os-search" placeholder="Search by order # or customer..." oninput="finOrdersRender()" style="width:100%;margin-bottom:12px;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Order #</th><th>Date</th><th>Customer</th><th>Channel</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="os-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-products">
         <div class="page-header"><h2>Products</h2><p>Store product catalog</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Products</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Products</span>
+            <button class="post-btn" onclick="finOpenProductModal()">+ Add Product</button>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select class="ctrl-select" id="prod-category-filter" style="width:auto;min-width:170px;" onchange="finProductsRender()"><option value="">All Categories</option></select>
+              <input class="search-input" id="prod-search" placeholder="Search products or SKU..." oninput="finProductsRender()" style="margin-left:auto;">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Category</th><th>Price</th><th>Cost</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="prod-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-categories">
         <div class="page-header"><h2>Categories</h2><p>Product categories</p></div>
         <div class="card">
           <div class="card-head"><span class="card-title">Categories</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-body">
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+              <input class="field-input" id="cat-new-name" placeholder="New category name (e.g. Uniforms)" style="max-width:260px;">
+              <input class="field-input" id="cat-new-description" placeholder="Description (optional)" style="max-width:300px;">
+              <button class="post-btn" onclick="finSaveCategory()">+ Add Category</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Name</th><th>Description</th><th>Products Using It</th><th>Action</th></tr></thead>
+                <tbody id="cat-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-inventorySupply">
-        <div class="page-header"><h2>Inventory &amp; Supply</h2><p>Stock levels and supply records</p></div>
+        <div class="page-header"><h2>Inventory &amp; Supply</h2><p>Stock levels and supply / adjustment records</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Stock Levels</span></div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);"><input type="checkbox" id="inv-low-only" onchange="finInventoryRender()"> Low stock only</label>
+              <input class="search-input" id="inv-search" placeholder="Search products..." oninput="finInventoryRender()" style="margin-left:auto;">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Product</th><th>Stock</th><th>Reorder Level</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="inv-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Inventory &amp; Supply</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Recent Stock Movements</span></div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Date</th><th>Product</th><th>Change</th><th>Reason</th></tr></thead>
+                <tbody id="inv-movements-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-storeSettings">
         <div class="page-header"><h2>Store Settings</h2><p>Store configuration and settings</p></div>
         <div class="card">
           <div class="card-head"><span class="card-title">Store Settings</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:640px;">
+              <div>
+                <label class="field-label">Store Name</label>
+                <input class="field-input" id="ss-store-name" style="width:100%;">
+              </div>
+              <div>
+                <label class="field-label">Currency</label>
+                <input class="field-input" id="ss-currency" style="width:100%;" placeholder="NGN">
+              </div>
+              <div>
+                <label class="field-label">Low Stock Threshold (default)</label>
+                <input class="field-input" id="ss-low-stock" type="number" min="0" style="width:100%;">
+              </div>
+              <div>
+                <label class="field-label">Store Tax Rate (%)</label>
+                <input class="field-input" id="ss-tax-rate" type="number" min="0" step="0.1" style="width:100%;">
+              </div>
+              <div style="grid-column:1 / -1;">
+                <label class="field-label">Store Contact Email</label>
+                <input class="field-input" id="ss-contact-email" style="width:100%;">
+              </div>
+            </div>
+            <button class="post-btn" style="margin-top:16px;" onclick="finSaveStoreSettings()">Save Settings</button>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-storefrontBanners">
         <div class="page-header"><h2>Storefront Banners</h2><p>Promotional banners on the storefront</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Storefront Banners</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Storefront Banners</span>
+            <button class="post-btn" onclick="finOpenBannerModal()">+ Add Banner</button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Title</th><th>Subtitle</th><th>Sort Order</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="ban-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-storefrontHomepageSections">
         <div class="page-header"><h2>Storefront Homepage Sections</h2><p>Homepage layout sections for the storefront</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Storefront Homepage Sections</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Homepage Sections</span>
+            <button class="post-btn" onclick="finOpenSectionModal()">+ Add Section</button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Title</th><th>Type</th><th>Sort Order</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="sec-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-internalRequisitions">
         <div class="page-header"><h2>Internal Requisitions</h2><p>Internal stock requisition requests</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Internal Requisitions</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Requisitions</span>
+            <button class="post-btn" onclick="finOpenRequisitionModal()">+ New Requisition</button>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select class="ctrl-select" id="req-status-filter" style="width:auto;min-width:150px;" onchange="finRequisitionsRender()">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="fulfilled">Fulfilled</option>
+              </select>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Department</th><th>Requested By</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="req-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-chartOfAccounts">
         <div class="page-header"><h2>Chart of Accounts</h2><p>List of financial accounts</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Chart of Accounts</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Accounts</span>
+            <button class="post-btn" onclick="finOpenAccountModal()">+ Add Account</button>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select class="ctrl-select" id="coa-type-filter" style="width:auto;min-width:150px;" onchange="finAccountsRender()">
+                <option value="">All Types</option>
+                <option value="asset">Asset</option>
+                <option value="liability">Liability</option>
+                <option value="equity">Equity</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
+              <input class="search-input" id="coa-search" placeholder="Search accounts..." oninput="finAccountsRender()" style="margin-left:auto;">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Normal Balance</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="coa-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-journalEntries">
-        <div class="page-header"><h2>Journal Entries</h2><p>Manual accounting journal entries</p></div>
+        <div class="page-header"><h2>Journal Entries</h2><p>Manual accounting journal entries — each entry must balance (total debit = total credit)</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">New Journal Entry</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-bottom:14px;">
+              <div>
+                <label class="field-label">Date</label>
+                <input class="field-input" id="je-date" type="date" style="width:100%;">
+              </div>
+              <div></div>
+              <div>
+                <label class="field-label">Memo</label>
+                <input class="field-input" id="je-memo" placeholder="e.g. Paid electricity bill" style="width:100%;">
+              </div>
+            </div>
+            <div style="overflow-x:auto;margin-bottom:10px;">
+              <table class="data-table">
+                <thead><tr><th style="min-width:220px;">Account</th><th>Description</th><th style="width:130px;">Debit</th><th style="width:130px;">Credit</th><th></th></tr></thead>
+                <tbody id="je-lines-tbody"></tbody>
+              </table>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <button class="ann-del" style="font-weight:700;" onclick="finAddJournalLine()">+ Add Line</button>
+              <div style="font-size:12px;color:var(--text-2);">Debit total: <strong id="je-total-debit">0.00</strong> &nbsp;|&nbsp; Credit total: <strong id="je-total-credit">0.00</strong> &nbsp; <span id="je-balance-flag"></span></div>
+            </div>
+            <button class="post-btn" style="margin-top:14px;" onclick="finSaveJournalEntry()">Post Journal Entry</button>
+          </div>
+        </div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Journal Entries</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Posted Entries</span></div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Entry #</th><th>Date</th><th>Memo</th><th>Lines</th><th>Total</th><th>Action</th></tr></thead>
+                <tbody id="je-entries-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-accountLedger">
-        <div class="page-header"><h2>Account Ledger</h2><p>General ledger of account activity</p></div>
+        <div class="page-header"><h2>Account Ledger</h2><p>General ledger of account activity — a filtered list of journal lines per account, with a running balance</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Account Ledger</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Ledger</span></div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;">
+              <div>
+                <label class="field-label">Account</label>
+                <select class="ctrl-select" id="ledger-account" style="width:280px;" onchange="finLedgerRender()"><option value="">Select Account</option></select>
+              </div>
+            </div>
+            <div id="ledger-summary" style="display:none;margin-bottom:12px;font-size:13px;color:var(--text-2);"></div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Date</th><th>Entry #</th><th>Description</th><th>Debit</th><th>Credit</th><th>Running Balance</th></tr></thead>
+                <tbody id="ledger-tbody"><tr><td colspan="6" style="padding:18px;color:var(--text-3);">Select an account to view its ledger.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-trialBalance">
-        <div class="page-header"><h2>Trial Balance</h2><p>Trial balance summary</p></div>
+        <div class="page-header"><h2>Trial Balance</h2><p>Sum of debits and credits per account, from all posted journal entries</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Trial Balance</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Trial Balance</span><span id="tb-balance-flag" style="font-size:12px;font-weight:700;"></span></div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Code</th><th>Account</th><th>Type</th><th>Total Debit</th><th>Total Credit</th></tr></thead>
+                <tbody id="tb-tbody"></tbody>
+                <tfoot><tr style="font-weight:700;border-top:2px solid var(--border);"><td colspan="3">Totals</td><td id="tb-total-debit"></td><td id="tb-total-credit"></td></tr></tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-contactsBillsInvoices">
         <div class="page-header"><h2>Contacts, Bills &amp; Invoices</h2><p>Vendor and customer contacts, bills, and invoices</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Contacts</span>
+            <button class="post-btn" onclick="finOpenContactModal()">+ Add Contact</button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>Action</th></tr></thead>
+                <tbody id="con-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Contacts, Bills &amp; Invoices</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Bills &amp; Invoices</span>
+            <button class="post-btn" onclick="finOpenBillModal()">+ Add Bill / Invoice</button>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+              <select class="ctrl-select" id="bill-status-filter" style="width:auto;min-width:150px;" onchange="finBillsRender()">
+                <option value="">All Statuses</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Doc #</th><th>Type</th><th>Contact</th><th>Issue Date</th><th>Due Date</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="bill-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-budgets">
-        <div class="page-header"><h2>Budgets</h2><p>Budget planning and tracking</p></div>
+        <div class="page-header"><h2>Budgets</h2><p>Budget planning and tracking — actuals are the account's all-time journal activity, compared against the budgeted amount</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Budgets</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Budgets</span>
+            <button class="post-btn" onclick="finOpenBudgetModal()">+ Add Budget</button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Period</th><th>Account</th><th>Budgeted</th><th>Actual</th><th>Variance</th><th>Action</th></tr></thead>
+                <tbody id="bud-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-bankReconciliation">
-        <div class="page-header"><h2>Bank Reconciliation</h2><p>Reconcile bank statements with records</p></div>
+        <div class="page-header"><h2>Bank Reconciliation</h2><p>Manually record bank statement lines and mark them reconciled</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Bank Reconciliation</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Bank Transactions</span>
+            <button class="post-btn" onclick="finOpenBankTxnModal()">+ Add Transaction</button>
+          </div>
+          <div class="card-body">
+            <div id="bank-summary" style="margin-bottom:12px;font-size:13px;color:var(--text-2);"></div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Reconciled</th><th>Action</th></tr></thead>
+                <tbody id="bank-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-taxCompliance">
-        <div class="page-header"><h2>Tax &amp; Compliance</h2><p>Tax filings and compliance records</p></div>
+        <div class="page-header"><h2>Tax &amp; Compliance</h2><p>Track tax filing periods, amounts due/paid, and status — a simple records log, not automated tax calculation</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Tax &amp; Compliance</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+          <div class="card-head"><span class="card-title">Tax Records</span>
+            <button class="post-btn" onclick="finOpenTaxModal()">+ Add Tax Record</button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Period</th><th>Tax Type</th><th>Amount Due</th><th>Amount Paid</th><th>Status</th><th>Due Date</th><th>Action</th></tr></thead>
+                <tbody id="tax-tbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-financialReports">
-        <div class="page-header"><h2>Financial Reports</h2><p>Generated financial reports</p></div>
-        <div class="card">
-          <div class="card-head"><span class="card-title">Financial Reports</span></div>
-          <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.6;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+        <div class="page-header"><h2>Financial Reports</h2><p>A simple totals summary computed live from posted journal entries</p></div>
+        <div class="card" id="fr-empty-card">
+          <div class="card-body" style="padding:40px 20px;text-align:center;color:var(--text-3);font-size:12px;">No data yet — add journal entries to see this report.</div>
+        </div>
+        <div id="fr-content" style="display:none;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:14px;">
+            <div class="card"><div class="card-body"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;">Total Income</div><div id="fr-income" style="font-size:22px;font-weight:700;margin-top:6px;"></div></div></div>
+            <div class="card"><div class="card-body"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;">Total Expense</div><div id="fr-expense" style="font-size:22px;font-weight:700;margin-top:6px;"></div></div></div>
+            <div class="card"><div class="card-body"><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;">Net Income</div><div id="fr-net" style="font-size:22px;font-weight:700;margin-top:6px;"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Balance Sheet Summary</span></div>
+            <div class="card-body">
+              <div style="overflow-x:auto;">
+                <table class="data-table">
+                  <thead><tr><th>Total Assets</th><th>Total Liabilities</th><th>Total Equity</th></tr></thead>
+                  <tbody><tr><td id="fr-assets"></td><td id="fr-liabilities"></td><td id="fr-equity"></td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Mark Daily Attendance -->
@@ -5760,6 +6073,20 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
     <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
       <button class="ann-del" onclick="slCloseModal()" style="font-size:12px;">Cancel</button>
       <button class="post-btn" onclick="slSubmit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Finance CRUD modal (Store & Inventory / Accounting sub-tabs) -->
+<div id="fin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div role="dialog" aria-modal="true" style="width:min(520px,100%);background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;max-height:calc(100vh - 60px);display:flex;flex-direction:column;">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+      <div id="fin-modal-title" style="font-size:15px;font-weight:700;color:var(--text-1);">Add</div>
+    </div>
+    <div id="fin-modal-body" style="padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;overflow-y:auto;"></div>
+    <div style="padding:16px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="ann-del" onclick="closeFinModal()" style="font-size:12px;">Cancel</button>
+      <button class="post-btn" id="fin-modal-save" onclick="submitFinModal()">Save</button>
     </div>
   </div>
 </div>

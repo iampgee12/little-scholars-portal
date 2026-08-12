@@ -853,12 +853,347 @@ function seedFeesDemoData() {
   }
 }
 
+// ── FINANCE: STORE & INVENTORY / ACCOUNTING SCHEMA + SEED ──────────────────
+// Self-contained schema/seed for the Store & Inventory and Accounting
+// sub-areas of the Finance module. Kept separate from createSchema()/
+// seedDatabase() above (core academics data) so this can evolve without
+// touching that shared boilerplate.
+function createStoreAccountingSchema() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS store_categories (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS store_products (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      sku TEXT UNIQUE,
+      category_id INTEGER REFERENCES store_categories(id) ON DELETE SET NULL,
+      price REAL NOT NULL DEFAULT 0,
+      cost REAL NOT NULL DEFAULT 0,
+      unit TEXT,
+      stock_qty INTEGER NOT NULL DEFAULT 0,
+      reorder_level INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS store_stock_movements (
+      id INTEGER PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES store_products(id) ON DELETE CASCADE,
+      change_qty INTEGER NOT NULL,
+      reason TEXT,
+      created_by TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS store_orders (
+      id INTEGER PRIMARY KEY,
+      order_no TEXT NOT NULL UNIQUE,
+      channel TEXT NOT NULL DEFAULT 'pos',
+      customer_name TEXT,
+      status TEXT NOT NULL DEFAULT 'completed',
+      subtotal REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL DEFAULT 0,
+      payment_method TEXT,
+      created_by TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS store_order_items (
+      id INTEGER PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES store_orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES store_products(id) ON DELETE SET NULL,
+      product_name TEXT NOT NULL,
+      unit_price REAL NOT NULL,
+      qty INTEGER NOT NULL,
+      line_total REAL NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS store_requisitions (
+      id INTEGER PRIMARY KEY,
+      item_description TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      department TEXT,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      requested_by TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      decided_by TEXT REFERENCES users(id),
+      decided_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS store_banners (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      subtitle TEXT,
+      image_url TEXT,
+      link_url TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS store_homepage_sections (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      section_type TEXT NOT NULL DEFAULT 'custom',
+      content TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_accounts (
+      id INTEGER PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('asset','liability','equity','income','expense')),
+      normal_balance TEXT NOT NULL CHECK(normal_balance IN ('debit','credit')),
+      is_active INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_journal_entries (
+      id INTEGER PRIMARY KEY,
+      entry_no TEXT NOT NULL UNIQUE,
+      entry_date TEXT NOT NULL,
+      memo TEXT,
+      created_by TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_journal_lines (
+      id INTEGER PRIMARY KEY,
+      entry_id INTEGER NOT NULL REFERENCES acct_journal_entries(id) ON DELETE CASCADE,
+      account_id INTEGER NOT NULL REFERENCES acct_accounts(id),
+      debit REAL NOT NULL DEFAULT 0,
+      credit REAL NOT NULL DEFAULT 0,
+      description TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_contacts (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'vendor' CHECK(type IN ('vendor','customer')),
+      email TEXT,
+      phone TEXT,
+      address TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_bills (
+      id INTEGER PRIMARY KEY,
+      contact_id INTEGER REFERENCES acct_contacts(id) ON DELETE SET NULL,
+      doc_no TEXT,
+      doc_type TEXT NOT NULL DEFAULT 'bill' CHECK(doc_type IN ('bill','invoice')),
+      issue_date TEXT NOT NULL,
+      due_date TEXT,
+      amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'unpaid',
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_budgets (
+      id INTEGER PRIMARY KEY,
+      account_id INTEGER NOT NULL REFERENCES acct_accounts(id) ON DELETE CASCADE,
+      period_label TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_bank_transactions (
+      id INTEGER PRIMARY KEY,
+      txn_date TEXT NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL,
+      txn_type TEXT NOT NULL CHECK(txn_type IN ('debit','credit')),
+      reconciled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS acct_tax_records (
+      id INTEGER PRIMARY KEY,
+      period_label TEXT NOT NULL,
+      tax_type TEXT NOT NULL,
+      amount_due REAL NOT NULL DEFAULT 0,
+      amount_paid REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      due_date TEXT,
+      notes TEXT
+    );
+  `);
+}
+
+function seedStoreAccountingData() {
+  const seeded = one('SELECT value FROM schema_meta WHERE key = ?', 'store_acct_seed_version');
+  if (seeded && seeded.value === '1') return;
+
+  db.exec('BEGIN');
+  try {
+    const now = new Date().toISOString();
+
+    // Store categories + products
+    const categories = [
+      ['Uniforms', 'School uniforms and wearables'],
+      ['Stationery', 'Books, pens, and writing supplies'],
+      ['Accessories', 'Bags, bottles, and other accessories'],
+    ];
+    categories.forEach(c => run('INSERT INTO store_categories (name, description) VALUES (?, ?)', ...c));
+    const catId = name => one('SELECT id FROM store_categories WHERE name = ?', name).id;
+
+    const products = [
+      ['School Uniform (Set)', 'UNI-001', catId('Uniforms'), 8000, 5000, 'set', 40, 10],
+      ['Exercise Book (Pack of 5)', 'STA-001', catId('Stationery'), 1200, 700, 'pack', 150, 30],
+      ['Little Scholars Backpack', 'ACC-001', catId('Accessories'), 6000, 3500, 'piece', 20, 5],
+      ['Water Bottle', 'ACC-002', catId('Accessories'), 1500, 800, 'piece', 60, 15],
+      ['Maths Textbook - Grade 4', 'STA-002', catId('Stationery'), 3500, 2200, 'piece', 25, 8],
+    ];
+    products.forEach(p => run(
+      `INSERT INTO store_products (name, sku, category_id, price, cost, unit, stock_qty, reorder_level, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      ...p, now
+    ));
+
+    // Sample completed order (already reflected in the seeded stock figures above)
+    const order = run(
+      `INSERT INTO store_orders (order_no, channel, customer_name, status, subtotal, discount, total, payment_method, created_by, created_at)
+       VALUES (?, 'pos', ?, 'completed', ?, 0, ?, 'cash', ?, ?)`,
+      'ORD-0001', 'Walk-in Customer', 4200, 4200, 'ADM-001', now
+    );
+    const orderId = Number(order.lastInsertRowid);
+    const bookProduct = one('SELECT id, price FROM store_products WHERE sku = ?', 'STA-001');
+    const bottleProduct = one('SELECT id, price FROM store_products WHERE sku = ?', 'ACC-002');
+    run(
+      `INSERT INTO store_order_items (order_id, product_id, product_name, unit_price, qty, line_total) VALUES (?, ?, ?, ?, ?, ?)`,
+      orderId, bookProduct.id, 'Exercise Book (Pack of 5)', bookProduct.price, 2, bookProduct.price * 2
+    );
+    run(
+      `INSERT INTO store_order_items (order_id, product_id, product_name, unit_price, qty, line_total) VALUES (?, ?, ?, ?, ?, ?)`,
+      orderId, bottleProduct.id, 'Water Bottle', bottleProduct.price, 1, bottleProduct.price
+    );
+
+    run(
+      `INSERT INTO store_requisitions (item_description, quantity, department, reason, status, requested_by, created_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+      'A4 Paper Reams', 10, 'Front Office', 'Restocking printer paper', 'TCH-001', now
+    );
+
+    run(
+      `INSERT INTO store_banners (title, subtitle, image_url, link_url, sort_order, is_active, created_at)
+       VALUES (?, ?, ?, ?, 1, 1, ?)`,
+      'Back to School Sale', '10% off all uniforms this week', '', '', now
+    );
+
+    run(
+      `INSERT INTO store_homepage_sections (title, section_type, content, sort_order, is_active, created_at)
+       VALUES (?, 'featured', ?, 1, 1, ?)`,
+      'Featured Items', 'Uniforms, backpacks, and stationery essentials for the new term.', now
+    );
+
+    // Chart of accounts
+    const accounts = [
+      ['1000', 'Cash', 'asset', 'debit'],
+      ['1010', 'Bank Account', 'asset', 'debit'],
+      ['1200', 'Accounts Receivable', 'asset', 'debit'],
+      ['1500', 'Inventory', 'asset', 'debit'],
+      ['2000', 'Accounts Payable', 'liability', 'credit'],
+      ['3000', "Fund Balance / Equity", 'equity', 'credit'],
+      ['4000', 'Tuition & Fees Income', 'income', 'credit'],
+      ['4100', 'Store Sales Income', 'income', 'credit'],
+      ['5000', 'Salaries Expense', 'expense', 'debit'],
+      ['5100', 'Utilities Expense', 'expense', 'debit'],
+      ['5200', 'Supplies Expense', 'expense', 'debit'],
+    ];
+    accounts.forEach(a => run(
+      'INSERT INTO acct_accounts (code, name, type, normal_balance, is_active) VALUES (?, ?, ?, ?, 1)',
+      ...a
+    ));
+    const acctId = code => one('SELECT id FROM acct_accounts WHERE code = ?', code).id;
+
+    function insertEntry(entryNo, date, memo, lines) {
+      const entry = run(
+        `INSERT INTO acct_journal_entries (entry_no, entry_date, memo, created_by, created_at) VALUES (?, ?, ?, ?, ?)`,
+        entryNo, date, memo, 'ADM-001', now
+      );
+      const entryId = Number(entry.lastInsertRowid);
+      lines.forEach(l => run(
+        `INSERT INTO acct_journal_lines (entry_id, account_id, debit, credit, description) VALUES (?, ?, ?, ?, ?)`,
+        entryId, acctId(l.code), l.debit || 0, l.credit || 0, l.description || ''
+      ));
+    }
+
+    insertEntry('JE-0001', '2026-01-05', 'Opening fund balance', [
+      { code: '1000', debit: 500000, description: 'Opening cash balance' },
+      { code: '3000', credit: 500000, description: 'Opening fund balance' },
+    ]);
+    insertEntry('JE-0002', '2026-01-20', 'Store sale - till reconciliation', [
+      { code: '1000', debit: 4200, description: 'Cash from ORD-0001' },
+      { code: '4100', credit: 4200, description: 'Store sales revenue' },
+    ]);
+    insertEntry('JE-0003', '2026-02-02', 'Paid electricity bill', [
+      { code: '5100', debit: 25000, description: 'February electricity bill' },
+      { code: '1000', credit: 25000, description: 'Paid from cash' },
+    ]);
+
+    // Contacts + bills
+    const vendor = run(
+      `INSERT INTO acct_contacts (name, type, email, phone, address, created_at) VALUES (?, 'vendor', ?, ?, ?, ?)`,
+      'ABC Stationery Suppliers', 'sales@abcstationery.example', '+234 800 000 0000', 'Lagos, Nigeria', now
+    );
+    run(
+      `INSERT INTO acct_contacts (name, type, email, phone, address, created_at) VALUES (?, 'customer', ?, ?, ?, ?)`,
+      'Parent-Teacher Association', 'pta@littlescholars.example', '+234 800 111 2222', 'On campus', now
+    );
+    run(
+      `INSERT INTO acct_bills (contact_id, doc_no, doc_type, issue_date, due_date, amount, status, notes, created_at)
+       VALUES (?, 'BILL-0001', 'bill', '2026-02-10', '2026-03-10', 45000, 'unpaid', 'Stationery restock', ?)`,
+      Number(vendor.lastInsertRowid), now
+    );
+
+    run(
+      `INSERT INTO acct_budgets (account_id, period_label, amount, notes) VALUES (?, ?, ?, ?)`,
+      acctId('5100'), '2025/2026 Term 2', 30000, 'Estimated utilities for the term'
+    );
+
+    run(
+      `INSERT INTO acct_bank_transactions (txn_date, description, amount, txn_type, reconciled, created_at) VALUES (?, ?, ?, 'debit', 1, ?)`,
+      '2026-01-05', 'Opening balance deposit', 500000, now
+    );
+    run(
+      `INSERT INTO acct_bank_transactions (txn_date, description, amount, txn_type, reconciled, created_at) VALUES (?, ?, ?, 'credit', 0, ?)`,
+      '2026-02-02', 'Electricity bill payment', 25000, now
+    );
+
+    run(
+      `INSERT INTO acct_tax_records (period_label, tax_type, amount_due, amount_paid, status, due_date, notes)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+      '2026 Q1', 'PAYE (Staff)', 60000, 0, '2026-04-15', 'Quarterly staff PAYE remittance'
+    );
+
+    run(
+      `INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      'store_acct_seed_version', '1'
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+// ── END FINANCE: STORE & INVENTORY / ACCOUNTING SCHEMA + SEED ──────────────
+
 createSchema();
 createFeesSchema();
 createFinancePayrollSchema();
+createStoreAccountingSchema();
 seedDatabase();
 seedFeesDemoData();
 seedFinancePayrollDemoData();
+seedStoreAccountingData();
 migratePlaintextPasswords();
 
 function sendJson(res, status, data, extraHeaders = {}) {
@@ -4267,6 +4602,901 @@ async function handleApi(req, res, url) {
       monthlyTrend: byMonth(),
     });
   }
+
+  // ── FINANCE: STORE & INVENTORY ────────────────────────────────────────
+  function storeProductRowMap(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      sku: row.sku,
+      categoryId: row.category_id,
+      categoryName: row.categoryName || null,
+      price: row.price,
+      cost: row.cost,
+      unit: row.unit,
+      stockQty: row.stock_qty,
+      reorderLevel: row.reorder_level,
+      isActive: !!row.is_active,
+      lowStock: row.stock_qty <= row.reorder_level,
+      createdAt: row.created_at,
+    };
+  }
+  function fetchStoreProducts() {
+    return all(
+      `SELECT p.*, c.name AS categoryName FROM store_products p
+       LEFT JOIN store_categories c ON c.id = p.category_id ORDER BY p.name`
+    ).map(storeProductRowMap);
+  }
+  function fetchStoreProduct(id) {
+    const row = one(
+      `SELECT p.*, c.name AS categoryName FROM store_products p
+       LEFT JOIN store_categories c ON c.id = p.category_id WHERE p.id = ?`,
+      id
+    );
+    return row ? storeProductRowMap(row) : null;
+  }
+  function nextStoreOrderNo() {
+    const count = one('SELECT COUNT(*) AS c FROM store_orders').c;
+    return `ORD-${String(count + 1).padStart(4, '0')}`;
+  }
+  function fetchStoreOrders() {
+    return all(
+      `SELECT o.*, (SELECT COUNT(*) FROM store_order_items i WHERE i.order_id = o.id) AS itemCount
+       FROM store_orders o ORDER BY o.created_at DESC`
+    ).map(o => ({
+      id: o.id,
+      orderNo: o.order_no,
+      channel: o.channel,
+      customerName: o.customer_name,
+      status: o.status,
+      subtotal: o.subtotal,
+      discount: o.discount,
+      total: o.total,
+      paymentMethod: o.payment_method,
+      createdBy: o.created_by,
+      createdAt: o.created_at,
+      itemCount: o.itemCount,
+    }));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/categories') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const categories = all(
+      `SELECT c.id, c.name, c.description,
+              (SELECT COUNT(*) FROM store_products p WHERE p.category_id = c.id) AS productCount
+       FROM store_categories c ORDER BY c.name`
+    );
+    return sendJson(res, 200, { categories });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/categories') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Category name is required' });
+    try {
+      run('INSERT INTO store_categories (name, description) VALUES (?, ?)', name, cleanText(body.description) || null);
+    } catch (err) {
+      if (String(err.message).includes('UNIQUE')) return sendJson(res, 409, { error: 'A category with that name already exists' });
+      throw err;
+    }
+    return sendJson(res, 201, { ok: true });
+  }
+
+  const storeCategoryMatch = url.pathname.match(/^\/api\/admin\/store\/categories\/(\d+)$/);
+  if (req.method === 'PUT' && storeCategoryMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Category name is required' });
+    run('UPDATE store_categories SET name = ?, description = ? WHERE id = ?', name, cleanText(body.description) || null, Number(storeCategoryMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && storeCategoryMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM store_categories WHERE id = ?', Number(storeCategoryMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/products') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    return sendJson(res, 200, { products: fetchStoreProducts() });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/products') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Product name is required' });
+    try {
+      const result = run(
+        `INSERT INTO store_products (name, sku, category_id, price, cost, unit, stock_qty, reorder_level, is_active, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        name,
+        cleanText(body.sku) || null,
+        body.categoryId ? Number(body.categoryId) : null,
+        Number(body.price) || 0,
+        Number(body.cost) || 0,
+        cleanText(body.unit) || 'piece',
+        Number(body.stockQty) || 0,
+        Number(body.reorderLevel) || 0,
+        body.isActive === false ? 0 : 1,
+        new Date().toISOString()
+      );
+      return sendJson(res, 201, { ok: true, product: fetchStoreProduct(Number(result.lastInsertRowid)) });
+    } catch (err) {
+      if (String(err.message).includes('UNIQUE')) return sendJson(res, 409, { error: 'A product with that SKU already exists' });
+      throw err;
+    }
+  }
+
+  const storeProductMatch = url.pathname.match(/^\/api\/admin\/store\/products\/(\d+)$/);
+  if (req.method === 'PUT' && storeProductMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const id = Number(storeProductMatch[1]);
+    if (!fetchStoreProduct(id)) return sendJson(res, 404, { error: 'Product not found' });
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Product name is required' });
+    try {
+      run(
+        `UPDATE store_products SET name = ?, sku = ?, category_id = ?, price = ?, cost = ?, unit = ?, reorder_level = ?, is_active = ? WHERE id = ?`,
+        name,
+        cleanText(body.sku) || null,
+        body.categoryId ? Number(body.categoryId) : null,
+        Number(body.price) || 0,
+        Number(body.cost) || 0,
+        cleanText(body.unit) || 'piece',
+        Number(body.reorderLevel) || 0,
+        body.isActive === false ? 0 : 1,
+        id
+      );
+    } catch (err) {
+      if (String(err.message).includes('UNIQUE')) return sendJson(res, 409, { error: 'A product with that SKU already exists' });
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, product: fetchStoreProduct(id) });
+  }
+  if (req.method === 'DELETE' && storeProductMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM store_products WHERE id = ?', Number(storeProductMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  const stockAdjustMatch = url.pathname.match(/^\/api\/admin\/store\/products\/(\d+)\/stock-adjust$/);
+  if (req.method === 'POST' && stockAdjustMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const id = Number(stockAdjustMatch[1]);
+    const product = one('SELECT * FROM store_products WHERE id = ?', id);
+    if (!product) return sendJson(res, 404, { error: 'Product not found' });
+    const body = await readJson(req);
+    const delta = Number(body.delta);
+    const reason = cleanText(body.reason) || 'Manual adjustment';
+    if (!Number.isFinite(delta) || delta === 0) return sendJson(res, 400, { error: 'A non-zero adjustment quantity is required' });
+    const newQty = product.stock_qty + delta;
+    if (newQty < 0) return sendJson(res, 400, { error: 'Adjustment would result in negative stock' });
+    db.exec('BEGIN');
+    try {
+      run('UPDATE store_products SET stock_qty = ? WHERE id = ?', newQty, id);
+      run(
+        'INSERT INTO store_stock_movements (product_id, change_qty, reason, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+        id, delta, reason, user.id, new Date().toISOString()
+      );
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, product: fetchStoreProduct(id) });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/stock-movements') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const movements = all(
+      `SELECT m.id, m.product_id AS productId, p.name AS productName, m.change_qty AS changeQty,
+              m.reason, m.created_by AS createdBy, m.created_at AS createdAt
+       FROM store_stock_movements m JOIN store_products p ON p.id = m.product_id
+       ORDER BY m.created_at DESC LIMIT 200`
+    );
+    return sendJson(res, 200, { movements });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/orders') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    return sendJson(res, 200, { orders: fetchStoreOrders() });
+  }
+
+  const storeOrderDetailMatch = url.pathname.match(/^\/api\/admin\/store\/orders\/(\d+)$/);
+  if (req.method === 'GET' && storeOrderDetailMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const id = Number(storeOrderDetailMatch[1]);
+    const order = one('SELECT * FROM store_orders WHERE id = ?', id);
+    if (!order) return sendJson(res, 404, { error: 'Order not found' });
+    const items = all(
+      `SELECT id, product_id AS productId, product_name AS productName, unit_price AS unitPrice, qty, line_total AS lineTotal
+       FROM store_order_items WHERE order_id = ?`,
+      id
+    );
+    return sendJson(res, 200, {
+      order: {
+        id: order.id, orderNo: order.order_no, channel: order.channel, customerName: order.customer_name,
+        status: order.status, subtotal: order.subtotal, discount: order.discount, total: order.total,
+        paymentMethod: order.payment_method, createdBy: order.created_by, createdAt: order.created_at,
+      },
+      items,
+    });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/orders') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (!items.length) return sendJson(res, 400, { error: 'At least one order item is required' });
+
+    const resolved = [];
+    for (const item of items) {
+      const productId = Number(item.productId);
+      const qty = Number(item.qty);
+      if (!productId || !Number.isFinite(qty) || qty <= 0) {
+        return sendJson(res, 400, { error: 'Each item needs a valid product and quantity' });
+      }
+      const product = one('SELECT * FROM store_products WHERE id = ?', productId);
+      if (!product) return sendJson(res, 400, { error: `Product #${productId} not found` });
+      if (product.stock_qty < qty) {
+        return sendJson(res, 400, { error: `Not enough stock for "${product.name}" (have ${product.stock_qty}, need ${qty})` });
+      }
+      resolved.push({ product, qty });
+    }
+
+    const subtotal = resolved.reduce((sum, r) => sum + r.product.price * r.qty, 0);
+    const discount = Math.max(0, Number(body.discount) || 0);
+    const total = Math.max(0, subtotal - discount);
+    const orderNo = nextStoreOrderNo();
+    const now = new Date().toISOString();
+
+    db.exec('BEGIN');
+    try {
+      const orderResult = run(
+        `INSERT INTO store_orders (order_no, channel, customer_name, status, subtotal, discount, total, payment_method, created_by, created_at)
+         VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?)`,
+        orderNo,
+        cleanText(body.channel) || 'pos',
+        cleanText(body.customerName) || 'Walk-in Customer',
+        subtotal,
+        discount,
+        total,
+        cleanText(body.paymentMethod) || 'cash',
+        user.id,
+        now
+      );
+      const orderId = Number(orderResult.lastInsertRowid);
+      resolved.forEach(({ product, qty }) => {
+        run(
+          `INSERT INTO store_order_items (order_id, product_id, product_name, unit_price, qty, line_total) VALUES (?, ?, ?, ?, ?, ?)`,
+          orderId, product.id, product.name, product.price, qty, product.price * qty
+        );
+        run('UPDATE store_products SET stock_qty = stock_qty - ? WHERE id = ?', qty, product.id);
+        run(
+          'INSERT INTO store_stock_movements (product_id, change_qty, reason, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+          product.id, -qty, `Sale ${orderNo}`, user.id, now
+        );
+      });
+      db.exec('COMMIT');
+      return sendJson(res, 201, { ok: true, orderId, orderNo });
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/requisitions') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const requisitions = all(
+      `SELECT r.id, r.item_description AS itemDescription, r.quantity, r.department, r.reason, r.status,
+              r.requested_by AS requestedBy, u.name AS requestedByName, r.created_at AS createdAt,
+              r.decided_by AS decidedBy, r.decided_at AS decidedAt
+       FROM store_requisitions r LEFT JOIN users u ON u.id = r.requested_by
+       ORDER BY r.created_at DESC`
+    );
+    return sendJson(res, 200, { requisitions });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/requisitions') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const itemDescription = cleanText(body.itemDescription);
+    const quantity = Number(body.quantity);
+    if (!itemDescription || !Number.isFinite(quantity) || quantity <= 0) {
+      return sendJson(res, 400, { error: 'Item description and a positive quantity are required' });
+    }
+    run(
+      `INSERT INTO store_requisitions (item_description, quantity, department, reason, status, requested_by, created_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+      itemDescription, quantity, cleanText(body.department) || null, cleanText(body.reason) || null, user.id, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+
+  const storeRequisitionMatch = url.pathname.match(/^\/api\/admin\/store\/requisitions\/(\d+)$/);
+  if (req.method === 'PUT' && storeRequisitionMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const status = cleanText((await readJson(req)).status);
+    if (!['pending', 'approved', 'rejected', 'fulfilled'].includes(status)) {
+      return sendJson(res, 400, { error: 'Invalid status' });
+    }
+    run(
+      'UPDATE store_requisitions SET status = ?, decided_by = ?, decided_at = ? WHERE id = ?',
+      status, user.id, new Date().toISOString(), Number(storeRequisitionMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/settings') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    return sendJson(res, 200, {
+      storeName: valueFromMeta('store_name', 'Little Scholars Store'),
+      currency: valueFromMeta('store_currency', 'NGN'),
+      lowStockThreshold: Number(valueFromMeta('store_low_stock_threshold', '10')),
+      taxRate: Number(valueFromMeta('store_tax_rate', '0')),
+      contactEmail: valueFromMeta('store_contact_email', ''),
+    });
+  }
+  if (req.method === 'PUT' && url.pathname === '/api/admin/store/settings') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    setMeta('store_name', cleanText(body.storeName) || 'Little Scholars Store');
+    setMeta('store_currency', cleanText(body.currency) || 'NGN');
+    setMeta('store_low_stock_threshold', String(Number(body.lowStockThreshold) || 0));
+    setMeta('store_tax_rate', String(Number(body.taxRate) || 0));
+    setMeta('store_contact_email', cleanText(body.contactEmail));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/banners') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const banners = all(
+      `SELECT id, title, subtitle, image_url AS imageUrl, link_url AS linkUrl, sort_order AS sortOrder,
+              is_active AS isActive, created_at AS createdAt FROM store_banners ORDER BY sort_order, id`
+    ).map(b => ({ ...b, isActive: !!b.isActive }));
+    return sendJson(res, 200, { banners });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/banners') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const title = cleanText(body.title);
+    if (!title) return sendJson(res, 400, { error: 'Banner title is required' });
+    run(
+      `INSERT INTO store_banners (title, subtitle, image_url, link_url, sort_order, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      title, cleanText(body.subtitle) || null, cleanText(body.imageUrl) || null, cleanText(body.linkUrl) || null,
+      Number(body.sortOrder) || 0, body.isActive === false ? 0 : 1, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const storeBannerMatch = url.pathname.match(/^\/api\/admin\/store\/banners\/(\d+)$/);
+  if (req.method === 'PUT' && storeBannerMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const title = cleanText(body.title);
+    if (!title) return sendJson(res, 400, { error: 'Banner title is required' });
+    run(
+      `UPDATE store_banners SET title = ?, subtitle = ?, image_url = ?, link_url = ?, sort_order = ?, is_active = ? WHERE id = ?`,
+      title, cleanText(body.subtitle) || null, cleanText(body.imageUrl) || null, cleanText(body.linkUrl) || null,
+      Number(body.sortOrder) || 0, body.isActive === false ? 0 : 1, Number(storeBannerMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && storeBannerMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM store_banners WHERE id = ?', Number(storeBannerMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/homepage-sections') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const sections = all(
+      `SELECT id, title, section_type AS sectionType, content, sort_order AS sortOrder,
+              is_active AS isActive, created_at AS createdAt FROM store_homepage_sections ORDER BY sort_order, id`
+    ).map(s => ({ ...s, isActive: !!s.isActive }));
+    return sendJson(res, 200, { sections });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/store/homepage-sections') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const title = cleanText(body.title);
+    if (!title) return sendJson(res, 400, { error: 'Section title is required' });
+    run(
+      `INSERT INTO store_homepage_sections (title, section_type, content, sort_order, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      title, cleanText(body.sectionType) || 'custom', cleanText(body.content) || null,
+      Number(body.sortOrder) || 0, body.isActive === false ? 0 : 1, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const storeSectionMatch = url.pathname.match(/^\/api\/admin\/store\/homepage-sections\/(\d+)$/);
+  if (req.method === 'PUT' && storeSectionMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const title = cleanText(body.title);
+    if (!title) return sendJson(res, 400, { error: 'Section title is required' });
+    run(
+      `UPDATE store_homepage_sections SET title = ?, section_type = ?, content = ?, sort_order = ?, is_active = ? WHERE id = ?`,
+      title, cleanText(body.sectionType) || 'custom', cleanText(body.content) || null,
+      Number(body.sortOrder) || 0, body.isActive === false ? 0 : 1, Number(storeSectionMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && storeSectionMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM store_homepage_sections WHERE id = ?', Number(storeSectionMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/store/storefront') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const products = fetchStoreProducts().filter(p => p.isActive);
+    const banners = all(
+      `SELECT id, title, subtitle, image_url AS imageUrl, link_url AS linkUrl FROM store_banners WHERE is_active = 1 ORDER BY sort_order, id`
+    );
+    const sections = all(
+      `SELECT id, title, section_type AS sectionType, content FROM store_homepage_sections WHERE is_active = 1 ORDER BY sort_order, id`
+    );
+    const categories = all('SELECT id, name FROM store_categories ORDER BY name');
+    return sendJson(res, 200, {
+      storeName: valueFromMeta('store_name', 'Little Scholars Store'),
+      currency: valueFromMeta('store_currency', 'NGN'),
+      banners,
+      sections,
+      categories,
+      products,
+    });
+  }
+
+  // ── FINANCE: ACCOUNTING ───────────────────────────────────────────────
+  function fetchAcctAccounts() {
+    return all('SELECT id, code, name, type, normal_balance AS normalBalance, is_active AS isActive FROM acct_accounts ORDER BY code')
+      .map(a => ({ ...a, isActive: !!a.isActive }));
+  }
+  function nextJournalEntryNo() {
+    const count = one('SELECT COUNT(*) AS c FROM acct_journal_entries').c;
+    return `JE-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/accounts') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    return sendJson(res, 200, { accounts: fetchAcctAccounts() });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/accounts') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const code = cleanText(body.code);
+    const name = cleanText(body.name);
+    const type = cleanText(body.type);
+    const normalBalance = cleanText(body.normalBalance);
+    if (!code || !name) return sendJson(res, 400, { error: 'Account code and name are required' });
+    if (!['asset', 'liability', 'equity', 'income', 'expense'].includes(type)) {
+      return sendJson(res, 400, { error: 'Account type is invalid' });
+    }
+    if (!['debit', 'credit'].includes(normalBalance)) {
+      return sendJson(res, 400, { error: 'Normal balance must be debit or credit' });
+    }
+    try {
+      run(
+        'INSERT INTO acct_accounts (code, name, type, normal_balance, is_active) VALUES (?, ?, ?, ?, ?)',
+        code, name, type, normalBalance, body.isActive === false ? 0 : 1
+      );
+    } catch (err) {
+      if (String(err.message).includes('UNIQUE')) return sendJson(res, 409, { error: 'An account with that code already exists' });
+      throw err;
+    }
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctAccountMatch = url.pathname.match(/^\/api\/admin\/acct\/accounts\/(\d+)$/);
+  if (req.method === 'PUT' && acctAccountMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Account name is required' });
+    run(
+      'UPDATE acct_accounts SET name = ?, is_active = ? WHERE id = ?',
+      name, body.isActive === false ? 0 : 1, Number(acctAccountMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctAccountMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const id = Number(acctAccountMatch[1]);
+    const used = one('SELECT COUNT(*) AS c FROM acct_journal_lines WHERE account_id = ?', id).c;
+    if (used > 0) return sendJson(res, 400, { error: 'This account has journal entries posted to it and cannot be deleted' });
+    run('DELETE FROM acct_accounts WHERE id = ?', id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/journal-entries') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const entries = all(
+      `SELECT je.id, je.entry_no AS entryNo, je.entry_date AS entryDate, je.memo, je.created_by AS createdBy, je.created_at AS createdAt
+       FROM acct_journal_entries je ORDER BY je.entry_date DESC, je.id DESC`
+    );
+    const lines = all(
+      `SELECT jl.id, jl.entry_id AS entryId, jl.account_id AS accountId, a.code AS accountCode, a.name AS accountName,
+              jl.debit, jl.credit, jl.description
+       FROM acct_journal_lines jl JOIN acct_accounts a ON a.id = jl.account_id`
+    );
+    const withLines = entries.map(e => ({
+      ...e,
+      lines: lines.filter(l => l.entryId === e.id),
+      totalDebit: lines.filter(l => l.entryId === e.id).reduce((s, l) => s + l.debit, 0),
+    }));
+    return sendJson(res, 200, { entries: withLines });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/journal-entries') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const entryDate = cleanText(body.date) || new Date().toISOString().slice(0, 10);
+    const memo = cleanText(body.memo);
+    const lines = Array.isArray(body.lines) ? body.lines : [];
+    if (lines.length < 2) return sendJson(res, 400, { error: 'A journal entry needs at least two lines' });
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    const cleanLines = [];
+    for (const line of lines) {
+      const accountId = Number(line.accountId);
+      const debit = Number(line.debit) || 0;
+      const credit = Number(line.credit) || 0;
+      if (!accountId) return sendJson(res, 400, { error: 'Every line needs an account' });
+      if (debit < 0 || credit < 0) return sendJson(res, 400, { error: 'Amounts cannot be negative' });
+      if ((debit > 0) === (credit > 0)) return sendJson(res, 400, { error: 'Each line must have either a debit or a credit amount (not both, not neither)' });
+      if (!one('SELECT id FROM acct_accounts WHERE id = ?', accountId)) return sendJson(res, 400, { error: `Account #${accountId} not found` });
+      totalDebit += debit;
+      totalCredit += credit;
+      cleanLines.push({ accountId, debit, credit, description: cleanText(line.description) });
+    }
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      return sendJson(res, 400, { error: `Entry is not balanced: total debit ${totalDebit.toFixed(2)} vs total credit ${totalCredit.toFixed(2)}` });
+    }
+
+    const entryNo = nextJournalEntryNo();
+    const now = new Date().toISOString();
+    db.exec('BEGIN');
+    try {
+      const result = run(
+        'INSERT INTO acct_journal_entries (entry_no, entry_date, memo, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+        entryNo, entryDate, memo, user.id, now
+      );
+      const entryId = Number(result.lastInsertRowid);
+      cleanLines.forEach(l => run(
+        'INSERT INTO acct_journal_lines (entry_id, account_id, debit, credit, description) VALUES (?, ?, ?, ?, ?)',
+        entryId, l.accountId, l.debit, l.credit, l.description
+      ));
+      db.exec('COMMIT');
+      return sendJson(res, 201, { ok: true, entryId, entryNo });
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  const acctEntryMatch = url.pathname.match(/^\/api\/admin\/acct\/journal-entries\/(\d+)$/);
+  if (req.method === 'DELETE' && acctEntryMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_journal_entries WHERE id = ?', Number(acctEntryMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/ledger') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const accountId = Number(url.searchParams.get('accountId'));
+    if (!accountId) return sendJson(res, 400, { error: 'accountId is required' });
+    const account = one('SELECT id, code, name, type, normal_balance AS normalBalance FROM acct_accounts WHERE id = ?', accountId);
+    if (!account) return sendJson(res, 404, { error: 'Account not found' });
+    const lines = all(
+      `SELECT jl.id, je.entry_no AS entryNo, je.entry_date AS entryDate, je.memo AS entryMemo, jl.debit, jl.credit, jl.description
+       FROM acct_journal_lines jl JOIN acct_journal_entries je ON je.id = jl.entry_id
+       WHERE jl.account_id = ? ORDER BY je.entry_date, je.id, jl.id`,
+      accountId
+    );
+    let balance = 0;
+    const rows = lines.map(l => {
+      balance += account.normalBalance === 'debit' ? (l.debit - l.credit) : (l.credit - l.debit);
+      return { ...l, runningBalance: balance };
+    });
+    return sendJson(res, 200, { account, lines: rows, closingBalance: balance });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/trial-balance') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    let totalDebit = 0;
+    let totalCredit = 0;
+    const rows = fetchAcctAccounts().map(a => {
+      const sums = one('SELECT COALESCE(SUM(debit),0) AS d, COALESCE(SUM(credit),0) AS c FROM acct_journal_lines WHERE account_id = ?', a.id);
+      totalDebit += sums.d;
+      totalCredit += sums.c;
+      return { ...a, totalDebit: sums.d, totalCredit: sums.c };
+    });
+    return sendJson(res, 200, { accounts: rows, totalDebit, totalCredit, balanced: Math.abs(totalDebit - totalCredit) < 0.01 });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/financial-reports') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const rows = all(
+      `SELECT a.type, COALESCE(SUM(jl.debit),0) AS totalDebit, COALESCE(SUM(jl.credit),0) AS totalCredit
+       FROM acct_accounts a LEFT JOIN acct_journal_lines jl ON jl.account_id = a.id GROUP BY a.type`
+    );
+    const byType = {};
+    rows.forEach(r => { byType[r.type] = { totalDebit: r.totalDebit, totalCredit: r.totalCredit }; });
+    const g = t => byType[t] || { totalDebit: 0, totalCredit: 0 };
+    const totalIncome = g('income').totalCredit - g('income').totalDebit;
+    const totalExpense = g('expense').totalDebit - g('expense').totalCredit;
+    const totalAssets = g('asset').totalDebit - g('asset').totalCredit;
+    const totalLiabilities = g('liability').totalCredit - g('liability').totalDebit;
+    const totalEquity = g('equity').totalCredit - g('equity').totalDebit;
+    const hasData = one('SELECT COUNT(*) AS c FROM acct_journal_lines').c > 0;
+    return sendJson(res, 200, {
+      hasData,
+      totalIncome, totalExpense, netIncome: totalIncome - totalExpense,
+      totalAssets, totalLiabilities, totalEquity,
+    });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/contacts') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const contacts = all('SELECT id, name, type, email, phone, address, created_at AS createdAt FROM acct_contacts ORDER BY name');
+    return sendJson(res, 200, { contacts });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/contacts') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    const type = cleanText(body.type) || 'vendor';
+    if (!name) return sendJson(res, 400, { error: 'Contact name is required' });
+    if (!['vendor', 'customer'].includes(type)) return sendJson(res, 400, { error: 'Contact type must be vendor or customer' });
+    run(
+      'INSERT INTO acct_contacts (name, type, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      name, type, cleanText(body.email) || null, cleanText(body.phone) || null, cleanText(body.address) || null, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctContactMatch = url.pathname.match(/^\/api\/admin\/acct\/contacts\/(\d+)$/);
+  if (req.method === 'PUT' && acctContactMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const name = cleanText(body.name);
+    if (!name) return sendJson(res, 400, { error: 'Contact name is required' });
+    run(
+      'UPDATE acct_contacts SET name = ?, type = ?, email = ?, phone = ?, address = ? WHERE id = ?',
+      name, cleanText(body.type) || 'vendor', cleanText(body.email) || null, cleanText(body.phone) || null,
+      cleanText(body.address) || null, Number(acctContactMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctContactMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_contacts WHERE id = ?', Number(acctContactMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/bills') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const bills = all(
+      `SELECT b.id, b.contact_id AS contactId, c.name AS contactName, b.doc_no AS docNo, b.doc_type AS docType,
+              b.issue_date AS issueDate, b.due_date AS dueDate, b.amount, b.status, b.notes, b.created_at AS createdAt
+       FROM acct_bills b LEFT JOIN acct_contacts c ON c.id = b.contact_id ORDER BY b.issue_date DESC, b.id DESC`
+    );
+    return sendJson(res, 200, { bills });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/bills') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const docType = cleanText(body.docType) || 'bill';
+    const issueDate = cleanText(body.issueDate) || new Date().toISOString().slice(0, 10);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: 'A positive amount is required' });
+    if (!['bill', 'invoice'].includes(docType)) return sendJson(res, 400, { error: 'Document type must be bill or invoice' });
+    run(
+      `INSERT INTO acct_bills (contact_id, doc_no, doc_type, issue_date, due_date, amount, status, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      body.contactId ? Number(body.contactId) : null, cleanText(body.docNo) || null, docType, issueDate,
+      cleanText(body.dueDate) || null, amount, cleanText(body.status) || 'unpaid', cleanText(body.notes) || null, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctBillMatch = url.pathname.match(/^\/api\/admin\/acct\/bills\/(\d+)$/);
+  if (req.method === 'PUT' && acctBillMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: 'A positive amount is required' });
+    run(
+      `UPDATE acct_bills SET contact_id = ?, doc_no = ?, doc_type = ?, issue_date = ?, due_date = ?, amount = ?, status = ?, notes = ? WHERE id = ?`,
+      body.contactId ? Number(body.contactId) : null, cleanText(body.docNo) || null, cleanText(body.docType) || 'bill',
+      cleanText(body.issueDate), cleanText(body.dueDate) || null, amount, cleanText(body.status) || 'unpaid',
+      cleanText(body.notes) || null, Number(acctBillMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctBillMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_bills WHERE id = ?', Number(acctBillMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/budgets') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const budgets = all(
+      `SELECT b.id, b.account_id AS accountId, a.code AS accountCode, a.name AS accountName, a.normal_balance AS normalBalance,
+              b.period_label AS periodLabel, b.amount, b.notes
+       FROM acct_budgets b JOIN acct_accounts a ON a.id = b.account_id ORDER BY b.period_label, a.code`
+    ).map(b => {
+      const sums = one('SELECT COALESCE(SUM(debit),0) AS d, COALESCE(SUM(credit),0) AS c FROM acct_journal_lines WHERE account_id = ?', b.accountId);
+      const actual = b.normalBalance === 'debit' ? sums.d - sums.c : sums.c - sums.d;
+      return { ...b, actual, variance: b.amount - actual };
+    });
+    return sendJson(res, 200, { budgets });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/budgets') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const accountId = Number(body.accountId);
+    const periodLabel = cleanText(body.periodLabel);
+    const amount = Number(body.amount);
+    if (!accountId || !periodLabel || !Number.isFinite(amount)) {
+      return sendJson(res, 400, { error: 'Account, period, and amount are required' });
+    }
+    run('INSERT INTO acct_budgets (account_id, period_label, amount, notes) VALUES (?, ?, ?, ?)', accountId, periodLabel, amount, cleanText(body.notes) || null);
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctBudgetMatch = url.pathname.match(/^\/api\/admin\/acct\/budgets\/(\d+)$/);
+  if (req.method === 'PUT' && acctBudgetMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount)) return sendJson(res, 400, { error: 'A valid amount is required' });
+    run(
+      'UPDATE acct_budgets SET account_id = ?, period_label = ?, amount = ?, notes = ? WHERE id = ?',
+      Number(body.accountId), cleanText(body.periodLabel), amount, cleanText(body.notes) || null, Number(acctBudgetMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctBudgetMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_budgets WHERE id = ?', Number(acctBudgetMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/bank-transactions') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const transactions = all(
+      `SELECT id, txn_date AS txnDate, description, amount, txn_type AS txnType, reconciled, created_at AS createdAt
+       FROM acct_bank_transactions ORDER BY txn_date DESC, id DESC`
+    ).map(t => ({ ...t, reconciled: !!t.reconciled }));
+    return sendJson(res, 200, { transactions });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/bank-transactions') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const amount = Number(body.amount);
+    const txnType = cleanText(body.txnType);
+    if (!Number.isFinite(amount) || amount <= 0) return sendJson(res, 400, { error: 'A positive amount is required' });
+    if (!['debit', 'credit'].includes(txnType)) return sendJson(res, 400, { error: 'Transaction type must be debit or credit' });
+    run(
+      `INSERT INTO acct_bank_transactions (txn_date, description, amount, txn_type, reconciled, created_at) VALUES (?, ?, ?, ?, 0, ?)`,
+      cleanText(body.txnDate) || new Date().toISOString().slice(0, 10), cleanText(body.description) || null, amount, txnType, new Date().toISOString()
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctBankTxnMatch = url.pathname.match(/^\/api\/admin\/acct\/bank-transactions\/(\d+)$/);
+  if (req.method === 'PUT' && acctBankTxnMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    run(
+      'UPDATE acct_bank_transactions SET reconciled = ? WHERE id = ?',
+      body.reconciled ? 1 : 0, Number(acctBankTxnMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctBankTxnMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_bank_transactions WHERE id = ?', Number(acctBankTxnMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/acct/tax-records') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const records = all(
+      `SELECT id, period_label AS periodLabel, tax_type AS taxType, amount_due AS amountDue, amount_paid AS amountPaid,
+              status, due_date AS dueDate, notes FROM acct_tax_records ORDER BY due_date DESC, id DESC`
+    );
+    return sendJson(res, 200, { records });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/admin/acct/tax-records') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const periodLabel = cleanText(body.periodLabel);
+    const taxType = cleanText(body.taxType);
+    if (!periodLabel || !taxType) return sendJson(res, 400, { error: 'Period and tax type are required' });
+    run(
+      `INSERT INTO acct_tax_records (period_label, tax_type, amount_due, amount_paid, status, due_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      periodLabel, taxType, Number(body.amountDue) || 0, Number(body.amountPaid) || 0,
+      cleanText(body.status) || 'pending', cleanText(body.dueDate) || null, cleanText(body.notes) || null
+    );
+    return sendJson(res, 201, { ok: true });
+  }
+  const acctTaxMatch = url.pathname.match(/^\/api\/admin\/acct\/tax-records\/(\d+)$/);
+  if (req.method === 'PUT' && acctTaxMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    run(
+      `UPDATE acct_tax_records SET period_label = ?, tax_type = ?, amount_due = ?, amount_paid = ?, status = ?, due_date = ?, notes = ? WHERE id = ?`,
+      cleanText(body.periodLabel), cleanText(body.taxType), Number(body.amountDue) || 0, Number(body.amountPaid) || 0,
+      cleanText(body.status) || 'pending', cleanText(body.dueDate) || null, cleanText(body.notes) || null, Number(acctTaxMatch[1])
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && acctTaxMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    run('DELETE FROM acct_tax_records WHERE id = ?', Number(acctTaxMatch[1]));
+    return sendJson(res, 200, { ok: true });
+  }
+  // ── END FINANCE: STORE & INVENTORY / ACCOUNTING ────────────────────────
+
 
   return sendJson(res, 404, { error: 'API route not found' });
 }

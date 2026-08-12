@@ -1887,6 +1887,26 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'commentsBank') cbLoadComments();
   if (tab === 'resultPrefs') switchRspTab('sheet');
   if (tab === 'scheduleExam') populateScheduleExamSelects();
+  // ── Finance: Store & Inventory / Accounting ──
+  if (tab === 'visitStorefront') finVisitStorefrontInit();
+  if (tab === 'posTerminal') finPosInit();
+  if (tab === 'ordersSales') finOrdersInit();
+  if (tab === 'products') finProductsInit();
+  if (tab === 'categories') finCategoriesInit();
+  if (tab === 'inventorySupply') finInventoryInit();
+  if (tab === 'storeSettings') finStoreSettingsInit();
+  if (tab === 'storefrontBanners') finBannersInit();
+  if (tab === 'storefrontHomepageSections') finSectionsInit();
+  if (tab === 'internalRequisitions') finRequisitionsInit();
+  if (tab === 'chartOfAccounts') finAccountsInit();
+  if (tab === 'journalEntries') finJournalInit();
+  if (tab === 'accountLedger') finLedgerInit();
+  if (tab === 'trialBalance') finTrialBalanceInit();
+  if (tab === 'contactsBillsInvoices') finContactsBillsInit();
+  if (tab === 'budgets') finBudgetsInit();
+  if (tab === 'bankReconciliation') finBankRecInit();
+  if (tab === 'taxCompliance') finTaxInit();
+  if (tab === 'financialReports') finReportsInit();
 }
 
 // ── GENERIC INNER SUB-TABS (finance placeholder pages) ──
@@ -5203,3 +5223,1250 @@ document.addEventListener('click', function(e) {
   const leafLink = e.target.closest('[onclick*="switchTab"]');
   if (leafLink) setTimeout(mobCloseSidebar, 180);
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// FINANCE: STORE & INVENTORY / ACCOUNTING
+// Self-contained module for the Finance > Store & Inventory and
+// Finance > Accounting sidebar sections. Fetches/renders/saves against
+// the /api/admin/store/* and /api/admin/acct/* routes in server.js.
+// Kept namespaced (state.fin / state.pos / state.je, fin*-prefixed
+// functions) so it doesn't collide with the Fees/Payroll finance work
+// landing in sibling branches.
+// ══════════════════════════════════════════════════════════════════════
+
+state.fin = {
+  categories: [], products: [], orders: [], requisitions: [], settings: {},
+  banners: [], sections: [], storefront: null,
+  accounts: [], journalEntries: [], contacts: [], bills: [],
+  budgets: [], bankTxns: [], taxRecords: [], stockMovements: [],
+};
+state.pos = { cart: [] };
+state.je = { lines: [] };
+
+function finMoney(n) {
+  const num = Number(n) || 0;
+  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Generic CRUD modal ──
+const finModalState = { fields: [], onSubmit: null };
+
+function finFieldHtml(f, val) {
+  const id = `fm-${f.key}`;
+  const span = f.full ? 'grid-column:1 / -1;' : '';
+  if (f.type === 'select') {
+    const opts = (f.options || []).map(o => `<option value="${escapeHtml(o.value)}" ${String(o.value) === String(val) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+    return `<div style="${span}"><label class="field-label">${escapeHtml(f.label)}</label><select class="ctrl-select" id="${id}" style="width:100%;" ${f.disabled ? 'disabled' : ''}>${f.placeholder ? `<option value="">${escapeHtml(f.placeholder)}</option>` : ''}${opts}</select></div>`;
+  }
+  if (f.type === 'textarea') {
+    return `<div style="${span}"><label class="field-label">${escapeHtml(f.label)}</label><textarea class="field-input" id="${id}" rows="3" style="width:100%;resize:vertical;">${escapeHtml(val || '')}</textarea></div>`;
+  }
+  if (f.type === 'checkbox') {
+    return `<div style="${span}display:flex;align-items:center;gap:8px;padding-top:18px;"><input type="checkbox" id="${id}" ${val ? 'checked' : ''}> <label class="field-label" style="margin:0;" for="${id}">${escapeHtml(f.label)}</label></div>`;
+  }
+  return `<div style="${span}"><label class="field-label">${escapeHtml(f.label)}</label><input class="field-input" id="${id}" type="${f.type || 'text'}" ${f.step !== undefined ? `step="${f.step}"` : ''} ${f.min !== undefined ? `min="${f.min}"` : ''} value="${escapeHtml(val ?? '')}" placeholder="${escapeHtml(f.placeholder || '')}" style="width:100%;" ${f.disabled ? 'disabled' : ''}></div>`;
+}
+
+function openFinModal({ title, fields, values = {}, onSubmit, saveLabel }) {
+  finModalState.fields = fields;
+  finModalState.onSubmit = onSubmit;
+  document.getElementById('fin-modal-title').textContent = title;
+  document.getElementById('fin-modal-save').textContent = saveLabel || 'Save';
+  document.getElementById('fin-modal-body').innerHTML = fields.map(f => finFieldHtml(f, values[f.key])).join('');
+  document.getElementById('fin-modal').style.display = 'flex';
+}
+
+function closeFinModal() {
+  document.getElementById('fin-modal').style.display = 'none';
+}
+
+async function submitFinModal() {
+  const values = {};
+  finModalState.fields.forEach(f => {
+    const el = document.getElementById(`fm-${f.key}`);
+    if (!el) return;
+    if (f.type === 'checkbox') values[f.key] = el.checked;
+    else if (f.type === 'number') values[f.key] = el.value === '' ? null : Number(el.value);
+    else values[f.key] = el.value;
+  });
+  try {
+    await finModalState.onSubmit(values);
+    closeFinModal();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+// ── STORE: CATEGORIES ──
+async function finLoadCategories() {
+  const data = await apiFetch('/api/admin/store/categories');
+  state.fin.categories = data.categories;
+}
+
+async function finCategoriesInit() {
+  try {
+    await finLoadCategories();
+    finCategoriesRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finCategoriesRender() {
+  const tbody = document.getElementById('cat-tbody');
+  if (!tbody) return;
+  const rows = state.fin.categories;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:18px;color:var(--text-3);">No categories yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((c, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(c.name)}</strong></td>
+      <td>${escapeHtml(c.description || '-')}</td>
+      <td>${c.productCount}</td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="finDeleteCategory(${c.id})">Delete</button></td>
+    </tr>`).join('');
+}
+
+async function finSaveCategory() {
+  const name = document.getElementById('cat-new-name').value.trim();
+  const description = document.getElementById('cat-new-description').value.trim();
+  if (!name) return showToast('Category name is required');
+  try {
+    await apiFetch('/api/admin/store/categories', { method: 'POST', body: JSON.stringify({ name, description }) });
+    document.getElementById('cat-new-name').value = '';
+    document.getElementById('cat-new-description').value = '';
+    await finLoadCategories();
+    finCategoriesRender();
+    showToast('Category added');
+  } catch (err) { showToast(err.message); }
+}
+
+async function finDeleteCategory(id) {
+  if (!confirm('Delete this category?')) return;
+  try {
+    await apiFetch(`/api/admin/store/categories/${id}`, { method: 'DELETE' });
+    await finLoadCategories();
+    finCategoriesRender();
+    showToast('Category deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: PRODUCTS ──
+async function finLoadProducts() {
+  const data = await apiFetch('/api/admin/store/products');
+  state.fin.products = data.products;
+}
+
+async function finProductsInit() {
+  try {
+    await Promise.all([finLoadCategories(), finLoadProducts()]);
+    const filter = document.getElementById('prod-category-filter');
+    if (filter) {
+      filter.innerHTML = '<option value="">All Categories</option>' + state.fin.categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    }
+    finProductsRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finProductsRender() {
+  const tbody = document.getElementById('prod-tbody');
+  if (!tbody) return;
+  const catFilter = document.getElementById('prod-category-filter')?.value || '';
+  const search = (document.getElementById('prod-search')?.value || '').toLowerCase();
+  const rows = state.fin.products.filter(p => {
+    if (catFilter && String(p.categoryId) !== catFilter) return false;
+    if (search && !`${p.name} ${p.sku || ''}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:18px;color:var(--text-3);">No products found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.sku || '-')}</td>
+      <td>${escapeHtml(p.categoryName || '-')}</td>
+      <td>${finMoney(p.price)}</td>
+      <td>${finMoney(p.cost)}</td>
+      <td>${p.stockQty} ${p.lowStock ? '<span style="color:var(--red);font-weight:700;font-size:10px;">LOW</span>' : ''}</td>
+      <td>${p.isActive ? '<span style="color:var(--green,#16a34a);">Active</span>' : '<span style="color:var(--text-3);">Inactive</span>'}</td>
+      <td>
+        <button class="post-btn" style="padding:6px 10px;" onclick="finOpenProductModal(${p.id})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteProduct(${p.id})">Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function finOpenProductModal(id) {
+  const product = id ? state.fin.products.find(p => p.id === id) : null;
+  openFinModal({
+    title: product ? `Edit Product - ${product.name}` : 'Add Product',
+    fields: [
+      { key: 'name', label: 'Product Name', full: true },
+      { key: 'sku', label: 'SKU' },
+      { key: 'categoryId', label: 'Category', type: 'select', placeholder: 'No Category', options: state.fin.categories.map(c => ({ value: c.id, label: c.name })) },
+      { key: 'price', label: 'Selling Price', type: 'number', step: '0.01', min: 0 },
+      { key: 'cost', label: 'Cost Price', type: 'number', step: '0.01', min: 0 },
+      { key: 'unit', label: 'Unit', placeholder: 'piece' },
+      ...(product ? [] : [{ key: 'stockQty', label: 'Opening Stock', type: 'number', min: 0 }]),
+      { key: 'reorderLevel', label: 'Reorder Level', type: 'number', min: 0 },
+      { key: 'isActive', label: 'Active', type: 'checkbox' },
+    ],
+    values: product ? { ...product } : { unit: 'piece', reorderLevel: 5, isActive: true },
+    onSubmit: async (values) => {
+      const payload = {
+        name: values.name, sku: values.sku, categoryId: values.categoryId || null,
+        price: values.price, cost: values.cost, unit: values.unit,
+        reorderLevel: values.reorderLevel, isActive: values.isActive,
+      };
+      if (!product) payload.stockQty = values.stockQty;
+      const url = product ? `/api/admin/store/products/${product.id}` : '/api/admin/store/products';
+      await apiFetch(url, { method: product ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+      await finLoadProducts();
+      finProductsRender();
+      showToast(`Product ${product ? 'updated' : 'added'}`);
+    },
+  });
+}
+
+async function finDeleteProduct(id) {
+  if (!confirm('Delete this product?')) return;
+  try {
+    await apiFetch(`/api/admin/store/products/${id}`, { method: 'DELETE' });
+    await finLoadProducts();
+    finProductsRender();
+    showToast('Product deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: INVENTORY & SUPPLY ──
+async function finInventoryInit() {
+  try {
+    await finLoadProducts();
+    const data = await apiFetch('/api/admin/store/stock-movements');
+    state.fin.stockMovements = data.movements;
+    finInventoryRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finInventoryRender() {
+  const tbody = document.getElementById('inv-tbody');
+  if (tbody) {
+    const lowOnly = document.getElementById('inv-low-only')?.checked;
+    const search = (document.getElementById('inv-search')?.value || '').toLowerCase();
+    const rows = state.fin.products.filter(p => {
+      if (lowOnly && !p.lowStock) return false;
+      if (search && !p.name.toLowerCase().includes(search)) return false;
+      return true;
+    });
+    tbody.innerHTML = rows.length ? rows.map((p, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${p.stockQty}</td>
+        <td>${p.reorderLevel}</td>
+        <td>${p.lowStock ? '<span style="color:var(--red);font-weight:700;">Low Stock</span>' : '<span style="color:var(--green,#16a34a);">OK</span>'}</td>
+        <td><button class="post-btn" style="padding:6px 10px;" onclick="finOpenStockAdjustModal(${p.id})">Adjust Stock</button></td>
+      </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No products found.</td></tr>';
+  }
+  const mv = document.getElementById('inv-movements-tbody');
+  if (mv) {
+    mv.innerHTML = state.fin.stockMovements.length ? state.fin.stockMovements.map(m => `
+      <tr>
+        <td>${new Date(m.createdAt).toLocaleString()}</td>
+        <td>${escapeHtml(m.productName)}</td>
+        <td style="color:${m.changeQty < 0 ? 'var(--red)' : 'var(--green,#16a34a)'};font-weight:700;">${m.changeQty > 0 ? '+' : ''}${m.changeQty}</td>
+        <td>${escapeHtml(m.reason || '-')}</td>
+      </tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No stock movements yet.</td></tr>';
+  }
+}
+
+function finOpenStockAdjustModal(productId) {
+  const product = state.fin.products.find(p => p.id === productId);
+  if (!product) return;
+  openFinModal({
+    title: `Adjust Stock - ${product.name} (current: ${product.stockQty})`,
+    fields: [
+      { key: 'delta', label: 'Quantity Change (use negative to remove)', type: 'number', full: true },
+      { key: 'reason', label: 'Reason', full: true, placeholder: 'e.g. New delivery, damaged stock, stock count correction' },
+    ],
+    values: { delta: '', reason: '' },
+    onSubmit: async (values) => {
+      await apiFetch(`/api/admin/store/products/${productId}/stock-adjust`, { method: 'POST', body: JSON.stringify(values) });
+      await finInventoryInit();
+      finProductsRender();
+      showToast('Stock adjusted');
+    },
+  });
+}
+
+// ── STORE: ORDERS & SALES ──
+async function finLoadOrders() {
+  const data = await apiFetch('/api/admin/store/orders');
+  state.fin.orders = data.orders;
+}
+
+async function finOrdersInit() {
+  try {
+    await finLoadOrders();
+    finOrdersRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finOrdersRender() {
+  const tbody = document.getElementById('os-tbody');
+  if (!tbody) return;
+  const search = (document.getElementById('os-search')?.value || '').toLowerCase();
+  const rows = state.fin.orders.filter(o => !search || `${o.orderNo} ${o.customerName || ''}`.toLowerCase().includes(search));
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:18px;color:var(--text-3);">No orders yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(o => `
+    <tr>
+      <td>${escapeHtml(o.orderNo)}</td>
+      <td>${new Date(o.createdAt).toLocaleDateString()}</td>
+      <td>${escapeHtml(o.customerName || '-')}</td>
+      <td>${escapeHtml(o.channel)}</td>
+      <td>${o.itemCount}</td>
+      <td>${finMoney(o.total)}</td>
+      <td>${escapeHtml(o.paymentMethod || '-')}</td>
+      <td>${escapeHtml(o.status)}</td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="finViewOrder(${o.id})">View</button></td>
+    </tr>`).join('');
+}
+
+async function finViewOrder(id) {
+  try {
+    const data = await apiFetch(`/api/admin/store/orders/${id}`);
+    const lines = data.items.map(it => `${it.qty} x ${it.productName} @ ${finMoney(it.unitPrice)} = ${finMoney(it.lineTotal)}`).join('\n');
+    alert(`Order ${data.order.orderNo}\nCustomer: ${data.order.customerName || '-'}\nDate: ${new Date(data.order.createdAt).toLocaleString()}\n\n${lines}\n\nSubtotal: ${finMoney(data.order.subtotal)}\nDiscount: ${finMoney(data.order.discount)}\nTotal: ${finMoney(data.order.total)}`);
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: POS TERMINAL ──
+async function finPosInit() {
+  try {
+    await finLoadProducts();
+    state.pos.cart = [];
+    document.getElementById('pos-customer-name').value = '';
+    document.getElementById('pos-discount').value = 0;
+    finPosRenderProducts();
+    finPosRenderCart();
+  } catch (err) { showToast(err.message); }
+}
+
+function finPosRenderProducts() {
+  const grid = document.getElementById('pos-products-grid');
+  if (!grid) return;
+  const search = (document.getElementById('pos-search')?.value || '').toLowerCase();
+  const rows = state.fin.products.filter(p => p.isActive && (!search || `${p.name} ${p.sku || ''}`.toLowerCase().includes(search)));
+  grid.innerHTML = rows.length ? rows.map(p => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer;${p.stockQty <= 0 ? 'opacity:.5;pointer-events:none;' : ''}" onclick="finPosAddToCart(${p.id})">
+      <div style="font-weight:700;font-size:12px;margin-bottom:4px;">${escapeHtml(p.name)}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">${escapeHtml(p.sku || '')}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--blue,#2563eb);">${finMoney(p.price)}</div>
+      <div style="font-size:10px;color:var(--text-3);">Stock: ${p.stockQty}</div>
+    </div>`).join('') : '<div style="padding:20px;color:var(--text-3);grid-column:1 / -1;">No products found.</div>';
+}
+
+function finPosAddToCart(productId) {
+  const product = state.fin.products.find(p => p.id === productId);
+  if (!product) return;
+  const existing = state.pos.cart.find(c => c.productId === productId);
+  const currentQty = existing ? existing.qty : 0;
+  if (currentQty + 1 > product.stockQty) return showToast(`Only ${product.stockQty} in stock`);
+  if (existing) existing.qty += 1;
+  else state.pos.cart.push({ productId, name: product.name, price: product.price, qty: 1 });
+  finPosRenderCart();
+}
+
+function finPosSetQty(productId, qty) {
+  const product = state.fin.products.find(p => p.id === productId);
+  const item = state.pos.cart.find(c => c.productId === productId);
+  if (!item) return;
+  qty = Math.max(0, Number(qty) || 0);
+  if (product && qty > product.stockQty) { showToast(`Only ${product.stockQty} in stock`); qty = product.stockQty; }
+  if (qty === 0) state.pos.cart = state.pos.cart.filter(c => c.productId !== productId);
+  else item.qty = qty;
+  finPosRenderCart();
+}
+
+function finPosRenderCart() {
+  const tbody = document.getElementById('pos-cart-tbody');
+  if (!tbody) return;
+  if (!state.pos.cart.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:14px;color:var(--text-3);">Cart is empty</td></tr>';
+  } else {
+    tbody.innerHTML = state.pos.cart.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td><input type="number" min="0" value="${c.qty}" style="width:56px;" onchange="finPosSetQty(${c.productId}, this.value)"></td>
+        <td>${finMoney(c.price * c.qty)}</td>
+        <td><button class="ann-del" style="color:var(--red);" onclick="finPosSetQty(${c.productId}, 0)">Remove</button></td>
+      </tr>`).join('');
+  }
+  const subtotal = state.pos.cart.reduce((s, c) => s + c.price * c.qty, 0);
+  const discount = Math.max(0, Number(document.getElementById('pos-discount')?.value) || 0);
+  const total = Math.max(0, subtotal - discount);
+  document.getElementById('pos-subtotal').textContent = finMoney(subtotal);
+  document.getElementById('pos-total').textContent = finMoney(total);
+}
+
+async function finPosCheckout() {
+  if (!state.pos.cart.length) return showToast('Cart is empty');
+  const payload = {
+    items: state.pos.cart.map(c => ({ productId: c.productId, qty: c.qty })),
+    customerName: document.getElementById('pos-customer-name').value.trim() || 'Walk-in Customer',
+    discount: Number(document.getElementById('pos-discount').value) || 0,
+    paymentMethod: document.getElementById('pos-payment-method').value,
+    channel: 'pos',
+  };
+  try {
+    const data = await apiFetch('/api/admin/store/orders', { method: 'POST', body: JSON.stringify(payload) });
+    showToast(`Sale recorded: ${data.orderNo}`);
+    state.pos.cart = [];
+    await finLoadProducts();
+    finPosRenderProducts();
+    finPosRenderCart();
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: INTERNAL REQUISITIONS ──
+async function finLoadRequisitions() {
+  const data = await apiFetch('/api/admin/store/requisitions');
+  state.fin.requisitions = data.requisitions;
+}
+
+async function finRequisitionsInit() {
+  try {
+    await finLoadRequisitions();
+    finRequisitionsRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finRequisitionsRender() {
+  const tbody = document.getElementById('req-tbody');
+  if (!tbody) return;
+  const statusFilter = document.getElementById('req-status-filter')?.value || '';
+  const rows = state.fin.requisitions.filter(r => !statusFilter || r.status === statusFilter);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:18px;color:var(--text-3);">No requisitions found.</td></tr>';
+    return;
+  }
+  const statusColor = { pending: 'var(--text-2)', approved: '#2563eb', rejected: 'var(--red)', fulfilled: 'var(--green,#16a34a)' };
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(r.itemDescription)}</td>
+      <td>${r.quantity}</td>
+      <td>${escapeHtml(r.department || '-')}</td>
+      <td>${escapeHtml(r.requestedByName || r.requestedBy || '-')}</td>
+      <td style="color:${statusColor[r.status] || 'var(--text-2)'};font-weight:700;text-transform:capitalize;">${escapeHtml(r.status)}</td>
+      <td>
+        ${r.status === 'pending' ? `
+          <button class="post-btn" style="padding:6px 10px;" onclick="finSetRequisitionStatus(${r.id}, 'approved')">Approve</button>
+          <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finSetRequisitionStatus(${r.id}, 'rejected')">Reject</button>
+        ` : ''}
+        ${r.status === 'approved' ? `<button class="post-btn" style="padding:6px 10px;" onclick="finSetRequisitionStatus(${r.id}, 'fulfilled')">Mark Fulfilled</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+function finOpenRequisitionModal() {
+  openFinModal({
+    title: 'New Requisition',
+    fields: [
+      { key: 'itemDescription', label: 'Item Description', full: true },
+      { key: 'quantity', label: 'Quantity', type: 'number', min: 1 },
+      { key: 'department', label: 'Department' },
+      { key: 'reason', label: 'Reason', full: true, type: 'textarea' },
+    ],
+    values: {},
+    onSubmit: async (values) => {
+      await apiFetch('/api/admin/store/requisitions', { method: 'POST', body: JSON.stringify(values) });
+      await finLoadRequisitions();
+      finRequisitionsRender();
+      showToast('Requisition submitted');
+    },
+  });
+}
+
+async function finSetRequisitionStatus(id, status) {
+  try {
+    await apiFetch(`/api/admin/store/requisitions/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    await finLoadRequisitions();
+    finRequisitionsRender();
+    showToast(`Requisition ${status}`);
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: SETTINGS ──
+async function finStoreSettingsInit() {
+  try {
+    const data = await apiFetch('/api/admin/store/settings');
+    state.fin.settings = data;
+    document.getElementById('ss-store-name').value = data.storeName;
+    document.getElementById('ss-currency').value = data.currency;
+    document.getElementById('ss-low-stock').value = data.lowStockThreshold;
+    document.getElementById('ss-tax-rate').value = data.taxRate;
+    document.getElementById('ss-contact-email').value = data.contactEmail;
+  } catch (err) { showToast(err.message); }
+}
+
+async function finSaveStoreSettings() {
+  const payload = {
+    storeName: document.getElementById('ss-store-name').value.trim(),
+    currency: document.getElementById('ss-currency').value.trim(),
+    lowStockThreshold: Number(document.getElementById('ss-low-stock').value) || 0,
+    taxRate: Number(document.getElementById('ss-tax-rate').value) || 0,
+    contactEmail: document.getElementById('ss-contact-email').value.trim(),
+  };
+  try {
+    await apiFetch('/api/admin/store/settings', { method: 'PUT', body: JSON.stringify(payload) });
+    showToast('Store settings saved');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: BANNERS ──
+async function finLoadBanners() {
+  const data = await apiFetch('/api/admin/store/banners');
+  state.fin.banners = data.banners;
+}
+
+async function finBannersInit() {
+  try { await finLoadBanners(); finBannersRender(); } catch (err) { showToast(err.message); }
+}
+
+function finBannersRender() {
+  const tbody = document.getElementById('ban-tbody');
+  if (!tbody) return;
+  const rows = state.fin.banners;
+  tbody.innerHTML = rows.length ? rows.map((b, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(b.title)}</strong></td>
+      <td>${escapeHtml(b.subtitle || '-')}</td>
+      <td>${b.sortOrder}</td>
+      <td>${b.isActive ? '<span style="color:var(--green,#16a34a);">Active</span>' : '<span style="color:var(--text-3);">Inactive</span>'}</td>
+      <td>
+        <button class="post-btn" style="padding:6px 10px;" onclick="finOpenBannerModal(${b.id})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteBanner(${b.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No banners yet.</td></tr>';
+}
+
+function finOpenBannerModal(id) {
+  const banner = id ? state.fin.banners.find(b => b.id === id) : null;
+  openFinModal({
+    title: banner ? 'Edit Banner' : 'Add Banner',
+    fields: [
+      { key: 'title', label: 'Title', full: true },
+      { key: 'subtitle', label: 'Subtitle', full: true },
+      { key: 'imageUrl', label: 'Image URL', full: true },
+      { key: 'linkUrl', label: 'Link URL', full: true },
+      { key: 'sortOrder', label: 'Sort Order', type: 'number' },
+      { key: 'isActive', label: 'Active', type: 'checkbox' },
+    ],
+    values: banner || { sortOrder: 0, isActive: true },
+    onSubmit: async (values) => {
+      const url = banner ? `/api/admin/store/banners/${banner.id}` : '/api/admin/store/banners';
+      await apiFetch(url, { method: banner ? 'PUT' : 'POST', body: JSON.stringify(values) });
+      await finLoadBanners();
+      finBannersRender();
+      showToast(`Banner ${banner ? 'updated' : 'added'}`);
+    },
+  });
+}
+
+async function finDeleteBanner(id) {
+  if (!confirm('Delete this banner?')) return;
+  try {
+    await apiFetch(`/api/admin/store/banners/${id}`, { method: 'DELETE' });
+    await finLoadBanners();
+    finBannersRender();
+    showToast('Banner deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: HOMEPAGE SECTIONS ──
+async function finLoadSections() {
+  const data = await apiFetch('/api/admin/store/homepage-sections');
+  state.fin.sections = data.sections;
+}
+
+async function finSectionsInit() {
+  try { await finLoadSections(); finSectionsRender(); } catch (err) { showToast(err.message); }
+}
+
+function finSectionsRender() {
+  const tbody = document.getElementById('sec-tbody');
+  if (!tbody) return;
+  const rows = state.fin.sections;
+  tbody.innerHTML = rows.length ? rows.map((s, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(s.title)}</strong></td>
+      <td>${escapeHtml(s.sectionType)}</td>
+      <td>${s.sortOrder}</td>
+      <td>${s.isActive ? '<span style="color:var(--green,#16a34a);">Active</span>' : '<span style="color:var(--text-3);">Inactive</span>'}</td>
+      <td>
+        <button class="post-btn" style="padding:6px 10px;" onclick="finOpenSectionModal(${s.id})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteSection(${s.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No homepage sections yet.</td></tr>';
+}
+
+function finOpenSectionModal(id) {
+  const section = id ? state.fin.sections.find(s => s.id === id) : null;
+  openFinModal({
+    title: section ? 'Edit Section' : 'Add Section',
+    fields: [
+      { key: 'title', label: 'Title', full: true },
+      { key: 'sectionType', label: 'Type', placeholder: 'e.g. featured, promo, custom' },
+      { key: 'sortOrder', label: 'Sort Order', type: 'number' },
+      { key: 'content', label: 'Content', full: true, type: 'textarea' },
+      { key: 'isActive', label: 'Active', type: 'checkbox' },
+    ],
+    values: section || { sectionType: 'custom', sortOrder: 0, isActive: true },
+    onSubmit: async (values) => {
+      const url = section ? `/api/admin/store/homepage-sections/${section.id}` : '/api/admin/store/homepage-sections';
+      await apiFetch(url, { method: section ? 'PUT' : 'POST', body: JSON.stringify(values) });
+      await finLoadSections();
+      finSectionsRender();
+      showToast(`Section ${section ? 'updated' : 'added'}`);
+    },
+  });
+}
+
+async function finDeleteSection(id) {
+  if (!confirm('Delete this section?')) return;
+  try {
+    await apiFetch(`/api/admin/store/homepage-sections/${id}`, { method: 'DELETE' });
+    await finLoadSections();
+    finSectionsRender();
+    showToast('Section deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── STORE: VISIT STOREFRONT (live read-only preview) ──
+async function finVisitStorefrontInit() {
+  try {
+    state.fin.storefront = await apiFetch('/api/admin/store/storefront');
+    document.getElementById('vs-store-name').textContent = state.fin.storefront.storeName;
+    const catFilter = document.getElementById('vs-category-filter');
+    catFilter.innerHTML = '<option value="">All Categories</option>' + state.fin.storefront.categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    const bannerCard = document.getElementById('vs-banner-card');
+    const bannerBody = document.getElementById('vs-banner-body');
+    if (state.fin.storefront.banners.length) {
+      bannerCard.style.display = '';
+      bannerBody.innerHTML = state.fin.storefront.banners.map(b => `<div style="margin-bottom:8px;"><div style="font-size:16px;font-weight:700;">${escapeHtml(b.title)}</div>${b.subtitle ? `<div style="font-size:12px;opacity:.9;">${escapeHtml(b.subtitle)}</div>` : ''}</div>`).join('');
+    } else {
+      bannerCard.style.display = 'none';
+    }
+    const sections = document.getElementById('vs-sections');
+    sections.innerHTML = state.fin.storefront.sections.map(s => `
+      <div style="margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:8px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${escapeHtml(s.title)}</div>
+        <div style="font-size:12px;color:var(--text-2);">${escapeHtml(s.content || '')}</div>
+      </div>`).join('');
+    finVisitStorefrontRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finVisitStorefrontRender() {
+  const grid = document.getElementById('vs-products-grid');
+  const empty = document.getElementById('vs-empty');
+  if (!grid || !state.fin.storefront) return;
+  const catFilter = document.getElementById('vs-category-filter')?.value || '';
+  const search = (document.getElementById('vs-search')?.value || '').toLowerCase();
+  const rows = state.fin.storefront.products.filter(p => {
+    if (catFilter && String(p.categoryId) !== catFilter) return false;
+    if (search && !p.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if (!rows.length) {
+    grid.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  grid.style.display = '';
+  empty.style.display = 'none';
+  grid.innerHTML = rows.map(p => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;">
+      <div style="height:80px;background:var(--black-3,#1a1a1a);border-radius:6px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:10px;">${escapeHtml(p.categoryName || 'Product')}</div>
+      <div style="font-weight:700;font-size:12px;margin-bottom:4px;">${escapeHtml(p.name)}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--blue,#2563eb);">${finMoney(p.price)}</div>
+      <div style="font-size:10px;color:var(--text-3);margin-top:2px;">${p.stockQty > 0 ? 'In stock' : 'Out of stock'}</div>
+    </div>`).join('');
+}
+
+// ── ACCOUNTING: CHART OF ACCOUNTS ──
+async function finLoadAccounts() {
+  const data = await apiFetch('/api/admin/acct/accounts');
+  state.fin.accounts = data.accounts;
+}
+
+async function finAccountsInit() {
+  try { await finLoadAccounts(); finAccountsRender(); } catch (err) { showToast(err.message); }
+}
+
+function finAccountsRender() {
+  const tbody = document.getElementById('coa-tbody');
+  if (!tbody) return;
+  const typeFilter = document.getElementById('coa-type-filter')?.value || '';
+  const search = (document.getElementById('coa-search')?.value || '').toLowerCase();
+  const rows = state.fin.accounts.filter(a => {
+    if (typeFilter && a.type !== typeFilter) return false;
+    if (search && !`${a.code} ${a.name}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  tbody.innerHTML = rows.length ? rows.map(a => `
+    <tr>
+      <td>${escapeHtml(a.code)}</td>
+      <td><strong>${escapeHtml(a.name)}</strong></td>
+      <td style="text-transform:capitalize;">${escapeHtml(a.type)}</td>
+      <td style="text-transform:capitalize;">${escapeHtml(a.normalBalance)}</td>
+      <td>${a.isActive ? '<span style="color:var(--green,#16a34a);">Active</span>' : '<span style="color:var(--text-3);">Inactive</span>'}</td>
+      <td>
+        <button class="post-btn" style="padding:6px 10px;" onclick="finOpenAccountModal(${a.id})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteAccount(${a.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No accounts found.</td></tr>';
+}
+
+const FIN_ACCOUNT_TYPES = [
+  { value: 'asset', label: 'Asset' },
+  { value: 'liability', label: 'Liability' },
+  { value: 'equity', label: 'Equity' },
+  { value: 'income', label: 'Income' },
+  { value: 'expense', label: 'Expense' },
+];
+
+function finOpenAccountModal(id) {
+  const account = id ? state.fin.accounts.find(a => a.id === id) : null;
+  openFinModal({
+    title: account ? `Edit Account - ${account.name}` : 'Add Account',
+    fields: [
+      { key: 'code', label: 'Account Code', disabled: !!account },
+      { key: 'name', label: 'Account Name' },
+      { key: 'type', label: 'Type', type: 'select', options: FIN_ACCOUNT_TYPES, disabled: !!account },
+      { key: 'normalBalance', label: 'Normal Balance', type: 'select', options: [{ value: 'debit', label: 'Debit' }, { value: 'credit', label: 'Credit' }], disabled: !!account },
+      { key: 'isActive', label: 'Active', type: 'checkbox' },
+    ],
+    values: account || { isActive: true },
+    onSubmit: async (values) => {
+      if (account) {
+        await apiFetch(`/api/admin/acct/accounts/${account.id}`, { method: 'PUT', body: JSON.stringify(values) });
+      } else {
+        await apiFetch('/api/admin/acct/accounts', { method: 'POST', body: JSON.stringify(values) });
+      }
+      await finLoadAccounts();
+      finAccountsRender();
+      showToast(`Account ${account ? 'updated' : 'added'}`);
+    },
+  });
+}
+
+async function finDeleteAccount(id) {
+  if (!confirm('Delete this account?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/accounts/${id}`, { method: 'DELETE' });
+    await finLoadAccounts();
+    finAccountsRender();
+    showToast('Account deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: JOURNAL ENTRIES ──
+async function finLoadJournalEntries() {
+  const data = await apiFetch('/api/admin/acct/journal-entries');
+  state.fin.journalEntries = data.entries;
+}
+
+async function finJournalInit() {
+  try {
+    await Promise.all([finLoadAccounts(), finLoadJournalEntries()]);
+    document.getElementById('je-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('je-memo').value = '';
+    state.je.lines = [{ accountId: '', debit: '', credit: '', description: '' }, { accountId: '', debit: '', credit: '', description: '' }];
+    finRenderJournalLines();
+    finJournalEntriesRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finAccountOptionsHtml(selected) {
+  return '<option value="">Select Account</option>' + state.fin.accounts.map(a => `<option value="${a.id}" ${String(a.id) === String(selected) ? 'selected' : ''}>${escapeHtml(a.code)} - ${escapeHtml(a.name)}</option>`).join('');
+}
+
+function finAddJournalLine() {
+  state.je.lines.push({ accountId: '', debit: '', credit: '', description: '' });
+  finRenderJournalLines();
+}
+
+function finRemoveJournalLine(index) {
+  state.je.lines.splice(index, 1);
+  finRenderJournalLines();
+}
+
+function finUpdateJournalLine(index, key, value) {
+  state.je.lines[index][key] = value;
+  if (key === 'debit' && value) state.je.lines[index].credit = '';
+  if (key === 'credit' && value) state.je.lines[index].debit = '';
+  finRenderJournalLines(true);
+}
+
+function finRenderJournalLines(skipFullRerender) {
+  const tbody = document.getElementById('je-lines-tbody');
+  if (!tbody) return;
+  if (!skipFullRerender) {
+    tbody.innerHTML = state.je.lines.map((line, i) => `
+      <tr>
+        <td><select class="ctrl-select" style="width:100%;" onchange="finUpdateJournalLine(${i}, 'accountId', this.value)">${finAccountOptionsHtml(line.accountId)}</select></td>
+        <td><input class="field-input" style="width:100%;" value="${escapeHtml(line.description)}" onchange="finUpdateJournalLine(${i}, 'description', this.value)"></td>
+        <td><input class="field-input" type="number" min="0" step="0.01" style="width:100%;" value="${line.debit}" onchange="finUpdateJournalLine(${i}, 'debit', this.value)"></td>
+        <td><input class="field-input" type="number" min="0" step="0.01" style="width:100%;" value="${line.credit}" onchange="finUpdateJournalLine(${i}, 'credit', this.value)"></td>
+        <td>${state.je.lines.length > 2 ? `<button class="ann-del" style="color:var(--red);" onclick="finRemoveJournalLine(${i})">Remove</button>` : ''}</td>
+      </tr>`).join('');
+  }
+  const totalDebit = state.je.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
+  const totalCredit = state.je.lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
+  document.getElementById('je-total-debit').textContent = finMoney(totalDebit);
+  document.getElementById('je-total-credit').textContent = finMoney(totalCredit);
+  const flag = document.getElementById('je-balance-flag');
+  const balanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0;
+  flag.textContent = totalDebit === 0 && totalCredit === 0 ? '' : (balanced ? 'Balanced' : 'Not balanced');
+  flag.style.color = balanced ? 'var(--green,#16a34a)' : 'var(--red)';
+}
+
+async function finSaveJournalEntry() {
+  const date = document.getElementById('je-date').value;
+  const memo = document.getElementById('je-memo').value.trim();
+  const lines = state.je.lines
+    .filter(l => l.accountId && (Number(l.debit) > 0 || Number(l.credit) > 0))
+    .map(l => ({ accountId: Number(l.accountId), debit: Number(l.debit) || 0, credit: Number(l.credit) || 0, description: l.description }));
+  if (lines.length < 2) return showToast('A journal entry needs at least two complete lines');
+  try {
+    const data = await apiFetch('/api/admin/acct/journal-entries', { method: 'POST', body: JSON.stringify({ date, memo, lines }) });
+    showToast(`Journal entry posted: ${data.entryNo}`);
+    document.getElementById('je-memo').value = '';
+    state.je.lines = [{ accountId: '', debit: '', credit: '', description: '' }, { accountId: '', debit: '', credit: '', description: '' }];
+    finRenderJournalLines();
+    await finLoadJournalEntries();
+    finJournalEntriesRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finJournalEntriesRender() {
+  const tbody = document.getElementById('je-entries-tbody');
+  if (!tbody) return;
+  const rows = state.fin.journalEntries;
+  tbody.innerHTML = rows.length ? rows.map(e => `
+    <tr>
+      <td>${escapeHtml(e.entryNo)}</td>
+      <td>${escapeHtml(e.entryDate)}</td>
+      <td>${escapeHtml(e.memo || '-')}</td>
+      <td>${e.lines.length}</td>
+      <td>${finMoney(e.totalDebit)}</td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="finDeleteJournalEntry(${e.id})">Delete</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No journal entries posted yet.</td></tr>';
+}
+
+async function finDeleteJournalEntry(id) {
+  if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+  try {
+    await apiFetch(`/api/admin/acct/journal-entries/${id}`, { method: 'DELETE' });
+    await finLoadJournalEntries();
+    finJournalEntriesRender();
+    showToast('Journal entry deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: LEDGER ──
+async function finLedgerInit() {
+  try {
+    await finLoadAccounts();
+    const select = document.getElementById('ledger-account');
+    const previous = select.value;
+    select.innerHTML = '<option value="">Select Account</option>' + state.fin.accounts.map(a => `<option value="${a.id}">${escapeHtml(a.code)} - ${escapeHtml(a.name)}</option>`).join('');
+    if (previous) select.value = previous;
+    finLedgerRender();
+  } catch (err) { showToast(err.message); }
+}
+
+async function finLedgerRender() {
+  const accountId = document.getElementById('ledger-account')?.value;
+  const tbody = document.getElementById('ledger-tbody');
+  const summary = document.getElementById('ledger-summary');
+  if (!accountId) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">Select an account to view its ledger.</td></tr>';
+    summary.style.display = 'none';
+    return;
+  }
+  try {
+    const data = await apiFetch(`/api/admin/acct/ledger?accountId=${accountId}`);
+    summary.style.display = '';
+    summary.innerHTML = `<strong>${escapeHtml(data.account.code)} - ${escapeHtml(data.account.name)}</strong> &nbsp;|&nbsp; Closing balance: <strong>${finMoney(data.closingBalance)}</strong> (${escapeHtml(data.account.normalBalance)} normal)`;
+    tbody.innerHTML = data.lines.length ? data.lines.map(l => `
+      <tr>
+        <td>${escapeHtml(l.entryDate)}</td>
+        <td>${escapeHtml(l.entryNo)}</td>
+        <td>${escapeHtml(l.description || l.entryMemo || '-')}</td>
+        <td>${l.debit ? finMoney(l.debit) : '-'}</td>
+        <td>${l.credit ? finMoney(l.credit) : '-'}</td>
+        <td>${finMoney(l.runningBalance)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No activity on this account yet.</td></tr>';
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: TRIAL BALANCE ──
+async function finTrialBalanceInit() {
+  try {
+    const data = await apiFetch('/api/admin/acct/trial-balance');
+    const tbody = document.getElementById('tb-tbody');
+    tbody.innerHTML = data.accounts.map(a => `
+      <tr>
+        <td>${escapeHtml(a.code)}</td>
+        <td>${escapeHtml(a.name)}</td>
+        <td style="text-transform:capitalize;">${escapeHtml(a.type)}</td>
+        <td>${a.totalDebit ? finMoney(a.totalDebit) : '-'}</td>
+        <td>${a.totalCredit ? finMoney(a.totalCredit) : '-'}</td>
+      </tr>`).join('');
+    document.getElementById('tb-total-debit').textContent = finMoney(data.totalDebit);
+    document.getElementById('tb-total-credit').textContent = finMoney(data.totalCredit);
+    const flag = document.getElementById('tb-balance-flag');
+    flag.textContent = data.balanced ? 'Balanced' : 'Not Balanced';
+    flag.style.color = data.balanced ? 'var(--green,#16a34a)' : 'var(--red)';
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: CONTACTS, BILLS & INVOICES ──
+async function finLoadContacts() {
+  const data = await apiFetch('/api/admin/acct/contacts');
+  state.fin.contacts = data.contacts;
+}
+async function finLoadBills() {
+  const data = await apiFetch('/api/admin/acct/bills');
+  state.fin.bills = data.bills;
+}
+
+async function finContactsBillsInit() {
+  try {
+    await Promise.all([finLoadContacts(), finLoadBills()]);
+    finContactsRender();
+    finBillsRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finContactsRender() {
+  const tbody = document.getElementById('con-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = state.fin.contacts.length ? state.fin.contacts.map((c, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(c.name)}</strong></td>
+      <td style="text-transform:capitalize;">${escapeHtml(c.type)}</td>
+      <td>${escapeHtml(c.email || '-')}</td>
+      <td>${escapeHtml(c.phone || '-')}</td>
+      <td>
+        <button class="post-btn" style="padding:6px 10px;" onclick="finOpenContactModal(${c.id})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteContact(${c.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No contacts yet.</td></tr>';
+}
+
+function finOpenContactModal(id) {
+  const contact = id ? state.fin.contacts.find(c => c.id === id) : null;
+  openFinModal({
+    title: contact ? 'Edit Contact' : 'Add Contact',
+    fields: [
+      { key: 'name', label: 'Name', full: true },
+      { key: 'type', label: 'Type', type: 'select', options: [{ value: 'vendor', label: 'Vendor' }, { value: 'customer', label: 'Customer' }] },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'address', label: 'Address', full: true, type: 'textarea' },
+    ],
+    values: contact || { type: 'vendor' },
+    onSubmit: async (values) => {
+      const url = contact ? `/api/admin/acct/contacts/${contact.id}` : '/api/admin/acct/contacts';
+      await apiFetch(url, { method: contact ? 'PUT' : 'POST', body: JSON.stringify(values) });
+      await finLoadContacts();
+      finContactsRender();
+      showToast(`Contact ${contact ? 'updated' : 'added'}`);
+    },
+  });
+}
+
+async function finDeleteContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/contacts/${id}`, { method: 'DELETE' });
+    await finLoadContacts();
+    finContactsRender();
+    showToast('Contact deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+function finBillsRender() {
+  const tbody = document.getElementById('bill-tbody');
+  if (!tbody) return;
+  const statusFilter = document.getElementById('bill-status-filter')?.value || '';
+  const rows = state.fin.bills.filter(b => !statusFilter || b.status === statusFilter);
+  const statusColor = { unpaid: 'var(--text-2)', paid: 'var(--green,#16a34a)', overdue: 'var(--red)' };
+  tbody.innerHTML = rows.length ? rows.map(b => `
+    <tr>
+      <td>${escapeHtml(b.docNo || '-')}</td>
+      <td style="text-transform:capitalize;">${escapeHtml(b.docType)}</td>
+      <td>${escapeHtml(b.contactName || '-')}</td>
+      <td>${escapeHtml(b.issueDate)}</td>
+      <td>${escapeHtml(b.dueDate || '-')}</td>
+      <td>${finMoney(b.amount)}</td>
+      <td style="color:${statusColor[b.status] || 'var(--text-2)'};font-weight:700;text-transform:capitalize;">${escapeHtml(b.status)}</td>
+      <td>
+        ${b.status !== 'paid' ? `<button class="post-btn" style="padding:6px 10px;" onclick="finMarkBillPaid(${b.id})">Mark Paid</button>` : ''}
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="finDeleteBill(${b.id})">Delete</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="8" style="padding:18px;color:var(--text-3);">No bills or invoices yet.</td></tr>';
+}
+
+function finOpenBillModal() {
+  openFinModal({
+    title: 'Add Bill / Invoice',
+    fields: [
+      { key: 'docType', label: 'Type', type: 'select', options: [{ value: 'bill', label: 'Bill (we owe)' }, { value: 'invoice', label: 'Invoice (owed to us)' }] },
+      { key: 'contactId', label: 'Contact', type: 'select', placeholder: 'No contact', options: state.fin.contacts.map(c => ({ value: c.id, label: c.name })) },
+      { key: 'docNo', label: 'Document #' },
+      { key: 'amount', label: 'Amount', type: 'number', step: '0.01', min: 0 },
+      { key: 'issueDate', label: 'Issue Date', type: 'date' },
+      { key: 'dueDate', label: 'Due Date', type: 'date' },
+      { key: 'status', label: 'Status', type: 'select', options: [{ value: 'unpaid', label: 'Unpaid' }, { value: 'paid', label: 'Paid' }, { value: 'overdue', label: 'Overdue' }] },
+      { key: 'notes', label: 'Notes', full: true, type: 'textarea' },
+    ],
+    values: { docType: 'bill', issueDate: new Date().toISOString().slice(0, 10), status: 'unpaid' },
+    onSubmit: async (values) => {
+      await apiFetch('/api/admin/acct/bills', { method: 'POST', body: JSON.stringify(values) });
+      await finLoadBills();
+      finBillsRender();
+      showToast('Bill / invoice added');
+    },
+  });
+}
+
+async function finMarkBillPaid(id) {
+  const bill = state.fin.bills.find(b => b.id === id);
+  if (!bill) return;
+  try {
+    await apiFetch(`/api/admin/acct/bills/${id}`, { method: 'PUT', body: JSON.stringify({ ...bill, status: 'paid' }) });
+    await finLoadBills();
+    finBillsRender();
+    showToast('Marked as paid');
+  } catch (err) { showToast(err.message); }
+}
+
+async function finDeleteBill(id) {
+  if (!confirm('Delete this bill / invoice?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/bills/${id}`, { method: 'DELETE' });
+    await finLoadBills();
+    finBillsRender();
+    showToast('Deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: BUDGETS ──
+async function finLoadBudgets() {
+  const data = await apiFetch('/api/admin/acct/budgets');
+  state.fin.budgets = data.budgets;
+}
+
+async function finBudgetsInit() {
+  try {
+    await Promise.all([finLoadAccounts(), finLoadBudgets()]);
+    finBudgetsRender();
+  } catch (err) { showToast(err.message); }
+}
+
+function finBudgetsRender() {
+  const tbody = document.getElementById('bud-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = state.fin.budgets.length ? state.fin.budgets.map(b => `
+    <tr>
+      <td>${escapeHtml(b.periodLabel)}</td>
+      <td>${escapeHtml(b.accountCode)} - ${escapeHtml(b.accountName)}</td>
+      <td>${finMoney(b.amount)}</td>
+      <td>${finMoney(b.actual)}</td>
+      <td style="color:${b.variance >= 0 ? 'var(--green,#16a34a)' : 'var(--red)'};font-weight:700;">${finMoney(b.variance)}</td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="finDeleteBudget(${b.id})">Delete</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No budgets yet.</td></tr>';
+}
+
+function finOpenBudgetModal() {
+  openFinModal({
+    title: 'Add Budget',
+    fields: [
+      { key: 'accountId', label: 'Account', type: 'select', options: state.fin.accounts.map(a => ({ value: a.id, label: `${a.code} - ${a.name}` })) },
+      { key: 'periodLabel', label: 'Period', placeholder: 'e.g. 2025/2026 Term 2' },
+      { key: 'amount', label: 'Budgeted Amount', type: 'number', step: '0.01', min: 0 },
+      { key: 'notes', label: 'Notes', full: true, type: 'textarea' },
+    ],
+    values: {},
+    onSubmit: async (values) => {
+      await apiFetch('/api/admin/acct/budgets', { method: 'POST', body: JSON.stringify(values) });
+      await finLoadBudgets();
+      finBudgetsRender();
+      showToast('Budget added');
+    },
+  });
+}
+
+async function finDeleteBudget(id) {
+  if (!confirm('Delete this budget?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/budgets/${id}`, { method: 'DELETE' });
+    await finLoadBudgets();
+    finBudgetsRender();
+    showToast('Budget deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: BANK RECONCILIATION ──
+async function finLoadBankTxns() {
+  const data = await apiFetch('/api/admin/acct/bank-transactions');
+  state.fin.bankTxns = data.transactions;
+}
+
+async function finBankRecInit() {
+  try { await finLoadBankTxns(); finBankRecRender(); } catch (err) { showToast(err.message); }
+}
+
+function finBankRecRender() {
+  const tbody = document.getElementById('bank-tbody');
+  if (!tbody) return;
+  const rows = state.fin.bankTxns;
+  tbody.innerHTML = rows.length ? rows.map(t => `
+    <tr>
+      <td>${escapeHtml(t.txnDate)}</td>
+      <td>${escapeHtml(t.description || '-')}</td>
+      <td style="text-transform:capitalize;">${escapeHtml(t.txnType)}</td>
+      <td>${finMoney(t.amount)}</td>
+      <td><label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" ${t.reconciled ? 'checked' : ''} onchange="finToggleReconciled(${t.id}, this.checked)"> ${t.reconciled ? 'Reconciled' : 'Pending'}</label></td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="finDeleteBankTxn(${t.id})">Delete</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No bank transactions yet.</td></tr>';
+  const reconciledCount = rows.filter(t => t.reconciled).length;
+  document.getElementById('bank-summary').textContent = `${reconciledCount} of ${rows.length} transactions reconciled`;
+}
+
+function finOpenBankTxnModal() {
+  openFinModal({
+    title: 'Add Bank Transaction',
+    fields: [
+      { key: 'txnDate', label: 'Date', type: 'date' },
+      { key: 'txnType', label: 'Type', type: 'select', options: [{ value: 'debit', label: 'Debit (money in)' }, { value: 'credit', label: 'Credit (money out)' }] },
+      { key: 'amount', label: 'Amount', type: 'number', step: '0.01', min: 0 },
+      { key: 'description', label: 'Description', full: true },
+    ],
+    values: { txnDate: new Date().toISOString().slice(0, 10) },
+    onSubmit: async (values) => {
+      await apiFetch('/api/admin/acct/bank-transactions', { method: 'POST', body: JSON.stringify(values) });
+      await finLoadBankTxns();
+      finBankRecRender();
+      showToast('Transaction added');
+    },
+  });
+}
+
+async function finToggleReconciled(id, reconciled) {
+  try {
+    await apiFetch(`/api/admin/acct/bank-transactions/${id}`, { method: 'PUT', body: JSON.stringify({ reconciled }) });
+    await finLoadBankTxns();
+    finBankRecRender();
+  } catch (err) { showToast(err.message); }
+}
+
+async function finDeleteBankTxn(id) {
+  if (!confirm('Delete this transaction?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/bank-transactions/${id}`, { method: 'DELETE' });
+    await finLoadBankTxns();
+    finBankRecRender();
+    showToast('Transaction deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: TAX & COMPLIANCE ──
+async function finLoadTaxRecords() {
+  const data = await apiFetch('/api/admin/acct/tax-records');
+  state.fin.taxRecords = data.records;
+}
+
+async function finTaxInit() {
+  try { await finLoadTaxRecords(); finTaxRender(); } catch (err) { showToast(err.message); }
+}
+
+function finTaxRender() {
+  const tbody = document.getElementById('tax-tbody');
+  if (!tbody) return;
+  const statusColor = { pending: 'var(--text-2)', filed: '#2563eb', paid: 'var(--green,#16a34a)', overdue: 'var(--red)' };
+  tbody.innerHTML = state.fin.taxRecords.length ? state.fin.taxRecords.map(t => `
+    <tr>
+      <td>${escapeHtml(t.periodLabel)}</td>
+      <td>${escapeHtml(t.taxType)}</td>
+      <td>${finMoney(t.amountDue)}</td>
+      <td>${finMoney(t.amountPaid)}</td>
+      <td style="color:${statusColor[t.status] || 'var(--text-2)'};font-weight:700;text-transform:capitalize;">${escapeHtml(t.status)}</td>
+      <td>${escapeHtml(t.dueDate || '-')}</td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="finDeleteTaxRecord(${t.id})">Delete</button></td>
+    </tr>`).join('') : '<tr><td colspan="7" style="padding:18px;color:var(--text-3);">No tax records yet.</td></tr>';
+}
+
+function finOpenTaxModal() {
+  openFinModal({
+    title: 'Add Tax Record',
+    fields: [
+      { key: 'periodLabel', label: 'Period', placeholder: 'e.g. 2026 Q1' },
+      { key: 'taxType', label: 'Tax Type', placeholder: 'e.g. PAYE, VAT' },
+      { key: 'amountDue', label: 'Amount Due', type: 'number', step: '0.01', min: 0 },
+      { key: 'amountPaid', label: 'Amount Paid', type: 'number', step: '0.01', min: 0 },
+      { key: 'status', label: 'Status', type: 'select', options: [{ value: 'pending', label: 'Pending' }, { value: 'filed', label: 'Filed' }, { value: 'paid', label: 'Paid' }, { value: 'overdue', label: 'Overdue' }] },
+      { key: 'dueDate', label: 'Due Date', type: 'date' },
+      { key: 'notes', label: 'Notes', full: true, type: 'textarea' },
+    ],
+    values: { status: 'pending' },
+    onSubmit: async (values) => {
+      await apiFetch('/api/admin/acct/tax-records', { method: 'POST', body: JSON.stringify(values) });
+      await finLoadTaxRecords();
+      finTaxRender();
+      showToast('Tax record added');
+    },
+  });
+}
+
+async function finDeleteTaxRecord(id) {
+  if (!confirm('Delete this tax record?')) return;
+  try {
+    await apiFetch(`/api/admin/acct/tax-records/${id}`, { method: 'DELETE' });
+    await finLoadTaxRecords();
+    finTaxRender();
+    showToast('Tax record deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+// ── ACCOUNTING: FINANCIAL REPORTS ──
+async function finReportsInit() {
+  try {
+    const data = await apiFetch('/api/admin/acct/financial-reports');
+    document.getElementById('fr-empty-card').style.display = data.hasData ? 'none' : '';
+    document.getElementById('fr-content').style.display = data.hasData ? '' : 'none';
+    if (!data.hasData) return;
+    document.getElementById('fr-income').textContent = finMoney(data.totalIncome);
+    document.getElementById('fr-expense').textContent = finMoney(data.totalExpense);
+    document.getElementById('fr-net').textContent = finMoney(data.netIncome);
+    document.getElementById('fr-net').style.color = data.netIncome >= 0 ? 'var(--green,#16a34a)' : 'var(--red)';
+    document.getElementById('fr-assets').textContent = finMoney(data.totalAssets);
+    document.getElementById('fr-liabilities').textContent = finMoney(data.totalLiabilities);
+    document.getElementById('fr-equity').textContent = finMoney(data.totalEquity);
+  } catch (err) { showToast(err.message); }
+}
