@@ -3713,16 +3713,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-head"><span class="card-title" style="display:flex;align-items:center;gap:8px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><path d="M1.5 2.5h13l-4.8 5.8v4.2l-3.4 1.8V8.3z"/></svg> Filter Invoices to View</span></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:14px;">
-              <div><label class="field-label">Class *</label><select class="ctrl-select" id="il-class"><option value="">Select Class</option></select></div>
-              <div><label class="field-label">Class Arm *</label><select class="ctrl-select" id="il-arm"><option value="">-Select Class</option></select></div>
-              <div><label class="field-label">Fees Session *</label><select class="ctrl-select" id="il-session"><option>2025-2026</option></select></div>
-              <div><label class="field-label">Fees Term *</label><select class="ctrl-select" id="il-term"><option>THIRD TERM</option><option>FIRST TERM</option><option>SECOND TERM</option></select></div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;align-items:end;">
-              <div><label class="field-label">View Invoices *</label><select class="ctrl-select" id="il-view"><option>All</option><option>Paid</option><option>Unpaid</option><option>Part Paid</option></select></div>
-              <div><label class="field-label">Filter By Invoice Type</label><select class="ctrl-select" id="il-type"><option>All (3)</option><option>Tuition</option><option>Bus Fee</option><option>Other</option></select></div>
-              <div><label class="field-label">Filter By Payment Status</label><select class="ctrl-select" id="il-status"><option>All (3)</option><option>Paid</option><option>Unpaid</option><option>Part Paid</option></select></div>
-              <div><button class="bs-print-btn" style="width:100%;" onclick="showToast('Invoice list coming soon')">View Invoice List</button></div>
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="il-class"><option value="">All Classes</option></select></div>
+              <div><label class="field-label">Academic Term</label><select class="ctrl-select" id="il-term"><option value="">All Terms</option></select></div>
+              <div><label class="field-label">Payment Status</label><select class="ctrl-select" id="il-status"><option value="all">All</option><option value="paid">Paid</option><option value="partial">Part Paid</option><option value="unpaid">Unpaid</option><option value="overdue">Overdue</option></select></div>
+              <div><button class="bs-print-btn" style="width:100%;" onclick="ilViewList()">View Invoice List</button></div>
             </div>
           </div>
         </div>
@@ -3732,34 +3726,118 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <div style="flex:1;min-width:240px;">
                 <label class="field-label">Search Invoices</label>
                 <div style="position:relative;">
-                  <input class="field-input" placeholder="Search Invoices by Name, Email or Reg. No." style="padding-right:36px;" oninput="showToast('Invoice search coming soon')">
+                  <input class="field-input" id="il-search" placeholder="Search by student name, ID or fee type" style="padding-right:36px;" oninput="ilRenderTable()">
                   <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text-3);pointer-events:none;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg></span>
                 </div>
               </div>
-              <button class="post-btn" style="background:#fff;color:#2563eb;border:1px solid #2563eb;flex-shrink:0;" onclick="showToast('New invoice coming soon')">+ New Invoice</button>
+              <button class="post-btn" style="background:#fff;color:#2563eb;border:1px solid #2563eb;flex-shrink:0;" onclick="openNewInvoiceModal()">+ New Invoice</button>
             </div>
-            <div style="text-align:center;color:var(--text-3);font-size:12px;padding:44px 0 12px;">Apply filters above and click View Invoice List to see results.</div>
+            <div style="overflow-x:auto;margin-top:14px;">
+              <table class="data-table" style="width:100%;">
+                <thead><tr>
+                  <th>#</th><th>Student</th><th>Class</th><th>Fee Type</th><th>Amount</th>
+                  <th>Paid</th><th>Balance</th><th>Due Date</th><th>Status</th><th>Action</th>
+                </tr></thead>
+                <tbody id="il-tbody"><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">Click "View Invoice List" to load invoices.</td></tr></tbody>
+              </table>
+            </div>
+            <div style="text-align:right;padding:12px 4px 0;font-size:12px;font-weight:700;color:var(--text-1);" id="il-summary"></div>
           </div>
         </div>
       </div>
+
+      <!-- New Invoice Modal -->
+      <div id="new-invoice-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeNewInvoiceModal()">
+        <div class="card" style="width:min(460px,95%);padding:0;max-height:90vh;overflow-y:auto;">
+          <div class="card-head"><span class="card-title">New Fee Invoice</span><button class="cog-modal-close" onclick="closeNewInvoiceModal()">&#x2715;</button></div>
+          <div class="card-body" style="padding:20px;">
+            <div style="margin-bottom:14px;">
+              <label class="field-label">Bill</label>
+              <select class="ctrl-select" id="ni-mode" onchange="niToggleMode()">
+                <option value="student">A Single Student</option>
+                <option value="class">An Entire Class</option>
+              </select>
+            </div>
+            <div style="margin-bottom:14px;" id="ni-student-wrap">
+              <label class="field-label">Student *</label>
+              <select class="ctrl-select" id="ni-student"><option value="">Select Student</option></select>
+            </div>
+            <div style="margin-bottom:14px;display:none;" id="ni-class-wrap">
+              <label class="field-label">Class *</label>
+              <select class="ctrl-select" id="ni-class"><option value="">Select Class</option></select>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="field-label">Fee Type *</label>
+              <select class="ctrl-select" id="ni-fee-type">
+                <option>Tuition Fee</option><option>Bus Fee</option><option>Development Levy</option>
+                <option>Exam Fee</option><option>Sports Fee</option><option>Other</option>
+              </select>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="field-label">Description</label>
+              <input class="field-input" id="ni-description" placeholder="e.g. Term 2 Tuition">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+              <div><label class="field-label">Amount (&#8358;) *</label><input class="field-input" type="number" min="1" step="0.01" id="ni-amount" placeholder="0.00"></div>
+              <div><label class="field-label">Due Date</label><input class="field-input" type="date" id="ni-due-date"></div>
+            </div>
+            <button class="bs-print-btn" style="width:100%;" onclick="submitNewInvoice()">Create Invoice</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invoice / Student Fee History Modal (shared by Invoice List, Class Invoice History, Family Fees History, Fees Debtors) -->
+      <div id="fee-history-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeFeeHistoryModal()">
+        <div class="card" style="width:min(640px,95%);padding:0;max-height:90vh;overflow-y:auto;">
+          <div class="card-head"><span class="card-title" id="fh-title">Fee History</span><button class="cog-modal-close" onclick="closeFeeHistoryModal()">&#x2715;</button></div>
+          <div class="card-body" style="padding:20px;" id="fh-body"></div>
+        </div>
+      </div>
+
+      <!-- Record Payment Modal (opened from an invoice row) -->
+      <div id="record-payment-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1001;align-items:center;justify-content:center;" onclick="if(event.target===this)closeRecordPaymentModal()">
+        <div class="card" style="width:min(420px,95%);padding:0;">
+          <div class="card-head"><span class="card-title">Record Payment</span><button class="cog-modal-close" onclick="closeRecordPaymentModal()">&#x2715;</button></div>
+          <div class="card-body" style="padding:20px;">
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:14px;" id="rp-invoice-label"></div>
+            <div style="margin-bottom:14px;"><label class="field-label">Amount (&#8358;) *</label><input class="field-input" type="number" min="1" step="0.01" id="rp-amount"></div>
+            <div style="margin-bottom:14px;"><label class="field-label">Payment Method *</label>
+              <select class="ctrl-select" id="rp-method"><option>Cash</option><option>Bank Transfer</option><option>Card Payment</option><option>USSD</option><option>Cheque</option><option>Other</option></select>
+            </div>
+            <div style="margin-bottom:14px;"><label class="field-label">Reference</label><input class="field-input" id="rp-reference" placeholder="Optional transaction reference"></div>
+            <div style="margin-bottom:18px;"><label class="field-label">Note</label><input class="field-input" id="rp-note" placeholder="Optional"></div>
+            <button class="bs-print-btn" style="width:100%;" onclick="submitRecordPayment()">Record Payment</button>
+          </div>
+        </div>
+      </div>
+
       <div class="tab-panel" id="tab-classInvoiceHistory">
-        <div class="page-header"><h2>Class Invoice History</h2><p>View invoice history for a class and arm across a session and term</p></div>
+        <div class="page-header"><h2>Class Invoice History</h2><p>View invoice history for a class across an academic term</p></div>
         <div class="card">
           <div class="card-head"><span class="card-title" style="display:flex;align-items:center;gap:8px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><path d="M1.5 2.5h13l-4.8 5.8v4.2l-3.4 1.8V8.3z"/></svg> Select Options to View List</span></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px;">
-              <div><label class="field-label">Fees Session *</label><select class="ctrl-select" id="cih-session"><option>2025-2026</option></select></div>
-              <div><label class="field-label">Fees Term *</label><select class="ctrl-select" id="cih-term"><option value="">Select Term</option><option>FIRST TERM</option><option>SECOND TERM</option><option>THIRD TERM</option></select></div>
+              <div><label class="field-label">Academic Term *</label><select class="ctrl-select" id="cih-term"><option value="">Select Term</option></select></div>
               <div><label class="field-label">Class *</label><select class="ctrl-select" id="cih-class"><option value="">Select Class</option></select></div>
-              <div><label class="field-label">Class Arm *</label><select class="ctrl-select" id="cih-arm"><option value="">Select Class First</option></select></div>
             </div>
             <div style="text-align:center;">
-              <button class="bs-print-btn" onclick="showToast('Class invoice history coming soon')">Load List</button>
+              <button class="bs-print-btn" onclick="cihLoadList()">Load List</button>
             </div>
           </div>
         </div>
-        <div class="card" style="margin-top:16px;">
-          <div class="card-body" style="text-align:center;color:var(--text-3);font-size:12px;padding:60px 20px;">Select a session, term, class, and arm, then click Load List to view invoice history.</div>
+        <div class="card" id="cih-results-card" style="margin-top:16px;display:none;">
+          <div class="card-body">
+            <div style="overflow-x:auto;">
+              <table class="data-table" style="width:100%;">
+                <thead><tr>
+                  <th>#</th><th>Student</th><th>Fee Type</th><th>Amount</th>
+                  <th>Paid</th><th>Balance</th><th>Due Date</th><th>Status</th>
+                </tr></thead>
+                <tbody id="cih-tbody"><tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">Select a term and class, then click Load List.</td></tr></tbody>
+              </table>
+            </div>
+            <div style="text-align:right;padding:12px 4px 0;font-size:12px;font-weight:700;color:var(--text-1);" id="cih-summary"></div>
+          </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-familyFeesHistory">
@@ -3773,132 +3851,62 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 
           <div class="fees-fam-view" data-view="families">
             <div class="card-body">
-              <div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:14px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="4.5" r="2"/><path d="M1 14c0-2.2 1.8-4 4-4s4 1.8 4 4"/><circle cx="12" cy="4.5" r="2"/><path d="M9 14c0-2.2 1.8-4 4-4"/></svg> Families</div>
-              <div style="text-align:center;margin-bottom:16px;">
-                <label class="field-label">Filter : Family List Type</label>
-                <select class="ctrl-select" style="max-width:420px;margin:0 auto;">
-                  <option>Families with active wards (at least one ward still active)</option>
-                  <option>All Families</option>
-                  <option>Families with no active wards</option>
-                </select>
-              </div>
-              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
-                <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:var(--text-1);">124</div><div style="font-size:11px;color:var(--text-3);">Families</div></div>
-                <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:#d97706;">84</div><div style="font-size:11px;color:var(--text-3);">With 1 Parent</div></div>
-                <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:var(--green);">40</div><div style="font-size:11px;color:var(--text-3);">With 2 Parents</div></div>
-                <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:#2563eb;">164</div><div style="font-size:11px;color:var(--text-3);">Total Parents</div></div>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-                <div style="display:flex;gap:10px;">
-                  <button class="bs-export-btn" style="position:static;" onclick="showToast('Bulk actions coming soon')">Action on selected ▾</button>
-                  <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export List ▾</button>
-                </div>
-                <input class="bs-search-input" placeholder="Search" style="width:220px;" oninput="showToast('Family search coming soon')">
+              <div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:14px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="4.5" r="2"/><path d="M1 14c0-2.2 1.8-4 4-4s4 1.8 4 4"/><circle cx="12" cy="4.5" r="2"/><path d="M9 14c0-2.2 1.8-4 4-4"/></svg> Families (grouped by parent/guardian email on file)</div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;" id="ffh-stats"></div>
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+                <input class="bs-search-input" id="ffh-search" placeholder="Search by parent email, student name or ID" style="width:280px;" oninput="ffhRenderTable()">
               </div>
               <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                  <thead><tr><th style="width:32px;"><input type="checkbox"></th><th>#</th><th>Parents</th><th>Wards</th><th>Family Fees</th></tr></thead>
-                  <tbody>
-                    <tr>
-                      <td><input type="checkbox"></td><td>1</td>
-                      <td>
-                        <div style="margin-bottom:8px;"><strong>ADAEZE OKONKWO</strong> (Father) <span class="chip-green">Active</span><br><span style="color:var(--text-3);">+2348012345678</span><br><span style="color:var(--text-3);">adaeze.okonkwo@example.com</span></div>
-                        <div><strong>NGOZI OKONKWO</strong> (Mother) <span class="chip-green">Active</span><br><span style="color:var(--text-3);">+2348023456789</span><br><span style="color:var(--text-3);">ngozi.okonkwo@example.com</span></div>
-                      </td>
-                      <td>
-                        <div>1. CHIDI OKONKWO <span style="color:var(--text-3);">(In Year 1 Violet - Violet)</span> <span class="chip-green">Active</span></div>
-                        <button class="bs-export-btn" style="position:static;margin-top:6px;font-size:11px;padding:5px 10px;" onclick="showToast('Manage wards coming soon')">Manage Wards / Members</button>
-                      </td>
-                      <td>
-                        <button class="bs-export-btn" style="position:static;margin-bottom:6px;" onclick="showToast('Fees records coming soon')">Fees Records</button><br>
-                        <button class="bs-export-btn" style="position:static;border-color:#2563eb;color:#2563eb;" onclick="showToast('Fees wallet coming soon')">Family Fees Account / Wallet</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td><input type="checkbox"></td><td>2</td>
-                      <td>
-                        <div style="margin-bottom:8px;"><strong>TUNDE BAKARE</strong> (Father) <span class="chip-green">Active</span><br><span style="color:var(--text-3);">+2347034567890</span><br><span style="color:var(--text-3);">tunde.bakare@example.com</span></div>
-                        <div><strong>FUNMI BAKARE</strong> (Mother) <span class="chip-green">Active</span><br><span style="color:var(--text-3);">+2348045678901</span><br><span style="color:var(--text-3);">funmi.bakare@example.com</span></div>
-                      </td>
-                      <td>
-                        <div>1. KEMI BAKARE <span style="color:var(--text-3);">(In Pre-School 1 Platinum - Platinum)</span> <span class="chip-green">Active</span></div>
-                        <button class="bs-export-btn" style="position:static;margin-top:6px;font-size:11px;padding:5px 10px;" onclick="showToast('Manage wards coming soon')">Manage Wards / Members</button>
-                      </td>
-                      <td>
-                        <button class="bs-export-btn" style="position:static;margin-bottom:6px;" onclick="showToast('Fees records coming soon')">Fees Records</button><br>
-                        <button class="bs-export-btn" style="position:static;border-color:#2563eb;color:#2563eb;" onclick="showToast('Fees wallet coming soon')">Family Fees Account / Wallet</button>
-                      </td>
-                    </tr>
-                  </tbody>
+                  <thead><tr><th>#</th><th>Parent / Guardian Email</th><th>Wards</th><th>Total Invoiced</th><th>Paid</th><th>Balance</th><th>Action</th></tr></thead>
+                  <tbody id="ffh-tbody"><tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3);">Loading families...</td></tr></tbody>
                 </table>
               </div>
             </div>
           </div>
 
           <div class="fees-fam-view" data-view="wallets" style="display:none;">
-            <div class="card-body" style="text-align:center;color:var(--text-3);font-size:12px;padding:60px 20px;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+            <div class="card-body" style="text-align:center;color:var(--text-3);font-size:12px;padding:60px 20px;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">Prepaid fee wallets aren't part of this release &mdash; use Invoice List and Record Payment for now.</span></div></div>
           </div>
 
           <div class="fees-fam-view" data-view="about" style="display:none;">
-            <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.7;padding:24px 20px;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+            <div class="card-body" style="font-size:12px;color:var(--text-2);line-height:1.7;padding:24px 20px;">
+              <p><strong>Families</strong> here are computed from each student's Parent Email on file (Admission &rarr; Student Directory), grouping every student that shares the same parent/guardian email into one family. There is no separate wallet ledger in this release &mdash; balances are always derived live from invoices and recorded payments.</p>
+            </div>
           </div>
         </div>
       </div>
       <div class="tab-panel" id="tab-reviewPaymentProofs">
-        <div class="page-header"><h2>Review Payment Proofs</h2><p>Proof-of-payment submissions and the online payment transactions log</p></div>
+        <div class="page-header"><h2>Review Payment Proofs</h2><p>Log a payment a parent says they made, then review and confirm it</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title" style="display:flex;align-items:center;gap:8px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><path d="M1.5 2.5h13l-4.8 5.8v4.2l-3.4 1.8V8.3z"/></svg> Select Date Range to View Online Payment Transactions Log</span></div>
+          <div class="card-head"><span class="card-title">Log a Reported Payment</span></div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr)) auto;gap:16px;align-items:end;">
-              <div>
-                <label class="field-label">Transactions Initiated Between *</label>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <input class="field-input" type="date" id="rpp-from" value="2026-05-27">
-                  <span style="color:var(--text-3);font-size:11px;">TO</span>
-                  <input class="field-input" type="date" id="rpp-to" value="2026-07-26">
-                </div>
-              </div>
-              <div><label class="field-label">Transaction Status</label><select class="ctrl-select" id="rpp-status"><option>Payment Proof Under Review</option><option>All Statuses</option><option>Successful</option><option>Failed</option></select></div>
-              <div><label class="field-label">Payment Channel <span style="text-transform:none;font-weight:400;">(Leave Empty for all Channels)</span></label><input class="field-input" id="rpp-channel" placeholder=""></div>
-              <div><button class="bs-print-btn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="showToast('Transaction log coming soon')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg> View Log</button></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:14px;">
+              <div><label class="field-label">Student *</label><select class="ctrl-select" id="rpp-student" onchange="rppLoadInvoices()"><option value="">Select Student</option></select></div>
+              <div><label class="field-label">Invoice *</label><select class="ctrl-select" id="rpp-invoice"><option value="">Select Student First</option></select></div>
+              <div><label class="field-label">Amount (&#8358;) *</label><input class="field-input" type="number" min="1" step="0.01" id="rpp-amount"></div>
+              <div><label class="field-label">Payment Method *</label><select class="ctrl-select" id="rpp-method"><option>Bank Transfer</option><option>Cash</option><option>Card Payment</option><option>USSD</option><option>Cheque</option><option>Other</option></select></div>
             </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;align-items:end;">
+              <div><label class="field-label">Reference</label><input class="field-input" id="rpp-reference" placeholder="Bank/transaction reference"></div>
+              <div><label class="field-label">Note</label><input class="field-input" id="rpp-note" placeholder="Optional"></div>
+              <div><button class="bs-print-btn" style="width:100%;" onclick="submitPaymentProof()">Submit for Review</button></div>
+            </div>
+            <p style="font-size:11px;color:var(--text-3);margin-top:10px;">Submitted payments land in the review queue below as <strong>Pending</strong> until approved.</p>
           </div>
         </div>
         <div class="card" style="margin-top:16px;">
-          <div class="card-head"><span class="card-title">Online Payment Transactions Log &nbsp;|&nbsp; 27 May, 2026 - 26 Jul, 2026</span></div>
+          <div class="card-head"><span class="card-title">Pending Review Queue</span></div>
           <div class="card-body" style="padding:0;">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
-              <div style="display:flex;gap:10px;">
-                <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) ▾</button>
-                <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) ▾</button>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
-              <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
-                <select class="ctrl-select" style="width:80px;"><option>100</option><option>50</option><option>25</option></select>
-                records per page
-              </div>
-              <input class="bs-search-input" placeholder="Search" style="width:220px;">
-            </div>
             <div style="overflow-x:auto;">
               <table class="data-table" style="width:100%;">
                 <thead><tr>
-                  <th>#</th><th>Transaction</th><th>Initiated By</th><th>For</th><th>Fees Title</th>
-                  <th>Gateway Tx Ref No</th><th>Payment Gateway / Channel</th><th>Transaction Amount</th><th>View Invoice</th><th>GL Status</th>
+                  <th>#</th><th>Student</th><th>Fee</th><th>Amount</th><th>Method</th>
+                  <th>Reference</th><th>Submitted</th><th>Action</th>
                 </tr></thead>
-                <tbody><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr></tbody>
+                <tbody id="rpp-tbody"><tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">Loading...</td></tr></tbody>
               </table>
             </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
-              <span style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries (filtered from 2,196 total entries)</span>
-              <div style="display:flex;gap:4px;">
-                <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
-                <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
-                <button class="bs-export-btn" style="position:static;padding:5px 10px;">›</button>
-                <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
-              </div>
-            </div>
-            <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);">Total Successful : &#8358;0</div>
           </div>
         </div>
       </div>
@@ -3937,15 +3945,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                 <label class="field-label">Fees Received Between <span style="color:#e53e3e;">*</span></label>
                 <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--card-bg);">
                   <span style="padding:0 10px;color:var(--text-3);display:flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/></svg></span>
-                  <input type="date" id="sp-date-from" class="field-input" style="border:none;border-radius:0;flex:1;min-width:0;">
+                  <input type="date" id="fsp-date-from" class="field-input" style="border:none;border-radius:0;flex:1;min-width:0;">
                   <span style="padding:0 8px;font-size:11px;color:var(--text-3);font-weight:600;">TO</span>
-                  <input type="date" id="sp-date-to" class="field-input" style="border:none;border-left:1px solid var(--border);border-radius:0;flex:1;min-width:0;">
+                  <input type="date" id="fsp-date-to" class="field-input" style="border:none;border-left:1px solid var(--border);border-radius:0;flex:1;min-width:0;">
                   <span style="padding:0 10px;color:var(--text-3);display:flex;align-items:center;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/></svg></span>
                 </div>
               </div>
               <div style="min-width:200px;">
                 <label class="field-label">Payment Channel</label>
-                <select class="ctrl-select" id="sp-channel">
+                <select class="ctrl-select" id="fsp-channel">
                   <option value="">All</option>
                   <option>Cash</option>
                   <option>Bank Transfer</option>
@@ -3954,7 +3962,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   <option>Bank Payment</option>
                 </select>
               </div>
-              <button class="bs-print-btn" onclick="spViewReport()" style="white-space:nowrap;padding:10px 20px;display:flex;align-items:center;gap:6px;">
+              <button class="bs-print-btn" onclick="fspViewReport()" style="white-space:nowrap;padding:10px 20px;display:flex;align-items:center;gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg>
                 View Report
               </button>
@@ -3962,10 +3970,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </div>
         </div>
         <!-- Results Card (hidden until View Report clicked) -->
-        <div class="card" id="sp-results-card" style="display:none;">
+        <div class="card" id="fsp-results-card" style="display:none;">
           <div class="card-head">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.3"/><path d="M8 5v3l2 1.5"/></svg>
-            <span class="card-title" id="sp-results-title">Report of Fees Received Between</span>
+            <span class="card-title" id="fsp-results-title">Report of Fees Received Between</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;gap:10px;">
@@ -3975,24 +3983,23 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
-              <select class="ctrl-select" style="width:80px;" id="sp-per-page" onchange="spRenderTable()"><option>100</option><option>50</option><option>25</option></select>
+              <select class="ctrl-select" style="width:80px;" id="fsp-per-page" onchange="fspRenderTable()"><option>100</option><option>50</option><option>25</option></select>
               records per page
             </div>
-            <input class="bs-search-input" id="sp-search" placeholder="Search" style="width:220px;" oninput="spRenderTable()">
+            <input class="bs-search-input" id="fsp-search" placeholder="Search" style="width:220px;" oninput="fspRenderTable()">
           </div>
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;">
               <thead><tr>
                 <th>#</th><th>Payment Date &amp; Time</th><th>Payment for</th><th>Class</th>
-                <th>Invoice Title</th><th>Invoice Code</th><th>Payment Amount</th>
-                <th>View Invoice</th><th>Payment Mode</th><th>Received / Confirmed By</th>
-                <th>Transaction ID</th><th>Gateway Tx Reference</th><th>GL Status</th>
+                <th>Fee Type</th><th>Amount</th><th>Payment Method</th>
+                <th>Reference</th><th>Recorded By</th>
               </tr></thead>
-              <tbody id="sp-tbody"><tr><td colspan="13" style="padding:24px;text-align:center;color:var(--text-3);">No data available in table</td></tr></tbody>
+              <tbody id="fsp-tbody"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available in table</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
-            <span id="sp-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
+            <span id="fsp-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
             <div style="display:flex;gap:4px;">
               <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
               <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
@@ -4000,7 +4007,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
             </div>
           </div>
-          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="sp-total">Total : &#8358;0.00</div>
+          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="fsp-total">Total : &#8358;0.00</div>
         </div>
       </div>
 
@@ -4028,15 +4035,18 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <div style="min-width:180px;">
                 <label class="field-label">Transaction Status</label>
                 <select class="ctrl-select" id="ap-status">
-                  <option value="">All</option>
-                  <option>Successful</option>
-                  <option>Pending</option>
-                  <option>Failed</option>
+                  <option value="all">All</option>
+                  <option value="successful">Successful</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
                 </select>
               </div>
               <div style="min-width:200px;">
-                <label class="field-label">Payment Channel <span style="font-size:10px;color:var(--text-3);">(Leave Empty for all Channels)</span></label>
-                <input class="field-input" id="ap-channel" placeholder="">
+                <label class="field-label">Payment Method</label>
+                <select class="ctrl-select" id="ap-channel">
+                  <option value="">All Methods</option>
+                  <option>Cash</option><option>Bank Transfer</option><option>Card Payment</option><option>USSD</option><option>Cheque</option><option>Other</option>
+                </select>
               </div>
               <button class="bs-print-btn" onclick="apViewLog()" style="white-space:nowrap;padding:10px 20px;display:flex;align-items:center;gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg>
@@ -4049,13 +4059,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <div class="card" id="ap-results-card" style="display:none;">
           <div class="card-head">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.5 8A5.5 5.5 0 1 1 11.8 4"/><polyline points="13.5 2.5 13.5 5.5 10.5 5.5"/></svg>
-            <span class="card-title" id="ap-results-title">Online Payment Transactions Log</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;gap:10px;">
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-            </div>
+            <span class="card-title" id="ap-results-title">Payment Attempts Log</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
@@ -4067,33 +4071,22 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;">
               <thead><tr>
-                <th>#</th><th>Transaction</th><th>Initiated By</th><th>For</th>
-                <th>Fees Title</th><th>Gateway Tx Ref No</th><th>Payment Gateway / Channel</th>
-                <th>Transaction Amount</th><th>View Invoice</th><th>GL Status</th>
+                <th>#</th><th>Date</th><th>Student</th><th>Class</th>
+                <th>Fee Type</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th>
               </tr></thead>
-              <tbody id="ap-tbody"><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr></tbody>
+              <tbody id="ap-tbody"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
             <span id="ap-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
-            <div style="display:flex;gap:4px;">
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">›</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
-            </div>
           </div>
-          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);">Total Successful : &#8358;0</div>
+          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="ap-total">Total Successful : &#8358;0</div>
         </div>
       </div>
 
       <!-- ── FEES DEBTORS ── -->
       <div class="tab-panel" id="tab-feesDebtors">
         <div class="page-header"><h2>Fees Debtors</h2><p>Students and families with outstanding fees</p></div>
-        <!-- Top Debtors List link -->
-        <div style="text-align:center;margin-bottom:10px;">
-          <a href="#" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:600;" onclick="return false;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg> Debtors List</a>
-        </div>
         <!-- Filter Card -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-head" style="gap:6px;">
@@ -4101,55 +4094,14 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <span class="card-title">Select Options to View Debtors List</span>
           </div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:14px;">
-              <div>
-                <label class="field-label">Fees Session <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-session"></select>
-              </div>
-              <div>
-                <label class="field-label">Fees Term <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-term">
-                  <option value="">Select Term</option>
-                  <option>FIRST TERM</option>
-                  <option>SECOND TERM</option>
-                  <option>THIRD TERM</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Class <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-class" onchange="fdLoadArms()">
-                  <option value="">Select Class</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Class Arm <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-arm">
-                  <option value="">Select Class First</option>
-                </select>
-              </div>
-            </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-items:flex-end;">
               <div>
-                <label class="field-label">For Invoice Type <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-invoice-type">
-                  <option value="">All</option>
-                  <option>School Fees</option>
-                  <option>Other Fees</option>
-                </select>
+                <label class="field-label">Academic Term</label>
+                <select class="ctrl-select" id="fd-term"><option value="">All Terms</option></select>
               </div>
               <div>
-                <label class="field-label">For Invoice(s) <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-invoices">
-                  <option value="">All</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Student Account Status <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-acct-status">
-                  <option value="">All</option>
-                  <option>Active</option>
-                  <option>Inactive</option>
-                </select>
+                <label class="field-label">Class</label>
+                <select class="ctrl-select" id="fd-class"><option value="">All Classes</option></select>
               </div>
               <div>
                 <button class="bs-print-btn" style="width:100%;padding:10px 0;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="fdLoadDebtors()">
@@ -4165,37 +4117,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-head">
             <span class="card-title" id="fd-results-title">Debtors List</span>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;gap:10px;">
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
-              <select class="ctrl-select" style="width:80px;" id="fd-per-page" onchange="fdRenderTable()"><option>100</option><option>50</option><option>25</option></select>
-              records per page
-            </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;padding:12px 18px;flex-wrap:wrap;gap:10px;">
             <input class="bs-search-input" id="fd-search" placeholder="Search" style="width:220px;" oninput="fdRenderTable()">
           </div>
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;">
               <thead><tr>
                 <th>#</th><th>Student Name</th><th>Reg No.</th><th>Class</th>
-                <th>Invoice</th><th>Total Fees</th><th>Amount Paid</th><th>Balance Due</th>
-                <th>View Invoice</th>
+                <th>Invoices</th><th>Total Fees</th><th>Amount Paid</th><th>Balance Due</th>
+                <th>Due Date</th><th>Action</th>
               </tr></thead>
-              <tbody id="fd-tbody"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr></tbody>
+              <tbody id="fd-tbody"><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
             <span id="fd-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
-            <div style="display:flex;gap:4px;">
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">›</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
-            </div>
           </div>
           <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="fd-total">Total Balance Due : &#8358;0.00</div>
         </div>

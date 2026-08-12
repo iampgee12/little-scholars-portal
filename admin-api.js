@@ -1857,7 +1857,11 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'lessonAttendanceReport') larInit();
   if (tab === 'markStaffAttendance') msaInit();
   if (tab === 'staffAttendanceReport') sarInit();
-  if (tab === 'successfulPayments') spInit();
+  if (tab === 'invoiceList') ilInit();
+  if (tab === 'classInvoiceHistory') cihInit();
+  if (tab === 'familyFeesHistory') ffhInit();
+  if (tab === 'reviewPaymentProofs') rppInit();
+  if (tab === 'successfulPayments') fspInit();
   if (tab === 'allPaymentAttempts') apInit();
   if (tab === 'feesDebtors') fdInit();
   if (tab === 'expenseRequests') erInit();
@@ -1909,13 +1913,26 @@ function closeVerifyPaymentModal() {
   if (m) m.style.display = 'none';
 }
 
-function submitVerifyPayment() {
+async function submitVerifyPayment() {
   const method = document.getElementById('vp-method')?.value;
   const ref = document.getElementById('vp-reference')?.value?.trim();
   if (!method) { showToast('Select a payment method'); return; }
   if (!ref) { showToast('Enter a payment / transaction reference'); return; }
-  showToast('Payment verification coming soon');
-  closeVerifyPaymentModal();
+  try {
+    const data = await apiFetch(`/api/admin/fees/payments?reference=${encodeURIComponent(ref)}&method=${encodeURIComponent(method)}`);
+    const match = (data.payments || [])[0];
+    if (!match) { showToast(`No ${method} payment found with reference "${ref}"`); return; }
+    if (match.status === 'successful') {
+      showToast(`Payment already verified — ${match.studentName}, ${fmtNaira(match.amount)}`);
+      closeVerifyPaymentModal();
+      return;
+    }
+    await apiFetch(`/api/admin/fees/payments/${match.id}/status`, { method: 'POST', body: JSON.stringify({ status: 'successful' }) });
+    showToast(`Verified: ${match.studentName} — ${fmtNaira(match.amount)} marked successful`);
+    closeVerifyPaymentModal();
+  } catch (e) {
+    showToast(e.message);
+  }
 }
 
 // ── ATTENDANCE HELPERS ──
@@ -3992,110 +4009,524 @@ function saveCbComment() {
   showToast('Comment saved','success');
 }
 
-// ── FEES LOGS & REPORTS ──────────────────────────────────────────────────────
+// ── FEES / BURSARY (Finance MVP) ─────────────────────────────────────────────
+// Backs Invoice List, Class Invoice History, Family Fees History, Review
+// Payment Proofs, Verify Payment Status, Successful Payments, All Payment
+// Attempts, and Fees Debtors. All of it talks to the /api/admin/fees/* routes
+// added in server.js. Kept as one self-contained section (own state, own
+// helpers) so it doesn't need to touch any of the result/academics code above.
 
-// Successful Payments
-let _spData = [];
-function spInit() {
-  document.getElementById('sp-results-card').style.display = 'none';
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('sp-date-to').value = today;
+let _feesTermsCache = null;
+async function feesTermsList() {
+  if (_feesTermsCache) return _feesTermsCache;
+  try {
+    const data = await apiFetch('/api/admin/academic-sessions');
+    _feesTermsCache = data.sessions || [];
+  } catch (e) {
+    _feesTermsCache = [];
+  }
+  return _feesTermsCache;
+}
+
+async function populateFeeTermSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const previous = select.value;
+  const placeholder = select.querySelector('option[value=""]')?.outerHTML || '<option value="">All Terms</option>';
+  const terms = await feesTermsList();
+  select.innerHTML = placeholder + terms.map(t =>
+    `<option value="${t.id}">${escapeHtml(t.sessionLabel)} - ${escapeHtml(t.termLabel)}${t.isActive ? ' (Active)' : ''}</option>`
+  ).join('');
+  if (terms.some(t => String(t.id) === previous)) select.value = previous;
+}
+
+function populateFeeClassSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const previous = select.value;
+  const placeholder = select.querySelector('option[value=""]')?.outerHTML || '<option value="">All Classes</option>';
+  const classes = state.setup.classes || [];
+  select.innerHTML = placeholder + classes.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
+  if (classes.some(c => c.code === previous)) select.value = previous;
+}
+
+function populateFeeStudentSelect(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const students = [...(state.setup.students || [])].sort((a, b) => a.name.localeCompare(b.name));
+  select.innerHTML = '<option value="">Select Student</option>' +
+    students.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} (${escapeHtml(s.id)}) - ${escapeHtml(s.classCode)}</option>`).join('');
+}
+
+function fmtNaira(n) {
+  return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function feeFmtDate(value) {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function invoiceStatusBadge(inv) {
+  const map = {
+    paid:    ['var(--green-bg)', 'var(--green)', 'Paid'],
+    partial: ['var(--amber-bg)', 'var(--amber)', 'Part Paid'],
+    unpaid:  ['var(--red-bg)', 'var(--red)', 'Unpaid'],
+  };
+  const [bg, color, label] = map[inv.status] || map.unpaid;
+  const overdueTag = inv.overdue ? ` <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--red);">Overdue</span>` : '';
+  return `<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${label}</span>${overdueTag}`;
+}
+
+function paymentStatusBadge(status) {
+  const map = {
+    successful: ['var(--green-bg)', 'var(--green)', 'Successful'],
+    pending:    ['var(--amber-bg)', 'var(--amber)', 'Pending'],
+    failed:     ['var(--red-bg)', 'var(--red)', 'Failed'],
+  };
+  const [bg, color, label] = map[status] || map.pending;
+  return `<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${label}</span>`;
+}
+
+// ── New Invoice modal ──
+function openNewInvoiceModal() {
+  populateFeeStudentSelect('ni-student');
+  populateFeeClassSelect('ni-class');
+  document.getElementById('ni-mode').value = 'student';
+  document.getElementById('ni-description').value = '';
+  document.getElementById('ni-amount').value = '';
+  document.getElementById('ni-due-date').value = '';
+  niToggleMode();
+  document.getElementById('new-invoice-modal').style.display = 'flex';
+}
+function closeNewInvoiceModal() {
+  document.getElementById('new-invoice-modal').style.display = 'none';
+}
+function niToggleMode() {
+  const mode = document.getElementById('ni-mode').value;
+  document.getElementById('ni-student-wrap').style.display = mode === 'student' ? '' : 'none';
+  document.getElementById('ni-class-wrap').style.display = mode === 'class' ? '' : 'none';
+}
+async function submitNewInvoice() {
+  const mode = document.getElementById('ni-mode').value;
+  const feeType = document.getElementById('ni-fee-type').value;
+  const description = document.getElementById('ni-description').value.trim();
+  const amount = document.getElementById('ni-amount').value;
+  const dueDate = document.getElementById('ni-due-date').value;
+  const body = { feeType, description, amount, dueDate };
+  if (mode === 'student') {
+    const studentId = document.getElementById('ni-student').value;
+    if (!studentId) return showToast('Select a student');
+    body.studentId = studentId;
+  } else {
+    const classCode = document.getElementById('ni-class').value;
+    if (!classCode) return showToast('Select a class');
+    body.classCode = classCode;
+  }
+  try {
+    const data = await apiFetch('/api/admin/fees/invoices', { method: 'POST', body: JSON.stringify(body) });
+    showToast(`Created ${data.count} invoice${data.count === 1 ? '' : 's'}`);
+    closeNewInvoiceModal();
+    if (document.getElementById('tab-invoiceList')?.classList.contains('active')) ilViewList();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+// ── Record Payment modal (opened from any invoice row) ──
+let _rpInvoiceId = null;
+let _rpOnDone = null;
+function openRecordPaymentModal(invoiceId, label, onDone) {
+  _rpInvoiceId = invoiceId;
+  _rpOnDone = onDone || null;
+  document.getElementById('rp-invoice-label').textContent = label || '';
+  document.getElementById('rp-amount').value = '';
+  document.getElementById('rp-reference').value = '';
+  document.getElementById('rp-note').value = '';
+  document.getElementById('record-payment-modal').style.display = 'flex';
+}
+function closeRecordPaymentModal() {
+  document.getElementById('record-payment-modal').style.display = 'none';
+}
+async function submitRecordPayment() {
+  const amount = document.getElementById('rp-amount').value;
+  const method = document.getElementById('rp-method').value;
+  const reference = document.getElementById('rp-reference').value.trim();
+  const note = document.getElementById('rp-note').value.trim();
+  if (!_rpInvoiceId) return;
+  try {
+    await apiFetch(`/api/admin/fees/invoices/${_rpInvoiceId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, method, reference, note, status: 'successful' }),
+    });
+    showToast('Payment recorded');
+    closeRecordPaymentModal();
+    if (typeof _rpOnDone === 'function') _rpOnDone();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+// ── Fee History modal (a student's, or a whole family's, invoices/payments) ──
+async function openFeeHistoryModal(query) {
+  const modal = document.getElementById('fee-history-modal');
+  const body = document.getElementById('fh-body');
+  document.getElementById('fh-title').textContent = 'Fee History';
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-3);">Loading...</div>';
+  modal.style.display = 'flex';
+  try {
+    const qs = query.studentId ? `studentId=${encodeURIComponent(query.studentId)}` : `parentEmail=${encodeURIComponent(query.parentEmail)}`;
+    const data = await apiFetch(`/api/admin/fees/history?${qs}`);
+    const students = data.students || [];
+    document.getElementById('fh-title').textContent = students.length === 1 ? `${students[0].name} - Fee History` : `Family Fee History (${students.length} students)`;
+    body.innerHTML = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <div style="flex:1;min-width:110px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;"><div style="font-size:15px;font-weight:800;">${fmtNaira(data.totals.invoiced)}</div><div style="font-size:10px;color:var(--text-3);">Invoiced</div></div>
+        <div style="flex:1;min-width:110px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;"><div style="font-size:15px;font-weight:800;color:var(--green);">${fmtNaira(data.totals.paid)}</div><div style="font-size:10px;color:var(--text-3);">Paid</div></div>
+        <div style="flex:1;min-width:110px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;"><div style="font-size:15px;font-weight:800;color:${data.totals.balance > 0 ? 'var(--red)' : 'var(--green)'};">${fmtNaira(data.totals.balance)}</div><div style="font-size:10px;color:var(--text-3);">Balance</div></div>
+      </div>
+      ${students.map(s => `
+        <div style="margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:8px;">${escapeHtml(s.name)} <span style="color:var(--text-3);font-weight:400;">(${escapeHtml(s.id)} - ${escapeHtml(s.classCode)})</span></div>
+          <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;">
+              <thead><tr><th>Fee Type</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                ${s.invoices.length ? s.invoices.map(inv => `
+                  <tr>
+                    <td>${escapeHtml(inv.feeType)}${inv.description ? `<br><span style="color:var(--text-3);font-size:11px;">${escapeHtml(inv.description)}</span>` : ''}</td>
+                    <td>${fmtNaira(inv.amount)}</td>
+                    <td>${fmtNaira(inv.paid)}</td>
+                    <td>${fmtNaira(inv.balance)}</td>
+                    <td>${feeFmtDate(inv.dueDate)}</td>
+                    <td>${invoiceStatusBadge(inv)}</td>
+                    <td>${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(s.name)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', () => openFeeHistoryModal(${query.studentId ? `{studentId:'${query.studentId}'}` : `{parentEmail:'${query.parentEmail}'}`}))">Record Payment</button>` : ''}</td>
+                  </tr>`).join('') : `<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--text-3);">No invoices yet</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`).join('')}
+    `;
+  } catch (e) {
+    body.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-3);">${escapeHtml(e.message)}</div>`;
+  }
+}
+function closeFeeHistoryModal() {
+  document.getElementById('fee-history-modal').style.display = 'none';
+}
+
+// ── Invoice List ──
+let _ilData = [];
+async function ilInit() {
+  populateFeeClassSelect('il-class');
+  await populateFeeTermSelect('il-term');
+}
+async function ilViewList() {
+  const classCode = document.getElementById('il-class').value;
+  const academicId = document.getElementById('il-term').value;
+  const status = document.getElementById('il-status').value;
+  const params = new URLSearchParams();
+  if (classCode) params.set('classCode', classCode);
+  if (academicId) params.set('academicId', academicId);
+  if (status) params.set('status', status);
+  try {
+    const data = await apiFetch(`/api/admin/fees/invoices?${params.toString()}`);
+    _ilData = data.invoices || [];
+    ilRenderTable();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+function ilRenderTable() {
+  const q = (document.getElementById('il-search').value || '').toLowerCase();
+  const rows = _ilData.filter(inv => !q ||
+    inv.studentName.toLowerCase().includes(q) ||
+    inv.studentId.toLowerCase().includes(q) ||
+    (inv.feeType || '').toLowerCase().includes(q));
+  const tbody = document.getElementById('il-tbody');
+  tbody.innerHTML = rows.length ? rows.map((inv, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><strong>${escapeHtml(inv.studentName)}</strong><br><span style="color:var(--text-3);font-size:11px;">${escapeHtml(inv.studentId)}</span></td>
+      <td>${escapeHtml(inv.classLabel)}</td>
+      <td>${escapeHtml(inv.feeType)}</td>
+      <td>${fmtNaira(inv.amount)}</td>
+      <td>${fmtNaira(inv.paid)}</td>
+      <td>${fmtNaira(inv.balance)}</td>
+      <td>${feeFmtDate(inv.dueDate)}</td>
+      <td>${invoiceStatusBadge(inv)}</td>
+      <td>
+        <button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${inv.studentId}'})">View</button>
+        ${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;border-color:#2563eb;color:#2563eb;margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
+      </td>
+    </tr>`).join('') : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No invoices match these filters.</td></tr>`;
+  const totals = rows.reduce((acc, inv) => ({ invoiced: acc.invoiced + inv.amount, paid: acc.paid + inv.paid, balance: acc.balance + inv.balance }), { invoiced: 0, paid: 0, balance: 0 });
+  document.getElementById('il-summary').textContent = rows.length
+    ? `${rows.length} invoice${rows.length === 1 ? '' : 's'} — Invoiced ${fmtNaira(totals.invoiced)} · Paid ${fmtNaira(totals.paid)} · Balance ${fmtNaira(totals.balance)}`
+    : '';
+}
+
+// ── Class Invoice History ──
+async function cihInit() {
+  await populateFeeTermSelect('cih-term');
+  populateFeeClassSelect('cih-class');
+}
+async function cihLoadList() {
+  const academicId = document.getElementById('cih-term').value;
+  const classCode = document.getElementById('cih-class').value;
+  if (!classCode) return showToast('Select a class');
+  const params = new URLSearchParams({ classCode });
+  if (academicId) params.set('academicId', academicId);
+  try {
+    const data = await apiFetch(`/api/admin/fees/invoices?${params.toString()}`);
+    const invoices = data.invoices || [];
+    document.getElementById('cih-results-card').style.display = '';
+    const tbody = document.getElementById('cih-tbody');
+    tbody.innerHTML = invoices.length ? invoices.map((inv, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(inv.studentName)}</td>
+        <td>${escapeHtml(inv.feeType)}</td>
+        <td>${fmtNaira(inv.amount)}</td>
+        <td>${fmtNaira(inv.paid)}</td>
+        <td>${fmtNaira(inv.balance)}</td>
+        <td>${feeFmtDate(inv.dueDate)}</td>
+        <td>${invoiceStatusBadge(inv)}</td>
+      </tr>`).join('') : `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">No invoices for this class/term.</td></tr>`;
+    document.getElementById('cih-summary').textContent = `${data.summary.count} invoices — Invoiced ${fmtNaira(data.summary.totalInvoiced)} · Paid ${fmtNaira(data.summary.totalPaid)} · Balance ${fmtNaira(data.summary.totalBalance)}`;
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+// ── Family Fees History ──
+let _ffhData = [];
+async function ffhInit() {
+  try {
+    const data = await apiFetch('/api/admin/fees/families');
+    _ffhData = data.families || [];
+    const totalBalance = _ffhData.reduce((sum, f) => sum + f.totals.balance, 0);
+    const withBalance = _ffhData.filter(f => f.totals.balance > 0).length;
+    document.getElementById('ffh-stats').innerHTML = `
+      <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:var(--text-1);">${_ffhData.length}</div><div style="font-size:11px;color:var(--text-3);">Families</div></div>
+      <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:var(--amber);">${withBalance}</div><div style="font-size:11px;color:var(--text-3);">With Balance Due</div></div>
+      <div style="flex:1;min-width:130px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;"><div style="font-size:20px;font-weight:800;color:var(--red);">${fmtNaira(totalBalance)}</div><div style="font-size:11px;color:var(--text-3);">Total Outstanding</div></div>
+    `;
+    ffhRenderTable();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+function ffhRenderTable() {
+  const q = (document.getElementById('ffh-search').value || '').toLowerCase();
+  const rows = _ffhData.filter(f => !q ||
+    f.parentEmail.toLowerCase().includes(q) ||
+    f.students.some(s => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)));
+  const tbody = document.getElementById('ffh-tbody');
+  tbody.innerHTML = rows.length ? rows.map((f, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${escapeHtml(f.parentEmail)}</td>
+      <td>${f.students.map(s => `${escapeHtml(s.name)} <span style="color:var(--text-3);">(${escapeHtml(s.classCode)})</span>`).join('<br>')}</td>
+      <td>${fmtNaira(f.totals.invoiced)}</td>
+      <td>${fmtNaira(f.totals.paid)}</td>
+      <td style="${f.totals.balance > 0 ? 'color:var(--red);font-weight:700;' : ''}">${fmtNaira(f.totals.balance)}</td>
+      <td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({parentEmail:'${escapeHtml(f.parentEmail)}'})">Fees Records</button></td>
+    </tr>`).join('') : `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3);">No families with a parent email on file yet.</td></tr>`;
+}
+
+// ── Review Payment Proofs (log a reported payment + review queue) ──
+async function rppInit() {
+  populateFeeStudentSelect('rpp-student');
+  document.getElementById('rpp-invoice').innerHTML = '<option value="">Select Student First</option>';
+  await rppLoadQueue();
+}
+async function rppLoadInvoices() {
+  const studentId = document.getElementById('rpp-student').value;
+  const select = document.getElementById('rpp-invoice');
+  if (!studentId) { select.innerHTML = '<option value="">Select Student First</option>'; return; }
+  try {
+    const data = await apiFetch(`/api/admin/fees/invoices?studentId=${encodeURIComponent(studentId)}`);
+    const open = (data.invoices || []).filter(inv => inv.balance > 0);
+    select.innerHTML = open.length
+      ? open.map(inv => `<option value="${inv.id}">${escapeHtml(inv.feeType)} — Balance ${fmtNaira(inv.balance)}</option>`).join('')
+      : '<option value="">No outstanding invoices for this student</option>';
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+async function submitPaymentProof() {
+  const invoiceId = document.getElementById('rpp-invoice').value;
+  const amount = document.getElementById('rpp-amount').value;
+  const method = document.getElementById('rpp-method').value;
+  const reference = document.getElementById('rpp-reference').value.trim();
+  const note = document.getElementById('rpp-note').value.trim();
+  if (!invoiceId) return showToast('Select an invoice');
+  try {
+    await apiFetch(`/api/admin/fees/invoices/${invoiceId}/payments`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, method, reference, note, status: 'pending' }),
+    });
+    showToast('Submitted for review');
+    document.getElementById('rpp-amount').value = '';
+    document.getElementById('rpp-reference').value = '';
+    document.getElementById('rpp-note').value = '';
+    rppLoadQueue();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+async function rppLoadQueue() {
+  const tbody = document.getElementById('rpp-tbody');
+  try {
+    const data = await apiFetch('/api/admin/fees/payments?status=pending');
+    const rows = data.payments || [];
+    tbody.innerHTML = rows.length ? rows.map((p, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(p.studentName)}</td>
+        <td>${escapeHtml(p.feeType)}</td>
+        <td>${fmtNaira(p.amount)}</td>
+        <td>${escapeHtml(p.method)}</td>
+        <td>${escapeHtml(p.reference || '-')}</td>
+        <td>${feeFmtDate(p.recordedAt)}</td>
+        <td>
+          <button class="bs-export-btn" style="position:static;border-color:var(--green);color:var(--green);" onclick="rppReview(${p.id}, 'successful')">Approve</button>
+          <button class="bs-export-btn" style="position:static;border-color:var(--red);color:var(--red);margin-left:4px;" onclick="rppReview(${p.id}, 'failed')">Reject</button>
+        </td>
+      </tr>`).join('') : `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">Nothing awaiting review.</td></tr>`;
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+async function rppReview(paymentId, status) {
+  try {
+    await apiFetch(`/api/admin/fees/payments/${paymentId}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+    showToast(status === 'successful' ? 'Payment approved' : 'Payment rejected');
+    rppLoadQueue();
+  } catch (e) {
+    showToast(e.message);
+  }
+}
+
+// ── Successful Payments ──
+// NOTE: ids/functions are prefixed `fsp` (not `sp`) because the pre-existing
+// Payroll "Staff Positions" screen already uses id="sp-tbody"/"sp-showing" —
+// this avoids colliding with that (out-of-scope, sibling-owned) markup.
+let _fspData = [];
+function fspInit() {
+  document.getElementById('fsp-results-card').style.display = 'none';
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('fsp-date-to').value = today;
   const past = new Date(); past.setDate(past.getDate() - 30);
-  document.getElementById('sp-date-from').value = past.toISOString().slice(0,10);
+  document.getElementById('fsp-date-from').value = past.toISOString().slice(0, 10);
 }
-function spViewReport() {
-  const from = document.getElementById('sp-date-from').value;
-  const to   = document.getElementById('sp-date-to').value;
-  if (!from || !to) { showToast('Please select a date range','error'); return; }
+async function fspViewReport() {
+  const from = document.getElementById('fsp-date-from').value;
+  const to = document.getElementById('fsp-date-to').value;
+  const channel = document.getElementById('fsp-channel').value;
+  if (!from || !to) { showToast('Please select a date range'); return; }
   const fmt = d => d.split('-').reverse().join('-');
-  document.getElementById('sp-results-title').textContent = `Report of Fees Received Between ${fmt(from)} — ${fmt(to)}`;
-  _spData = [];
-  document.getElementById('sp-results-card').style.display = '';
-  spRenderTable();
+  document.getElementById('fsp-results-title').textContent = `Report of Fees Received Between ${fmt(from)} — ${fmt(to)}`;
+  const params = new URLSearchParams({ from, to, status: 'successful' });
+  if (channel) params.set('method', channel);
+  try {
+    const data = await apiFetch(`/api/admin/fees/payments?${params.toString()}`);
+    _fspData = data.payments || [];
+    document.getElementById('fsp-results-card').style.display = '';
+    fspRenderTable();
+  } catch (e) {
+    showToast(e.message);
+  }
 }
-function spRenderTable() {
-  const q = (document.getElementById('sp-search').value || '').toLowerCase();
-  const rows = _spData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
-  const tbody = document.getElementById('sp-tbody');
+function fspRenderTable() {
+  const q = (document.getElementById('fsp-search').value || '').toLowerCase();
+  const rows = _fspData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+  const tbody = document.getElementById('fsp-tbody');
   tbody.innerHTML = rows.length
-    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.date||''}</td><td>${r.student||''}</td><td>${r.cls||''}</td><td>${r.title||''}</td><td>${r.code||''}</td><td>${r.amount||''}</td><td>—</td><td>${r.mode||''}</td><td>${r.confirmedBy||''}</td><td>${r.txId||''}</td><td>${r.gwRef||''}</td><td>${r.glStatus||''}</td></tr>`).join('')
-    : `<tr><td colspan="13" style="padding:24px;text-align:center;color:var(--text-3);">No data available in table</td></tr>`;
-  document.getElementById('sp-showing').textContent = `Showing 0 to 0 of ${rows.length} entries`;
-  document.getElementById('sp-total').textContent = 'Total : ₦0.00';
+    ? rows.map((r, i) => `<tr><td>${i + 1}</td><td>${feeFmtDate(r.recordedAt)}</td><td>${escapeHtml(r.studentName)}</td><td>${escapeHtml(r.classLabel)}</td><td>${escapeHtml(r.feeType)}</td><td>${fmtNaira(r.amount)}</td><td>${escapeHtml(r.method)}</td><td>${escapeHtml(r.reference || '-')}</td><td>${escapeHtml(r.recordedByName || '-')}</td></tr>`).join('')
+    : `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available in table</td></tr>`;
+  document.getElementById('fsp-showing').textContent = `Showing ${rows.length} of ${_fspData.length} entries`;
+  const total = rows.reduce((sum, r) => sum + r.amount, 0);
+  document.getElementById('fsp-total').textContent = `Total : ${fmtNaira(total)}`;
 }
 
-// All Payment Attempts
+// ── All Payment Attempts ──
 let _apData = [];
 function apInit() {
   document.getElementById('ap-results-card').style.display = 'none';
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0, 10);
   document.getElementById('ap-date-to').value = today;
   const past = new Date(); past.setDate(past.getDate() - 183);
-  document.getElementById('ap-date-from').value = past.toISOString().slice(0,10);
+  document.getElementById('ap-date-from').value = past.toISOString().slice(0, 10);
 }
-function apViewLog() {
+async function apViewLog() {
   const from = document.getElementById('ap-date-from').value;
-  const to   = document.getElementById('ap-date-to').value;
-  if (!from || !to) { showToast('Please select a date range','error'); return; }
+  const to = document.getElementById('ap-date-to').value;
+  const status = document.getElementById('ap-status').value;
+  const method = document.getElementById('ap-channel').value;
+  if (!from || !to) { showToast('Please select a date range'); return; }
   const fmt = d => d.split('-').reverse().join('-');
-  document.getElementById('ap-results-title').textContent = `Online Payment Transactions Log  |  ${fmt(from)}  -  ${fmt(to)}`;
-  _apData = [];
-  document.getElementById('ap-results-card').style.display = '';
-  apRenderTable();
+  document.getElementById('ap-results-title').textContent = `Payment Attempts Log  |  ${fmt(from)}  -  ${fmt(to)}`;
+  const params = new URLSearchParams({ from, to });
+  if (status && status !== 'all') params.set('status', status);
+  if (method) params.set('method', method);
+  try {
+    const data = await apiFetch(`/api/admin/fees/payments?${params.toString()}`);
+    _apData = data.payments || [];
+    document.getElementById('ap-results-card').style.display = '';
+    apRenderTable();
+  } catch (e) {
+    showToast(e.message);
+  }
 }
 function apRenderTable() {
   const q = (document.getElementById('ap-search').value || '').toLowerCase();
   const rows = _apData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
   const tbody = document.getElementById('ap-tbody');
   tbody.innerHTML = rows.length
-    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.tx||''}</td><td>${r.by||''}</td><td>${r.for_||''}</td><td>${r.title||''}</td><td>${r.gwRef||''}</td><td>${r.channel||''}</td><td>${r.amount||''}</td><td>—</td><td>${r.glStatus||''}</td></tr>`).join('')
-    : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr>`;
-  document.getElementById('ap-showing').textContent = `Showing 0 to 0 of 0 entries (filtered from ${_apData.length} total entries)`;
+    ? rows.map((r, i) => `<tr><td>${i + 1}</td><td>${feeFmtDate(r.recordedAt)}</td><td>${escapeHtml(r.studentName)}</td><td>${escapeHtml(r.classLabel)}</td><td>${escapeHtml(r.feeType)}</td><td>${escapeHtml(r.method)}</td><td>${fmtNaira(r.amount)}</td><td>${escapeHtml(r.reference || '-')}</td><td>${paymentStatusBadge(r.status)}</td></tr>`).join('')
+    : `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr>`;
+  document.getElementById('ap-showing').textContent = `Showing ${rows.length} of ${_apData.length} entries`;
+  const total = rows.filter(r => r.status === 'successful').reduce((sum, r) => sum + r.amount, 0);
+  document.getElementById('ap-total').textContent = `Total Successful : ${fmtNaira(total)}`;
 }
 
-// Fees Debtors
+// ── Fees Debtors ──
 let _fdData = [];
-function fdInit() {
+async function fdInit() {
   document.getElementById('fd-results-card').style.display = 'none';
-  const sess = document.getElementById('fd-session');
-  const st = state.setup;
-  if (sess && !sess.options.length) {
-    const sessions = [...new Set((st.resultBatches||[]).map(b => b.session).filter(Boolean))];
-    sess.innerHTML = sessions.length
-      ? sessions.map(s => `<option value="${s}">${s}</option>`).join('')
-      : `<option value="">No sessions</option>`;
-  }
-  const cls = document.getElementById('fd-class');
-  if (cls && cls.options.length <= 1) {
-    cls.innerHTML = `<option value="">Select Class</option>` +
-      (st.classes||[]).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-  }
+  await populateFeeTermSelect('fd-term');
+  populateFeeClassSelect('fd-class');
 }
-function fdLoadArms() {
-  const clsId = document.getElementById('fd-class').value;
-  const arm = document.getElementById('fd-arm');
-  if (!clsId) { arm.innerHTML = `<option value="">Select Class First</option>`; return; }
-  const arms = (state.setup.classArms||[]).filter(a => String(a.class_id) === String(clsId));
-  arm.innerHTML = `<option value="">All Arms</option>` + arms.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
-}
-function fdLoadDebtors() {
-  const sess = document.getElementById('fd-session').value;
-  const term = document.getElementById('fd-term').value;
-  const cls  = document.getElementById('fd-class').value;
-  if (!sess || !term || !cls) { showToast('Please select Session, Term and Class','error'); return; }
-  _fdData = [];
-  document.getElementById('fd-results-card').style.display = '';
-  fdRenderTable();
+async function fdLoadDebtors() {
+  const academicId = document.getElementById('fd-term').value;
+  const classCode = document.getElementById('fd-class').value;
+  const params = new URLSearchParams();
+  if (academicId) params.set('academicId', academicId);
+  if (classCode) params.set('classCode', classCode);
+  try {
+    const data = await apiFetch(`/api/admin/fees/debtors?${params.toString()}`);
+    _fdData = data.debtors || [];
+    document.getElementById('fd-results-card').style.display = '';
+    fdRenderTable();
+  } catch (e) {
+    showToast(e.message);
+  }
 }
 function fdRenderTable() {
   const q = (document.getElementById('fd-search').value || '').toLowerCase();
-  const rows = _fdData.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+  const rows = _fdData.filter(r => !q || r.studentName.toLowerCase().includes(q) || r.studentId.toLowerCase().includes(q));
   const tbody = document.getElementById('fd-tbody');
   tbody.innerHTML = rows.length
-    ? rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.name||''}</td><td>${r.regNo||''}</td><td>${r.cls||''}</td><td>${r.invoice||''}</td><td>${r.total||''}</td><td>${r.paid||''}</td><td>${r.balance||''}</td><td>—</td></tr>`).join('')
-    : `<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr>`;
-  document.getElementById('fd-showing').textContent = `Showing 0 to 0 of ${rows.length} entries`;
-  document.getElementById('fd-total').textContent = 'Total Balance Due : ₦0.00';
+    ? rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.studentName)}</td><td>${escapeHtml(r.studentId)}</td><td>${escapeHtml(r.classLabel)}</td><td>${r.invoiceCount}</td><td>${fmtNaira(r.totalInvoiced)}</td><td>${fmtNaira(r.totalPaid)}</td><td style="color:var(--red);font-weight:700;">${fmtNaira(r.balance)}</td><td>${feeFmtDate(r.dueDate)}${r.overdue ? ' <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--red);">Overdue</span>' : ''}</td><td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${r.studentId}'})">View</button></td></tr>`).join('')
+    : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No outstanding balances for these filters.</td></tr>`;
+  document.getElementById('fd-showing').textContent = `Showing ${rows.length} of ${_fdData.length} entries`;
+  const total = rows.reduce((sum, r) => sum + r.balance, 0);
+  document.getElementById('fd-total').textContent = `Total Balance Due : ${fmtNaira(total)}`;
 }
 
 // Auto-open date picker on click/focus anywhere in the portal
