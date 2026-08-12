@@ -361,7 +361,7 @@ body {
       <div class="nav-label">Main</div>
       <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon">▣</span> Dashboard</div>
       <div class="nav-item" onclick="switchTab('timetable',this)"><span class="nav-icon">◫</span> Timetable</div>
-      <div class="nav-item" onclick="switchTab('assignments',this)"><span class="nav-icon">◳</span> Assignments <span class="nav-badge">4</span></div>
+      <div class="nav-item" onclick="switchTab('assignments',this)"><span class="nav-icon">◳</span> Assignments</div>
       <div class="nav-item" onclick="switchTab('courses',this)"><span class="nav-icon">◈</span> Courses &amp; Grades</div>
       <div class="nav-item" onclick="switchTab('results',this)"><span class="nav-icon">◉</span> Exam Results</div>
       <div class="nav-label" style="margin-top:8px;">Account</div>
@@ -400,26 +400,26 @@ body {
         </div>
         <div class="stats-row">
           <div class="stat-card ac-green">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">📅</div><span class="stat-delta delta-up">↑ 2%</span></div>
-            <div class="stat-value">94%</div><div class="stat-label">Attendance Rate</div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">📅</div></div>
+            <div class="stat-value" id="stat-attendance">—</div><div class="stat-label">Attendance Rate</div>
           </div>
           <div class="stat-card">
             <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);">📚</div></div>
-            <div class="stat-value">8</div><div class="stat-label">Subjects · Term 2</div>
+            <div class="stat-value" id="stat-subjects">—</div><div class="stat-label" id="stat-subjects-label">Subjects</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);">📝</div><span class="stat-delta delta-dn">4 pending</span></div>
-            <div class="stat-value" style="color:var(--red);">4</div><div class="stat-label">Assignments Due</div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);">📝</div></div>
+            <div class="stat-value" style="color:var(--red);" id="stat-assignments">—</div><div class="stat-label">Assignments Due</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">⭐</div><span class="stat-delta delta-up">5th / 32</span></div>
-            <div class="stat-value" style="color:var(--amber);">B+</div><div class="stat-label">Overall Grade</div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">⭐</div><span class="stat-delta delta-up" id="stat-position">—</span></div>
+            <div class="stat-value" style="color:var(--amber);" id="stat-grade">—</div><div class="stat-label">Overall Grade</div>
           </div>
         </div>
 
         <div class="grid-3-1" style="margin-bottom:14px;">
           <div class="card">
-            <div class="card-head"><span class="card-title">Announcements</span><button class="card-action">View all →</button></div>
+            <div class="card-head"><span class="card-title">Announcements</span><span style="font-size:9px;color:var(--text-3);font-family:'DM Mono',monospace;text-transform:uppercase;">Sample · feature coming soon</span></div>
             <div class="card-body">
               <div class="ann-item"><div class="ann-line" style="background:var(--red);"></div><div><div class="ann-title">Inter-School Sports Day</div><div class="ann-desc">All students wear PE kits on Friday. Parents are invited to attend.</div><div class="ann-date">17 MAY 2026</div></div></div>
               <div class="ann-item"><div class="ann-line" style="background:var(--green);"></div><div><div class="ann-title">Mid-Term Break Notice</div><div class="ann-desc">School closes Friday 23 May. Resumes Monday 2 June.</div><div class="ann-date">12 MAY 2026</div></div></div>
@@ -430,7 +430,7 @@ body {
 
           <div style="display:flex;flex-direction:column;gap:12px;">
             <div class="card">
-              <div class="card-head"><span class="card-title">Today's Schedule</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">WED · 13 MAY</span></div>
+              <div class="card-head"><span class="card-title">Today's Schedule</span><span style="font-size:9px;color:var(--text-3);font-family:'DM Mono',monospace;text-transform:uppercase;">Sample · coming soon</span></div>
               <div class="card-body">
                 <div class="sch-item"><span class="sch-time">08:00</span><span class="sch-subject">English</span><span class="sch-teacher">Mrs. Eze</span></div>
                 <div class="sch-item"><span class="sch-time">09:00</span><span class="sch-subject">Mathematics</span><span class="sch-teacher">Mr. Adeyemi</span></div>
@@ -443,7 +443,7 @@ body {
             </div>
 
             <div class="card">
-              <div class="card-head"><span class="card-title">Attendance · This Week</span></div>
+              <div class="card-head"><span class="card-title">Attendance · This Week</span><span style="font-size:9px;color:var(--text-3);font-family:'DM Mono',monospace;text-transform:uppercase;">Sample · coming soon</span></div>
               <div class="card-body">
                 <div class="attend-week">
                   <div class="attend-col"><div class="attend-bar-wrap"><div class="attend-bar-fill" style="height:100%;background:var(--green);"></div></div><span class="attend-day-lbl">MON</span></div>
@@ -463,7 +463,7 @@ body {
         </div>
 
         <div class="card">
-          <div class="card-head"><span class="card-title">Upcoming Assignments</span><button class="card-action" onclick="switchTab('assignments',null)">View all →</button></div>
+          <div class="card-head"><span class="card-title">Upcoming Assignments</span><span style="font-size:9px;color:var(--text-3);font-family:'DM Mono',monospace;text-transform:uppercase;">Sample · feature coming soon</span></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px;">
               <div>
@@ -481,9 +481,9 @@ body {
 
       <!-- ━━━ TIMETABLE ━━━ -->
       <div class="tab-panel" id="tab-timetable">
-        <div class="page-header"><h2>Weekly Timetable</h2><p>Grade 4B · Term 2 · 2025/2026 Academic Year</p></div>
+        <div class="page-header"><h2>Weekly Timetable</h2><p id="timetable-sub">Term · Academic Year</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Class Schedule</span><span style="font-size:10px;color:var(--green);font-family:'DM Mono',monospace;">● Live: Wednesday</span></div>
+          <div class="card-head"><span class="card-title">Class Schedule</span><span style="font-size:9px;color:var(--text-3);font-family:'DM Mono',monospace;text-transform:uppercase;">Sample · feature coming soon</span></div>
           <div class="card-body" style="padding:0;">
             <div class="tt-wrap" style="padding:14px 18px 18px;">
               <table class="tt-table">
@@ -506,7 +506,7 @@ body {
 
       <!-- ━━━ ASSIGNMENTS ━━━ -->
       <div class="tab-panel" id="tab-assignments">
-        <div class="page-header"><h2>Assignments</h2><p>4 pending · 2 submitted · 0 overdue</p></div>
+        <div class="page-header"><h2>Assignments</h2><p>Sample data · assignment tracking is coming soon</p></div>
         <div class="filter-bar">
           <button class="filter-btn active" onclick="filterAssign('all',this)">All (6)</button>
           <button class="filter-btn" onclick="filterAssign('pending',this)">Pending (4)</button>
@@ -525,37 +525,33 @@ body {
 
       <!-- ━━━ COURSES ━━━ -->
       <div class="tab-panel" id="tab-courses">
-        <div class="page-header"><h2>Courses &amp; Grades</h2><p>Term 2 · 2025/2026 Academic Year</p></div>
+        <div class="page-header"><h2>Courses &amp; Grades</h2><p id="courses-sub">Term · Academic Year</p></div>
         <div class="grid-2" style="align-items:start;">
           <div class="card">
             <div class="card-head"><span class="card-title">All Subjects</span></div>
-            <div class="card-body">
-              <div class="course-row"><div class="course-top"><div><div class="course-name">Mathematics</div><div class="course-sub">Mr. Adeyemi</div></div><span class="grade-tag gt-b">B+ · 78%</span></div><div class="progress-track"><div class="progress-fill" style="width:78%;"></div></div><div class="course-foot"><span>Classwork 80%</span><span>Tests 76%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">English Language</div><div class="course-sub">Mrs. Eze</div></div><span class="grade-tag gt-a">A · 88%</span></div><div class="progress-track"><div class="progress-fill pf-blue" style="width:88%;"></div></div><div class="course-foot"><span>Reading 90%</span><span>Writing 86%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">Basic Science</div><div class="course-sub">Mr. Okafor</div></div><span class="grade-tag gt-a">A- · 84%</span></div><div class="progress-track"><div class="progress-fill pf-cyan" style="width:84%;"></div></div><div class="course-foot"><span>Theory 82%</span><span>Practical 86%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">Social Studies</div><div class="course-sub">Mr. Balogun</div></div><span class="grade-tag gt-b">B · 74%</span></div><div class="progress-track"><div class="progress-fill pf-teal" style="width:74%;"></div></div><div class="course-foot"><span>Classwork 70%</span><span>Tests 78%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">Creative Arts</div><div class="course-sub">Mrs. Lawal</div></div><span class="grade-tag gt-a">A · 92%</span></div><div class="progress-track"><div class="progress-fill pf-amber" style="width:92%;"></div></div><div class="course-foot"><span>Projects 95%</span><span>Portfolio 89%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">French</div><div class="course-sub">Mme. Akpan</div></div><span class="grade-tag gt-c">C+ · 65%</span></div><div class="progress-track"><div class="progress-fill pf-orange" style="width:65%;"></div></div><div class="course-foot"><span>Speaking 68%</span><span>Written 62%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">ICT</div><div class="course-sub">Mrs. Dada</div></div><span class="grade-tag gt-b">B+ · 80%</span></div><div class="progress-track"><div class="progress-fill pf-purple" style="width:80%;"></div></div><div class="course-foot"><span>Practical 85%</span><span>Theory 75%</span></div></div>
-              <div class="course-row"><div class="course-top"><div><div class="course-name">Physical Education</div><div class="course-sub">Mr. Salisu</div></div><span class="grade-tag gt-a">A · 90%</span></div><div class="progress-track"><div class="progress-fill pf-pink" style="width:90%;"></div></div><div class="course-foot"><span>Participation 95%</span><span>Skills 85%</span></div></div>
+            <div class="card-body" id="course-rows">
+              <div class="empty-state"><div class="empty-icon">◈</div><div class="empty-title">Loading…</div></div>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:12px;">
             <div class="card">
               <div class="card-head"><span class="card-title">Performance Summary</span></div>
               <div class="card-body">
-                <div style="margin-bottom:14px;"><div class="summary-big">81%</div><div class="summary-label">Overall average · Term 2</div></div>
-                <div class="perf-row"><span class="perf-key">Class Position</span><span class="perf-val pv-green">5th / 32</span></div>
-                <div class="perf-row"><span class="perf-key">Best Subject</span><span class="perf-val pv-amber">Creative Arts</span></div>
-                <div class="perf-row"><span class="perf-key">Needs Attention</span><span class="perf-val pv-red">French</span></div>
-                <div class="perf-row"><span class="perf-key">Subjects Passed</span><span class="perf-val">8 / 8</span></div>
+                <div style="margin-bottom:14px;"><div class="summary-big" id="course-overall-pct">—</div><div class="summary-label" id="course-overall-label">Overall average</div></div>
+                <div class="perf-row"><span class="perf-key">Class Position</span><span class="perf-val pv-green" id="course-position">—</span></div>
+                <div class="perf-row"><span class="perf-key">Best Subject</span><span class="perf-val pv-amber" id="course-best">—</span></div>
+                <div class="perf-row"><span class="perf-key">Needs Attention</span><span class="perf-val pv-red" id="course-worst">—</span></div>
+                <div class="perf-row"><span class="perf-key">Subjects Passed</span><span class="perf-val" id="course-passed">—</span></div>
               </div>
             </div>
             <div class="card">
               <div class="card-head"><span class="card-title">Form Teacher's Note</span></div>
               <div class="card-body">
-                <div class="teacher-note" id="teacher-note-text">Amara is a bright and enthusiastic learner. She excels in creative subjects and shows great curiosity in Science. We encourage more practice in French vocabulary this term.</div>
-                <span class="teacher-sig">— Mrs. Chukwu, Form Teacher · Grade 4B</span>
+                <div class="empty-state" style="padding:20px 8px;">
+                  <div class="empty-icon">✎</div>
+                  <div class="empty-title">Not Yet Available</div>
+                  <div class="empty-desc">Your form teacher has not added a note for this term yet.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -564,61 +560,16 @@ body {
 
       <!-- ━━━ RESULTS ━━━ -->
       <div class="tab-panel" id="tab-results">
-        <div class="page-header"><h2>Examination Results</h2><p>Mid-Term &amp; Final Exams · Term 2 · 2025/2026</p></div>
+        <div class="page-header"><h2>Examination Results</h2><p id="results-sub">Term · Academic Year</p></div>
         <div class="result-tabs">
-          <button class="result-tab active" onclick="switchResult('midterm',this)">Mid-Term Exam</button>
-          <button class="result-tab" onclick="switchResult('final',this)">Final Exam</button>
+          <button class="result-tab active" onclick="switchResult('Mid-Term Exam',this)">Mid-Term Exam</button>
+          <button class="result-tab" onclick="switchResult('Final Exam',this)">Final Exam</button>
         </div>
         <div id="result-midterm">
-          <div class="grid-2" style="align-items:start;">
-            <div class="card">
-              <div class="card-head"><span class="card-title">Mid-Term Examination</span><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">MARCH 2026</span></div>
-              <div class="card-body" style="padding:0;"><div style="overflow-x:auto;padding:0 18px 18px;">
-                <table class="results-table">
-                  <thead><tr><th>Subject</th><th>Max</th><th>Score</th><th>%</th><th>Grade</th><th>Remark</th></tr></thead>
-                  <tbody>
-                    <tr><td>Mathematics</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">74</td><td class="score-mono">74%</td><td><span class="grade-mono" style="color:var(--blue);">B</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
-                    <tr><td>English Language</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">86</td><td class="score-mono">86%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
-                    <tr><td>Basic Science</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">82</td><td class="score-mono">82%</td><td><span class="grade-mono" style="color:var(--green);">A-</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
-                    <tr><td>Social Studies</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">71</td><td class="score-mono">71%</td><td><span class="grade-mono" style="color:var(--blue);">B</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
-                    <tr><td>Creative Arts</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">90</td><td class="score-mono">90%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
-                    <tr><td>French</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">62</td><td class="score-mono">62%</td><td><span class="grade-mono" style="color:var(--amber);">C</span></td><td><span class="remark-tag rm-gd">Good</span></td></tr>
-                    <tr><td>ICT</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">78</td><td class="score-mono">78%</td><td><span class="grade-mono" style="color:var(--blue);">B+</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
-                    <tr><td>Physical Education</td><td class="score-mono" style="color:var(--text-3);">100</td><td class="score-mono">88</td><td class="score-mono">88%</td><td><span class="grade-mono" style="color:var(--green);">A</span></td><td><span class="remark-tag rm-ex">Excellent</span></td></tr>
-                    <tr class="total-row"><td>Total / Average</td><td class="score-mono">800</td><td class="score-mono" style="color:var(--green);">631</td><td class="score-mono" style="color:var(--green);">78.9%</td><td><span class="grade-mono" style="color:var(--blue);">B+</span></td><td><span class="remark-tag rm-vg">Very Good</span></td></tr>
-                  </tbody>
-                </table>
-              </div></div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:12px;">
-              <div class="card">
-                <div class="card-head"><span class="card-title">Summary</span></div>
-                <div class="card-body">
-                  <div style="margin-bottom:14px;"><div class="summary-big">78.9%</div><div class="summary-label">Mid-Term Average</div></div>
-                  <div class="perf-row"><span class="perf-key">Total Score</span><span class="perf-val">631 / 800</span></div>
-                  <div class="perf-row"><span class="perf-key">Class Position</span><span class="perf-val pv-green">6th / 32</span></div>
-                  <div class="perf-row"><span class="perf-key">Highest Score</span><span class="perf-val pv-amber">Creative Arts · 90</span></div>
-                  <div class="perf-row"><span class="perf-key">Promoted</span><span class="perf-val pv-green">Yes ✓</span></div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-head"><span class="card-title">Principal's Remark</span></div>
-                <div class="card-body">
-                  <div class="teacher-note">Amara has performed commendably. Her scores in Creative Arts and English demonstrate strong natural ability. We encourage dedicating more time to French before the Final Examinations.</div>
-                  <span class="teacher-sig">— Principal, Little Scholars Academy</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Loading…</div></div>
         </div>
         <div id="result-final" style="display:none;">
-          <div class="card"><div class="card-body">
-            <div class="empty-state">
-              <div class="empty-icon">📋</div>
-              <div class="empty-title">Results Not Yet Available</div>
-              <div class="empty-desc">Final examinations are scheduled for <strong style="color:var(--text-1);">16–20 June 2026</strong>. Results will be published within two weeks of the last exam date.</div>
-            </div>
-          </div></div>
+          <div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Loading…</div></div>
         </div>
       </div>
 

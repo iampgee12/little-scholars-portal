@@ -827,6 +827,100 @@ function classBatches(classCode, examType) {
   );
 }
 
+// ── STUDENT PORTAL HELPERS ──
+// A student must only ever be able to see PUBLISHED results (a row exists in
+// report_publications for their id/class/exam/term) - never a teacher's
+// in-progress result_batches / result_entries directly.
+
+function maxScoreForExamType(examType) {
+  return examType === 'Continuous Assessment' ? 30 : 100;
+}
+
+function gradeForPct(pct) {
+  if (pct >= 90) return { grade: 'A+', remark: 'Excellent' };
+  if (pct >= 80) return { grade: 'A', remark: 'Excellent' };
+  if (pct >= 75) return { grade: 'B+', remark: 'Very Good' };
+  if (pct >= 70) return { grade: 'B', remark: 'Very Good' };
+  if (pct >= 65) return { grade: 'C+', remark: 'Good' };
+  if (pct >= 50) return { grade: 'C', remark: 'Good' };
+  if (pct >= 40) return { grade: 'D', remark: 'Average' };
+  return { grade: 'F', remark: 'Poor' };
+}
+
+function studentRecord(studentId) {
+  return one(
+    `SELECT st.id, st.name, st.initials, st.gender, st.avg, st.att,
+            st.class_code AS classCode, c.label AS classLabel
+     FROM students st
+     JOIN classes c ON c.code = st.class_code
+     WHERE st.id = ?`,
+    studentId
+  );
+}
+
+function isResultPublished(studentId, classCode, examType, academicId) {
+  return !!one(
+    `SELECT id FROM report_publications
+     WHERE student_id = ? AND class_code = ? AND exam_type = ? AND academic_id = ?`,
+    studentId, classCode, examType, academicId
+  );
+}
+
+// Only ever reads rows that belong to a PUBLISHED report (joins result_entries
+// through report_publications so unpublished/in-progress teacher entries can
+// never leak to a student).
+function publishedRowsForClass(classCode, academicId, examType) {
+  const params = [classCode, academicId];
+  let examClause = '';
+  if (examType) {
+    examClause = 'AND rb.exam_type = ?';
+    params.push(examType);
+  }
+  return all(
+    `SELECT re.student_id AS studentId, rb.exam_type AS examType,
+            s.id AS subjectId, s.name AS subjectName, u.name AS teacherName,
+            re.ca_score AS ca, re.exam_score AS exam, re.total_score AS total
+     FROM result_entries re
+     JOIN result_batches rb ON rb.id = re.batch_id
+     JOIN subjects s ON s.id = rb.subject_id
+     JOIN users u ON u.id = rb.teacher_id
+     JOIN report_publications rp
+       ON rp.student_id = re.student_id
+      AND rp.class_code = rb.class_code
+      AND rp.exam_type = rb.exam_type
+      AND rp.academic_id = rb.academic_id
+     WHERE rb.class_code = ? AND rb.academic_id = ? ${examClause}
+     ORDER BY s.name`,
+    ...params
+  );
+}
+
+// Ranks every classmate who has at least one published result this term,
+// by their average percentage across all of their published subjects
+// (optionally scoped to a single exam type). Used for class-position stats.
+function classStandings(classCode, academicId, examType) {
+  const rows = publishedRowsForClass(classCode, academicId, examType);
+  const byStudent = new Map();
+  rows.forEach(row => {
+    const pct = (row.total / maxScoreForExamType(row.examType)) * 100;
+    if (!byStudent.has(row.studentId)) byStudent.set(row.studentId, []);
+    byStudent.get(row.studentId).push(pct);
+  });
+  return [...byStudent.entries()]
+    .map(([studentId, pcts]) => ({
+      studentId,
+      avgPct: pcts.reduce((a, b) => a + b, 0) / pcts.length,
+      subjectCount: pcts.length,
+    }))
+    .sort((a, b) => b.avgPct - a.avgPct);
+}
+
+function rankOf(standings, studentId) {
+  const idx = standings.findIndex(s => s.studentId === studentId);
+  if (idx === -1) return null;
+  return { position: idx + 1, classSize: standings.length, avgPct: standings[idx].avgPct };
+}
+
 function adminBatchReview(batchId) {
   const batch = one(
     `SELECT
@@ -1831,6 +1925,199 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, {
       ok: true,
       result: resultPayload(contextId, examType),
+    });
+  }
+
+  // ── STUDENT PORTAL ROUTES ──
+  // Every route below requires a valid student session and always filters by
+  // the session's own user.id - a student id is never accepted from the
+  // client (query/body), so a student can never request another student's
+  // data. Results are only ever read via report_publications, so a teacher's
+  // unpublished/in-progress scores are never exposed here.
+
+  if (req.method === 'GET' && url.pathname === '/api/student/dashboard') {
+    const user = requireUser(req, res, 'student');
+    if (!user) return;
+    const student = studentRecord(user.id);
+    if (!student) return sendJson(res, 404, { error: 'Student record not found' });
+    const academic = activeAcademic();
+
+    const subjectsCount = one(
+      'SELECT COUNT(DISTINCT subject_id) AS n FROM teacher_assignments WHERE class_code = ?',
+      student.classCode
+    ).n;
+
+    const standings = classStandings(student.classCode, academic.id, null);
+    const mine = rankOf(standings, student.id);
+    const overall = mine ? gradeForPct(mine.avgPct) : null;
+
+    const publishedExamTypes = all(
+      `SELECT DISTINCT exam_type AS examType FROM report_publications
+       WHERE student_id = ? AND class_code = ? AND academic_id = ?`,
+      student.id, student.classCode, academic.id
+    ).map(r => r.examType);
+
+    return sendJson(res, 200, {
+      student: {
+        id: student.id,
+        name: student.name,
+        initials: student.initials,
+        classCode: student.classCode,
+        classLabel: student.classLabel,
+      },
+      academic,
+      attendanceRate: student.att,
+      subjectsCount,
+      hasPublishedResults: !!mine,
+      overallGrade: overall ? overall.grade : null,
+      overallPct: mine ? Math.round(mine.avgPct) : null,
+      classPosition: mine ? mine.position : null,
+      classSize: mine ? mine.classSize : null,
+      publishedExamTypes,
+    });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/student/courses') {
+    const user = requireUser(req, res, 'student');
+    if (!user) return;
+    const student = studentRecord(user.id);
+    if (!student) return sendJson(res, 404, { error: 'Student record not found' });
+    const academic = activeAcademic();
+
+    const subjects = all(
+      `SELECT DISTINCT s.id, s.name, u.name AS teacherName
+       FROM teacher_assignments ta
+       JOIN subjects s ON s.id = ta.subject_id
+       JOIN users u ON u.id = ta.teacher_id
+       WHERE ta.class_code = ?
+       ORDER BY s.name`,
+      student.classCode
+    );
+
+    const publishedRows = publishedRowsForClass(student.classCode, academic.id, null)
+      .filter(row => row.studentId === student.id);
+    // Prefer the most authoritative published exam per subject: Final > Mid-Term > CA.
+    const priority = { 'Final Exam': 3, 'Mid-Term Exam': 2, 'Continuous Assessment': 1 };
+    const bestBySubject = new Map();
+    publishedRows.forEach(row => {
+      const current = bestBySubject.get(row.subjectId);
+      if (!current || priority[row.examType] > priority[current.examType]) {
+        bestBySubject.set(row.subjectId, row);
+      }
+    });
+
+    const courses = subjects.map(subject => {
+      const row = bestBySubject.get(subject.id);
+      if (!row) {
+        return {
+          subjectId: subject.id,
+          subjectName: subject.name,
+          teacherName: subject.teacherName,
+          published: false,
+        };
+      }
+      const max = maxScoreForExamType(row.examType);
+      const pct = Math.round((row.total / max) * 100);
+      const { grade, remark } = gradeForPct(pct);
+      return {
+        subjectId: subject.id,
+        subjectName: subject.name,
+        teacherName: subject.teacherName,
+        published: true,
+        examType: row.examType,
+        ca: row.ca,
+        exam: row.exam,
+        total: row.total,
+        max,
+        pct,
+        grade,
+        remark,
+      };
+    });
+
+    const standings = classStandings(student.classCode, academic.id, null);
+    const mine = rankOf(standings, student.id);
+    const publishedCourses = courses.filter(c => c.published);
+    const best = publishedCourses.length
+      ? publishedCourses.reduce((a, b) => (b.pct > a.pct ? b : a))
+      : null;
+    const worst = publishedCourses.length
+      ? publishedCourses.reduce((a, b) => (b.pct < a.pct ? b : a))
+      : null;
+
+    return sendJson(res, 200, {
+      academic,
+      classLabel: student.classLabel,
+      courses,
+      summary: {
+        overallPct: mine ? Math.round(mine.avgPct) : null,
+        classPosition: mine ? mine.position : null,
+        classSize: mine ? mine.classSize : null,
+        bestSubject: best ? best.subjectName : null,
+        needsAttention: worst ? worst.subjectName : null,
+        subjectsPassed: publishedCourses.filter(c => c.total >= c.max * 0.4).length,
+        subjectsPublished: publishedCourses.length,
+        subjectsTotal: courses.length,
+      },
+    });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/student/results') {
+    const user = requireUser(req, res, 'student');
+    if (!user) return;
+    const examType = cleanText(url.searchParams.get('examType') || 'Mid-Term Exam');
+    if (!validateExamType(examType)) {
+      return sendJson(res, 400, { error: 'Valid examType is required' });
+    }
+    const student = studentRecord(user.id);
+    if (!student) return sendJson(res, 404, { error: 'Student record not found' });
+    const academic = activeAcademic();
+
+    if (!isResultPublished(student.id, student.classCode, examType, academic.id)) {
+      return sendJson(res, 200, { published: false, examType, academic });
+    }
+
+    const pub = one(
+      `SELECT published_at AS publishedAtIso FROM report_publications
+       WHERE student_id = ? AND class_code = ? AND exam_type = ? AND academic_id = ?`,
+      student.id, student.classCode, examType, academic.id
+    );
+    const max = maxScoreForExamType(examType);
+    const rawRows = classReportRows(student.classCode, examType, student.id);
+    const rows = rawRows.map(row => {
+      const pct = Math.round((row.total / max) * 100);
+      const { grade, remark } = gradeForPct(pct);
+      return {
+        subjectName: row.subjectName,
+        teacherName: row.teacherName,
+        ca: row.ca,
+        exam: row.exam,
+        total: row.total,
+        max,
+        pct,
+        grade,
+        remark,
+      };
+    });
+    const totalScore = rows.reduce((sum, r) => sum + r.total, 0);
+    const totalMax = rows.length * max;
+    const avgPct = rows.length ? Math.round((totalScore / totalMax) * 100) : 0;
+    const overall = gradeForPct(avgPct);
+    const highest = rows.length ? rows.reduce((a, b) => (b.pct > a.pct ? b : a)) : null;
+
+    const standings = classStandings(student.classCode, academic.id, examType);
+    const mine = rankOf(standings, student.id);
+
+    return sendJson(res, 200, {
+      published: true,
+      examType,
+      academic,
+      publishedAt: formatSavedAt(pub.publishedAtIso),
+      rows,
+      totals: { score: totalScore, max: totalMax, pct: avgPct, grade: overall.grade, remark: overall.remark },
+      classPosition: mine ? mine.position : null,
+      classSize: mine ? mine.classSize : null,
+      highestSubject: highest ? { subjectName: highest.subjectName, total: highest.total } : null,
     });
   }
 
