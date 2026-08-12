@@ -2440,6 +2440,70 @@ function populateBroadsheetControls() {
   const exams = [...new Set((state.setup.examTypes||[]).concat((state.setup.resultBatches||[]).map(b=>b.examType)))].filter(Boolean);
   examSel.innerHTML = '<option value="">— Select Exam —</option>' +
     exams.map(e=>`<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('');
+
+  renderBsEmailNote();
+}
+
+function renderBsEmailNote() {
+  const note = document.getElementById('bs-publish-email-note');
+  if (!note) return;
+  const config = state.setup?.emailConfig || {};
+  note.textContent = config.configured
+    ? `Parent emails will be sent from ${config.from} through ${config.host}:${config.port}.`
+    : 'SMTP is not configured — reports will still publish, but parent emails will not be sent.';
+}
+
+async function publishBroadsheet() {
+  const classCode = document.getElementById('bs-class-sel')?.value;
+  const examType = document.getElementById('bs-exam-sel')?.value;
+  if (!classCode || !examType) {
+    showToast('Select a class and exam first');
+    return;
+  }
+  const btn = document.getElementById('bs-publish-btn');
+  const label = document.getElementById('bs-publish-label');
+  const originalLabel = label ? label.textContent : 'Publish';
+  if (btn) btn.disabled = true;
+  if (label) label.textContent = 'Publishing…';
+  try {
+    const data = await apiFetch('/api/admin/reports/publish', {
+      method: 'POST',
+      body: JSON.stringify({ classCode, examType }),
+    });
+    state.setup = data.setup;
+    renderBsEmailNote();
+
+    const published = data.published || [];
+    const sent = published.filter(row => row.emailStatus === 'sent').length;
+    const notConfigured = published.filter(row => row.emailStatus === 'email_not_configured').length;
+    const failed = published.filter(row => row.emailStatus === 'email_failed').length;
+    const noParentEmail = published.filter(row => row.emailStatus === 'missing_parent_email' || row.emailStatus === 'missing_email_address').length;
+    const count = published.length;
+    const noun = `report${count === 1 ? '' : 's'}`;
+
+    let msg;
+    if (notConfigured && notConfigured === count) {
+      msg = `Published ${count} ${noun} — email not sent, SMTP not configured`;
+    } else if (sent === count && count > 0) {
+      msg = `Published ${count} ${noun} — ${sent} parent email${sent === 1 ? '' : 's'} sent`;
+    } else {
+      const parts = [];
+      if (sent) parts.push(`${sent} emailed`);
+      if (notConfigured) parts.push(`${notConfigured} skipped (SMTP not configured)`);
+      if (noParentEmail) parts.push(`${noParentEmail} skipped (no parent email on file)`);
+      if (failed) parts.push(`${failed} email failed`);
+      msg = `Published ${count} ${noun}${parts.length ? ' — ' + parts.join(', ') : ''}`;
+    }
+    showToast(msg);
+
+    const unpubBtn = document.getElementById('bs-unpublish-btn');
+    if (unpubBtn) unpubBtn.style.display = count ? '' : 'none';
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = originalLabel;
+  }
 }
 
 function viewBroadsheet() {

@@ -176,6 +176,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .bs-filter-foot label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); cursor:pointer; }
 .bs-view-results-btn { background:#2563eb; color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); margin:0 auto; }
 .bs-view-results-btn:hover { background:#1d4ed8; }
+.bs-publish-btn { background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); }
+.bs-publish-btn:hover { background:#15803d; }
+.bs-publish-btn:disabled { opacity:.6; cursor:not-allowed; }
 .bs-rank-btn { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:4px 8px; cursor:pointer; color:var(--text-2); display:inline-flex; align-items:center; transition:all var(--transition); }
 .bs-rank-btn:hover { background:var(--blue-bg); color:var(--blue); border-color:var(--blue); }
 .rank-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2000; display:flex; align-items:center; justify-content:center; }
@@ -3422,10 +3425,17 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <label><input type="checkbox" id="bs-archived"> Include Archived Students</label>
           </div>
           <div style="text-align:center;margin-top:14px;">
-            <button class="bs-view-results-btn" onclick="viewBroadsheet()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              View Results
-            </button>
+            <div style="display:inline-flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+              <button class="bs-view-results-btn" onclick="viewBroadsheet()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                View Results
+              </button>
+              <button class="bs-publish-btn" id="bs-publish-btn" onclick="publishBroadsheet()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+                <span id="bs-publish-label">Publish</span>
+              </button>
+            </div>
+            <div id="bs-publish-email-note" style="margin-top:8px;font-size:11px;color:var(--text-3);"></div>
           </div>
         </div>
 

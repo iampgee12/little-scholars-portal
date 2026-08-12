@@ -752,16 +752,11 @@ function skillRatingForReport(studentId, classCode, examType) {
 }
 
 function loadPdfLib() {
-  const candidates = [
-    path.join(ROOT, 'node_modules', 'pdf-lib', 'dist', 'pdf-lib.js'),
-    'C:\\Users\\Emmanuel Okoroafor\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\node_modules\\pdf-lib\\dist\\pdf-lib.js',
-  ];
-  for (const candidate of candidates) {
-    try {
-      return require(candidate);
-    } catch {}
+  try {
+    return require('pdf-lib');
+  } catch (err) {
+    throw new Error('pdf-lib is required to generate report PDFs. Run `npm install` and try again.');
   }
-  throw new Error('pdf-lib is required to generate report PDFs');
 }
 
 function saveDataUrl(dataUrl, prefix, dir = UPLOAD_DIR) {
@@ -1554,7 +1549,7 @@ async function generateReportPdf({ studentId, classCode, examType }) {
     `SELECT s.*, c.label AS classLabel, u.grade
      FROM students s
      JOIN classes c ON c.code = s.class_code
-     JOIN users u ON u.id = s.id
+     LEFT JOIN users u ON u.id = s.id
      WHERE s.id = ? AND s.class_code = ?`,
     studentId,
     classCode
