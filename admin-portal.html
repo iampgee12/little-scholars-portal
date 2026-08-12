@@ -4025,15 +4025,18 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <div style="min-width:180px;">
                 <label class="field-label">Transaction Status</label>
                 <select class="ctrl-select" id="ap-status">
-                  <option value="">All</option>
-                  <option>Successful</option>
-                  <option>Pending</option>
-                  <option>Failed</option>
+                  <option value="all">All</option>
+                  <option value="successful">Successful</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
                 </select>
               </div>
               <div style="min-width:200px;">
-                <label class="field-label">Payment Channel <span style="font-size:10px;color:var(--text-3);">(Leave Empty for all Channels)</span></label>
-                <input class="field-input" id="ap-channel" placeholder="">
+                <label class="field-label">Payment Method</label>
+                <select class="ctrl-select" id="ap-channel">
+                  <option value="">All Methods</option>
+                  <option>Cash</option><option>Bank Transfer</option><option>Card Payment</option><option>USSD</option><option>Cheque</option><option>Other</option>
+                </select>
               </div>
               <button class="bs-print-btn" onclick="apViewLog()" style="white-space:nowrap;padding:10px 20px;display:flex;align-items:center;gap:6px;">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg>
@@ -4046,13 +4049,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <div class="card" id="ap-results-card" style="display:none;">
           <div class="card-head">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.5 8A5.5 5.5 0 1 1 11.8 4"/><polyline points="13.5 2.5 13.5 5.5 10.5 5.5"/></svg>
-            <span class="card-title" id="ap-results-title">Online Payment Transactions Log</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;gap:10px;">
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-            </div>
+            <span class="card-title" id="ap-results-title">Payment Attempts Log</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
@@ -4064,33 +4061,22 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;">
               <thead><tr>
-                <th>#</th><th>Transaction</th><th>Initiated By</th><th>For</th>
-                <th>Fees Title</th><th>Gateway Tx Ref No</th><th>Payment Gateway / Channel</th>
-                <th>Transaction Amount</th><th>View Invoice</th><th>GL Status</th>
+                <th>#</th><th>Date</th><th>Student</th><th>Class</th>
+                <th>Fee Type</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th>
               </tr></thead>
-              <tbody id="ap-tbody"><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr></tbody>
+              <tbody id="ap-tbody"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No matching records found</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
             <span id="ap-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
-            <div style="display:flex;gap:4px;">
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">›</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
-            </div>
           </div>
-          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);">Total Successful : &#8358;0</div>
+          <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="ap-total">Total Successful : &#8358;0</div>
         </div>
       </div>
 
       <!-- ── FEES DEBTORS ── -->
       <div class="tab-panel" id="tab-feesDebtors">
         <div class="page-header"><h2>Fees Debtors</h2><p>Students and families with outstanding fees</p></div>
-        <!-- Top Debtors List link -->
-        <div style="text-align:center;margin-bottom:10px;">
-          <a href="#" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:600;" onclick="return false;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg> Debtors List</a>
-        </div>
         <!-- Filter Card -->
         <div class="card" style="margin-bottom:16px;">
           <div class="card-head" style="gap:6px;">
@@ -4098,55 +4084,14 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <span class="card-title">Select Options to View Debtors List</span>
           </div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:14px;">
-              <div>
-                <label class="field-label">Fees Session <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-session"></select>
-              </div>
-              <div>
-                <label class="field-label">Fees Term <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-term">
-                  <option value="">Select Term</option>
-                  <option>FIRST TERM</option>
-                  <option>SECOND TERM</option>
-                  <option>THIRD TERM</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Class <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-class" onchange="fdLoadArms()">
-                  <option value="">Select Class</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Class Arm <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-arm">
-                  <option value="">Select Class First</option>
-                </select>
-              </div>
-            </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-items:flex-end;">
               <div>
-                <label class="field-label">For Invoice Type <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-invoice-type">
-                  <option value="">All</option>
-                  <option>School Fees</option>
-                  <option>Other Fees</option>
-                </select>
+                <label class="field-label">Academic Term</label>
+                <select class="ctrl-select" id="fd-term"><option value="">All Terms</option></select>
               </div>
               <div>
-                <label class="field-label">For Invoice(s) <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-invoices">
-                  <option value="">All</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Student Account Status <span style="color:#e53e3e;">*</span></label>
-                <select class="ctrl-select" id="fd-acct-status">
-                  <option value="">All</option>
-                  <option>Active</option>
-                  <option>Inactive</option>
-                </select>
+                <label class="field-label">Class</label>
+                <select class="ctrl-select" id="fd-class"><option value="">All Classes</option></select>
               </div>
               <div>
                 <button class="bs-print-btn" style="width:100%;padding:10px 0;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="fdLoadDebtors()">
@@ -4162,37 +4107,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-head">
             <span class="card-title" id="fd-results-title">Debtors List</span>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;gap:10px;">
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);">
-              <select class="ctrl-select" style="width:80px;" id="fd-per-page" onchange="fdRenderTable()"><option>100</option><option>50</option><option>25</option></select>
-              records per page
-            </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;padding:12px 18px;flex-wrap:wrap;gap:10px;">
             <input class="bs-search-input" id="fd-search" placeholder="Search" style="width:220px;" oninput="fdRenderTable()">
           </div>
           <div style="overflow-x:auto;">
             <table class="data-table" style="width:100%;">
               <thead><tr>
                 <th>#</th><th>Student Name</th><th>Reg No.</th><th>Class</th>
-                <th>Invoice</th><th>Total Fees</th><th>Amount Paid</th><th>Balance Due</th>
-                <th>View Invoice</th>
+                <th>Invoices</th><th>Total Fees</th><th>Amount Paid</th><th>Balance Due</th>
+                <th>Due Date</th><th>Action</th>
               </tr></thead>
-              <tbody id="fd-tbody"><tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr></tbody>
+              <tbody id="fd-tbody"><tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No data available</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px;">
             <span id="fd-showing" style="font-size:11px;color:var(--text-3);">Showing 0 to 0 of 0 entries</span>
-            <div style="display:flex;gap:4px;">
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">«</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">‹</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">›</button>
-              <button class="bs-export-btn" style="position:static;padding:5px 10px;">»</button>
-            </div>
           </div>
           <div style="text-align:right;padding:0 18px 18px;font-size:12px;font-weight:700;color:var(--text-1);" id="fd-total">Total Balance Due : &#8358;0.00</div>
         </div>

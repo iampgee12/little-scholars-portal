@@ -1857,6 +1857,10 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'lessonAttendanceReport') larInit();
   if (tab === 'markStaffAttendance') msaInit();
   if (tab === 'staffAttendanceReport') sarInit();
+  if (tab === 'invoiceList') ilInit();
+  if (tab === 'classInvoiceHistory') cihInit();
+  if (tab === 'familyFeesHistory') ffhInit();
+  if (tab === 'reviewPaymentProofs') rppInit();
   if (tab === 'successfulPayments') spInit();
   if (tab === 'allPaymentAttempts') apInit();
   if (tab === 'feesDebtors') fdInit();
@@ -1909,13 +1913,26 @@ function closeVerifyPaymentModal() {
   if (m) m.style.display = 'none';
 }
 
-function submitVerifyPayment() {
+async function submitVerifyPayment() {
   const method = document.getElementById('vp-method')?.value;
   const ref = document.getElementById('vp-reference')?.value?.trim();
   if (!method) { showToast('Select a payment method'); return; }
   if (!ref) { showToast('Enter a payment / transaction reference'); return; }
-  showToast('Payment verification coming soon');
-  closeVerifyPaymentModal();
+  try {
+    const data = await apiFetch(`/api/admin/fees/payments?reference=${encodeURIComponent(ref)}&method=${encodeURIComponent(method)}`);
+    const match = (data.payments || [])[0];
+    if (!match) { showToast(`No ${method} payment found with reference "${ref}"`); return; }
+    if (match.status === 'successful') {
+      showToast(`Payment already verified — ${match.studentName}, ${fmtNaira(match.amount)}`);
+      closeVerifyPaymentModal();
+      return;
+    }
+    await apiFetch(`/api/admin/fees/payments/${match.id}/status`, { method: 'POST', body: JSON.stringify({ status: 'successful' }) });
+    showToast(`Verified: ${match.studentName} — ${fmtNaira(match.amount)} marked successful`);
+    closeVerifyPaymentModal();
+  } catch (e) {
+    showToast(e.message);
+  }
 }
 
 // ── ATTENDANCE HELPERS ──
