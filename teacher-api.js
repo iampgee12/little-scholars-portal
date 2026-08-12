@@ -429,41 +429,70 @@ async function onContextChange() {
 function renderResultsGrid() {
   const ctx = state.currentContext;
   const saved = resultFor(ctx.id, state.currentExam);
+  const isCA = state.currentExam === 'Continuous Assessment';
   const students = state.students;
   const entered = students.filter(student => saved.entries?.[student.id]?.total != null).length;
   const pct = students.length ? Math.round((entered / students.length) * 100) : 0;
+  const vals = Object.values(saved.entries || {}).map(entry => entry.total).filter(value => value != null);
+  const avg = vals.length ? Math.round(vals.reduce((sum, value) => sum + value, 0) / vals.length) : null;
+
   const q = state.gridSearch.toLowerCase();
   const filtered = q
     ? students.filter(student => student.name.toLowerCase().includes(q) || student.id.toLowerCase().includes(q))
     : students;
 
-  const cards = filtered.map(student => {
+  const rows = filtered.map(student => {
     const idx = students.indexOf(student);
     const rec = saved.entries?.[student.id];
-    const hasVal = rec && rec.total != null;
-    return `<div class="stu-card ${hasVal ? 'sc-saved' : ''}" onclick="openStudentPanel(${idx})">
-      ${hasVal ? `<span class="sc-score" style="color:${gradeColor(scoreToGrade(rec.total))};">${rec.total}</span>` : ''}
-      <div class="sc-avatar">${escapeHtml(student.initials)}</div>
-      <div class="sc-name">${escapeHtml(student.name)}</div>
-      <div class="sc-id">${escapeHtml(student.id)}</div>
-      <div class="sc-status"><span class="rs-dot ${hasVal ? 'rs-saved' : 'rs-missing'}"></span><span style="color:${hasVal ? 'var(--green)' : 'var(--text-3)'};">${hasVal ? 'Saved' : 'Empty'}</span></div>
-    </div>`;
+    const caV = rec ? rec.ca ?? '' : '';
+    const exV = rec ? rec.exam ?? '' : '';
+    const total = rec ? rec.total : null;
+    const grade = total != null ? scoreToGrade(total) : '-';
+    const color = gradeColor(grade);
+    const statusChip = rec ? '<span class="chip-green">Saved</span>' : '<span class="chip-gray">Empty</span>';
+    return `<tr id="row-${student.id}" class="${rec ? 'row-saved' : ''}">
+      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
+      <td><div class="score-wrap"><input type="number" min="0" max="30" class="score-input${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/30</span></div></td>
+      ${!isCA ? `<td><div class="score-wrap"><input type="number" min="0" max="70" class="score-input${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
+      <td class="tot-cell" id="tot-${student.id}" style="color:${total != null ? color : 'var(--text-3)'};">${total != null ? total : '-'}</td>
+      <td class="grade-cell"><span class="grade-pill ${total != null ? gradeClass(total) : ''}" id="grd-${student.id}" style="${total == null ? 'background:var(--black-3);color:var(--text-3);' : ''}">${grade}</span></td>
+      <td class="stat-cell" id="sta-${student.id}">${statusChip}</td>
+      <td class="act-cell"><button class="row-open-btn" onclick="openStudentPanel(${idx})" title="Open focused entry for ${escapeHtml(student.name)}">Open</button></td>
+    </tr>`;
   }).join('');
 
   document.getElementById('results-main').innerHTML = `
-    <div class="prog-wrap">
-      <div class="prog-top">
-        <span class="prog-title">${escapeHtml(ctx.classLabel)} - ${escapeHtml(ctx.subjectName)} - ${escapeHtml(state.currentExam)}</span>
-        <span class="prog-count">${entered} / ${students.length} students entered</span>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <span class="card-title">${escapeHtml(ctx.classLabel)} &middot; ${escapeHtml(ctx.subjectName)} &middot; ${escapeHtml(state.currentExam)}</span>
+          <div style="font-size:10px;color:var(--text-3);margin-top:3px;font-family:'DM Mono',monospace;">${entered} / ${students.length} entered${avg != null ? ` &middot; Class avg ${avg}` : ''}</div>
+        </div>
+        <span class="${saved.savedAt ? 'chip-green' : 'chip-amber'}">${saved.savedAt ? `Saved - ${escapeHtml(saved.savedAt)}` : 'Not yet saved'}</span>
       </div>
-      <div class="prog-track"><div class="prog-fill" style="width:${pct}%;"></div></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <span style="font-size:11px;color:var(--text-3);">${filtered.length} student${filtered.length !== 1 ? 's' : ''}</span>
-      <input class="grid-search" id="grid-search-input" placeholder="Search student..." value="${escapeHtml(state.gridSearch)}" oninput="state.gridSearch=this.value;renderResultsGrid();" style="margin-left:auto;">
-      <button class="vt-btn" onclick="switchToBulk()" title="Switch to bulk table view" style="white-space:nowrap;">Bulk Entry</button>
-    </div>
-    <div class="stu-grid">${cards || '<div style="color:var(--text-3);font-size:12px;padding:20px 0;">No students match your search.</div>'}</div>`;
+      <div class="card-body">
+        <div class="prog-track" style="margin-bottom:16px;"><div class="prog-fill" style="width:${pct}%;"></div></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--text-3);">${filtered.length} student${filtered.length !== 1 ? 's' : ''}</span>
+          <input class="grid-search" id="grid-search-input" placeholder="Search student..." value="${escapeHtml(state.gridSearch)}" oninput="state.gridSearch=this.value;renderResultsGrid();" style="margin-left:auto;">
+        </div>
+        <div class="entry-table-wrap">
+          <table class="entry-table">
+            <thead><tr>
+              <th style="min-width:190px;">Student</th>
+              <th class="c">CA /30</th>
+              ${!isCA ? '<th class="c">Exam /70</th>' : ''}
+              <th class="c">Total</th>
+              <th class="c">Grade</th>
+              <th class="c">Status</th>
+              <th class="c">&nbsp;</th>
+            </tr></thead>
+            <tbody>${rows || `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:24px;background:var(--black-2);">No students match your search.</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div class="tbl-actions"><button class="act-btn btn-clear" onclick="clearSheet()">Clear All</button><button class="act-btn btn-exp" onclick="showToast('Export feature coming soon')">Export CSV</button><button class="act-btn btn-save" onclick="saveResults()">Save All</button></div>
+      </div>
+    </div>`;
 }
 
 async function openStudentPanel(idx) {
@@ -490,7 +519,7 @@ function renderStudentPanel() {
   document.getElementById('results-main').innerHTML = `
     <div class="entry-panel">
       <div class="ep-nav">
-        <button class="ep-back-btn" onclick="backToGrid()">Back to Students</button>
+        <button class="ep-back-btn" onclick="backToGrid()">&larr; Back to Grid</button>
         <span style="font-size:11px;color:var(--text-3);">Student ${idx + 1} of ${state.students.length}</span>
         <div class="ep-nav-arrows">
           <button class="ep-arr-btn" onclick="navigateStudent(-1)" ${idx <= 0 ? 'disabled' : ''} title="Previous student">&lt;</button>
@@ -727,44 +756,6 @@ function navigateStudent(dir) {
   renderStudentPanel();
 }
 
-function switchToBulk() {
-  const ctx = state.currentContext;
-  const saved = resultFor(ctx.id, state.currentExam);
-  const isCA = state.currentExam === 'Continuous Assessment';
-  const students = state.students;
-  const vals = Object.values(saved.entries || {}).map(entry => entry.total).filter(value => value != null);
-  const avg = vals.length ? Math.round(vals.reduce((sum, value) => sum + value, 0) / vals.length) : 0;
-
-  const rows = students.map(student => {
-    const rec = saved.entries?.[student.id];
-    const caV = rec ? rec.ca ?? '' : '';
-    const exV = rec ? rec.exam ?? '' : '';
-    const total = rec ? rec.total : '';
-    const grade = total !== '' && total != null ? scoreToGrade(total) : '-';
-    const color = gradeColor(grade);
-    return `<tr id="row-${student.id}">
-      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
-      <td><div class="score-wrap"><input type="number" min="0" max="30" class="score-input${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/30</span></div></td>
-      ${!isCA ? `<td><div class="score-wrap"><input type="number" min="0" max="70" class="score-input${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
-      <td class="tot-cell" id="tot-${student.id}" style="color:${total !== '' && total != null ? color : 'var(--text-3)'};">${total !== '' && total != null ? total : '-'}</td>
-      <td class="grade-cell"><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:${color};" id="grd-${student.id}">${grade}</span></td>
-      <td class="stat-cell" id="sta-${student.id}"><span class="rs-dot ${rec ? 'rs-saved' : 'rs-missing'}"></span><span class="rs-lbl" style="color:${rec ? 'var(--green)' : 'var(--text-3)'};">${rec ? 'Saved' : 'Empty'}</span></td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('results-main').innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-      <button class="ep-back-btn" onclick="renderResultsGrid()">Back to Student Grid</button>
-      <span style="font-size:11px;color:var(--text-3);margin-left:4px;">Bulk entry: ${escapeHtml(ctx.classLabel)} - ${escapeHtml(ctx.subjectName)} - ${escapeHtml(state.currentExam)}</span>
-    </div>
-    <div class="card">
-      <div class="card-head"><span class="card-title">${escapeHtml(ctx.classLabel)} - ${escapeHtml(ctx.subjectName)} - ${escapeHtml(state.currentExam)}</span><span style="font-size:10px;color:${saved.savedAt ? 'var(--green)' : 'var(--amber)'};font-family:'DM Mono',monospace;">${saved.savedAt ? `Saved - ${escapeHtml(saved.savedAt)}` : 'Not yet saved'}</span></div>
-      <div style="padding:14px 18px 0;"><div class="summary-bar"><div class="sb-item"><div class="sb-val">${students.length}</div><div class="sb-lbl">Students</div></div><div class="sb-item"><div class="sb-val" style="color:var(--green);">${avg || '-'}</div><div class="sb-lbl">Class Avg</div></div></div></div>
-      <div style="padding:0 18px;overflow-x:auto;"><table class="entry-table"><thead><tr><th style="min-width:200px;">Student</th><th class="c">CA /30</th>${!isCA ? '<th class="c">Exam /70</th>' : ''}<th class="c">Total</th><th class="c">Grade</th><th class="c">Status</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <div style="padding:12px 18px 18px;" class="tbl-actions"><button class="act-btn btn-clear" onclick="clearSheet()">Clear All</button><button class="act-btn btn-exp" onclick="showToast('Export feature coming soon')">Export CSV</button><button class="act-btn btn-save" onclick="saveResults()">Save All</button></div>
-    </div>`;
-}
-
 function calcRow(stuId, mode) {
   const caEl = document.getElementById(`ca-${stuId}`);
   const exEl = document.getElementById(`ex-${stuId}`);
@@ -792,14 +783,16 @@ function calcRow(stuId, mode) {
     totalEl.textContent = total;
     totalEl.style.color = gradeColor(grade);
     gradeEl.textContent = grade;
-    gradeEl.style.color = gradeColor(grade);
-    statusEl.innerHTML = '<span class="rs-dot rs-unsaved"></span><span class="rs-lbl" style="color:var(--amber);">Unsaved</span>';
+    gradeEl.className = `grade-pill ${gradeClass(total)}`;
+    gradeEl.style.cssText = '';
+    statusEl.innerHTML = '<span class="chip-amber">Unsaved</span>';
   } else {
     totalEl.textContent = '-';
     totalEl.style.color = 'var(--text-3)';
     gradeEl.textContent = '-';
-    gradeEl.style.color = 'var(--text-3)';
-    statusEl.innerHTML = '<span class="rs-dot rs-missing"></span><span class="rs-lbl" style="color:var(--text-3);">Empty</span>';
+    gradeEl.className = 'grade-pill';
+    gradeEl.style.cssText = 'background:var(--black-3);color:var(--text-3);';
+    statusEl.innerHTML = '<span class="chip-gray">Empty</span>';
   }
 }
 
@@ -830,7 +823,7 @@ async function saveResults() {
     populateDashboard();
     renderPublished();
     showToast(`${entries.length} result${entries.length === 1 ? '' : 's'} saved successfully`);
-    switchToBulk();
+    renderResultsGrid();
   } catch (err) {
     showToast(err.message);
   }
@@ -845,6 +838,8 @@ function clearSheet() {
         el.classList.remove('has-val', 'err-val');
       }
     });
+    const rowEl = document.getElementById(`row-${student.id}`);
+    if (rowEl) rowEl.classList.remove('row-saved');
     const totalEl = document.getElementById(`tot-${student.id}`);
     const gradeEl = document.getElementById(`grd-${student.id}`);
     const statusEl = document.getElementById(`sta-${student.id}`);
@@ -854,9 +849,10 @@ function clearSheet() {
     }
     if (gradeEl) {
       gradeEl.textContent = '-';
-      gradeEl.style.color = 'var(--text-3)';
+      gradeEl.className = 'grade-pill';
+      gradeEl.style.cssText = 'background:var(--black-3);color:var(--text-3);';
     }
-    if (statusEl) statusEl.innerHTML = '<span class="rs-dot rs-missing"></span><span class="rs-lbl" style="color:var(--text-3);">Empty</span>';
+    if (statusEl) statusEl.innerHTML = '<span class="chip-gray">Empty</span>';
   });
 }
 
