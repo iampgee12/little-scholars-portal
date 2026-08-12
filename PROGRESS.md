@@ -4,27 +4,30 @@ Last updated: 2026-08-12 (day 1)
 
 ## Done and merged into `launch-prep`
 
-- **Student portal backend** — real `/api/student/*` routes (dashboard, courses, results), filtered strictly to the logged-in student's own ID, showing only *published* results. Two demo students verified to see different, correct data. Sections with no backing data model (timetable, assignments, announcements) are honestly labeled "Sample · feature coming soon" rather than faked.
-- **Staff Results Entry redesign** — the old UI hid a proper spreadsheet-style grid behind a "Bulk Entry" toggle, defaulting to slow one-student-at-a-time cards. Grid is now the default view, sticky header, styling matches the rest of the app. No functional/API changes.
-- **Security hardening** — all passwords hashed (`node:crypto` scrypt, salted, timing-safe compare), existing plaintext passwords auto-migrated on boot, login rate limiting (5 failed attempts / 15 min lockout), and the System Settings tab's `_sid` ReferenceError bug is fixed.
+Everything originally scoped is now built, merged together, and verified working as a whole (not just individually) on a fresh database:
 
-All three verified together via a clean local boot + curl smoke test (all 3 demo logins work, rate limiting triggers, System Settings loads) before merging. No conflicts.
+- **Student portal backend** — real `/api/student/*` routes, filtered strictly to the logged-in student's own ID, showing only *published* results. Unbuilt areas (timetable, assignments, announcements) are honestly labeled "coming soon" rather than faked.
+- **Staff Results Entry redesign** — standard spreadsheet-style grid is now the default view instead of one-student-at-a-time cards. No functional/API changes.
+- **Security hardening** — passwords hashed (scrypt, salted), plaintext auto-migrated on boot, login rate limiting (5 attempts / 15 min lockout), System Settings crash fixed.
+- **Results Publish + parent email** — "Publish" button on the admin "Review And Publish Results" screen. Fixed the pre-existing broken PDF generation (`pdf-lib` is now a real, properly vendored dependency — was previously a hardcoded path to another developer's machine that could never have worked). Also found and fixed a second latent bug: an inner JOIN that silently failed publishing for any student without a portal login account (would have broken most real classes, not just the demo one). Emails parents via the existing SMTP pipeline when configured; publishes + generates the PDF regardless and says so clearly when SMTP isn't set up.
+- **Finance MVP** (breadth-first, real CRUD, no dead buttons, no fake numbers):
+  - **Fees & Bursary** — invoices, payments, family fee history, debtors report.
+  - **Payroll & Expenses** — staff salaries, loans/advances, expense request approval workflow, income/expense logging + analytics.
+  - **Store & Accounting** — inventory/POS with real stock decrement on sale, and a minimal general ledger (chart of accounts, journal entries validated balanced before posting, live trial balance, financial reports). Bank reconciliation and tax records are intentionally thin (manual entry, no automated logic) per the MVP-first instruction.
 
-## Known bug found (blocks the item below — fix as part of it)
-
-**PDF report generation is broken.** The report-publish flow depends on `pdf-lib`, which isn't actually vendored in this repo — there's only a hardcoded file path pointing to a different developer's local machine. This means `/api/admin/reports/publish` currently fails for anyone. This must be fixed (vendor `pdf-lib` properly, or replace with a self-contained PDF generation approach — check zero-npm-dependency constraint; if `pdf-lib` requires npm, either add it as the one justified exception or hand-roll minimal PDF generation) before "Results Publish + email" can work end to end.
-
-## Next up (not started)
-
-1. **Results Publish + parent email** — On the admin "Review And Publish Results" screen, add a "Publish" button beside "View Results" that publishes results and emails each parent their child's report. Reuse the existing `smtpSend` raw-socket SMTP pipeline in `server.js`. Must fix the `pdf-lib` bug above first. No real SMTP credentials exist in the cloud sandbox (`email-settings.env` is gitignored) — implement and trace the code path correctly, but live email delivery needs verification after merge with real credentials.
-2. **Finance MVP** — Fees/Bursary, Payroll/HRM, Store & Inventory, Accounting are all UI shells with zero backend. Build working basics (real CRUD, correct core numbers) across all of them — breadth over depth, nothing left as a dead button. Split into separate `feature/finance-*` branches by sub-area so partial progress isn't lost.
-   - **Store & Inventory / Accounting: done, on `feature/finance-store-accounting` (not yet merged).** New tables (`store_categories/products/orders/order_items/stock_movements/requisitions/banners/homepage_sections`, `acct_accounts/journal_entries/journal_lines/contacts/bills/budgets/bank_transactions/tax_records`), seeded with realistic demo data, full CRUD routes under `/api/admin/store/*` and `/api/admin/acct/*`, and all 19 sidebar screens (10 Store & Inventory + 9 Accounting) wired to real data — no dead buttons, no hardcoded numbers. POS terminal records a real sale and decrements stock; journal entries are validated balanced before posting; trial balance and financial reports are computed live from posted journal lines. Bank reconciliation and tax records are intentionally thin (manual entry + reconcile/status toggle, no automated matching or tax logic) per the MVP-first instruction. Verified via curl: all 3 demo logins, fresh-DB boot + seed, full CRUD round-trips, POS stock decrement, unbalanced-entry rejection, in-use-account delete protection. Fees/Bursary and Payroll/Expenses are separate sibling branches, not touched here.
+All four finance/results branches were built by independent cloud routines (RemoteTrigger, genuinely detached from any local session), each verified individually via curl before merging, then merged into `launch-prep` one at a time. Two merges hit real conflicts — in both cases, git had collapsed two independently-added code blocks' generic closing braces into one shared line (a known git 3-way-merge artifact when two additions end in textually-identical trailing lines). Resolved by pulling each side's clean content directly from its source branch and splicing manually, then verifying with `node --check` and a full curl pass covering all four merged areas together (all 3 demo logins, rate limiting, and one representative route from each feature) on a completely fresh database.
 
 ## Branch model (do not deviate)
 
 - `master` = live production (Railway auto-deploys from it). Never push here directly.
-- `launch-prep` = integration branch, this is where everything lands for human review.
-- `feature/*` branches, based off latest `launch-prep`, merged back in after a sanity check (server boots, demo logins work, no regression).
+- `launch-prep` = integration branch — everything above is merged and verified here, ready for human review. **Not yet merged to master/production.**
+- `feature/*` branches, based off latest `launch-prep`, merged back in after a sanity check.
+
+## What's left
+
+- **Human review of `launch-prep`** before it goes anywhere near `master`/production — nothing has been deployed live.
+- **Real SMTP verification** — email sending was built and its code path traced/verified, but no cloud sandbox had real credentials (`email-settings.env` is gitignored by design). Needs one real test with actual SMTP settings before trusting parent emails in production.
+- Everything else originally requested (finance, results publish, staff/student portals) is done. CBT was explicitly deferred by the owner to a later phase.
 
 ## Demo logins (auto-seeded on fresh DB)
 
