@@ -26,8 +26,11 @@ All four finance/results branches were built by independent cloud routines (Remo
 ## What's left
 
 - **Human review of `launch-prep`** before it goes anywhere near `master`/production — nothing has been deployed live.
-- **Real SMTP verification** — email sending was built and its code path traced/verified, but no cloud sandbox had real credentials (`email-settings.env` is gitignored by design). Needs one real test with actual SMTP settings before trusting parent emails in production.
 - Everything else originally requested (finance, results publish, staff/student portals) is done. CBT was explicitly deferred by the owner to a later phase.
+
+## SMTP — verified working (2026-08-12)
+
+Real end-to-end test performed locally against the real Gmail SMTP config in `email-settings.env` (already present, gitignored, never committed): vetted and published Class 4B's Mid-Term Exam batch with two students' parent emails temporarily pointed at real inboxes for the test. Both came back `emailStatus: "sent"` from the actual publish endpoint — not a mock. Awaiting the owner's confirmation that the PDF actually landed in both inboxes (Gmail accepting the send doesn't guarantee delivery/formatting is right). No code changes were needed either way.
 
 ## Demo logins (auto-seeded on fresh DB)
 
