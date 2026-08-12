@@ -131,6 +131,13 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
+// Used by the finance/payroll routes: returns a non-negative finite number,
+// or null when the input isn't a valid non-negative amount.
+function parseMoney(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 function initialsFromName(name) {
   return cleanText(name)
     .split(/\s+/)
@@ -352,6 +359,207 @@ function createSchema() {
     ['Core', 'Elective', 'Vocational'].forEach(name =>
       run('INSERT OR IGNORE INTO subject_types (name) VALUES (?)', name)
     );
+  }
+}
+
+// ── FINANCE: HRM/PAYROLL + INCOME & EXPENSES (feature/finance-payroll-expenses) ──
+// Kept in its own schema/seed/route blocks (rather than editing the shared
+// createSchema()/seedDatabase() bodies) so this sub-area merges cleanly
+// alongside sibling finance branches (Fees/Bursary, Store & Accounting).
+function createFinancePayrollSchema() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_pay_rates (
+      staff_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      base_salary REAL NOT NULL DEFAULT 0,
+      allowances REAL NOT NULL DEFAULT 0,
+      deductions REAL NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_salaries (
+      id INTEGER PRIMARY KEY,
+      staff_id TEXT NOT NULL REFERENCES users(id),
+      period TEXT NOT NULL,
+      base_salary REAL NOT NULL DEFAULT 0,
+      allowances REAL NOT NULL DEFAULT 0,
+      deductions REAL NOT NULL DEFAULT 0,
+      net_salary REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid')),
+      paid_at TEXT,
+      created_by TEXT REFERENCES users(id),
+      created_at TEXT NOT NULL,
+      UNIQUE(staff_id, period)
+    );
+
+    CREATE TABLE IF NOT EXISTS staff_loans (
+      id INTEGER PRIMARY KEY,
+      staff_id TEXT NOT NULL REFERENCES users(id),
+      loan_type TEXT NOT NULL DEFAULT 'loan' CHECK(loan_type IN ('loan','advance')),
+      amount REAL NOT NULL,
+      reason TEXT,
+      monthly_deduction REAL NOT NULL DEFAULT 0,
+      repayment_status TEXT NOT NULL DEFAULT 'outstanding' CHECK(repayment_status IN ('outstanding','repaying','repaid')),
+      issued_at TEXT NOT NULL,
+      created_by TEXT REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS expense_requests (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT,
+      amount REAL NOT NULL,
+      reason TEXT,
+      requested_by TEXT NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','dispensed')),
+      approved_by TEXT REFERENCES users(id),
+      approved_at TEXT,
+      requested_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS expenses (
+      id INTEGER PRIMARY KEY,
+      category TEXT NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL,
+      expense_date TEXT NOT NULL,
+      request_id INTEGER REFERENCES expense_requests(id),
+      recorded_by TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS income_entries (
+      id INTEGER PRIMARY KEY,
+      category TEXT NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL,
+      income_date TEXT NOT NULL,
+      recorded_by TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+  `);
+}
+
+function periodString(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function seedFinancePayrollDemoData() {
+  const seeded = one('SELECT value FROM schema_meta WHERE key = ?', 'finance_payroll_seed_version');
+  if (seeded && seeded.value === '1') return;
+
+  const staffRows = all("SELECT id FROM users WHERE role IN ('teacher','admin') ORDER BY id");
+  if (!staffRows.length) return; // main seed hasn't run yet (shouldn't happen, but stay safe)
+
+  db.exec('BEGIN');
+  try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const rateDefaults = {
+      'ADM-001': [450000, 60000, 25000],
+      'TCH-001': [280000, 35000, 15000],
+      'TCH-002': [260000, 30000, 12000],
+    };
+    staffRows.forEach(s => {
+      const [base, allow, ded] = rateDefaults[s.id] || [220000, 20000, 10000];
+      run(
+        `INSERT INTO staff_pay_rates (staff_id, base_salary, allowances, deductions, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(staff_id) DO NOTHING`,
+        s.id, base, allow, ded, nowIso
+      );
+    });
+
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevPeriod = periodString(prevDate);
+    const currentPeriod = periodString(now);
+    staffRows.forEach(s => {
+      const [base, allow, ded] = rateDefaults[s.id] || [220000, 20000, 10000];
+      const net = base + allow - ded;
+      const prevPaidAt = new Date(prevDate.getFullYear(), prevDate.getMonth(), 28).toISOString();
+      run(
+        `INSERT INTO staff_salaries (staff_id, period, base_salary, allowances, deductions, net_salary, status, paid_at, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'paid', ?, 'ADM-001', ?)`,
+        s.id, prevPeriod, base, allow, ded, net, prevPaidAt, prevPaidAt
+      );
+    });
+    // Leave the current period unprocessed for TCH-002 and ADM-001, but show
+    // one staff member already processed-but-unpaid so both screens have data.
+    const [tBase, tAllow, tDed] = rateDefaults['TCH-001'];
+    run(
+      `INSERT INTO staff_salaries (staff_id, period, base_salary, allowances, deductions, net_salary, status, created_by, created_at)
+       VALUES ('TCH-001', ?, ?, ?, ?, ?, 'pending', 'ADM-001', ?)`,
+      currentPeriod, tBase, tAllow, tDed, tBase + tAllow - tDed, nowIso
+    );
+
+    run(
+      `INSERT INTO staff_loans (staff_id, loan_type, amount, reason, monthly_deduction, repayment_status, issued_at, created_by)
+       VALUES ('TCH-001', 'loan', 150000, 'Emergency medical expense for family member', 25000, 'repaying', ?, 'ADM-001')`,
+      new Date(now.getFullYear(), now.getMonth() - 2, 10).toISOString()
+    );
+    run(
+      `INSERT INTO staff_loans (staff_id, loan_type, amount, reason, monthly_deduction, repayment_status, issued_at, created_by)
+       VALUES ('TCH-002', 'advance', 40000, 'Salary advance ahead of school resumption', 0, 'outstanding', ?, 'ADM-001')`,
+      new Date(now.getFullYear(), now.getMonth(), 3).toISOString()
+    );
+
+    const reqBase = new Date(now.getFullYear(), now.getMonth(), 2);
+    const req1 = run(
+      `INSERT INTO expense_requests (title, category, amount, reason, requested_by, status, requested_at)
+       VALUES ('Classroom cleaning supplies', 'Facilities', 18500, 'Restock cleaning supplies for Primary block', 'TCH-001', 'pending', ?)`,
+      reqBase.toISOString()
+    );
+    const req2 = run(
+      `INSERT INTO expense_requests (title, category, amount, reason, requested_by, status, approved_by, approved_at, requested_at)
+       VALUES ('Inter-house sports refreshments', 'Events', 65000, 'Drinks and snacks for sports day', 'TCH-002', 'approved', 'ADM-001', ?, ?)`,
+      reqBase.toISOString(), reqBase.toISOString()
+    );
+    run(
+      `INSERT INTO expense_requests (title, category, amount, reason, requested_by, status, approved_by, approved_at, requested_at)
+       VALUES ('New printer for front office', 'Equipment', 220000, 'Old printer beyond repair', 'ADM-001', 'rejected', 'ADM-001', ?, ?)`,
+      reqBase.toISOString(), reqBase.toISOString()
+    );
+    const dispensedAt = new Date(now.getFullYear(), now.getMonth(), 5).toISOString();
+    const req4 = run(
+      `INSERT INTO expense_requests (title, category, amount, reason, requested_by, status, approved_by, approved_at, requested_at)
+       VALUES ('Diesel for generator', 'Utilities', 45000, 'Fuel for backup generator', 'TCH-001', 'dispensed', 'ADM-001', ?, ?)`,
+      dispensedAt, dispensedAt
+    );
+    run(
+      `INSERT INTO expenses (category, description, amount, expense_date, request_id, recorded_by, created_at)
+       VALUES ('Utilities', 'Diesel for generator', 45000, ?, ?, 'ADM-001', ?)`,
+      dispensedAt.slice(0, 10), Number(req4.lastInsertRowid), dispensedAt
+    );
+
+    [
+      ['Stationery', 'Exercise books and office stationery', 32000, new Date(now.getFullYear(), now.getMonth(), 6)],
+      ['Maintenance', 'Plumbing repairs in staff wing', 27500, new Date(now.getFullYear(), now.getMonth(), 9)],
+      ['Utilities', 'Electricity bill for the term', 98000, new Date(now.getFullYear(), now.getMonth() - 1, 20)],
+    ].forEach(([category, description, amount, date]) => run(
+      `INSERT INTO expenses (category, description, amount, expense_date, recorded_by, created_at)
+       VALUES (?, ?, ?, ?, 'ADM-001', ?)`,
+      category, description, amount, date.toISOString().slice(0, 10), date.toISOString()
+    ));
+
+    [
+      ['School Fees', 'Term 2 fee payments (bulk deposit)', 4250000, new Date(now.getFullYear(), now.getMonth(), 4)],
+      ['Donations', 'PTA fundraising contribution', 150000, new Date(now.getFullYear(), now.getMonth(), 11)],
+      ['Uniform Sales', 'Sale of school uniforms', 62000, new Date(now.getFullYear(), now.getMonth() - 1, 18)],
+    ].forEach(([category, description, amount, date]) => run(
+      `INSERT INTO income_entries (category, description, amount, income_date, recorded_by, created_at)
+       VALUES (?, ?, ?, ?, 'ADM-001', ?)`,
+      category, description, amount, date.toISOString().slice(0, 10), date.toISOString()
+    ));
+
+    run(
+      `INSERT INTO schema_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      'finance_payroll_seed_version',
+      '1'
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
   }
 }
 
@@ -647,8 +855,10 @@ function seedFeesDemoData() {
 
 createSchema();
 createFeesSchema();
+createFinancePayrollSchema();
 seedDatabase();
 seedFeesDemoData();
+seedFinancePayrollDemoData();
 migratePlaintextPasswords();
 
 function sendJson(res, status, data, extraHeaders = {}) {
@@ -3719,6 +3929,343 @@ async function handleApi(req, res, url) {
     }, { count: 0, totalBalance: 0 });
 
     return sendJson(res, 200, { debtors, summary });
+  }
+
+  // ── FINANCE: HRM/PAYROLL + INCOME & EXPENSES (feature/finance-payroll-expenses) ──
+  // Self-contained route block (own tables, own helpers) so it merges cleanly
+  // alongside sibling finance branches (Fees/Bursary, Store & Accounting).
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/payroll/rates') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const rates = all(
+      `SELECT u.id AS staffId, u.name, u.role, u.teacher_type AS teacherType,
+              COALESCE(r.base_salary, 0) AS baseSalary,
+              COALESCE(r.allowances, 0) AS allowances,
+              COALESCE(r.deductions, 0) AS deductions
+       FROM users u
+       LEFT JOIN staff_pay_rates r ON r.staff_id = u.id
+       WHERE u.role IN ('teacher','admin')
+       ORDER BY u.role DESC, u.name`
+    );
+    return sendJson(res, 200, { rates });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/payroll/rates') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const staffId = cleanText(body.staffId).toUpperCase();
+    const staff = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher','admin')", staffId);
+    if (!staff) return sendJson(res, 400, { error: 'Staff member not found' });
+    const baseSalary = parseMoney(body.baseSalary);
+    const allowances = parseMoney(body.allowances);
+    const deductions = parseMoney(body.deductions);
+    if (baseSalary === null || allowances === null || deductions === null) {
+      return sendJson(res, 400, { error: 'Base salary, allowances, and deductions must be non-negative numbers' });
+    }
+    run(
+      `INSERT INTO staff_pay_rates (staff_id, base_salary, allowances, deductions, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(staff_id) DO UPDATE SET base_salary = excluded.base_salary, allowances = excluded.allowances, deductions = excluded.deductions, updated_at = excluded.updated_at`,
+      staffId, baseSalary, allowances, deductions, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/payroll/salaries') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const period = cleanText(url.searchParams.get('period')) || periodString(new Date());
+    const salaries = all(
+      `SELECT s.id, s.staff_id AS staffId, u.name, u.role, u.teacher_type AS teacherType,
+              s.period, s.base_salary AS baseSalary, s.allowances, s.deductions,
+              s.net_salary AS netSalary, s.status, s.paid_at AS paidAt, s.created_at AS createdAt
+       FROM staff_salaries s
+       JOIN users u ON u.id = s.staff_id
+       WHERE s.period = ?
+       ORDER BY u.role DESC, u.name`,
+      period
+    );
+    return sendJson(res, 200, { period, salaries });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/payroll/salaries/generate') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const period = cleanText(body.period);
+    if (!/^\d{4}-\d{2}$/.test(period)) {
+      return sendJson(res, 400, { error: 'A valid period (YYYY-MM) is required' });
+    }
+    const entries = Array.isArray(body.entries) ? body.entries : [];
+    if (!entries.length) return sendJson(res, 400, { error: 'At least one staff entry is required' });
+
+    const now = new Date().toISOString();
+    let processed = 0;
+    for (const entry of entries) {
+      const staffId = cleanText(entry.staffId).toUpperCase();
+      const staff = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher','admin')", staffId);
+      if (!staff) continue;
+      const baseSalary = parseMoney(entry.baseSalary) ?? 0;
+      const allowances = parseMoney(entry.allowances) ?? 0;
+      const deductions = parseMoney(entry.deductions) ?? 0;
+      const netSalary = baseSalary + allowances - deductions;
+      const existing = one('SELECT id, status FROM staff_salaries WHERE staff_id = ? AND period = ?', staffId, period);
+      if (existing && existing.status === 'paid') continue; // never overwrite a paid record
+      if (existing) {
+        run(
+          `UPDATE staff_salaries SET base_salary = ?, allowances = ?, deductions = ?, net_salary = ?, created_by = ?, created_at = ?
+           WHERE id = ?`,
+          baseSalary, allowances, deductions, netSalary, user.id, now, existing.id
+        );
+      } else {
+        run(
+          `INSERT INTO staff_salaries (staff_id, period, base_salary, allowances, deductions, net_salary, status, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+          staffId, period, baseSalary, allowances, deductions, netSalary, user.id, now
+        );
+      }
+      processed += 1;
+    }
+    const salaries = all(
+      `SELECT s.id, s.staff_id AS staffId, u.name, s.period, s.base_salary AS baseSalary, s.allowances, s.deductions,
+              s.net_salary AS netSalary, s.status, s.paid_at AS paidAt
+       FROM staff_salaries s JOIN users u ON u.id = s.staff_id
+       WHERE s.period = ? ORDER BY u.name`,
+      period
+    );
+    return sendJson(res, 200, { ok: true, processed, period, salaries });
+  }
+
+  const salaryPayMatch = url.pathname.match(/^\/api\/admin\/payroll\/salaries\/(\d+)\/pay$/);
+  if (req.method === 'POST' && salaryPayMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const record = one('SELECT * FROM staff_salaries WHERE id = ?', Number(salaryPayMatch[1]));
+    if (!record) return sendJson(res, 404, { error: 'Salary record not found' });
+    if (record.status === 'paid') return sendJson(res, 400, { error: 'This salary has already been marked paid' });
+    run('UPDATE staff_salaries SET status = ?, paid_at = ? WHERE id = ?', 'paid', new Date().toISOString(), record.id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/payroll/loans') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const loans = all(
+      `SELECT l.id, l.staff_id AS staffId, u.name, l.loan_type AS loanType, l.amount, l.reason,
+              l.monthly_deduction AS monthlyDeduction, l.repayment_status AS repaymentStatus,
+              l.issued_at AS issuedAt
+       FROM staff_loans l
+       JOIN users u ON u.id = l.staff_id
+       ORDER BY l.issued_at DESC`
+    );
+    return sendJson(res, 200, { loans });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/payroll/loans') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const staffId = cleanText(body.staffId).toUpperCase();
+    const staff = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher','admin')", staffId);
+    if (!staff) return sendJson(res, 400, { error: 'Staff member not found' });
+    const loanType = body.loanType === 'advance' ? 'advance' : 'loan';
+    const amount = parseMoney(body.amount);
+    if (amount === null || amount <= 0) return sendJson(res, 400, { error: 'A positive amount is required' });
+    const monthlyDeduction = parseMoney(body.monthlyDeduction) ?? 0;
+    const reason = cleanText(body.reason);
+    const inserted = run(
+      `INSERT INTO staff_loans (staff_id, loan_type, amount, reason, monthly_deduction, repayment_status, issued_at, created_by)
+       VALUES (?, ?, ?, ?, ?, 'outstanding', ?, ?)`,
+      staffId, loanType, amount, reason, monthlyDeduction, new Date().toISOString(), user.id
+    );
+    return sendJson(res, 200, { ok: true, id: Number(inserted.lastInsertRowid) });
+  }
+
+  const loanStatusMatch = url.pathname.match(/^\/api\/admin\/payroll\/loans\/(\d+)\/status$/);
+  if (req.method === 'POST' && loanStatusMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const loan = one('SELECT id FROM staff_loans WHERE id = ?', Number(loanStatusMatch[1]));
+    if (!loan) return sendJson(res, 404, { error: 'Loan record not found' });
+    const body = await readJson(req);
+    const status = cleanText(body.status);
+    if (!['outstanding', 'repaying', 'repaid'].includes(status)) {
+      return sendJson(res, 400, { error: 'Invalid repayment status' });
+    }
+    run('UPDATE staff_loans SET repayment_status = ? WHERE id = ?', status, loan.id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/finance/expense-requests') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const requests = all(
+      `SELECT r.id, r.title, r.category, r.amount, r.reason, r.status,
+              r.requested_by AS requestedBy, ru.name AS requestedByName,
+              r.approved_by AS approvedBy, au.name AS approvedByName,
+              r.approved_at AS approvedAt, r.requested_at AS requestedAt
+       FROM expense_requests r
+       JOIN users ru ON ru.id = r.requested_by
+       LEFT JOIN users au ON au.id = r.approved_by
+       ORDER BY r.requested_at DESC`
+    );
+    return sendJson(res, 200, { requests });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/finance/expense-requests') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const title = cleanText(body.title);
+    const amount = parseMoney(body.amount);
+    if (!title || amount === null || amount <= 0) {
+      return sendJson(res, 400, { error: 'Title and a positive amount are required' });
+    }
+    const category = cleanText(body.category) || 'General';
+    const reason = cleanText(body.reason);
+    const inserted = run(
+      `INSERT INTO expense_requests (title, category, amount, reason, requested_by, status, requested_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+      title, category, amount, reason, user.id, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true, id: Number(inserted.lastInsertRowid) });
+  }
+
+  const requestDecisionMatch = url.pathname.match(/^\/api\/admin\/finance\/expense-requests\/(\d+)\/decision$/);
+  if (req.method === 'POST' && requestDecisionMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const request = one('SELECT * FROM expense_requests WHERE id = ?', Number(requestDecisionMatch[1]));
+    if (!request) return sendJson(res, 404, { error: 'Expense request not found' });
+    const body = await readJson(req);
+    const action = cleanText(body.action);
+    const now = new Date().toISOString();
+    if (action === 'approve') {
+      if (request.status !== 'pending') return sendJson(res, 400, { error: 'Only pending requests can be approved' });
+      run('UPDATE expense_requests SET status = ?, approved_by = ?, approved_at = ? WHERE id = ?', 'approved', user.id, now, request.id);
+    } else if (action === 'reject') {
+      if (request.status !== 'pending') return sendJson(res, 400, { error: 'Only pending requests can be rejected' });
+      run('UPDATE expense_requests SET status = ?, approved_by = ?, approved_at = ? WHERE id = ?', 'rejected', user.id, now, request.id);
+    } else if (action === 'dispense') {
+      if (request.status !== 'approved') return sendJson(res, 400, { error: 'Only approved requests can be dispensed' });
+      run('UPDATE expense_requests SET status = ? WHERE id = ?', 'dispensed', request.id);
+      run(
+        `INSERT INTO expenses (category, description, amount, expense_date, request_id, recorded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        request.category || 'General', request.title, request.amount, now.slice(0, 10), request.id, user.id, now
+      );
+    } else {
+      return sendJson(res, 400, { error: 'Action must be approve, reject, or dispense' });
+    }
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/finance/expenses') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const expenses = all(
+      `SELECT e.id, e.category, e.description, e.amount, e.expense_date AS expenseDate,
+              e.request_id AS requestId, e.recorded_by AS recordedBy, u.name AS recordedByName,
+              e.created_at AS createdAt
+       FROM expenses e
+       JOIN users u ON u.id = e.recorded_by
+       ORDER BY e.expense_date DESC, e.id DESC`
+    );
+    return sendJson(res, 200, { expenses });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/finance/expenses') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const category = cleanText(body.category);
+    const amount = parseMoney(body.amount);
+    const expenseDate = cleanText(body.date) || new Date().toISOString().slice(0, 10);
+    if (!category || amount === null || amount <= 0) {
+      return sendJson(res, 400, { error: 'Category and a positive amount are required' });
+    }
+    const inserted = run(
+      `INSERT INTO expenses (category, description, amount, expense_date, recorded_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      category, cleanText(body.description), amount, expenseDate, user.id, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true, id: Number(inserted.lastInsertRowid) });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/finance/income') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const income = all(
+      `SELECT i.id, i.category, i.description, i.amount, i.income_date AS incomeDate,
+              i.recorded_by AS recordedBy, u.name AS recordedByName, i.created_at AS createdAt
+       FROM income_entries i
+       JOIN users u ON u.id = i.recorded_by
+       ORDER BY i.income_date DESC, i.id DESC`
+    );
+    return sendJson(res, 200, { income });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/admin/finance/income') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const category = cleanText(body.category);
+    const amount = parseMoney(body.amount);
+    const incomeDate = cleanText(body.date) || new Date().toISOString().slice(0, 10);
+    if (!category || amount === null || amount <= 0) {
+      return sendJson(res, 400, { error: 'Category and a positive amount are required' });
+    }
+    const inserted = run(
+      `INSERT INTO income_entries (category, description, amount, income_date, recorded_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      category, cleanText(body.description), amount, incomeDate, user.id, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true, id: Number(inserted.lastInsertRowid) });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/admin/finance/analytics') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const expenses = all('SELECT category, amount, expense_date AS date FROM expenses');
+    const income = all('SELECT category, amount, income_date AS date FROM income_entries');
+
+    const sum = rows => rows.reduce((total, r) => total + Number(r.amount || 0), 0);
+    const byCategory = rows => {
+      const map = new Map();
+      rows.forEach(r => map.set(r.category, (map.get(r.category) || 0) + Number(r.amount || 0)));
+      return [...map.entries()]
+        .map(([category, amount]) => ({ category, amount, count: rows.filter(r => r.category === category).length }))
+        .sort((a, b) => b.amount - a.amount);
+    };
+    const byMonth = () => {
+      const map = new Map();
+      const bump = (rows, key) => rows.forEach(r => {
+        const month = String(r.date || '').slice(0, 7);
+        if (!month) return;
+        if (!map.has(month)) map.set(month, { month, income: 0, expenses: 0 });
+        map.get(month)[key] += Number(r.amount || 0);
+      });
+      bump(income, 'income');
+      bump(expenses, 'expenses');
+      return [...map.values()]
+        .map(row => ({ ...row, net: row.income - row.expenses }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+    };
+
+    const totalIncome = sum(income);
+    const totalExpenses = sum(expenses);
+    return sendJson(res, 200, {
+      totalIncome,
+      totalExpenses,
+      net: totalIncome - totalExpenses,
+      incomeCount: income.length,
+      expenseCount: expenses.length,
+      expensesByCategory: byCategory(expenses),
+      incomeByCategory: byCategory(income),
+      monthlyTrend: byMonth(),
+    });
   }
 
   return sendJson(res, 404, { error: 'API route not found' });

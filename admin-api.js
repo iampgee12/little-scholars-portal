@@ -4541,55 +4541,182 @@ document.addEventListener('focus', function(e) {
   }
 }, true);
 
-// ── EXPENSE REQUESTS (Cash Requests) ──
-function erInit() {
-  const sess = document.getElementById('er-session');
-  if (sess && !sess.options.length) {
-    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
-    sess.innerHTML = sessions.length
-      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
-      : `<option value="">No sessions</option>`;
-  }
-  erApplyFilter();
+// ── FINANCE: HRM/PAYROLL + INCOME & EXPENSES (feature/finance-payroll-expenses) ──
+// Self-contained: own state, own helpers, own DOM ids. Kept separate from the
+// rest of admin-api.js so it merges cleanly alongside sibling finance branches.
+
+function finMoney(n) {
+  return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function erApplyFilter() {
-  const q = document.getElementById('er-quick-date');
-  const label = q ? q.value : 'This Year';
-  const yr = new Date().getFullYear();
-  document.getElementById('er-period-label').textContent = `(${label} (${yr}))`;
-  document.getElementById('er-period-top').textContent = `${label} (${yr})`;
+function finToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+function finStaffOptions(selectedId) {
+  const staff = (state.setup && state.setup.staff) || [];
+  return staff.map(s => `<option value="${s.id}"${s.id === selectedId ? ' selected' : ''}>${escapeHtml(s.name)} (${escapeHtml(s.roleLabel || s.role)})</option>`).join('');
+}
+function finStatusPill(status, map) {
+  const colors = map || { pending: '#d97706', outstanding: '#d97706', approved: '#2563eb', repaying: '#2563eb', dispensed: '#059669', paid: '#059669', repaid: '#059669', rejected: '#ef4444' };
+  const c = colors[status] || 'var(--text-2)';
+  return `<span style="display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;background:${c}22;color:${c};text-transform:capitalize;">${escapeHtml(status)}</span>`;
+}
+
+// ── EXPENSE REQUESTS (approval workflow) ──
+let _erData = [];
+async function erInit() {
+  document.getElementById('er-tbody').innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:var(--text-3);">Loading…</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/finance/expense-requests');
+    _erData = data.requests || [];
+  } catch (err) {
+    _erData = [];
+    showToast(err.message || 'Failed to load expense requests');
+  }
+  erRenderTable();
+}
+function erRenderTable() {
+  const statusFilter = (document.getElementById('er-status') || {}).value || '';
+  const search = ((document.getElementById('er-search') || {}).value || '').toLowerCase();
+  const rows = _erData.filter(r => {
+    if (statusFilter && r.status !== statusFilter) return false;
+    if (search && !(`${r.title} ${r.category} ${r.requestedByName}`.toLowerCase().includes(search))) return false;
+    return true;
+  });
+  const tbody = document.getElementById('er-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:28px;text-align:center;color:var(--text-3);">No expense requests found.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map((r, i) => {
+      let actions = '';
+      if (r.status === 'pending') {
+        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="erDecide(${r.id},'approve')">Approve</button> <button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#ef4444;" onclick="erDecide(${r.id},'reject')">Reject</button>`;
+      } else if (r.status === 'approved') {
+        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#2563eb;" onclick="erDecide(${r.id},'dispense')">Mark Dispensed</button>`;
+      } else {
+        actions = '—';
+      }
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(r.title)}</td><td>${escapeHtml(r.category || '')}</td><td>${finMoney(r.amount)}</td><td>${escapeHtml(r.requestedByName)}</td><td>${new Date(r.requestedAt).toLocaleDateString()}</td><td>${finStatusPill(r.status)}</td><td>${escapeHtml(r.approvedByName || '—')}</td><td>${actions}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('er-showing').textContent = `Showing ${rows.length} of ${_erData.length} entries`;
+
+  const sum = (pred) => _erData.filter(pred).reduce((t, r) => t + Number(r.amount), 0);
+  const count = (pred) => _erData.filter(pred).length;
+  document.getElementById('er-stat-total').textContent = finMoney(_erData.reduce((t, r) => t + Number(r.amount), 0));
+  document.getElementById('er-stat-total-count').textContent = `${_erData.length} Entries`;
+  document.getElementById('er-stat-pending').textContent = finMoney(sum(r => r.status === 'pending'));
+  document.getElementById('er-stat-pending-count').textContent = `${count(r => r.status === 'pending')} Requests`;
+  document.getElementById('er-stat-approved').textContent = finMoney(sum(r => r.status === 'approved'));
+  document.getElementById('er-stat-approved-count').textContent = `${count(r => r.status === 'approved')} Requests`;
+  document.getElementById('er-stat-dispensed').textContent = finMoney(sum(r => r.status === 'dispensed'));
+  document.getElementById('er-stat-dispensed-count').textContent = `${count(r => r.status === 'dispensed')} Requests`;
+}
+function erOpenModal() {
+  ['er-form-title', 'er-form-category', 'er-form-amount', 'er-form-reason'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('er-modal').style.display = 'flex';
+}
+function erCloseModal() { document.getElementById('er-modal').style.display = 'none'; }
+async function erSubmit() {
+  const title = document.getElementById('er-form-title').value.trim();
+  const amount = Number(document.getElementById('er-form-amount').value);
+  if (!title || !amount || amount <= 0) { showToast('Title and a positive amount are required'); return; }
+  try {
+    await apiFetch('/api/admin/finance/expense-requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        category: document.getElementById('er-form-category').value.trim(),
+        amount,
+        reason: document.getElementById('er-form-reason').value.trim(),
+      }),
+    });
+    erCloseModal();
+    showToast('Expense request submitted');
+    erInit();
+  } catch (err) { showToast(err.message || 'Failed to submit request'); }
+}
+async function erDecide(id, action) {
+  try {
+    await apiFetch(`/api/admin/finance/expense-requests/${id}/decision`, { method: 'POST', body: JSON.stringify({ action }) });
+    showToast(action === 'approve' ? 'Request approved' : action === 'reject' ? 'Request rejected' : 'Marked dispensed');
+    erInit();
+  } catch (err) { showToast(err.message || 'Action failed'); }
 }
 
 // ── EXPENSES (Expenditures) ──
-function expInit() {
-  const sess = document.getElementById('exp-session');
-  if (sess && !sess.options.length) {
-    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
-    sess.innerHTML = sessions.length
-      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
-      : `<option value="">No sessions</option>`;
+let _expData = [];
+async function expInit() {
+  document.getElementById('exp-tbody').innerHTML = '<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--text-3);">Loading…</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/finance/expenses');
+    _expData = data.expenses || [];
+  } catch (err) {
+    _expData = [];
+    showToast(err.message || 'Failed to load expenses');
   }
+  const catSel = document.getElementById('exp-category');
+  const cats = [...new Set(_expData.map(e => e.category))].sort();
+  const prevVal = catSel.value;
+  catSel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  catSel.value = cats.includes(prevVal) ? prevVal : '';
+  expRenderTable();
 }
-function setBsView(mode) {
-  document.getElementById('exp-btn-item').classList.toggle('active', mode==='item');
-  document.getElementById('exp-btn-voucher').classList.toggle('active', mode==='voucher');
-}
-function toggleIeSummary(bodyId, chevId) {
-  const body = document.getElementById(bodyId);
-  const chev = document.getElementById(chevId);
-  if (!body) return;
-  const isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : '';
-  if (chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : '';
-}
-function switchIeSum(prefix, view, btn) {
-  btn.closest('.card').querySelectorAll('.ie-sum-tab').forEach(t => {
-    t.style.borderBottomColor = 'transparent';
-    t.style.color = 'var(--text-2)';
+function expRenderTable() {
+  const catFilter = (document.getElementById('exp-category') || {}).value || '';
+  const search = ((document.getElementById('exp-search') || {}).value || '').toLowerCase();
+  const rows = _expData.filter(e => {
+    if (catFilter && e.category !== catFilter) return false;
+    if (search && !((e.description || '').toLowerCase().includes(search))) return false;
+    return true;
   });
-  btn.style.borderBottomColor = '#2563eb';
-  btn.style.color = '#2563eb';
+  const tbody = document.getElementById('exp-tbody');
+  tbody.innerHTML = rows.length ? rows.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.description || '—')}</td><td>${finMoney(e.amount)}</td><td>${e.expenseDate}</td><td>${escapeHtml(e.recordedByName)}</td><td>${e.requestId ? 'Expense Request #' + e.requestId : 'Direct entry'}</td></tr>`).join('')
+    : '<tr><td colspan="7" style="padding:28px;text-align:center;color:var(--text-3);">No expenses recorded yet.</td></tr>';
+
+  const total = _expData.reduce((t, e) => t + Number(e.amount), 0);
+  const today = finToday();
+  const month = today.slice(0, 7);
+  document.getElementById('exp-stat-total').textContent = finMoney(total);
+  document.getElementById('exp-stat-total-count').textContent = `${_expData.length} Entries`;
+  document.getElementById('exp-stat-avg').textContent = finMoney(_expData.length ? total / _expData.length : 0);
+  document.getElementById('exp-stat-today').textContent = finMoney(_expData.filter(e => e.expenseDate === today).reduce((t, e) => t + Number(e.amount), 0));
+  document.getElementById('exp-stat-month').textContent = finMoney(_expData.filter(e => (e.expenseDate || '').slice(0, 7) === month).reduce((t, e) => t + Number(e.amount), 0));
+  document.getElementById('exp-total-label').textContent = finMoney(rows.reduce((t, e) => t + Number(e.amount), 0));
+
+  const catMap = new Map();
+  _expData.forEach(e => catMap.set(e.category, (catMap.get(e.category) || { amount: 0, count: 0 })));
+  _expData.forEach(e => { const c = catMap.get(e.category); c.amount += Number(e.amount); c.count += 1; });
+  const catRows = [...catMap.entries()].sort((a, b) => b[1].amount - a[1].amount);
+  const catTbody = document.getElementById('exp-cat-tbody');
+  catTbody.innerHTML = catRows.length ? catRows.map(([cat, v], i) => `<tr><td>${i + 1}</td><td>${escapeHtml(cat)}</td><td>${finMoney(v.amount)}</td><td>${v.count}</td><td>${total ? Math.round(v.amount / total * 100) : 0}%</td></tr>`).join('')
+    : '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3);">No expense data available.</td></tr>';
 }
+function expOpenModal() {
+  ['exp-form-category', 'exp-form-description', 'exp-form-amount'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('exp-form-date').value = finToday();
+  document.getElementById('exp-modal').style.display = 'flex';
+}
+function expCloseModal() { document.getElementById('exp-modal').style.display = 'none'; }
+async function expSubmit() {
+  const category = document.getElementById('exp-form-category').value.trim();
+  const amount = Number(document.getElementById('exp-form-amount').value);
+  if (!category || !amount || amount <= 0) { showToast('Category and a positive amount are required'); return; }
+  try {
+    await apiFetch('/api/admin/finance/expenses', {
+      method: 'POST',
+      body: JSON.stringify({
+        category,
+        description: document.getElementById('exp-form-description').value.trim(),
+        amount,
+        date: document.getElementById('exp-form-date').value || finToday(),
+      }),
+    });
+    expCloseModal();
+    showToast('Expense recorded');
+    expInit();
+  } catch (err) { showToast(err.message || 'Failed to record expense'); }
+}
+
 function switchIeView(viewId, btn) {
   const panel = btn.closest('.tab-panel');
   panel.querySelectorAll('[id^="ie-view-"]').forEach(v => v.style.display = 'none');
@@ -4605,26 +4732,108 @@ function switchIeView(viewId, btn) {
 }
 
 // ── INCOME ──
-function incInit() {
-  const sess = document.getElementById('inc-session');
-  if (sess && !sess.options.length) {
-    const sessions = [...new Set((state.setup.resultBatches||[]).map(b=>b.session).filter(Boolean))];
-    sess.innerHTML = sessions.length
-      ? sessions.map(s=>`<option value="${s}">${s}</option>`).join('')
-      : `<option value="">No sessions</option>`;
+let _incData = [];
+async function incInit() {
+  document.getElementById('inc-tbody').innerHTML = '<tr><td colspan="6" style="padding:28px;text-align:center;color:var(--text-3);">Loading…</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/finance/income');
+    _incData = data.income || [];
+  } catch (err) {
+    _incData = [];
+    showToast(err.message || 'Failed to load income');
   }
+  const catSel = document.getElementById('inc-category');
+  const cats = [...new Set(_incData.map(e => e.category))].sort();
+  const prevVal = catSel.value;
+  catSel.innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  catSel.value = cats.includes(prevVal) ? prevVal : '';
+  incRenderTable();
+}
+function incRenderTable() {
+  const catFilter = (document.getElementById('inc-category') || {}).value || '';
+  const search = ((document.getElementById('inc-search') || {}).value || '').toLowerCase();
+  const rows = _incData.filter(e => {
+    if (catFilter && e.category !== catFilter) return false;
+    if (search && !((e.description || '').toLowerCase().includes(search))) return false;
+    return true;
+  });
+  const tbody = document.getElementById('inc-tbody');
+  tbody.innerHTML = rows.length ? rows.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.description || '—')}</td><td>${finMoney(e.amount)}</td><td>${e.incomeDate}</td><td>${escapeHtml(e.recordedByName)}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="padding:28px;text-align:center;color:var(--text-3);">No income recorded yet.</td></tr>';
+
+  const total = _incData.reduce((t, e) => t + Number(e.amount), 0);
+  const today = finToday();
+  const month = today.slice(0, 7);
+  document.getElementById('inc-stat-total').textContent = finMoney(total);
+  document.getElementById('inc-stat-total-count').textContent = `${_incData.length} Entries`;
+  document.getElementById('inc-stat-avg').textContent = finMoney(_incData.length ? total / _incData.length : 0);
+  document.getElementById('inc-stat-today').textContent = finMoney(_incData.filter(e => e.incomeDate === today).reduce((t, e) => t + Number(e.amount), 0));
+  document.getElementById('inc-stat-month').textContent = finMoney(_incData.filter(e => (e.incomeDate || '').slice(0, 7) === month).reduce((t, e) => t + Number(e.amount), 0));
+  document.getElementById('inc-total-label').textContent = finMoney(rows.reduce((t, e) => t + Number(e.amount), 0));
+
+  const catMap = new Map();
+  _incData.forEach(e => catMap.set(e.category, (catMap.get(e.category) || { amount: 0, count: 0 })));
+  _incData.forEach(e => { const c = catMap.get(e.category); c.amount += Number(e.amount); c.count += 1; });
+  const catRows = [...catMap.entries()].sort((a, b) => b[1].amount - a[1].amount);
+  const catTbody = document.getElementById('inc-cat-tbody');
+  catTbody.innerHTML = catRows.length ? catRows.map(([cat, v], i) => `<tr><td>${i + 1}</td><td>${escapeHtml(cat)}</td><td>${finMoney(v.amount)}</td><td>${v.count}</td><td>${total ? Math.round(v.amount / total * 100) : 0}%</td></tr>`).join('')
+    : '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3);">No income data available.</td></tr>';
+}
+function incOpenModal() {
+  ['inc-form-category', 'inc-form-description', 'inc-form-amount'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inc-form-date').value = finToday();
+  document.getElementById('inc-modal').style.display = 'flex';
+}
+function incCloseModal() { document.getElementById('inc-modal').style.display = 'none'; }
+async function incSubmit() {
+  const category = document.getElementById('inc-form-category').value.trim();
+  const amount = Number(document.getElementById('inc-form-amount').value);
+  if (!category || !amount || amount <= 0) { showToast('Category and a positive amount are required'); return; }
+  try {
+    await apiFetch('/api/admin/finance/income', {
+      method: 'POST',
+      body: JSON.stringify({
+        category,
+        description: document.getElementById('inc-form-description').value.trim(),
+        amount,
+        date: document.getElementById('inc-form-date').value || finToday(),
+      }),
+    });
+    incCloseModal();
+    showToast('Income recorded');
+    incInit();
+  } catch (err) { showToast(err.message || 'Failed to record income'); }
 }
 
 // ── INCOME & EXPENSES ANALYTICS ──
-function ieaInit() {
-  document.getElementById('iea-results').style.display = 'none';
-  document.getElementById('iea-empty').style.display = '';
-}
-function ieaViewAnalytics() {
-  const period = document.getElementById('iea-period').value;
-  document.getElementById('iea-period-label').textContent = `Period : ${period}`;
-  document.getElementById('iea-empty').style.display = 'none';
-  document.getElementById('iea-results').style.display = '';
+async function ieaInit() {
+  let data;
+  try {
+    data = await apiFetch('/api/admin/finance/analytics');
+  } catch (err) {
+    showToast(err.message || 'Failed to load analytics');
+    return;
+  }
+  document.getElementById('iea-total-income').textContent = finMoney(data.totalIncome);
+  document.getElementById('iea-income-txn').textContent = `${data.incomeCount} Transactions`;
+  document.getElementById('iea-total-exp').textContent = finMoney(data.totalExpenses);
+  document.getElementById('iea-exp-txn').textContent = `${data.expenseCount} Transactions`;
+  document.getElementById('iea-net').textContent = finMoney(data.net);
+  const netLabel = document.getElementById('iea-net-label');
+  netLabel.style.color = data.net >= 0 ? '#059669' : '#ef4444';
+  netLabel.textContent = data.net >= 0 ? 'Surplus' : 'Deficit';
+
+  const expTbody = document.getElementById('iea-exp-tbody');
+  expTbody.innerHTML = data.expensesByCategory.length ? data.expensesByCategory.map((c, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(c.category)}</td><td>${finMoney(c.amount)}</td><td>${c.count}</td><td>${data.totalExpenses ? Math.round(c.amount / data.totalExpenses * 100) : 0}%</td></tr>`).join('')
+    : '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3);">No Data Found</td></tr>';
+
+  const incTbody = document.getElementById('iea-inc-tbody');
+  incTbody.innerHTML = data.incomeByCategory.length ? data.incomeByCategory.map((c, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(c.category)}</td><td>${finMoney(c.amount)}</td><td>${c.count}</td><td>${data.totalIncome ? Math.round(c.amount / data.totalIncome * 100) : 0}%</td></tr>`).join('')
+    : '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3);">No Data Found</td></tr>';
+
+  const trendTbody = document.getElementById('iea-trend-tbody');
+  trendTbody.innerHTML = data.monthlyTrend.length ? data.monthlyTrend.map(m => `<tr><td>${m.month}</td><td>${finMoney(m.income)}</td><td>${finMoney(m.expenses)}</td><td style="color:${m.net >= 0 ? '#059669' : '#ef4444'};">${finMoney(m.net)}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3);">No Data Found</td></tr>';
 }
 function switchIeaTab(tabId, btn) {
   document.querySelectorAll('[id^="iea-tab-"]').forEach(t => t.style.display = 'none');
@@ -4639,12 +4848,28 @@ function switchIeaTab(tabId, btn) {
 }
 
 // ── MONTHLY SALARIES PROCESSING ──
+function finPeriodFromSelects(monthId, yearId) {
+  const month = document.getElementById(monthId).value;
+  const year = document.getElementById(yearId).value;
+  return month && year ? `${year}-${String(month).padStart(2, '0')}` : '';
+}
+function finMatchesEmpType(role, emptype) {
+  if (!emptype || emptype === 'all') return true;
+  if (emptype === 'teacher') return role === 'teacher';
+  if (emptype === 'non-teaching') return role === 'admin';
+  return true;
+}
+let _mspRates = [], _mspSalaries = [];
 function mspInit() {
+  const now = new Date();
+  document.getElementById('msp-month').value = String(now.getMonth() + 1);
+  document.getElementById('msp-year').value = String(now.getFullYear());
   document.getElementById('msp-results-card').style.display = 'none';
 }
-function mspLoadList() {
+async function mspLoadList() {
   const emptype = document.getElementById('msp-emptype').value;
-  if (!emptype) { showToast('Please select Employee Type', 'error'); return; }
+  if (!emptype) { showToast('Please select Employee Type'); return; }
+  const period = finPeriodFromSelects('msp-month', 'msp-year');
   const monthSel = document.getElementById('msp-month');
   const monthName = monthSel.options[monthSel.selectedIndex].text;
   const year = document.getElementById('msp-year').value;
@@ -4652,50 +4877,187 @@ function mspLoadList() {
   document.getElementById('msp-period-label').textContent = `Computing ${monthName} ${year} Salary`;
   document.getElementById('msp-emptype-label').textContent = `Employee Type : ${emptypeLabel}`;
   document.getElementById('msp-results-card').style.display = '';
-  mspRenderTable();
+  try {
+    const [ratesData, salariesData] = await Promise.all([
+      apiFetch('/api/admin/payroll/rates'),
+      apiFetch(`/api/admin/payroll/salaries?period=${encodeURIComponent(period)}`),
+    ]);
+    _mspRates = ratesData.rates || [];
+    _mspSalaries = salariesData.salaries || [];
+  } catch (err) {
+    showToast(err.message || 'Failed to load payroll data');
+    _mspRates = []; _mspSalaries = [];
+  }
+  mspRenderTable(emptype, period);
 }
-function mspRenderTable() {
-  const staff = (state.setup.staff || []);
+function mspRenderTable(emptype, period) {
   const tbody = document.getElementById('msp-tbody');
-  if (!staff.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--text-3);">No staff records found for the selected criteria.</td></tr>';
+  const rows = _mspRates.filter(s => finMatchesEmpType(s.role, emptype));
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--text-3);">No staff records found for the selected criteria.</td></tr>';
     document.getElementById('msp-showing').textContent = 'Showing 0 entries';
     return;
   }
-  tbody.innerHTML = staff.map((s, i) => '<tr><td>' + (i+1) + '</td><td><div style="font-weight:600;font-size:12px;">' + (s.name||s.fullname||'—') + '</div><div style="font-size:10px;color:var(--text-3);">' + (s.type||'') + '</div></td><td style="color:var(--text-3);font-size:11px;">—</td><td><select class="ctrl-select" style="font-size:11px;"><option>Cash Pay...</option><option>Bank Transfer</option></select></td><td><div style="display:flex;align-items:center;gap:4px;font-size:12px;"><span style="color:var(--text-3);">₦</span><input type="number" value="0.00" style="width:80px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;"/></div></td><td></td><td><button class="bs-toggle-btn" style="padding:3px 10px;font-size:10px;">+ Add</button></td><td><button class="bs-toggle-btn" style="padding:3px 10px;font-size:10px;">+ Add</button></td><td style="font-size:12px;">₦ 0</td><td style="font-size:12px;">₦ 0</td><td style="font-size:12px;">₦ 0</td><td><button style="background:#e53e3e;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;">Exclude</button></td></tr>').join('');
-  document.getElementById('msp-showing').textContent = 'Showing ' + staff.length + ' entries';
+  tbody.innerHTML = rows.map((s, i) => {
+    const existing = _mspSalaries.find(sal => sal.staffId === s.staffId);
+    const base = existing ? existing.baseSalary : s.baseSalary;
+    const allow = existing ? existing.allowances : s.allowances;
+    const ded = existing ? existing.deductions : s.deductions;
+    const locked = existing && existing.status === 'paid';
+    const roleLabel = s.role === 'admin' ? 'Admin' : (s.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher');
+    return `<tr data-staff="${s.staffId}">
+      <td>${i + 1}</td>
+      <td><div style="font-weight:600;font-size:12px;">${escapeHtml(s.name)}</div><div style="font-size:10px;color:var(--text-3);">${s.staffId}</div></td>
+      <td style="font-size:11px;color:var(--text-3);">${roleLabel}</td>
+      <td><input type="number" class="msp-base" value="${base}" ${locked ? 'disabled' : ''} style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="msp-allow" value="${allow}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="msp-ded" value="${ded}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
+      <td class="msp-net" style="font-weight:700;">${finMoney(base + allow - ded)}</td>
+      <td>${existing ? finStatusPill(existing.status) : finStatusPill('not processed', { 'not processed': 'var(--text-3)' })}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('msp-showing').textContent = `Showing ${rows.length} entries`;
+  tbody.dataset.period = period;
 }
-function mspProcess() { showToast('Salary processing will be available when payroll data is configured.', 'info'); }
-function mspExport()  { showToast('Export will be available when records are loaded.', 'info'); }
+function mspRecalc(staffId) {
+  const row = document.querySelector(`#msp-tbody tr[data-staff="${staffId}"]`);
+  if (!row) return;
+  const base = Number(row.querySelector('.msp-base').value) || 0;
+  const allow = Number(row.querySelector('.msp-allow').value) || 0;
+  const ded = Number(row.querySelector('.msp-ded').value) || 0;
+  row.querySelector('.msp-net').textContent = finMoney(base + allow - ded);
+}
+async function mspProcess() {
+  const tbody = document.getElementById('msp-tbody');
+  const period = tbody.dataset.period;
+  if (!period) { showToast('Load a list first'); return; }
+  const entries = [...tbody.querySelectorAll('tr[data-staff]')].map(row => ({
+    staffId: row.dataset.staff,
+    baseSalary: Number(row.querySelector('.msp-base').value) || 0,
+    allowances: Number(row.querySelector('.msp-allow').value) || 0,
+    deductions: Number(row.querySelector('.msp-ded').value) || 0,
+  }));
+  if (!entries.length) { showToast('Nothing to process'); return; }
+  try {
+    const data = await apiFetch('/api/admin/payroll/salaries/generate', {
+      method: 'POST',
+      body: JSON.stringify({ period, entries }),
+    });
+    showToast(`Processed ${data.processed} salary record(s) for ${period}`);
+    _mspSalaries = data.salaries || [];
+    const emptype = document.getElementById('msp-emptype').value;
+    mspRenderTable(emptype, period);
+  } catch (err) { showToast(err.message || 'Failed to process salaries'); }
+}
 
 // ── SALARY PAYMENT SCHEDULE ──
+let _spsData = [];
 function spsInit() {
+  const now = new Date();
+  document.getElementById('sps-month').value = String(now.getMonth() + 1);
+  document.getElementById('sps-year').value = String(now.getFullYear());
   document.getElementById('sps-results-card').style.display = 'none';
 }
-function spsView() {
+async function spsView() {
   const month = document.getElementById('sps-month').value;
-  if (!month) { showToast('Please select a Salary Month', 'error'); return; }
+  if (!month) { showToast('Please select a Salary Month'); return; }
+  const period = finPeriodFromSelects('sps-month', 'sps-year');
   const monthSel = document.getElementById('sps-month');
   const monthName = monthSel.options[monthSel.selectedIndex].text;
   const year = document.getElementById('sps-year').value;
   document.getElementById('sps-period-label').textContent = 'Salary Payment Schedule — ' + monthName + ' ' + year;
   document.getElementById('sps-results-card').style.display = '';
+  try {
+    const data = await apiFetch(`/api/admin/payroll/salaries?period=${encodeURIComponent(period)}`);
+    _spsData = data.salaries || [];
+  } catch (err) {
+    _spsData = [];
+    showToast(err.message || 'Failed to load salary schedule');
+  }
   spsRenderTable();
 }
 function spsRenderTable() {
-  document.getElementById('sps-tbody').innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--text-3);">No records found.</td></tr>';
-  document.getElementById('sps-showing').textContent = 'Showing 0 to 0 of 0 entries';
+  const emptype = document.getElementById('sps-emptype').value;
+  const search = ((document.getElementById('sps-search') || {}).value || '').toLowerCase();
+  const rows = _spsData.filter(s => finMatchesEmpType(s.role, emptype) && (!search || s.name.toLowerCase().includes(search)));
+  const tbody = document.getElementById('sps-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3);">No records found. Process this month\'s salaries first from Monthly Salaries Processing.</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map((s, i) => {
+      const roleLabel = s.role === 'admin' ? 'Admin' : (s.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher');
+      const action = s.status === 'paid' ? '—' : `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="spsMarkPaid(${s.id})">Mark Paid</button>`;
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${roleLabel}</td><td>${finMoney(s.baseSalary)}</td><td>${finMoney(s.allowances)}</td><td>${finMoney(s.deductions)}</td><td style="font-weight:700;">${finMoney(s.netSalary)}</td><td>${finStatusPill(s.status)}</td><td>${action}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('sps-showing').textContent = `Showing ${rows.length} of ${_spsData.length} entries`;
+}
+async function spsMarkPaid(id) {
+  try {
+    await apiFetch(`/api/admin/payroll/salaries/${id}/pay`, { method: 'POST' });
+    showToast('Salary marked as paid');
+    spsView();
+  } catch (err) { showToast(err.message || 'Failed to mark paid'); }
 }
 
-// ── PAYROLL SETTINGS ──
-var _glData = [], _gsData = [];
-function prInit() {
+// ── PAYROLL SETTINGS (Pay Rates) ──
+let _prRates = [];
+async function prInit() {
   switchPrTab('scale', document.getElementById('pr-tab-scale'));
-  glRenderTable();
-  gsRenderTable();
+  document.getElementById('pr-tbody').innerHTML = '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--text-3);">Loading…</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/payroll/rates');
+    _prRates = data.rates || [];
+  } catch (err) {
+    _prRates = [];
+    showToast(err.message || 'Failed to load pay rates');
+  }
+  prRenderTable();
+}
+function prRenderTable() {
+  const tbody = document.getElementById('pr-tbody');
+  if (!_prRates.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--text-3);">No staff found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _prRates.map((s, i) => {
+    const roleLabel = s.role === 'admin' ? 'Admin' : (s.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher');
+    return `<tr data-staff="${s.staffId}">
+      <td>${i + 1}</td>
+      <td>${escapeHtml(s.name)}</td>
+      <td style="font-size:11px;color:var(--text-3);">${roleLabel}</td>
+      <td><input type="number" class="pr-base" value="${s.baseSalary}" style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="pr-allow" value="${s.allowances}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="pr-ded" value="${s.deductions}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
+      <td class="pr-net" style="font-weight:700;">${finMoney(s.baseSalary + s.allowances - s.deductions)}</td>
+      <td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;" onclick="prSave('${s.staffId}')">Save</button></td>
+    </tr>`;
+  }).join('');
+}
+function prRecalc(staffId) {
+  const row = document.querySelector(`#pr-tbody tr[data-staff="${staffId}"]`);
+  if (!row) return;
+  const base = Number(row.querySelector('.pr-base').value) || 0;
+  const allow = Number(row.querySelector('.pr-allow').value) || 0;
+  const ded = Number(row.querySelector('.pr-ded').value) || 0;
+  row.querySelector('.pr-net').textContent = finMoney(base + allow - ded);
+}
+async function prSave(staffId) {
+  const row = document.querySelector(`#pr-tbody tr[data-staff="${staffId}"]`);
+  if (!row) return;
+  const baseSalary = Number(row.querySelector('.pr-base').value) || 0;
+  const allowances = Number(row.querySelector('.pr-allow').value) || 0;
+  const deductions = Number(row.querySelector('.pr-ded').value) || 0;
+  try {
+    await apiFetch('/api/admin/payroll/rates', {
+      method: 'POST',
+      body: JSON.stringify({ staffId, baseSalary, allowances, deductions }),
+    });
+    showToast('Pay rate saved');
+  } catch (err) { showToast(err.message || 'Failed to save pay rate'); }
 }
 function switchPrTab(view, btn) {
-  ['scale','positions','contracts','paye'].forEach(function(v) {
+  ['scale', 'positions', 'contracts', 'paye'].forEach(function (v) {
     var el = document.getElementById('pr-view-' + v);
     if (el) el.style.display = 'none';
     var tb = document.getElementById('pr-tab-' + v);
@@ -4705,52 +5067,27 @@ function switchPrTab(view, btn) {
   if (active) active.style.display = '';
   if (btn) { btn.style.borderBottomColor = '#2563eb'; btn.style.color = '#2563eb'; }
 }
-function glRenderTable() {
-  var tbody = document.getElementById('gl-tbody');
-  if (!tbody) return;
-  if (!_glData.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3);">No grade levels added yet.</td></tr>';
-    document.getElementById('gl-showing').textContent = 'Showing 0 entries';
-    return;
-  }
-  tbody.innerHTML = _glData.map(function(g,i) { return '<tr><td>' + (i+1) + '</td><td style="font-weight:600;">' + g.name + '</td><td style="text-align:right;color:#2563eb;">' + g.numeric + '</td><td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;">Actions v</button></td></tr>'; }).join('');
-  document.getElementById('gl-showing').textContent = 'Showing 1 to ' + _glData.length + ' of ' + _glData.length + ' entries';
-  var sel = document.getElementById('gs-filter-level');
-  if (sel) sel.innerHTML = '<option value="">All Grade Levels</option>' + _glData.map(function(g) { return '<option value="' + g.name + '">' + g.name + '</option>'; }).join('');
-}
-function glAddModal() { showToast('Add Grade Level — form will open here.', 'info'); }
-function gsRenderTable() {
-  var tbody = document.getElementById('gs-tbody');
-  if (!tbody) return;
-  var filter = (document.getElementById('gs-filter-level') || {}).value || '';
-  var rows = filter ? _gsData.filter(function(s) { return s.level === filter; }) : _gsData;
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3);">No steps added yet.</td></tr>';
-    document.getElementById('gs-showing').textContent = 'Showing 0 entries';
-    return;
-  }
-  tbody.innerHTML = rows.map(function(s,i) { return '<tr><td>' + (i+1) + '</td><td style="font-weight:600;">' + s.level + '</td><td>' + s.name + '</td><td>' + s.numeric + '</td><td>N' + Number(s.salary).toLocaleString('en-NG',{minimumFractionDigits:2}) + '</td><td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;">Actions v</button></td></tr>'; }).join('');
-  document.getElementById('gs-showing').textContent = 'Showing 1 to ' + rows.length + ' of ' + rows.length + ' entries';
-}
-function gsAddModal() { showToast('Add Grade Level Step — form will open here.', 'info'); }
-function gsClearFilter() {
-  var sel = document.getElementById('gs-filter-level');
-  if (sel) sel.value = '';
-  gsRenderTable();
-}
 
 // ── STAFF LOANS & ADVANCES ──
-var _slData = [];
-function slInit() {
+let _slData = [];
+async function slInit() {
   switchSlTab('loans', document.querySelector('.sl-tab'));
+  document.getElementById('sl-tbody').innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3);">Loading…</td></tr>';
+  try {
+    const data = await apiFetch('/api/admin/payroll/loans');
+    _slData = data.loans || [];
+  } catch (err) {
+    _slData = [];
+    showToast(err.message || 'Failed to load loans');
+  }
   slRenderTable();
 }
 function switchSlTab(view, btn) {
-  ['loans','settings'].forEach(function(v) {
+  ['loans', 'settings'].forEach(function (v) {
     var el = document.getElementById('sl-view-' + v);
     if (el) el.style.display = 'none';
   });
-  document.querySelectorAll('.sl-tab').forEach(function(t) {
+  document.querySelectorAll('.sl-tab').forEach(function (t) {
     t.style.borderBottomColor = 'transparent'; t.style.color = 'var(--text-2)';
   });
   var el = document.getElementById('sl-view-' + view);
@@ -4758,15 +5095,61 @@ function switchSlTab(view, btn) {
   if (btn) { btn.style.borderBottomColor = '#2563eb'; btn.style.color = '#2563eb'; }
 }
 function slRenderTable() {
-  var tbody = document.getElementById('sl-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3);">No data available in table</td></tr>';
-  document.getElementById('sl-showing').textContent = 'Showing 0 to 0 of 0 entries';
+  const statusFilter = (document.getElementById('sl-status') || {}).value || '';
+  const typeFilter = (document.getElementById('sl-type') || {}).value || '';
+  const rows = _slData.filter(l => (!statusFilter || l.repaymentStatus === statusFilter) && (!typeFilter || l.loanType === typeFilter));
+  const tbody = document.getElementById('sl-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:32px;text-align:center;color:var(--text-3);">No data available in table</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map((l, i) => {
+      const nextStatus = l.repaymentStatus === 'outstanding' ? 'repaying' : (l.repaymentStatus === 'repaying' ? 'repaid' : null);
+      const actionBtn = nextStatus
+        ? `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;" onclick="slAdvanceStatus(${l.id},'${nextStatus}')">Mark ${nextStatus === 'repaying' ? 'Repaying' : 'Repaid'}</button>`
+        : '—';
+      return `<tr><td>${i + 1}</td><td>${escapeHtml(l.name)}</td><td style="text-transform:capitalize;">${escapeHtml(l.loanType)}</td><td>${finMoney(l.amount)}</td><td>${finMoney(l.monthlyDeduction)}</td><td style="max-width:200px;font-size:11px;color:var(--text-2);">${escapeHtml(l.reason || '—')}</td><td>${finStatusPill(l.repaymentStatus)}</td><td>${new Date(l.issuedAt).toLocaleDateString()}</td><td>${actionBtn}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('sl-showing').textContent = `Showing ${rows.length} of ${_slData.length} entries`;
 }
 function slClear() {
   document.getElementById('sl-status').value = '';
   document.getElementById('sl-type').value = '';
   slRenderTable();
+}
+function slOpenModal() {
+  document.getElementById('sl-form-staff').innerHTML = finStaffOptions();
+  document.getElementById('sl-form-type').value = 'loan';
+  ['sl-form-amount', 'sl-form-deduction', 'sl-form-reason'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('sl-modal').style.display = 'flex';
+}
+function slCloseModal() { document.getElementById('sl-modal').style.display = 'none'; }
+async function slSubmit() {
+  const staffId = document.getElementById('sl-form-staff').value;
+  const amount = Number(document.getElementById('sl-form-amount').value);
+  if (!staffId || !amount || amount <= 0) { showToast('Staff member and a positive amount are required'); return; }
+  try {
+    await apiFetch('/api/admin/payroll/loans', {
+      method: 'POST',
+      body: JSON.stringify({
+        staffId,
+        loanType: document.getElementById('sl-form-type').value,
+        amount,
+        monthlyDeduction: Number(document.getElementById('sl-form-deduction').value) || 0,
+        reason: document.getElementById('sl-form-reason').value.trim(),
+      }),
+    });
+    slCloseModal();
+    showToast('Loan recorded');
+    slInit();
+  } catch (err) { showToast(err.message || 'Failed to record loan'); }
+}
+async function slAdvanceStatus(id, status) {
+  try {
+    await apiFetch(`/api/admin/payroll/loans/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+    showToast('Loan status updated');
+    slInit();
+  } catch (err) { showToast(err.message || 'Failed to update status'); }
 }
 
 // ── MOBILE SIDEBAR TOGGLE ──
