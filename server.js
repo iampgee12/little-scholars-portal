@@ -504,8 +504,151 @@ function seedDatabase() {
   }
 }
 
+// ── FEES / BURSARY SCHEMA (Finance MVP: invoices + payments) ──
+// Kept as its own function/tables (not merged into createSchema()'s big
+// template literal) so this can land independently of sibling finance
+// sub-areas (Payroll/Expenses, Store/Accounting) without touching shared code.
+function createFeesSchema() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS fee_invoices (
+      id INTEGER PRIMARY KEY,
+      student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      academic_id INTEGER NOT NULL REFERENCES academic_terms(id),
+      class_code TEXT NOT NULL REFERENCES classes(code),
+      fee_type TEXT NOT NULL,
+      description TEXT,
+      amount REAL NOT NULL,
+      due_date TEXT,
+      created_by TEXT NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS fee_payments (
+      id INTEGER PRIMARY KEY,
+      invoice_id INTEGER NOT NULL REFERENCES fee_invoices(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      method TEXT NOT NULL,
+      reference TEXT,
+      status TEXT NOT NULL DEFAULT 'successful' CHECK(status IN ('successful','pending','failed')),
+      note TEXT,
+      recorded_by TEXT NOT NULL REFERENCES users(id),
+      recorded_at TEXT NOT NULL
+    );
+  `);
+}
+
+// One-off demo data for Fees/Bursary so the finance screens aren't empty on a
+// fresh database. Gated by its own schema_meta key (independent of the main
+// seed_version) so it can be added/rerun without touching seedDatabase().
+function seedFeesDemoData() {
+  const seeded = one('SELECT value FROM schema_meta WHERE key = ?', 'fees_seed_version');
+  if (seeded && seeded.value === '1') return;
+  if (one('SELECT COUNT(*) AS count FROM students').count === 0) return;
+
+  db.exec('BEGIN');
+  try {
+    const academic = one('SELECT id FROM academic_terms WHERE is_active = 1');
+    const academicId = academic ? academic.id : 1;
+    const admin = one("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+    const createdBy = admin ? admin.id : 'ADM-001';
+
+    // Backfill a parent email for a handful of demo students (only where one
+    // isn't already set) so Family Fees History has real families to show.
+    const setParentEmail = (studentId, email) => run(
+      `UPDATE students SET parent_email = ? WHERE id = ? AND (parent_email IS NULL OR parent_email = '')`,
+      email, studentId
+    );
+    [
+      ['STU-2024-0421', 'osei.family@example.com'],
+      ['STU-2024-0388', 'mensah.family@example.com'],
+      ['STU-2024-0412', 'nwosu.family@example.com'],
+      ['STU-2024-0430', 'bello.family@example.com'],
+      ['STU-2024-0441', 'okafor.family@example.com'],
+      ['STU-2024-0455', 'adebisi.family@example.com'],
+      ['STU-2024-0301', 'coker.family@example.com'],
+      ['STU-2024-0334', 'musa.family@example.com'],
+      ['STU-2024-0345', 'adesanya.family@example.com'],
+      ['STU-2023-0101', 'ahmed.family@example.com'],
+      ['STU-2023-0112', 'diop.family@example.com'],
+      ['STU-2023-0123', 'uche.family@example.com'],
+    ].forEach(([studentId, email]) => setParentEmail(studentId, email));
+
+    const invoice = (studentId, feeType, description, amount, dueDate, createdAt) => {
+      const result = run(
+        `INSERT INTO fee_invoices (student_id, academic_id, class_code, fee_type, description, amount, due_date, created_by, created_at)
+         VALUES (?, ?, (SELECT class_code FROM students WHERE id = ?), ?, ?, ?, ?, ?, ?)`,
+        studentId, academicId, studentId, feeType, description, amount, dueDate, createdBy, createdAt
+      );
+      return Number(result.lastInsertRowid);
+    };
+    const payment = (invoiceId, amount, method, reference, status, recordedAt, note) => {
+      run(
+        `INSERT INTO fee_payments (invoice_id, amount, method, reference, status, note, recorded_by, recorded_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        invoiceId, amount, method, reference, status, note || null, createdBy, recordedAt
+      );
+    };
+
+    // Fully paid
+    let inv = invoice('STU-2024-0421', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 85000, 'Bank Transfer', 'TRX-10021', 'successful', '2026-05-20T10:12:00.000Z', 'Paid in full via bank transfer');
+
+    // Partially paid
+    inv = invoice('STU-2024-0388', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 50000, 'Cash', 'RCPT-2201', 'successful', '2026-05-25T11:00:00.000Z', 'First installment');
+
+    // Unpaid, overdue
+    invoice('STU-2024-0412', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+
+    // Bus fee, unpaid + not yet due (soft demo of a non-tuition fee type)
+    invoice('STU-2024-0430', 'Bus Fee', 'Term 2 Transport Levy', 15000, '2026-09-01', '2026-05-12T09:00:00.000Z');
+    // ... plus a paid tuition invoice for the same student
+    inv = invoice('STU-2024-0430', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 85000, 'Card Payment', 'TRX-10098', 'successful', '2026-05-18T08:40:00.000Z', null);
+
+    // Pending payment awaiting review (Review Payment Proofs demo)
+    inv = invoice('STU-2024-0441', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 85000, 'Bank Transfer', 'TRX-PENDING-01', 'pending', '2026-06-02T13:20:00.000Z', 'Awaiting bank confirmation');
+
+    // Failed attempt demo
+    inv = invoice('STU-2024-0455', 'Tuition Fee', 'Term 2 Tuition', 85000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 85000, 'Card Payment', 'TRX-FAIL-01', 'failed', '2026-05-28T16:05:00.000Z', 'Card declined');
+
+    // Class 4A students
+    inv = invoice('STU-2024-0301', 'Tuition Fee', 'Term 2 Tuition', 80000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 80000, 'Bank Transfer', 'TRX-10145', 'successful', '2026-05-22T09:30:00.000Z', null);
+
+    invoice('STU-2024-0334', 'Tuition Fee', 'Term 2 Tuition', 80000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+
+    inv = invoice('STU-2024-0345', 'Development Levy', 'Annual Development Levy', 20000, '2026-07-01', '2026-05-15T09:00:00.000Z');
+    payment(inv, 10000, 'Cash', 'RCPT-2306', 'successful', '2026-06-01T12:00:00.000Z', 'Partial payment');
+
+    // Class 5A students
+    inv = invoice('STU-2023-0101', 'Tuition Fee', 'Term 2 Tuition', 90000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+    payment(inv, 90000, 'Bank Transfer', 'TRX-10201', 'successful', '2026-05-19T14:00:00.000Z', null);
+
+    invoice('STU-2023-0112', 'Tuition Fee', 'Term 2 Tuition', 90000, '2026-06-15', '2026-05-11T09:00:00.000Z');
+
+    inv = invoice('STU-2023-0123', 'Exam Fee', 'Term 2 Exam Fee', 8000, '2026-06-20', '2026-05-15T09:00:00.000Z');
+    payment(inv, 8000, 'USSD', 'TRX-10245', 'successful', '2026-05-30T10:10:00.000Z', null);
+
+    run(
+      `INSERT INTO schema_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      'fees_seed_version',
+      '1'
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 createSchema();
+createFeesSchema();
 seedDatabase();
+seedFeesDemoData();
 migratePlaintextPasswords();
 
 function sendJson(res, status, data, extraHeaders = {}) {
@@ -1763,6 +1906,65 @@ function recordFailedLogin(identifier) {
 
 function resetLoginAttempts(identifier) {
   loginAttempts.delete(String(identifier || '').toUpperCase());
+}
+
+// ── FEES / BURSARY HELPERS (Finance MVP) ───────────────────────────────────
+// Self-contained helpers for the fee_invoices / fee_payments tables added in
+// createFeesSchema(). Kept separate from the result/academics helpers above
+// so this can be reviewed/lifted independently of the rest of server.js.
+const FEE_PAYMENT_STATUSES = ['successful', 'pending', 'failed'];
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function invoicePaidAmount(invoiceId) {
+  return round2(one(
+    `SELECT COALESCE(SUM(amount), 0) AS paid FROM fee_payments WHERE invoice_id = ? AND status = 'successful'`,
+    invoiceId
+  ).paid);
+}
+
+// Attaches computed paid/balance/status/overdue fields to a raw invoice row
+// (a row already carrying `amount` and `dueDate` fields).
+function decorateInvoice(row) {
+  const paid = invoicePaidAmount(row.id);
+  const amount = round2(row.amount);
+  const balance = round2(amount - paid);
+  const overdue = balance > 0 && !!row.dueDate && row.dueDate < todayStr();
+  const status = balance <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
+  return { ...row, amount, paid, balance, status, overdue };
+}
+
+function feeInvoiceById(id) {
+  const row = one(
+    `SELECT fi.id, fi.student_id AS studentId, st.name AS studentName, st.parent_email AS parentEmail,
+            fi.academic_id AS academicId, fi.class_code AS classCode, c.label AS classLabel,
+            fi.fee_type AS feeType, fi.description, fi.amount, fi.due_date AS dueDate,
+            fi.created_by AS createdBy, fi.created_at AS createdAt
+     FROM fee_invoices fi
+     JOIN students st ON st.id = fi.student_id
+     JOIN classes c ON c.code = fi.class_code
+     WHERE fi.id = ?`,
+    Number(id)
+  );
+  if (!row) return null;
+  const payments = all(
+    `SELECT id, amount, method, reference, status, note, recorded_by AS recordedBy, recorded_at AS recordedAt
+     FROM fee_payments WHERE invoice_id = ? ORDER BY recorded_at DESC`,
+    row.id
+  ).map(p => ({ ...p, amount: round2(p.amount) }));
+  return { ...decorateInvoice(row), payments };
+}
+
+function validateFeeAmount(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be a positive number');
+  return round2(amount);
 }
 
 async function handleApi(req, res, url) {
@@ -3201,6 +3403,327 @@ async function handleApi(req, res, url) {
       }
     });
     return sendJson(res, 200, { ok: true });
+  }
+
+  // ── FEES / BURSARY (Finance MVP) ──
+  // Invoice list — powers Invoice List and Class Invoice History (same
+  // endpoint, filtered by classCode/academicId).
+  if (req.method === 'GET' && url.pathname === '/api/admin/fees/invoices') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const academicIdParam = url.searchParams.get('academicId');
+    const statusFilter = cleanText(url.searchParams.get('status') || 'all').toLowerCase();
+    const search = cleanText(url.searchParams.get('search')).toLowerCase();
+    const studentId = cleanText(url.searchParams.get('studentId')).toUpperCase();
+
+    let sql = `SELECT fi.id, fi.student_id AS studentId, st.name AS studentName, st.parent_email AS parentEmail,
+                      fi.academic_id AS academicId, fi.class_code AS classCode, c.label AS classLabel,
+                      fi.fee_type AS feeType, fi.description, fi.amount, fi.due_date AS dueDate,
+                      fi.created_by AS createdBy, fi.created_at AS createdAt
+               FROM fee_invoices fi
+               JOIN students st ON st.id = fi.student_id
+               JOIN classes c ON c.code = fi.class_code
+               WHERE 1=1`;
+    const params = [];
+    if (classCode) { sql += ' AND fi.class_code = ?'; params.push(classCode); }
+    if (academicIdParam) { sql += ' AND fi.academic_id = ?'; params.push(Number(academicIdParam)); }
+    if (studentId) { sql += ' AND fi.student_id = ?'; params.push(studentId); }
+    sql += ' ORDER BY fi.created_at DESC';
+
+    let invoices = all(sql, ...params).map(decorateInvoice);
+    if (statusFilter && statusFilter !== 'all') {
+      invoices = invoices.filter(inv => (statusFilter === 'overdue' ? inv.overdue : inv.status === statusFilter));
+    }
+    if (search) {
+      invoices = invoices.filter(inv =>
+        inv.studentName.toLowerCase().includes(search) ||
+        inv.studentId.toLowerCase().includes(search) ||
+        (inv.feeType || '').toLowerCase().includes(search) ||
+        (inv.description || '').toLowerCase().includes(search)
+      );
+    }
+    const summary = invoices.reduce((acc, inv) => {
+      acc.count += 1;
+      acc.totalInvoiced = round2(acc.totalInvoiced + inv.amount);
+      acc.totalPaid = round2(acc.totalPaid + inv.paid);
+      acc.totalBalance = round2(acc.totalBalance + inv.balance);
+      return acc;
+    }, { count: 0, totalInvoiced: 0, totalPaid: 0, totalBalance: 0 });
+
+    return sendJson(res, 200, { invoices, summary });
+  }
+
+  // Create an invoice for one/many students, or a whole class in one call.
+  if (req.method === 'POST' && url.pathname === '/api/admin/fees/invoices') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const feeType = cleanText(body.feeType);
+    const description = cleanText(body.description);
+    const dueDate = cleanText(body.dueDate);
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const explicitIds = Array.isArray(body.studentIds)
+      ? body.studentIds.map(id => cleanText(id).toUpperCase()).filter(Boolean)
+      : (body.studentId ? [cleanText(body.studentId).toUpperCase()] : []);
+
+    if (!feeType) return sendJson(res, 400, { error: 'Fee type is required' });
+    let amount;
+    try {
+      amount = validateFeeAmount(body.amount);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+
+    let targetStudentIds = explicitIds;
+    if (!targetStudentIds.length && classCode) {
+      targetStudentIds = all('SELECT id FROM students WHERE class_code = ?', classCode).map(r => r.id);
+    }
+    if (!targetStudentIds.length) {
+      return sendJson(res, 400, { error: 'Select at least one student, or a whole class, to invoice' });
+    }
+
+    let academicId = Number(body.academicId) || null;
+    if (academicId) {
+      if (!one('SELECT id FROM academic_terms WHERE id = ?', academicId)) {
+        return sendJson(res, 400, { error: 'Academic term not found' });
+      }
+    } else {
+      const active = one('SELECT id FROM academic_terms WHERE is_active = 1');
+      academicId = active ? active.id : null;
+    }
+    if (!academicId) return sendJson(res, 400, { error: 'No active academic term is configured' });
+
+    const validStudents = all(
+      `SELECT id, class_code AS classCode FROM students WHERE id IN (${targetStudentIds.map(() => '?').join(',')})`,
+      ...targetStudentIds
+    );
+    if (!validStudents.length) return sendJson(res, 400, { error: 'No matching students found' });
+
+    const createdAt = new Date().toISOString();
+    const createdIds = validStudents.map(student => {
+      const result = run(
+        `INSERT INTO fee_invoices (student_id, academic_id, class_code, fee_type, description, amount, due_date, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        student.id, academicId, student.classCode, feeType, description || null, amount, dueDate || null, user.id, createdAt
+      );
+      return Number(result.lastInsertRowid);
+    });
+
+    return sendJson(res, 200, { ok: true, count: createdIds.length, invoices: createdIds.map(feeInvoiceById) });
+  }
+
+  const feeInvoiceMatch = url.pathname.match(/^\/api\/admin\/fees\/invoices\/(\d+)$/);
+  if (req.method === 'GET' && feeInvoiceMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const invoice = feeInvoiceById(feeInvoiceMatch[1]);
+    if (!invoice) return sendJson(res, 404, { error: 'Invoice not found' });
+    return sendJson(res, 200, { invoice });
+  }
+
+  // Record a payment (successful/pending/failed) against an invoice.
+  const feePaymentMatch = url.pathname.match(/^\/api\/admin\/fees\/invoices\/(\d+)\/payments$/);
+  if (req.method === 'POST' && feePaymentMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const invoiceId = Number(feePaymentMatch[1]);
+    if (!one('SELECT id FROM fee_invoices WHERE id = ?', invoiceId)) {
+      return sendJson(res, 404, { error: 'Invoice not found' });
+    }
+    const body = await readJson(req);
+    const method = cleanText(body.method);
+    if (!method) return sendJson(res, 400, { error: 'Payment method is required' });
+    let amount;
+    try {
+      amount = validateFeeAmount(body.amount);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    const status = FEE_PAYMENT_STATUSES.includes(body.status) ? body.status : 'successful';
+    const reference = cleanText(body.reference) || null;
+    const note = cleanText(body.note) || null;
+
+    run(
+      `INSERT INTO fee_payments (invoice_id, amount, method, reference, status, note, recorded_by, recorded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      invoiceId, amount, method, reference, status, note, user.id, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true, invoice: feeInvoiceById(invoiceId) });
+  }
+
+  // Flip a payment's status — used to approve/reject a pending proof (Review
+  // Payment Proofs) or reconcile a payment found by reference (Verify
+  // Payment Status).
+  const feePaymentStatusMatch = url.pathname.match(/^\/api\/admin\/fees\/payments\/(\d+)\/status$/);
+  if (req.method === 'POST' && feePaymentStatusMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const paymentId = Number(feePaymentStatusMatch[1]);
+    const payment = one('SELECT id, invoice_id AS invoiceId FROM fee_payments WHERE id = ?', paymentId);
+    if (!payment) return sendJson(res, 404, { error: 'Payment not found' });
+    const body = await readJson(req);
+    const status = cleanText(body.status);
+    if (!FEE_PAYMENT_STATUSES.includes(status)) return sendJson(res, 400, { error: 'Invalid status' });
+    run('UPDATE fee_payments SET status = ? WHERE id = ?', status, paymentId);
+    return sendJson(res, 200, { ok: true, invoice: feeInvoiceById(payment.invoiceId) });
+  }
+
+  // Payments log — powers Successful Payments, All Payment Attempts, the
+  // Review Payment Proofs queue (status=pending), and Verify Payment Status
+  // (reference lookup).
+  if (req.method === 'GET' && url.pathname === '/api/admin/fees/payments') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const from = cleanText(url.searchParams.get('from'));
+    const to = cleanText(url.searchParams.get('to'));
+    const statusFilter = cleanText(url.searchParams.get('status') || 'all').toLowerCase();
+    const method = cleanText(url.searchParams.get('method'));
+    const search = cleanText(url.searchParams.get('search')).toLowerCase();
+    const reference = cleanText(url.searchParams.get('reference')).toLowerCase();
+
+    let sql = `SELECT fp.id, fp.invoice_id AS invoiceId, fp.amount, fp.method, fp.reference, fp.status, fp.note,
+                      fp.recorded_by AS recordedBy, fp.recorded_at AS recordedAt,
+                      fi.fee_type AS feeType, fi.description, fi.class_code AS classCode, c.label AS classLabel,
+                      st.id AS studentId, st.name AS studentName, u.name AS recordedByName
+               FROM fee_payments fp
+               JOIN fee_invoices fi ON fi.id = fp.invoice_id
+               JOIN students st ON st.id = fi.student_id
+               JOIN classes c ON c.code = fi.class_code
+               LEFT JOIN users u ON u.id = fp.recorded_by
+               WHERE 1=1`;
+    const params = [];
+    if (from) { sql += ' AND date(fp.recorded_at) >= date(?)'; params.push(from); }
+    if (to) { sql += ' AND date(fp.recorded_at) <= date(?)'; params.push(to); }
+    if (method) { sql += ' AND fp.method = ?'; params.push(method); }
+    sql += ' ORDER BY fp.recorded_at DESC';
+
+    let rows = all(sql, ...params).map(r => ({ ...r, amount: round2(r.amount) }));
+    if (statusFilter && statusFilter !== 'all') rows = rows.filter(r => r.status === statusFilter);
+    if (search) {
+      rows = rows.filter(r =>
+        r.studentName.toLowerCase().includes(search) ||
+        r.studentId.toLowerCase().includes(search) ||
+        (r.reference || '').toLowerCase().includes(search)
+      );
+    }
+    if (reference) rows = rows.filter(r => (r.reference || '').toLowerCase().includes(reference));
+
+    const total = round2(rows.filter(r => r.status === 'successful').reduce((sum, r) => sum + r.amount, 0));
+    return sendJson(res, 200, { payments: rows, total });
+  }
+
+  // Full fee history for one student, or every student sharing a parent
+  // email ("family").
+  if (req.method === 'GET' && url.pathname === '/api/admin/fees/history') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const studentId = cleanText(url.searchParams.get('studentId')).toUpperCase();
+    const parentEmail = cleanText(url.searchParams.get('parentEmail')).toLowerCase();
+    if (!studentId && !parentEmail) return sendJson(res, 400, { error: 'studentId or parentEmail is required' });
+
+    const students = studentId
+      ? all('SELECT id, name, class_code AS classCode, parent_email AS parentEmail FROM students WHERE id = ?', studentId)
+      : all('SELECT id, name, class_code AS classCode, parent_email AS parentEmail FROM students WHERE lower(parent_email) = ?', parentEmail);
+    if (!students.length) return sendJson(res, 404, { error: 'No matching student(s) found' });
+
+    const studentDetails = students.map(student => {
+      const invoices = all(
+        `SELECT id, fee_type AS feeType, description, amount, due_date AS dueDate,
+                academic_id AS academicId, class_code AS classCode, created_at AS createdAt
+         FROM fee_invoices WHERE student_id = ? ORDER BY created_at DESC`,
+        student.id
+      ).map(row => decorateInvoice({ ...row, studentId: student.id, studentName: student.name }));
+      const totals = invoices.reduce((acc, inv) => {
+        acc.invoiced = round2(acc.invoiced + inv.amount);
+        acc.paid = round2(acc.paid + inv.paid);
+        acc.balance = round2(acc.balance + inv.balance);
+        return acc;
+      }, { invoiced: 0, paid: 0, balance: 0 });
+      return { ...student, invoices, totals };
+    });
+
+    const totals = studentDetails.reduce((acc, s) => {
+      acc.invoiced = round2(acc.invoiced + s.totals.invoiced);
+      acc.paid = round2(acc.paid + s.totals.paid);
+      acc.balance = round2(acc.balance + s.totals.balance);
+      return acc;
+    }, { invoiced: 0, paid: 0, balance: 0 });
+
+    return sendJson(res, 200, { students: studentDetails, totals });
+  }
+
+  // Families list (students grouped by parent email) for Family Fees History.
+  if (req.method === 'GET' && url.pathname === '/api/admin/fees/families') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const students = all(
+      `SELECT id, name, class_code AS classCode, parent_email AS parentEmail
+       FROM students WHERE parent_email IS NOT NULL AND parent_email <> '' ORDER BY parent_email`
+    );
+    const families = new Map();
+    students.forEach(student => {
+      const key = student.parentEmail.toLowerCase();
+      if (!families.has(key)) families.set(key, { parentEmail: student.parentEmail, students: [] });
+      families.get(key).students.push(student);
+    });
+    const rows = [...families.values()].map(family => {
+      let invoiced = 0, paid = 0, balance = 0;
+      family.students.forEach(student => {
+        all('SELECT id, amount FROM fee_invoices WHERE student_id = ?', student.id).forEach(inv => {
+          const p = invoicePaidAmount(inv.id);
+          invoiced = round2(invoiced + inv.amount);
+          paid = round2(paid + p);
+          balance = round2(balance + (inv.amount - p));
+        });
+      });
+      return { ...family, studentCount: family.students.length, totals: { invoiced, paid, balance } };
+    });
+    return sendJson(res, 200, { families: rows });
+  }
+
+  // Debtors report — students with an outstanding balance.
+  if (req.method === 'GET' && url.pathname === '/api/admin/fees/debtors') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const academicIdParam = url.searchParams.get('academicId');
+
+    let sql = `SELECT fi.id, fi.student_id AS studentId, st.name AS studentName, fi.class_code AS classCode,
+                      c.label AS classLabel, fi.amount, fi.due_date AS dueDate
+               FROM fee_invoices fi
+               JOIN students st ON st.id = fi.student_id
+               JOIN classes c ON c.code = fi.class_code
+               WHERE 1=1`;
+    const params = [];
+    if (classCode) { sql += ' AND fi.class_code = ?'; params.push(classCode); }
+    if (academicIdParam) { sql += ' AND fi.academic_id = ?'; params.push(Number(academicIdParam)); }
+
+    const invoices = all(sql, ...params).map(decorateInvoice).filter(inv => inv.balance > 0);
+    const byStudent = new Map();
+    invoices.forEach(inv => {
+      if (!byStudent.has(inv.studentId)) {
+        byStudent.set(inv.studentId, {
+          studentId: inv.studentId, studentName: inv.studentName, classCode: inv.classCode, classLabel: inv.classLabel,
+          invoiceCount: 0, totalInvoiced: 0, totalPaid: 0, balance: 0, dueDate: null, overdue: false,
+        });
+      }
+      const row = byStudent.get(inv.studentId);
+      row.invoiceCount += 1;
+      row.totalInvoiced = round2(row.totalInvoiced + inv.amount);
+      row.totalPaid = round2(row.totalPaid + inv.paid);
+      row.balance = round2(row.balance + inv.balance);
+      if (inv.overdue) row.overdue = true;
+      if (inv.dueDate && (!row.dueDate || inv.dueDate < row.dueDate)) row.dueDate = inv.dueDate;
+    });
+    const debtors = [...byStudent.values()].sort((a, b) => b.balance - a.balance);
+    const summary = debtors.reduce((acc, d) => {
+      acc.count += 1;
+      acc.totalBalance = round2(acc.totalBalance + d.balance);
+      return acc;
+    }, { count: 0, totalBalance: 0 });
+
+    return sendJson(res, 200, { debtors, summary });
   }
 
   return sendJson(res, 404, { error: 'API route not found' });
