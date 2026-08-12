@@ -84,6 +84,49 @@ function run(sql, ...params) {
   return db.prepare(sql).run(...params);
 }
 
+const SCRYPT_KEYLEN = 64;
+const HASHED_PASSWORD_RE = /^[0-9a-f]{32}:[0-9a-f]{128}$/i;
+
+// Hashes a plaintext password into a `salt:hash` string using scrypt with a
+// random per-password salt. No external dependencies (node:crypto only).
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function isHashedPassword(value) {
+  return typeof value === 'string' && HASHED_PASSWORD_RE.test(value);
+}
+
+// Verifies a plaintext password against a stored `salt:hash` value using a
+// timing-safe comparison. Returns false (never throws) for malformed/legacy
+// stored values so callers can safely treat that as "no match".
+function verifyPassword(password, stored) {
+  if (!isHashedPassword(stored)) return false;
+  const [salt, hash] = stored.split(':');
+  try {
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const candidateBuffer = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN);
+    if (candidateBuffer.length !== hashBuffer.length) return false;
+    return crypto.timingSafeEqual(candidateBuffer, hashBuffer);
+  } catch {
+    return false;
+  }
+}
+
+// One-time (idempotent) startup migration: any password already stored in
+// plaintext (i.e. not matching the salt:hash format) gets hashed in place so
+// existing accounts keep working without anyone needing to reset anything.
+function migratePlaintextPasswords() {
+  const users = all('SELECT id, password FROM users');
+  users.forEach(u => {
+    if (!isHashedPassword(u.password)) {
+      run('UPDATE users SET password = ? WHERE id = ?', hashPassword(u.password), u.id);
+    }
+  });
+}
+
 function cleanText(value) {
   return String(value || '').trim();
 }
@@ -335,11 +378,15 @@ function seedDatabase() {
       ['TCH-002', 'teacher', 'teach456', 'Mrs. Eze', 'Mrs. Eze', 'ME', 'subject_teacher', 'MRS. EZE', null],
       ['ADM-001', 'admin', 'admin123', 'Mrs. Chukwu', 'Mrs. Chukwu', 'MC', null, null, null],
     ];
-    users.forEach(u => run(
-      `INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip, grade)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ...u
-    ));
+    users.forEach(u => {
+      const row = [...u];
+      row[2] = hashPassword(row[2]);
+      return run(
+        `INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip, grade)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ...row
+      );
+    });
 
     run('INSERT INTO academic_terms (id, session_label, term_label, is_active) VALUES (?, ?, ?, ?)', 1, '2025/2026', 'Term 2', 1);
 
@@ -459,6 +506,7 @@ function seedDatabase() {
 
 createSchema();
 seedDatabase();
+migratePlaintextPasswords();
 
 function sendJson(res, status, data, extraHeaders = {}) {
   const body = JSON.stringify(data);
@@ -1583,15 +1631,63 @@ function smtpSend({ host, port, user, pass, from, to, message }) {
   });
 }
 
+// Simple in-memory brute-force protection for /api/login. Keyed by the
+// login identifier (not IP) so repeated attempts against one account are
+// throttled regardless of source. No external store needed at this scale.
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // window for counting failed attempts
+const LOGIN_COOLDOWN_MS = 15 * 60 * 1000; // lockout duration once tripped
+const loginAttempts = new Map(); // identifier -> { count, firstAttempt, lockedUntil }
+
+function loginRateLimitStatus(identifier) {
+  const key = String(identifier || '').toUpperCase();
+  const entry = loginAttempts.get(key);
+  const now = Date.now();
+  if (entry && entry.lockedUntil && entry.lockedUntil > now) {
+    const minutesLeft = Math.ceil((entry.lockedUntil - now) / 60000);
+    return {
+      allowed: false,
+      message: `Too many failed login attempts. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`,
+    };
+  }
+  return { allowed: true };
+}
+
+function recordFailedLogin(identifier) {
+  const key = String(identifier || '').toUpperCase();
+  const now = Date.now();
+  let entry = loginAttempts.get(key);
+  if (!entry || (entry.lockedUntil && entry.lockedUntil <= now) || now - entry.firstAttempt > LOGIN_WINDOW_MS) {
+    entry = { count: 0, firstAttempt: now, lockedUntil: 0 };
+  }
+  entry.count += 1;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = now + LOGIN_COOLDOWN_MS;
+  }
+  loginAttempts.set(key, entry);
+}
+
+function resetLoginAttempts(identifier) {
+  loginAttempts.delete(String(identifier || '').toUpperCase());
+}
+
 async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/login') {
     const body = await readJson(req);
     const id = String(body.id || '').trim().toUpperCase();
     const password = String(body.password || '');
+
+    const rateLimit = loginRateLimitStatus(id);
+    if (!rateLimit.allowed) {
+      return sendJson(res, 429, { error: rateLimit.message });
+    }
+
     const user = one('SELECT * FROM users WHERE id = ?', id);
-    if (!user || user.password !== password) {
+    if (!user || !verifyPassword(password, user.password)) {
+      recordFailedLogin(id);
       return sendJson(res, 401, { error: 'Incorrect ID or password' });
     }
+    resetLoginAttempts(id);
 
     const token = crypto.randomBytes(32).toString('hex');
     const now = new Date();
@@ -2104,7 +2200,7 @@ async function handleApi(req, res, url) {
          SET name = ?, first_name = ?, initials = ?, grade = ?${password ? ', password = ?' : ''}
          WHERE id = ? AND role = 'student'`,
         ...(password
-          ? [name, firstName, initials, `Class ${classCode}`, password, studentId]
+          ? [name, firstName, initials, `Class ${classCode}`, hashPassword(password), studentId]
           : [name, firstName, initials, `Class ${classCode}`, studentId])
       );
       run(
@@ -2188,7 +2284,7 @@ async function handleApi(req, res, url) {
         `INSERT INTO users (id, role, password, name, first_name, initials, grade)
          VALUES (?, 'student', ?, ?, ?, ?, ?)`,
         id,
-        password,
+        hashPassword(password),
         name,
         firstName,
         initials,
@@ -2259,7 +2355,7 @@ async function handleApi(req, res, url) {
            ${password ? ', password = ?' : ''}
        WHERE id = ?`,
       ...(password
-        ? [role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, password, staffId]
+        ? [role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, hashPassword(password), staffId]
         : [role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, staffId])
     );
 
@@ -2294,7 +2390,7 @@ async function handleApi(req, res, url) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         id,
         role,
-        password,
+        hashPassword(password),
         name,
         firstName,
         initials,

@@ -3037,9 +3037,7 @@ const SYS_FIELD_MAP = {
 
 async function loadSystemSettings() {
   try {
-    const r = await fetch('/api/admin/system-settings', { headers: { 'x-session-id': _sid } });
-    if (!r.ok) throw new Error('fetch failed');
-    const { settings } = await r.json();
+    const { settings } = await apiFetch('/api/admin/system-settings');
     Object.entries(SYS_FIELD_MAP).forEach(([id, key]) => {
       const el = document.getElementById(id);
       if (!el || settings[key] === undefined || settings[key] === '') return;
@@ -3066,12 +3064,10 @@ async function saveSystemSettings() {
     if (el) body[key] = el.value;
   });
   try {
-    const r = await fetch('/api/admin/system-settings', {
+    await apiFetch('/api/admin/system-settings', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-session-id': _sid },
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error('save failed');
     showToast('Settings saved successfully', 'success');
   } catch (e) {
     showToast('Failed to save settings', 'error');
