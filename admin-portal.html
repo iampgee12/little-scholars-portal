@@ -174,9 +174,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .bs-filter-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
 .bs-filter-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
 .bs-filter-foot label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); cursor:pointer; }
-.bs-view-results-btn { background:#2563eb; color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); margin:0 auto; }
-.bs-view-results-btn:hover { background:#1d4ed8; }
-.bs-publish-btn { background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); }
+.bs-view-results-btn { background:#0d6efd; color:#fff; border:none; border-radius:var(--radius); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); margin:0 auto; }
+.bs-view-results-btn:hover { background:#0b5ed7; }
+.bs-publish-btn { background:var(--green); color:#fff; border:none; border-radius:var(--radius); padding:9px 22px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:background var(--transition); }
 .bs-publish-btn:hover { background:#15803d; }
 .bs-publish-btn:disabled { opacity:.6; cursor:not-allowed; }
 .bs-rank-btn { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:4px 8px; cursor:pointer; color:var(--text-2); display:inline-flex; align-items:center; transition:all var(--transition); }
@@ -195,81 +195,81 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .rank-table tr:hover td { background:var(--black-3); }
 .rank-num { font-family:'DM Mono',monospace; font-weight:700; color:var(--text-3); }
 .rank-score { font-family:'DM Mono',monospace; font-weight:700; }
-.bs-results-wrap { margin-top:18px; }
+.bs-results-wrap { margin-top:18px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:22px 26px 28px; box-shadow:0 1px 4px rgba(0,0,0,0.06); color:#222; }
 .bs-action-row { display:flex; justify-content:flex-end; gap:8px; margin-bottom:16px; }
-.bs-unpublish-btn { background:#f59e0b; color:#fff; border:none; border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background var(--transition); }
-.bs-unpublish-btn:hover { background:#d97706; }
-.bs-ext-view-btn { background:#fff; color:#2563eb; border:1.5px solid #2563eb; border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all var(--transition); }
+.bs-unpublish-btn { background:#ed9c28; color:#fff; border:none; border-radius:var(--radius); padding:8.5px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background var(--transition); }
+.bs-unpublish-btn:hover { background:#d6841a; }
+.bs-ext-view-btn { background:#fff; color:#0d6efd; border:1px solid #0d6efd; border-radius:var(--radius); padding:8.5px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all var(--transition); }
 .bs-ext-view-btn:hover { background:#eff6ff; }
-.bs-school-header { text-align:center; padding:18px 0 12px; border-bottom:1px solid var(--border); margin-bottom:14px; }
+.bs-school-header { text-align:center; padding:18px 0 12px; border-bottom:1px solid #e5e7eb; margin-bottom:14px; }
 .bs-school-logo { width:72px; height:72px; object-fit:contain; margin-bottom:6px; display:block; margin-left:auto; margin-right:auto; }
-.bs-school-logo-placeholder { width:72px; height:72px; border-radius:50%; background:var(--black-4); border:2px dashed var(--border-2); display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:22px; }
-.bs-hdr-name { font-size:16px; font-weight:800; letter-spacing:0.5px; color:var(--text-1); }
-.bs-hdr-address { font-size:11.5px; color:var(--text-2); margin-top:3px; }
-.bs-hdr-contact { font-size:11.5px; color:var(--text-2); }
-.bs-hdr-title { margin-top:10px; font-size:12px; color:#2563eb; font-weight:600; }
-.bs-hdr-teacher { font-size:11px; color:var(--text-3); margin-top:2px; }
-.bs-pills-row { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-.bs-pill { font-size:11px; font-weight:700; padding:4px 12px; border-radius:20px; background:#2563eb; color:#fff; font-family:'DM Mono',monospace; cursor:default; }
+.bs-school-logo-placeholder { width:72px; height:72px; border-radius:50%; background:#f3f4f6; border:2px dashed #d1d5db; display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:22px; }
+.bs-results-wrap .card { background:#fff; border-color:#e5e7eb; }
+.bs-results-wrap .card-head { border-bottom-color:#e5e7eb; }
+.bs-results-wrap .card-title { color:#333; }
+.bs-hdr-name { font-size:20px; font-weight:700; letter-spacing:0.3px; color:#666; }
+.bs-hdr-address { font-size:13px; color:#555; margin-top:3px; }
+.bs-hdr-contact { font-size:13px; color:#555; }
+.bs-hdr-title { margin-top:10px; font-size:12px; color:#0d6efd; font-weight:600; }
+.bs-hdr-teacher { font-size:12px; color:#0d6efd; margin-top:2px; }
+.bs-pills-row { display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.bs-pill { font-size:12px; font-weight:600; padding:2px 8px; border-radius:3px; background:#0d6efd; color:#fff; font-family:'DM Sans',sans-serif; cursor:default; }
 .bs-controls-row { display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-.bs-toggle-btn { background:#fff; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:7px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); display:flex; align-items:center; gap:5px; }
-.bs-toggle-btn.active { background:#2563eb; border-color:#2563eb; color:#fff; }
-.bs-export-btn { background:none; border:1px solid var(--border-2); color:var(--text-2); border-radius:var(--radius-sm); padding:7px 14px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); position:absolute; left:0; }
+.bs-toggle-btn { background:#fff; border:1px solid #ccc; color:#333; border-radius:var(--radius); padding:7px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); display:flex; align-items:center; gap:5px; }
+.bs-toggle-btn.active { background:#0d6efd; border-color:#0d6efd; color:#fff; }
+.bs-export-btn { background:#fff; border:1px solid #ccc; color:#333; border-radius:var(--radius); padding:7px 14px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all var(--transition); position:absolute; left:0; }
 .bs-controls-outer { position:relative; display:flex; align-items:center; margin-bottom:12px; }
 .bs-export-side { position:absolute; left:0; }
 .bs-search-wrap { margin-bottom:14px; display:flex; justify-content:center; }
-.bs-search-input { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; width:520px; max-width:100%; transition:border-color var(--transition); }
-.bs-search-input:focus { border-color:rgba(37,99,235,0.5); }
-.bs-search-input::placeholder { color:var(--text-3); }
-.bs-table-outer { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px; }
+.bs-search-input { background:#f9fafb; border:1px solid #dcdfe4; border-radius:var(--radius); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:13px; color:#333; outline:none; width:520px; max-width:100%; transition:border-color var(--transition); }
+.bs-search-input:focus { border-color:rgba(13,110,253,0.5); }
+.bs-search-input::placeholder { color:#999; }
+.bs-table-outer { overflow-x:auto; border:1px solid #e5e7eb; border-radius:var(--radius); margin-bottom:14px; }
 .bs-table { border-collapse:collapse; font-size:11px; white-space:nowrap; }
-.bs-table th, .bs-table td { border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:6px 8px; vertical-align:middle; text-align:center; }
-.bs-table th { background:var(--black-3); color:var(--text-2); font-weight:700; font-size:10px; }
-.bs-table td { background:var(--black-2); color:var(--text-1); }
-.bs-table tbody tr:hover td { background:var(--black-3); }
+.bs-table th, .bs-table td { border-right:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; padding:6px 8px; vertical-align:middle; text-align:center; }
+.bs-table th { background:#f3f4f6; color:#555; font-weight:700; font-size:10px; }
+.bs-table td { background:#fff; color:#333; }
+.bs-table tbody tr:hover td { background:#f9fafb; }
 .bs-th-subj { background:#e8f0fe !important; color:#1a3a6b !important; font-size:11px !important; font-weight:700 !important; border-bottom:2px solid #c7d8fa !important; padding:8px !important; }
-@media (prefers-color-scheme:dark) { .bs-th-subj { background:#1e2d50 !important; color:#93b4f7 !important; border-bottom-color:#2a3f70 !important; } }
-:root[data-theme="light"] .bs-th-subj { background:#e8f0fe !important; color:#1a3a6b !important; }
-:root[data-theme="dark"]  .bs-th-subj { background:#1e2d50 !important; color:#93b4f7 !important; }
-.bs-th-rotated { writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; height:90px; min-width:30px; padding:8px 6px !important; font-size:10px !important; font-weight:600 !important; color:var(--text-2) !important; }
+.bs-th-rotated { writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; height:90px; min-width:30px; padding:8px 6px !important; font-size:10px !important; font-weight:600 !important; color:#555 !important; }
 .bs-sticky { position:sticky; z-index:3; }
 .bs-sticky-h { position:sticky; z-index:4; }
-.bs-col-num  { left:0;    min-width:32px; width:32px; background:var(--black-2); }
-.bs-col-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:var(--black-2); }
-.bs-col-reg  { left:202px;min-width:100px; width:100px; background:var(--black-2); }
-.bs-th-num  { left:0;    min-width:32px; width:32px; background:var(--black-3); }
-.bs-th-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:var(--black-3); }
-.bs-th-reg  { left:202px;min-width:100px; width:100px; background:var(--black-3); }
+.bs-col-num  { left:0;    min-width:32px; width:32px; background:#fff; }
+.bs-col-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:#fff; }
+.bs-col-reg  { left:202px;min-width:100px; width:100px; background:#fff; }
+.bs-th-num  { left:0;    min-width:32px; width:32px; background:#f3f4f6; }
+.bs-th-name { left:32px; min-width:170px; width:170px; text-align:left !important; background:#f3f4f6; }
+.bs-th-reg  { left:202px;min-width:100px; width:100px; background:#f3f4f6; }
 .bs-td-name { text-align:left; font-weight:600; font-size:11.5px; }
-.bs-td-reg  { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-3); }
+.bs-td-reg  { font-family:'DM Mono',monospace; font-size:10px; color:#999; }
 .bs-score-total { font-weight:800; font-size:12px; }
 .bs-grade-badge { font-size:9px; color:#16a34a; font-weight:700; display:block; margin-top:1px; }
 .bs-avg-cell { min-width:130px; padding:6px 10px !important; }
-.bs-avg-pct { font-size:12px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-avg-pct { font-size:12px; font-weight:800; color:#333; font-family:'DM Mono',monospace; }
 .bs-avg-sub { font-size:9px; color:#16a34a; font-weight:700; font-family:'DM Mono',monospace; }
-.bs-avg-track { height:6px; background:var(--black-4); border-radius:99px; overflow:hidden; margin-top:4px; }
-.bs-avg-fill { height:100%; background:#2563eb; border-radius:99px; }
+.bs-avg-track { height:6px; background:#e5e7eb; border-radius:99px; overflow:hidden; margin-top:4px; }
+.bs-avg-fill { height:100%; background:#0d6efd; border-radius:99px; }
 .bs-summary-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:11px; font-weight:700; color:#fff; background:#16a34a; }
 .bs-summary-badge.fair { background:#d97706; } .bs-summary-badge.poor { background:#dc2626; }
 .bs-pos-badge { font-size:11px; font-weight:800; font-family:'DM Mono',monospace; }
 .bs-pos-badge.top1 { color:#ca8a04; } .bs-pos-badge.top2 { color:#64748b; } .bs-pos-badge.top3 { color:#b45309; }
-.bs-remark-td { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-size:11px; color:var(--text-2); }
-.bs-att-cell { min-width:80px; font-size:10px; line-height:1.7; color:var(--text-2); }
+.bs-remark-td { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-size:11px; color:#555; }
+.bs-att-cell { min-width:80px; font-size:10px; line-height:1.7; color:#555; }
 .bs-att-cell span { display:block; }
-.bs-preview-btn { background:none; border:none; color:var(--text-3); font-size:15px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:color var(--transition); }
-.bs-preview-btn:hover { color:#2563eb; }
-.bs-excluded { color:var(--text-3); font-size:10px; }
+.bs-preview-btn { background:none; border:none; color:#999; font-size:15px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:color var(--transition); }
+.bs-preview-btn:hover { color:#0d6efd; }
+.bs-excluded { color:#999; font-size:10px; }
 .bs-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
-.bs-summary-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
-.bs-summary-label { font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; font-family:'DM Mono',monospace; margin-bottom:4px; }
-.bs-summary-val { font-size:18px; font-weight:800; color:var(--text-1); font-family:'DM Mono',monospace; }
+.bs-summary-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:var(--radius); padding:14px 18px; }
+.bs-summary-label { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; font-family:'DM Mono',monospace; margin-bottom:4px; }
+.bs-summary-val { font-size:18px; font-weight:800; color:#222; font-family:'DM Mono',monospace; }
 .bs-subject-stats-table { width:100%; border-collapse:collapse; font-size:11.5px; }
-.bs-subject-stats-table th { padding:8px 12px; text-align:left; font-size:9.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; }
-.bs-subject-stats-table td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+.bs-subject-stats-table th { padding:8px 12px; text-align:left; font-size:9.5px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.6px; border-bottom:1px solid #e5e7eb; font-family:'DM Mono',monospace; }
+.bs-subject-stats-table td { padding:9px 12px; border-bottom:1px solid #e5e7eb; vertical-align:top; color:#333; }
 .bs-subject-stats-table tr:last-child td { border-bottom:none; }
 .bs-print-row { text-align:center; margin-top:18px; }
-.bs-print-btn { background:#2563eb; color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 24px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:background var(--transition); }
-.bs-print-btn:hover { background:#1d4ed8; }
+.bs-print-btn { background:#0d6efd; color:#fff; border:none; border-radius:var(--radius); padding:9px 24px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:background var(--transition); }
+.bs-print-btn:hover { background:#0b5ed7; }
 .bs-publish-section { margin-top:22px; }
 .bs-publish-toggle { display:flex; align-items:center; gap:10px; padding:12px 18px; background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; color:var(--text-2); user-select:none; }
 .bs-publish-toggle:hover { color:var(--text-1); }
@@ -3482,7 +3482,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 
           <!-- Table -->
           <div class="bs-table-outer" id="bs-table-outer">
-            <div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;">Select filters and click View Results.</div>
+            <div style="padding:40px;text-align:center;color:#888;font-size:13px;">Select filters and click View Results.</div>
           </div>
 
           <!-- Summary (shown after results load) -->
@@ -3506,33 +3506,33 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   </thead>
                   <tbody id="bs-stats-tbody"></tbody>
                 </table>
-                <div id="bs-stats-footer" style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:2px solid var(--border);font-size:12px;">
-                  <div style="padding:10px 14px;border-right:1px solid var(--border);">
-                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Grand Total Subject Score Averages</div>
-                    <div id="bs-foot-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                <div id="bs-stats-footer" style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:2px solid #e5e7eb;font-size:12px;">
+                  <div style="padding:10px 14px;border-right:1px solid #e5e7eb;">
+                    <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Grand Total Subject Score Averages</div>
+                    <div id="bs-foot-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;color:#222;"></div>
                   </div>
-                  <div style="padding:10px 14px;border-right:1px solid var(--border);">
-                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Number of Active Students</div>
-                    <div id="bs-foot-count" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                  <div style="padding:10px 14px;border-right:1px solid #e5e7eb;">
+                    <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Number of Active Students</div>
+                    <div id="bs-foot-count" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;color:#222;"></div>
                   </div>
                   <div style="padding:10px 14px;">
-                    <div style="font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Class Score Average</div>
-                    <div id="bs-foot-class-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;"></div>
+                    <div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">Class Score Average</div>
+                    <div id="bs-foot-class-avg" style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace;color:#222;"></div>
                   </div>
                 </div>
               </div>
             </div>
             <div class="card" style="margin-bottom:18px;">
               <div class="card-body" style="padding:0;">
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;padding:10px 16px 6px;border-bottom:1px solid var(--border);">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;padding:10px 16px 6px;border-bottom:1px solid #e5e7eb;">
                   <span>Best Performing Student(s) in Class</span>
                   <span>Grand Total Score</span>
                   <span>Student Score Average</span>
                 </div>
-                <div id="bs-best-student-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;font-size:13px;font-weight:700;"></div>
+                <div id="bs-best-student-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;font-size:13px;font-weight:700;color:#222;"></div>
               </div>
             </div>
-            <div style="text-align:center;font-size:11px;color:var(--text-3);margin-bottom:14px;">(If hard-copy is needed, result broadsheets are best printed industrially on A0, A1 or A2 paper size, scaled accordingly.)</div>
+            <div style="text-align:center;font-size:11px;color:#888;margin-bottom:14px;">(If hard-copy is needed, result broadsheets are best printed industrially on A0, A1 or A2 paper size, scaled accordingly.)</div>
             <div class="bs-print-row" style="margin-bottom:24px;">
               <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print Options &#x2192;</button>
             </div>
