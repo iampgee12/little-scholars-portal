@@ -35,3 +35,7 @@ Real end-to-end test performed locally against the real Gmail SMTP config in `em
 ## Demo logins (auto-seeded on fresh DB)
 
 Admin `ADM-001`/`admin123` · Staff `TCH-001`/`teach123` · Student `STU-2024-0421`/`amara123`
+
+## Check-in (2026-08-14)
+
+No new `feature/*` work landed since the 2026-08-12 merge. All seven feature branches on origin (student-portal-backend, staff-results-entry-redesign, security-hardening, results-publish-email, finance-fees-bursary, finance-payroll-expenses, finance-store-accounting) confirmed already merged into `launch-prep` via `git merge-base --is-ancestor`. Local `launch-prep` was already up to date with `origin/launch-prep` — nothing to push. Re-ran sanity checks against the already-running local server: `node --check` clean on `server.js`/`admin-api.js`/`teacher-api.js`, all three demo logins still return 200, and a real `/api/admin/fees/invoices` call returned live data. Status unchanged: everything originally scoped is built and merged; the only remaining step is the owner's review of `launch-prep` before it goes anywhere near `master`. Not invoking new scope per instructions — nothing in "What's left" beyond that review.
