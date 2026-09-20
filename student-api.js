@@ -13,6 +13,16 @@ async function apiFetch(url, options = {}) {
   return data;
 }
 
+let currentUser = null;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.style.display = 'none', 3000);
+}
+
 async function loadTopbarSession() {
   try {
     const active = await apiFetch('/api/active-term');
@@ -94,7 +104,7 @@ async function loadCourses() {
   try {
     const data = await apiFetch('/api/student/courses');
     if (!data.courses.length) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-title">No Subjects Assigned Yet</div><div class="empty-desc">Your class has no subjects set up yet.</div></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1.5"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="10.5" y2="10"/><line x1="5.5" y1="4.5" x2="8" y2="4.5"/></svg></div><div class="empty-title">No Subjects Assigned Yet</div><div class="empty-desc">Your class has no subjects set up yet.</div></div>`;
     } else {
       container.innerHTML = data.courses.map(c => {
         if (!c.published) {
@@ -123,7 +133,7 @@ async function loadCourses() {
       : '—';
   } catch (e) {
     console.error('Failed to load courses', e);
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-title">Couldn't Load Courses</div><div class="empty-desc">Please refresh the page to try again.</div></div>`;
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 1 14h14z"/><line x1="8" y1="6.5" x2="8" y2="9.5"/><circle cx="8" cy="11.7" r="0.2" fill="currentColor" stroke="none"/></svg></div><div class="empty-title">Couldn't Load Courses</div><div class="empty-desc">Please refresh the page to try again.</div></div>`;
   }
 }
 
@@ -138,7 +148,7 @@ function renderResultEmpty(targetId, examType) {
   document.getElementById(targetId).innerHTML = `
     <div class="card"><div class="card-body">
       <div class="empty-state">
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1.5"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="10.5" y2="10"/><line x1="5.5" y1="4.5" x2="8" y2="4.5"/></svg></div>
         <div class="empty-title">Results Not Yet Available</div>
         <div class="empty-desc">Your ${escapeHtml(examType)} results have not been published yet. Check back once your school publishes them.</div>
       </div>
@@ -191,7 +201,7 @@ function renderResult(targetId, data) {
           <div class="card-head"><span class="card-title">Principal's Remark</span></div>
           <div class="card-body">
             <div class="empty-state" style="padding:20px 8px;">
-              <div class="empty-icon">✎</div>
+              <div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5a1.5 1.5 0 0 1 2 0l1 1a1.5 1.5 0 0 1 0 2L5 14 2 14.5 2.5 11.5z"/><line x1="9" y1="4" x2="12" y2="7"/></svg></div>
               <div class="empty-title">Not Yet Available</div>
               <div class="empty-desc">A remark has not been added for this exam yet.</div>
             </div>
@@ -218,7 +228,7 @@ async function loadResult(examType) {
     }
   } catch (e) {
     console.error('Failed to load results', e);
-    document.getElementById(targetId).innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-title">Couldn't Load Results</div><div class="empty-desc">Please refresh the page to try again.</div></div></div></div>`;
+    document.getElementById(targetId).innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 1 14h14z"/><line x1="8" y1="6.5" x2="8" y2="9.5"/><circle cx="8" cy="11.7" r="0.2" fill="currentColor" stroke="none"/></svg></div><div class="empty-title">Couldn't Load Results</div><div class="empty-desc">Please refresh the page to try again.</div></div></div></div>`;
   }
 }
 
@@ -233,6 +243,7 @@ async function init() {
     return;
   }
   const acct = session.user;
+  currentUser = acct;
   document.getElementById('s-avatar').textContent = acct.initials;
   document.getElementById('s-name').textContent = acct.name;
   document.getElementById('s-grade').textContent = acct.grade || 'Student Portal';
@@ -292,6 +303,131 @@ async function signOut() {
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
   window.location.href = 'index.html';
+}
+
+// ── SIDEBAR TOGGLE (desktop collapse + mobile drawer) ──
+function mobStaggerItems(sidebar) {
+  var els = Array.from(sidebar.querySelectorAll('.sidebar-logo,.user-pill,.nav-item'));
+  els.forEach(function(el) { el.style.opacity = '0'; el.style.animation = 'none'; });
+  els.forEach(function(el, i) {
+    el.style.animation = 'mobNavIn 0.38s cubic-bezier(0.4,0,0.2,1) ' + (120 + i * 48) + 'ms both';
+  });
+}
+function mobClearStagger(sidebar) {
+  sidebar.querySelectorAll('.sidebar-logo,.user-pill,.nav-item').forEach(function(el) {
+    el.style.animation = '';
+    el.style.opacity = '';
+  });
+}
+function deskToggleSidebar() {
+  document.body.classList.toggle('sidebar-collapsed');
+}
+function mobToggleSidebar() {
+  var sidebar = document.getElementById('main-sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  var btn = document.getElementById('mob-hamburger');
+  var isOpen = sidebar.classList.contains('mob-open');
+  if (isOpen) {
+    sidebar.classList.remove('mob-open');
+    overlay.classList.remove('open');
+    if (btn) btn.classList.remove('is-open');
+    mobClearStagger(sidebar);
+  } else {
+    sidebar.classList.add('mob-open');
+    overlay.classList.add('open');
+    if (btn) btn.classList.add('is-open');
+    mobStaggerItems(sidebar);
+  }
+}
+function mobCloseSidebar() {
+  var sidebar = document.getElementById('main-sidebar');
+  sidebar.classList.remove('mob-open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+  var btn = document.getElementById('mob-hamburger');
+  if (btn) btn.classList.remove('is-open');
+  mobClearStagger(sidebar);
+}
+document.getElementById('sidebar-overlay').addEventListener('click', mobCloseSidebar);
+document.addEventListener('click', function(e) {
+  if (window.innerWidth > 768) return;
+  const leafLink = e.target.closest('[onclick*="switchTab"]');
+  if (leafLink) setTimeout(mobCloseSidebar, 180);
+});
+
+// ── ACCOUNT SETTINGS ──
+function openAccountSettings() {
+  const u = currentUser || {};
+  document.getElementById('as-avatar').textContent = u.initials || '';
+  document.getElementById('as-name').textContent = u.name || '';
+  document.getElementById('as-role').textContent = u.role === 'student' ? 'Student' : (u.role || '');
+  document.getElementById('as-email').value = u.email || '';
+  document.getElementById('as-pw-current').value = '';
+  document.getElementById('as-pw-new').value = '';
+  document.getElementById('as-pw-confirm').value = '';
+
+  const rows = [['Student ID', u.id || '—'], ['Role', u.role === 'student' ? 'Student' : (u.role || '—')]];
+  if (u.grade) rows.push(['Class', u.grade]);
+  rows.push(['Email', u.email || 'Not set']);
+  document.getElementById('as-info-table').innerHTML = rows.map(([k, v]) =>
+    `<div class="as-info-row"><span class="as-info-key">${k}</span><span class="as-info-val">${escapeHtml(String(v))}</span></div>`
+  ).join('');
+
+  switchAsTab('view', document.getElementById('as-tab-view'));
+  document.getElementById('account-settings-modal').style.display = 'flex';
+}
+
+function switchAsTab(tab, btn) {
+  document.querySelectorAll('.as-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.as-panel').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById(`as-panel-${tab}`).classList.add('active');
+}
+
+function toggleAsPw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.innerHTML = showing
+    ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l12 12"/><path d="M1 8s2.5-4.5 7-4.5c1.1 0 2.1.25 3 .65M15 8s-1 1.8-2.9 3.15M9.4 9.4a2 2 0 0 1-2.8-2.8"/></svg>';
+}
+
+function closeAccountSettings() {
+  document.getElementById('account-settings-modal').style.display = 'none';
+}
+
+async function saveAccountEmail() {
+  const email = document.getElementById('as-email').value.trim();
+  try {
+    const data = await apiFetch('/api/account', { method: 'PUT', body: JSON.stringify({ email }) });
+    currentUser = data.user;
+    showToast('Email updated');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function changeAccountPassword() {
+  const currentPassword = document.getElementById('as-pw-current').value;
+  const newPassword = document.getElementById('as-pw-new').value;
+  const confirm = document.getElementById('as-pw-confirm').value;
+  if (!currentPassword || !newPassword) {
+    showToast('Fill in both password fields');
+    return;
+  }
+  if (newPassword !== confirm) {
+    showToast('New passwords do not match');
+    return;
+  }
+  try {
+    await apiFetch('/api/account/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+    showToast('Password updated');
+    document.getElementById('as-pw-current').value = '';
+    document.getElementById('as-pw-new').value = '';
+    document.getElementById('as-pw-confirm').value = '';
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 init();

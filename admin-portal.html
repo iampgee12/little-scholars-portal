@@ -38,13 +38,14 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .portal-wrap { display:flex; min-height:100vh; }
 
 /* ── SIDEBAR ── */
-.sidebar { width:240px; min-height:100vh; background:var(--black-2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; animation:slideIn 0.35s ease both; }
+.sidebar { width:240px; min-height:100vh; background:var(--black-2); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; left:0; bottom:0; z-index:50; animation:slideIn 0.35s ease backwards; }
 @keyframes slideIn { from{transform:translateX(-240px);opacity:0} to{transform:translateX(0);opacity:1} }
 .sidebar-logo { padding:22px 20px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
 .logo-mark-sm { width:30px; height:30px; background:var(--green); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px; color:#ffffff; font-weight:900; }
 .logo-name-sm { font-size:13px; font-weight:700; color:var(--text-1); letter-spacing:-0.2px; line-height:1.2; }
 .logo-sub-sm  { font-size:9px; color:var(--text-3); font-weight:500; letter-spacing:0.6px; text-transform:uppercase; margin-top:1px; }
-.user-pill { margin:14px 12px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px; display:flex; align-items:center; gap:10px; }
+.user-pill { margin:14px 12px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:all var(--transition); }
+.user-pill:hover { border-color:var(--border-2); background:var(--black-4); }
 .avatar { width:32px; height:32px; border-radius:50%; background:var(--blue-bg); border:1.5px solid var(--blue); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--blue); font-family:'DM Mono',monospace; flex-shrink:0; }
 .u-name  { font-size:12px; font-weight:600; color:var(--text-1); line-height:1.2; }
 .u-sub   { font-size:10px; color:var(--text-3); margin-top:1px; }
@@ -61,7 +62,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .signout-btn:hover { border-color:var(--red); color:var(--red); }
 
 /* ── MAIN ── */
-.main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
+.main { margin-left:240px; flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
 @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 .topbar { height:54px; border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 26px; gap:12px; position:sticky; top:0; background:rgba(255,255,255,0.95); backdrop-filter:blur(12px); z-index:40; }
 .topbar-title { font-size:13px; font-weight:600; color:var(--text-1); }
@@ -75,6 +76,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .tsi-term  { color:var(--blue); }
 .chip-green { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--green-bg); border:1px solid rgba(34,197,94,0.22); color:var(--green); }
 .chip-blue  { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.22); color:var(--blue); }
+.chip-amber { font-size:10px; font-weight:600; padding:3px 9px; border-radius:20px; font-family:'DM Mono',monospace; background:var(--amber-bg); border:1px solid rgba(217,119,6,0.22); color:var(--amber); }
 .icon-btn { width:30px; height:30px; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all var(--transition); position:relative; }
 .icon-btn:hover { border-color:var(--border-2); }
 .notif-dot { position:absolute; top:5px; right:5px; width:5px; height:5px; background:var(--red); border-radius:50%; border:1px solid var(--black-3); }
@@ -88,7 +90,8 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .page-header h2 { font-size:20px; font-weight:700; letter-spacing:-0.4px; }
 .page-header p  { font-size:12px; color:var(--text-3); margin-top:3px; }
 .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
-.stat-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; transition:border-color var(--transition); }
+.stat-card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; min-width:0; transition:border-color var(--transition); }
+.stat-value { overflow-wrap:break-word; }
 .stat-card:hover    { border-color:var(--border-2); }
 .stat-card.ac-green { border-color:rgba(34,197,94,0.28); }
 .stat-card.ac-amber { border-color:rgba(251,191,36,0.28); }
@@ -100,6 +103,32 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .delta-amber { background:var(--amber-bg); color:var(--amber); }
 .stat-value { font-size:25px; font-weight:700; letter-spacing:-1px; line-height:1; font-family:'DM Mono',monospace; color:var(--text-1); }
 .stat-label { font-size:10px; color:var(--text-3); margin-top:4px; font-weight:500; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* ── PEOPLE (dashboard) ── */
+.people-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:900px) { .people-grid { grid-template-columns:repeat(2,1fr); } }
+.people-card { background:var(--black-3); border:1px solid var(--border); border-left:3px solid var(--border-2); border-radius:var(--radius-sm); padding:12px 14px; }
+.people-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; }
+.people-label { font-size:11px; font-weight:600; color:var(--text-2); }
+.people-icon { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.people-value { font-size:22px; font-weight:700; font-family:'DM Mono',monospace; line-height:1; color:var(--text-1); }
+.people-sub { font-size:10px; color:var(--text-3); margin-top:4px; }
+
+/* ── POPULATION BAR CHARTS (dashboard) ── */
+.pd-chart { display:flex; align-items:flex-end; gap:10px; min-height:170px; padding:4px 6px 30px; }
+.pd-col { display:flex; flex-direction:column; align-items:center; gap:6px; flex:1; min-width:30px; position:relative; }
+.pd-bar-wrap { width:100%; max-width:26px; height:110px; display:flex; align-items:flex-end; background:var(--black-3); border-radius:3px 3px 0 0; overflow:hidden; }
+.pd-bar-fill { width:100%; border-radius:3px 3px 0 0; background:var(--blue); transition:height 0.4s ease; }
+.pd-val { font-size:9px; font-family:'DM Mono',monospace; color:var(--text-2); font-weight:700; }
+.pd-lbl { font-size:9px; color:var(--text-3); text-align:center; white-space:nowrap; position:absolute; top:100%; margin-top:8px; transform:rotate(-42deg); transform-origin:top left; left:50%; }
+
+/* ── FEES SUMMARY GAUGE (dashboard) ── */
+.fees-track { height:10px; background:var(--black-4); border-radius:99px; overflow:hidden; margin:12px 0 14px; display:flex; }
+.fees-fill-paid { height:100%; background:var(--green); }
+.fees-fill-due  { height:100%; background:var(--red); }
+.fees-legend-row { display:flex; justify-content:space-between; font-size:11px; padding:6px 0; border-bottom:1px solid var(--border); }
+.fees-legend-row:last-child { border-bottom:none; }
+
 .card { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
 .card-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .card-title { font-size:12px; font-weight:600; color:var(--text-1); }
@@ -133,6 +162,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .data-table tr:last-child td { border-bottom:none; }
 .data-table tbody tr:hover td { background:var(--black-3); }
 .stu-av { width:26px; height:26px; border-radius:50%; background:var(--green-bg); border:1px solid rgba(34,197,94,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+.stu-av-photo { width:26px; height:26px; border-radius:50%; object-fit:cover; margin-right:8px; vertical-align:middle; flex-shrink:0; border:1px solid rgba(34,197,94,0.3); }
 .staff-av { width:26px; height:26px; border-radius:50%; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--blue); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
 .grade-pill { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; }
 .gp-a{background:var(--green-bg);color:var(--green);} .gp-b{background:var(--blue-bg);color:var(--blue);} .gp-c{background:var(--amber-bg);color:var(--amber);} .gp-d{background:var(--red-bg);color:var(--red);}
@@ -201,6 +231,20 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .bs-unpublish-btn:hover { background:#d6841a; }
 .bs-ext-view-btn { background:#fff; color:#0d6efd; border:1px solid #0d6efd; border-radius:var(--radius); padding:8.5px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all var(--transition); }
 .bs-ext-view-btn:hover { background:#eff6ff; }
+/* Focus mode: opened in a new tab via "View Results" for a clearer, distraction-free read of a broadsheet */
+body.bs-focus-mode .sidebar,
+body.bs-focus-mode .sidebar-overlay,
+body.bs-focus-mode .topbar,
+body.bs-focus-mode .bs-filter-card,
+body.bs-focus-mode .bs-action-row,
+body.bs-focus-mode .gb-breadcrumb,
+body.bs-focus-mode .page-header { display:none !important; }
+body.bs-focus-mode .main { margin-left:0 !important; }
+body.bs-focus-mode .content { max-width:1180px; margin:0 auto; padding:28px 22px 60px; }
+body.bs-focus-mode .bs-results-wrap { margin-top:0; }
+.bs-focus-banner { display:none; }
+body.bs-focus-mode .bs-focus-banner { display:flex; align-items:center; justify-content:space-between; gap:10px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:var(--radius); padding:9px 16px; font-size:12px; font-weight:600; margin-bottom:16px; }
+body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer; }
 .bs-school-header { text-align:center; padding:18px 0 12px; border-bottom:1px solid #e5e7eb; margin-bottom:14px; }
 .bs-school-logo { width:72px; height:72px; object-fit:contain; margin-bottom:6px; display:block; margin-left:auto; margin-right:auto; }
 .bs-school-logo-placeholder { width:72px; height:72px; border-radius:50%; background:#f3f4f6; border:2px dashed #d1d5db; display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:22px; }
@@ -1069,6 +1113,62 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   font-size:15px;
   line-height:1.35;
 }
+.staff-profile-modal,
+.teacher-subjects-modal {
+  position:fixed;
+  inset:0;
+  z-index:1200;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:rgba(15,23,42,.46);
+}
+.staff-profile-dialog,
+.teacher-subjects-dialog {
+  width:min(980px, 96vw);
+  max-height:92vh;
+  overflow:auto;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 24px 70px rgba(15,23,42,.25);
+}
+.staff-profile-head,
+.teacher-subjects-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:20px 24px;
+  border-bottom:1px solid #e5e7eb;
+}
+.staff-profile-head h2 { margin:0; color:#172033; font-size:20px; }
+.staff-profile-role { margin-top:4px; color:#64748b; font-size:12px; }
+.staff-profile-close { border:0; background:transparent; color:#64748b; font-size:24px; cursor:pointer; }
+.staff-profile-tabs { display:flex; gap:4px; padding:10px 24px 0; border-bottom:1px solid #e5e7eb; }
+.staff-profile-tab { border:0; background:transparent; color:#64748b; padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; }
+.staff-profile-tab.active { color:#2563eb; border-bottom-color:#2563eb; font-weight:700; }
+.staff-profile-body { padding:20px 24px 26px; }
+.staff-profile-details { border:1px solid #e5e7eb; border-radius:6px; overflow:hidden; }
+.staff-profile-detail { display:grid; grid-template-columns:220px 1fr; gap:16px; padding:11px 14px; border-bottom:1px solid #eef2f7; }
+.staff-profile-detail:last-child { border-bottom:0; }
+.staff-profile-detail span { color:#64748b; font-size:12px; }
+.staff-profile-detail strong { color:#172033; font-size:13px; font-weight:500; }
+.staff-profile-empty { display:flex; flex-direction:column; gap:8px; padding:35px; text-align:center; color:#64748b; }
+.staff-profile-empty strong { color:#172033; }
+.staff-subjects-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; color:#64748b; font-size:13px; }
+.staff-subjects-table { width:100%; }
+.teacher-subjects-dialog { width:min(1080px, 96vw); }
+.teacher-subjects-body { padding:20px 24px 26px; }
+.teacher-subjects-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
+.teacher-subjects-actions .ctrl-select { min-width:180px; }
+.teacher-subjects-add { display:grid; grid-template-columns:1fr 1fr 180px auto; gap:10px; align-items:end; padding:14px; margin-top:18px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:7px; }
+.teacher-subjects-footer { display:flex; justify-content:center; padding-top:20px; }
+@media (max-width:700px) {
+  .staff-profile-detail { grid-template-columns:1fr; gap:4px; }
+  .staff-subjects-toolbar { align-items:flex-start; flex-direction:column; }
+  .teacher-subjects-add { grid-template-columns:1fr; }
+}
 .staff-profile-btn {
   width:38px;
   height:38px;
@@ -1092,6 +1192,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   font-size:13px;
   font-weight:800;
 }
+.staff-status-toggle { display:inline-flex; border-radius:4px; overflow:hidden; border:1px solid var(--border-2); }
+.staff-status-toggle button { display:inline-flex; min-width:42px; height:26px; align-items:center; justify-content:center; font-size:11px; font-weight:800; border:none; cursor:pointer; background:var(--black-3); color:var(--text-3); transition:all var(--transition); }
+.staff-status-toggle button.on-active { background:#096eea; color:#fff; }
+.staff-status-toggle button.off-active { background:var(--red); color:#fff; }
 .staff-form-light {
   margin-top:28px;
   background:#ffffff;
@@ -1703,6 +1807,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 }
 .gb-flag.absent span { background:var(--red); }
 .gb-flag.exclude span { background:var(--cyan); }
+.gb-flag { cursor:pointer; }
+.gb-flag:disabled { cursor:not-allowed; opacity:.55; }
+.gb-flag.absent.active { background:var(--red-bg); border-color:var(--red); color:var(--red); font-weight:700; }
+.gb-flag.exclude.active { background:var(--cyan-bg); border-color:var(--cyan); color:var(--cyan); font-weight:700; }
+.gb-row-excluded { opacity:.55; }
 .gb-important {
   margin:14px 22px 22px;
   border:1px solid var(--border);
@@ -1950,6 +2059,28 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   line-height:1;
 }
 .cog-modal-close:hover { background:var(--red-bg); border-color:var(--red); color:var(--red); }
+
+/* ── ACCOUNT SETTINGS (profile) ── */
+.as-tabs { display:flex; border-bottom:1px solid var(--border); }
+.as-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:12px 8px; background:none; border:none; border-bottom:2px solid transparent; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:var(--text-3); cursor:pointer; transition:all var(--transition); }
+.as-tab:hover { color:var(--text-1); }
+.as-tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.as-panel { display:none; }
+.as-panel.active { display:block; }
+.as-hero { padding:26px 20px 18px; text-align:center; background:var(--black-3); border-bottom:1px solid var(--border); }
+.as-hero-avatar { width:64px; height:64px; font-size:20px; margin:0 auto 10px; }
+.as-hero-name { font-size:15px; font-weight:700; color:var(--text-1); }
+.as-hero-badge { display:inline-block; margin-top:7px; background:var(--blue-bg); border:1px solid rgba(37,99,235,0.2); color:var(--blue); font-size:10px; font-weight:700; padding:3px 11px; border-radius:20px; font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.4px; }
+.as-info-table { padding:4px 0; }
+.as-info-row { display:flex; justify-content:space-between; gap:10px; padding:10px 20px; font-size:12px; border-bottom:1px solid var(--border); }
+.as-info-row:nth-child(even) { background:var(--black-3); }
+.as-info-row:last-child { border-bottom:none; }
+.as-info-key { color:var(--text-3); font-weight:600; }
+.as-info-val { color:var(--text-1); font-weight:600; text-align:right; }
+.as-pw-wrap { position:relative; margin-bottom:14px; }
+.as-pw-wrap .field-input { padding-right:38px; }
+.as-pw-eye { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-3); padding:4px; display:flex; }
+.as-pw-eye:hover { color:var(--text-1); }
 /* ── COGNITIVE MODAL BODY LAYOUT ── */
 .cog-modal-body {
   flex:1;
@@ -2287,7 +2418,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <div class="logo-mark-sm">UG</div>
       <div><div class="logo-name-sm">Unique School</div><div class="logo-sub-sm">Admin Portal</div></div>
     </div>
-    <div class="user-pill admin-user-card">
+    <div class="user-pill admin-user-card" onclick="openAccountSettings()" title="Account settings">
       <div class="avatar" id="a-avatar">MC</div>
       <div>
         <div class="u-name" id="a-name">Loading...</div>
@@ -2301,7 +2432,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
     <div class="nav-group admin-sidebar-body">
       <div class="admin-rail">
         <button type="button" class="rail-item active" data-section="dashboard" onclick="showAdminSection('dashboard', this, 'dashboard')"><span class="rail-icon">D</span><span>Dashboard</span></button>
-        <button type="button" class="rail-item" data-section="admission" onclick="showAdminSection('admission', this, 'students')"><span class="rail-icon">+</span><span>Admission</span></button>
+        <button type="button" class="rail-item" data-section="admission" onclick="showAdminSection('admission', this, 'admissions')"><span class="rail-icon">+</span><span>Admission</span></button>
         <button type="button" class="rail-item" data-section="people" onclick="showAdminSection('people', this, 'students')"><span class="rail-icon">P</span><span>People</span></button>
         <button type="button" class="rail-item" data-section="academics" onclick="showAdminSection('academics', this, 'classes')"><span class="rail-icon">A</span><span>Academics</span></button>
         <button type="button" class="rail-item" data-section="eclass" onclick="showAdminSection('eclass', this, 'eclass')"><span class="rail-icon">EC</span><span>E-Class</span></button>
@@ -2316,17 +2447,26 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         </div>
 
         <div class="sub-menu" data-menu="admission">
+          <button type="button" class="sub-nav-item active" data-tab="admissions" onclick="switchTab('admissions', this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2.5h9l3 3v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M11 2.5v3h3"/><line x1="5" y1="8.5" x2="11" y2="8.5"/><line x1="5" y1="11" x2="9" y2="11"/></svg></span><span>Applications Summary</span></button>
           <button type="button" class="sub-nav-item" data-tab="students" onclick="switchTab('students', this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5" r="2.5"/><path d="M1.5 14c0-2.8 2.2-5 5-5"/><line x1="11.5" y1="9.5" x2="11.5" y2="14.5"/><line x1="9" y1="12" x2="14" y2="12"/></svg></span><span>Student Admission</span></button>
         </div>
 
         <div class="sub-menu" data-menu="people">
-          <button type="button" class="sub-nav-item" onclick="toggleDropdown('people-children','people-chev',this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="2.5"/><path d="M1 14c0-2.5 2-4.5 4.5-4.5S10 11.5 10 14"/><circle cx="12" cy="5" r="2"/><path d="M10.5 14c0-1.7.7-3.2 1.7-4.2"/></svg></span><span>People</span><span class="sub-chev" id="people-chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span></button>
-          <div id="people-children" class="result-gradebook-children" style="display:none;">
-            <button type="button" class="sub-nav-item result-child" data-tab="students" data-title="Students" data-sub="Student Records" onclick="switchTab('students', this, 'Students', 'Student Records')">Students</button>
-            <button type="button" class="sub-nav-item result-child" data-tab="parents" onclick="switchTab('parents', this)">Parents</button>
-            <button type="button" class="sub-nav-item result-child" data-tab="staff" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')">Staff / Employees</button>
-            <button type="button" class="sub-nav-item result-child" data-tab="selfRegistration" onclick="switchTab('selfRegistration', this)">Self Registration</button>
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('students-children','students-chev',this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5" r="2.5"/><path d="M1.5 14c0-2.8 2.2-5 5-5"/><line x1="11.5" y1="9.5" x2="11.5" y2="14.5"/><line x1="9" y1="12" x2="14" y2="12"/></svg></span><span>Students</span><span class="sub-chev" id="students-chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span></button>
+          <div id="students-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="students" data-title="Students" data-sub="Student Records" onclick="switchTab('students', this, 'Students', 'Student Records')">Student Directory</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="addStudent" data-title="Add Student" data-sub="New Student Record" onclick="clearStudentForm();switchTab('addStudent', this, 'Add Student', 'New Student Record')">Add Student</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="importStudents" data-title="Import Student Records" data-sub="Bulk Import from .xlsx" onclick="switchTab('importStudents', this, 'Import Student Records', 'Bulk Import from .xlsx')">Import Records</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="enrollmentHistory" onclick="switchTab('enrollmentHistory', this)">Enrollment History</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="studentsRegistry" onclick="switchTab('studentsRegistry', this)">Students Registry</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="studentTags" onclick="switchTab('studentTags', this)">Student Tags</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="communicationBook" onclick="switchTab('communicationBook', this)">Communication Book</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="extracurricularGroups" onclick="switchTab('extracurricularGroups', this)">Extracurricular Groups</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="classAllocation" onclick="switchTab('classAllocation', this)">Class Allocation / Transfer / Graduation</button>
           </div>
+          <button type="button" class="sub-nav-item" data-tab="parents" onclick="switchTab('parents', this)"><span>Parents</span></button>
+          <button type="button" class="sub-nav-item" data-tab="staff" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')"><span>Staff / Employees</span></button>
+          <button type="button" class="sub-nav-item" data-tab="selfRegistration" onclick="switchTab('selfRegistration', this)"><span>Self Registration</span></button>
         </div>
 
         <div class="sub-menu" data-menu="academics">
@@ -2346,7 +2486,14 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         </div>
 
         <div class="sub-menu" data-menu="eclass">
-          <button type="button" class="sub-nav-item" data-tab="eclass" onclick="switchTab('eclass', this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="9.5" rx="1.5"/><line x1="5" y1="14.5" x2="11" y2="14.5"/><line x1="8" y1="11.5" x2="8" y2="14.5"/></svg></span><span>E-Class</span></button>
+          <button type="button" class="sub-nav-item" onclick="toggleDropdown('cbt-children','cbt-chev',this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="9.5" rx="1.5"/><line x1="5" y1="14.5" x2="11" y2="14.5"/><line x1="8" y1="11.5" x2="8" y2="14.5"/></svg></span><span>CBT</span><span class="sub-chev" id="cbt-chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span></button>
+          <div id="cbt-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="questionBank" onclick="switchTab('questionBank', this)">Question Bank</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="instructionSets" onclick="switchTab('instructionSets', this)">Instruction Sets</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="cbtSchedules" onclick="switchTab('cbtSchedules', this)">CBT Schedules</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="cbtScores" onclick="switchTab('cbtScores', this)">CBT Scores</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="examPractice" onclick="switchTab('examPractice', this)">Exam Practice</button>
+          </div>
         </div>
 
         <div class="sub-menu" data-menu="results">
@@ -2492,30 +2639,79 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 
     <div class="content">
 
+      <div class="bs-focus-banner">
+        <span>Read-only broadsheet view, opened in a new tab for a clearer read.</span>
+        <button type="button" onclick="window.print()">Print</button>
+      </div>
+
       <!-- ━━━ DASHBOARD ━━━ -->
       <div class="tab-panel active" id="tab-dashboard">
         <div class="page-header">
           <h2 id="a-greeting">Good morning, Mrs. Chukwu.</h2>
-          <p>School overview · Term 2, 2025/2026 · Wednesday, 13 May 2026</p>
+          <p id="a-greeting-sub">School overview</p>
         </div>
 
+        <!-- Finance: today / last 30 days -->
         <div class="stats-row">
           <div class="stat-card ac-green">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5L1.5 6 8 9.5 14.5 6 8 2.5z"/><path d="M4 8v4c0 1 1.8 1.8 4 1.8s4-.8 4-1.8V8"/><line x1="14.5" y1="6" x2="14.5" y2="10"/></svg></div><span class="stat-delta delta-up">enrolled</span></div>
-            <div class="stat-value">248</div><div class="stat-label">Total Students</div>
-          </div>
-          <div class="stat-card ac-amber">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="4.5" r="2.5"/><path d="M1.5 14c0-3 2.5-5.5 5.5-5.5"/><line x1="11.5" y1="9" x2="11.5" y2="14"/><line x1="9" y1="11.5" x2="14" y2="11.5"/></svg></div><span class="stat-delta delta-amber">active</span></div>
-            <div class="stat-value">18</div><div class="stat-label">Teaching Staff</div>
-          </div>
-          <div class="stat-card ac-blue">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="8.5" rx="0.8"/><path d="M1.5 9 L8 5 L14.5 9"/><rect x="6" y="10.5" width="4" height="4"/></svg></div></div>
-            <div class="stat-value">12</div><div class="stat-label">Active Classes</div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);color:var(--green);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7"/><path d="M2 12.5h12v2H2z"/></svg></div></div>
+            <div class="stat-value" style="font-size:18px;white-space:nowrap;" id="fin-received-today">₦0</div><div class="stat-label">Received Today</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="1.5" y1="14" x2="14.5" y2="14"/><rect x="2" y="9" width="3" height="5"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="3" width="3" height="11"/></svg></div><span class="stat-delta delta-up">term avg</span></div>
-            <div class="stat-value">76%</div><div class="stat-label">School Average</div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);color:var(--red);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10.5v-9M8 1.5 4.5 5M8 1.5 11.5 5"/><path d="M2 12.5h12v2H2z"/></svg></div></div>
+            <div class="stat-value" style="font-size:18px;white-space:nowrap;" id="fin-spent-today">₦0</div><div class="stat-label">Spent Today</div>
           </div>
+          <div class="stat-card ac-green">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);color:var(--green);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7"/><path d="M2 12.5h12v2H2z"/></svg></div></div>
+            <div class="stat-value" style="font-size:18px;white-space:nowrap;" id="fin-received-30d">₦0</div><div class="stat-label">Received · Last 30 Days</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);color:var(--red);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10.5v-9M8 1.5 4.5 5M8 1.5 11.5 5"/><path d="M2 12.5h12v2H2z"/></svg></div></div>
+            <div class="stat-value" style="font-size:18px;white-space:nowrap;" id="fin-spent-30d">₦0</div><div class="stat-label">Spent · Last 30 Days</div>
+          </div>
+        </div>
+
+        <!-- People -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">People</span></div>
+          <div class="card-body" style="padding:16px 18px;">
+            <div class="people-grid">
+              <div class="people-card" style="border-left-color:var(--green);">
+                <div class="people-top"><span class="people-label">Students</span><div class="people-icon" style="background:var(--green-bg);color:var(--green);"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5L1.5 6 8 9.5 14.5 6 8 2.5z"/><path d="M4 8v4c0 1 1.8 1.8 4 1.8s4-.8 4-1.8V8"/></svg></div></div>
+                <div class="people-value" id="d-students">0</div><div class="people-sub">Active Students</div>
+              </div>
+              <div class="people-card" style="border-left-color:var(--blue);">
+                <div class="people-top"><span class="people-label">Staff</span><div class="people-icon" style="background:var(--blue-bg);color:var(--blue);"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div></div>
+                <div class="people-value" id="d-staff">0</div><div class="people-sub">Total Employees</div>
+              </div>
+              <div class="people-card" style="border-left-color:var(--cyan);">
+                <div class="people-top"><span class="people-label">Parents / Guardians</span><div class="people-icon" style="background:var(--cyan-bg);color:var(--cyan);"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="2.5"/><path d="M1 14c0-2.5 2-4.5 4.5-4.5S10 11.5 10 14"/><circle cx="12" cy="5" r="2"/><path d="M10.5 14c0-1.7.7-3.2 1.7-4.2"/></svg></div></div>
+                <div class="people-value" id="d-parents">0</div><div class="people-sub" id="d-parents-sub">Active Parents</div>
+              </div>
+              <div class="people-card" style="border-left-color:var(--amber);">
+                <div class="people-top"><span class="people-label">Active Classes</span><div class="people-icon" style="background:var(--amber-bg);color:var(--amber);"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="8.5" rx="0.8"/><path d="M1.5 9 L8 5 L14.5 9"/></svg></div></div>
+                <div class="people-value" id="d-active-classes">0</div><div class="people-sub">Classes in Session</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Population distribution -->
+        <div class="grid-2" style="margin-bottom:14px;align-items:start;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Population Distribution — By Classes</span></div>
+            <div class="card-body" id="d-pop-classes" style="overflow-x:auto;"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Population Distribution — By Category</span></div>
+            <div class="card-body" id="d-pop-categories"></div>
+          </div>
+        </div>
+
+        <!-- Monthly finance summary -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Monthly Finance Summary</span></div>
+          <div class="card-body" id="d-finance-trend" style="overflow-x:auto;"></div>
         </div>
 
         <div class="grid-3-1" style="margin-bottom:14px;">
@@ -2528,26 +2724,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <!-- Recent activity -->
             <div class="card">
               <div class="card-head"><span class="card-title">Recent System Activity</span></div>
-              <div class="card-body">
-                <div class="activity-item"><span class="act-dot" style="background:var(--green);"></span><div><div class="act-text"><strong>Mr. Adeyemi</strong> saved Mid-Term results for Class 4B — Mathematics</div><div class="act-time">10 MAY 2026 · 14:32</div></div></div>
-                <div class="activity-item"><span class="act-dot" style="background:var(--blue);"></span><div><div class="act-text"><strong>Mrs. Eze</strong> updated CA scores for Class 4B — English Language</div><div class="act-time">09 MAY 2026 · 11:15</div></div></div>
-                <div class="activity-item"><span class="act-dot" style="background:var(--amber);"></span><div><div class="act-text"><strong>3 teachers</strong> have pending result entries for Mid-Term Exam</div><div class="act-time">TODAY</div></div></div>
-                <div class="activity-item"><span class="act-dot" style="background:var(--border-2);"></span><div><div class="act-text"><strong>New student</strong> Zainab Yusuf enrolled in Grade 3B</div><div class="act-time">07 MAY 2026 · 09:45</div></div></div>
-              </div>
+              <div class="card-body" id="d-activity"></div>
             </div>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <!-- Quick summary -->
+            <!-- Fees summary -->
             <div class="card">
-              <div class="card-head"><span class="card-title">Term Overview</span></div>
-              <div class="card-body">
-                <div class="perf-row"><span class="perf-key">Term 2 Progress</span><span class="perf-val pv-green">Week 9 / 14</span></div>
-                <div class="perf-row"><span class="perf-key">Mid-Term Results</span><span class="perf-val pv-amber">8 / 18 pending</span></div>
-                <div class="perf-row"><span class="perf-key">School Attendance</span><span class="perf-val pv-green">91%</span></div>
-                <div class="perf-row"><span class="perf-key">Next Examination</span><span class="perf-val">16 Jun 2026</span></div>
-                <div class="perf-row"><span class="perf-key">Mid-Term Break</span><span class="perf-val">23 May 2026</span></div>
-              </div>
+              <div class="card-head"><span class="card-title">Fees Summary — Active Term</span></div>
+              <div class="card-body" id="d-fees-summary"></div>
             </div>
             <!-- Attendance by grade -->
             <div class="card">
@@ -2557,12 +2742,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <!-- Staff breakdown -->
             <div class="card">
               <div class="card-head"><span class="card-title">Staff Breakdown</span></div>
-              <div class="card-body">
-                <div class="perf-row"><span class="perf-key">Academic Staff</span><span class="perf-val">13</span></div>
-                <div class="perf-row"><span class="perf-key">Admin Staff</span><span class="perf-val">3</span></div>
-                <div class="perf-row"><span class="perf-key">Support Staff</span><span class="perf-val">2</span></div>
-                <div class="perf-row"><span class="perf-key">On Leave</span><span class="perf-val pv-amber">1</span></div>
-              </div>
+              <div class="card-body" id="d-staff-breakdown"></div>
             </div>
           </div>
         </div>
@@ -2592,68 +2772,61 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <!-- ALL STUDENTS -->
       <!-- ALL STUDENTS -->
       <!-- ALL STUDENTS -->
-      <div class="tab-panel" id="tab-students">
+      <!-- ━━━ ADMISSION APPLICATIONS ━━━ -->
+      <div class="tab-panel" id="tab-admissions">
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
           <div>
-            <h2 id="student-page-title">All Students</h2>
-            <p id="student-page-sub">Complete student directory - Term 2, 2025/2026</p>
+            <h2>Admission Applications</h2>
+            <p>Review, approve, and convert prospective student applications</p>
           </div>
-          <button class="ann-del" id="student-back-btn" onclick="clearStudentForm()" style="display:none;font-size:12px;">Back to Student Directory</button>
+          <button class="bs-print-btn" onclick="openAdmissionForm()">+ Add Application</button>
         </div>
 
-        <div class="card" style="margin-bottom:14px;">
-          <div class="card-head"><span class="card-title" id="student-form-title">Add Student</span></div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);color:var(--blue);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2.5h9l3 3v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M11 2.5v3h3"/></svg></div></div><div class="stat-value" id="adm-total">0</div><div class="stat-label">Total Applications</div></div>
+          <div class="stat-card ac-amber"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);color:var(--amber);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.5V8l2.5 1.5"/></svg></div></div><div class="stat-value" style="color:var(--amber);" id="adm-pending">0</div><div class="stat-label">Pending Review</div></div>
+          <div class="stat-card ac-green"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);color:var(--green);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11.5,6"/></svg></div></div><div class="stat-value" style="color:var(--green);" id="adm-approved">0</div><div class="stat-label">Approved</div></div>
+          <div class="stat-card"><div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);color:var(--green);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5L1.5 6 8 9.5 14.5 6 8 2.5z"/><path d="M4 8v4c0 1 1.8 1.8 4 1.8s4-.8 4-1.8V8"/></svg></div></div><div class="stat-value" id="adm-converted">0</div><div class="stat-label">Converted to Student</div></div>
+        </div>
+
+        <!-- Add application form (hidden until "Add Application" clicked) -->
+        <div class="card" id="adm-form-card" style="display:none;margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">New Application</span><button class="cog-modal-close" onclick="closeAdmissionForm()">&#x2715;</button></div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-              <div>
-                <label class="field-label">Student ID</label>
-                <input class="field-input" id="new-student-id" placeholder="STU-2026-0001">
-              </div>
-              <div>
-                <label class="field-label">Password</label>
-                <input class="field-input" id="new-student-password" value="1234" placeholder="Auto password: 1234" readonly>
-              </div>
-              <div>
-                <label class="field-label">Full Name</label>
-                <input class="field-input" id="new-student-name" placeholder="Student name">
-              </div>
-              <div>
-                <label class="field-label">Initials</label>
-                <input class="field-input" id="new-student-initials" placeholder="Optional">
-              </div>
-              <div>
-                <label class="field-label">Parent Email</label>
-                <input class="field-input" id="new-student-parent-email" type="email" placeholder="parent@example.com">
-              </div>
-              <div>
-                <label class="field-label">Gender</label>
-                <select class="ctrl-select" id="new-student-gender">
-                  <option value="F">Female</option>
-                  <option value="M">Male</option>
-                </select>
-              </div>
-              <div>
-                <label class="field-label">Class</label>
-                <select class="ctrl-select" id="new-student-class"></select>
-              </div>
-              <div>
-                <label class="field-label">Current Avg</label>
-                <input class="field-input" id="new-student-avg" type="number" min="0" max="100" placeholder="0">
-              </div>
-              <div>
-                <label class="field-label">Attendance</label>
-                <input class="field-input" id="new-student-att" type="number" min="0" max="100" placeholder="100">
-              </div>
-              <div style="grid-column:1 / -1;">
-                <label class="field-label">Student Photo</label>
-                <input class="field-input" id="new-student-photo" type="file" accept="image/png,image/jpeg">
-              </div>
+            <div class="bs-filter-grid" style="margin-bottom:14px;">
+              <div><label class="field-label">Applicant Name *</label><input class="field-input" id="adm-name" placeholder="Full name"></div>
+              <div><label class="field-label">Gender</label><select class="ctrl-select" id="adm-gender" style="width:100%;"><option value="">Select…</option><option value="F">Female</option><option value="M">Male</option></select></div>
+              <div><label class="field-label">Class Applying For</label><select class="ctrl-select" id="adm-class" style="width:100%;"><option value="">Select…</option></select></div>
+              <div><label class="field-label">Parent / Guardian Name</label><input class="field-input" id="adm-parent-name" placeholder="Parent or guardian name"></div>
+              <div><label class="field-label">Parent Phone</label><input class="field-input" id="adm-parent-phone" placeholder="Phone number"></div>
+              <div><label class="field-label">Parent Email</label><input class="field-input" id="adm-parent-email" type="email" placeholder="parent@example.com"></div>
             </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-              <button class="ann-del" onclick="clearStudentForm()" id="student-cancel-label" style="font-size:12px;">Clear</button>
-              <button class="ann-del" onclick="openStudentDeleteModal()" id="student-delete-btn" style="display:none;font-size:12px;color:var(--red);">Delete Student</button>
-              <button class="post-btn" onclick="saveStudent()" id="student-save-label">Add Student</button>
-            </div>
+            <label class="field-label">Notes</label>
+            <textarea class="field-input" id="adm-notes" rows="2" style="margin-bottom:14px;resize:vertical;" placeholder="Optional notes"></textarea>
+            <button class="bs-print-btn" onclick="submitAdmissionApplication()">Save Application</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Applications</span></div>
+          <div class="card-body" style="padding:0;overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th>Applicant</th><th>Class Applying For</th><th>Parent Contact</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead>
+              <tbody id="adm-tbody"><tr><td colspan="6" style="color:var(--text-3);padding:20px;text-align:center;">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-students">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+          <div>
+            <h2>All Students</h2>
+            <p id="student-page-sub">Complete student directory - Term 2, 2025/2026</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="post-btn" style="background:var(--black-3);color:var(--text-1);" onclick="switchTab('importStudents', document.querySelector('[data-tab=\'importStudents\']'))">&#x2B06; Import Records</button>
+            <button class="post-btn" onclick="clearStudentForm();switchTab('addStudent', document.querySelector('[data-tab=\'addStudent\']'))">&#x2795; Add Student</button>
           </div>
         </div>
 
@@ -2665,7 +2838,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-body" style="padding:0;">
             <div style="overflow-x:auto;padding:0 18px 14px;">
               <table class="data-table">
-                <thead><tr><th>Student</th><th>ID</th><th>Class</th><th>Gender</th><th>Avg Score</th><th>Grade</th><th>Attendance</th><th>Parent Email</th><th>Action</th></tr></thead>
+                <thead><tr><th>Student</th><th>ID</th><th>Class</th><th>Gender</th><th>Avg Score</th><th>Grade</th><th>Attendance</th><th>Parent Email</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody id="stu-tbody"></tbody>
               </table>
             </div>
@@ -2687,6 +2860,337 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </div>
         </div>
       </div>
+
+      <!-- ━━━ ADD / EDIT STUDENT (dedicated page, not inline on the directory) ━━━ -->
+      <div class="tab-panel" id="tab-addStudent">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
+          <div>
+            <h2 id="stu-form-page-title">Add Student</h2>
+            <p id="stu-form-page-sub">First name, surname, class, and class arm are required — everything else is optional.</p>
+          </div>
+          <button class="ann-del" onclick="switchTab('students', document.querySelector('[data-tab=\'students\']'))" style="font-size:12px;">&larr; Back to Student Directory</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title" id="student-form-title">Add Student</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <label class="field-label">First Name *</label>
+                <input class="field-input" id="new-student-firstname" placeholder="First name">
+              </div>
+              <div>
+                <label class="field-label">Surname *</label>
+                <input class="field-input" id="new-student-surname" placeholder="Surname">
+              </div>
+              <div>
+                <label class="field-label">Other Names</label>
+                <input class="field-input" id="new-student-othernames" placeholder="Optional">
+              </div>
+              <div>
+                <label class="field-label">Class *</label>
+                <select class="ctrl-select" id="new-student-class" onchange="stuLoadArms()"></select>
+              </div>
+              <div>
+                <label class="field-label" id="new-student-arm-label">Class Arm *</label>
+                <select class="ctrl-select" id="new-student-arm"></select>
+              </div>
+              <div>
+                <label class="field-label">Gender</label>
+                <select class="ctrl-select" id="new-student-gender">
+                  <option value="F">Female</option>
+                  <option value="M">Male</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label">Student ID</label>
+                <input class="field-input" id="new-student-id" placeholder="Auto-generated if left blank">
+              </div>
+              <div>
+                <label class="field-label">Password</label>
+                <input class="field-input" id="new-student-password" value="1234" placeholder="Auto password: 1234" readonly>
+              </div>
+              <div>
+                <label class="field-label">Initials</label>
+                <input class="field-input" id="new-student-initials" placeholder="Optional">
+              </div>
+              <div>
+                <label class="field-label">Parent Email</label>
+                <input class="field-input" id="new-student-parent-email" type="email" placeholder="parent@example.com">
+              </div>
+              <div>
+                <label class="field-label">Current Avg</label>
+                <input class="field-input" id="new-student-avg" type="number" min="0" max="100" placeholder="0">
+              </div>
+              <div>
+                <label class="field-label">Attendance</label>
+                <input class="field-input" id="new-student-att" type="number" min="0" max="100" placeholder="100">
+              </div>
+              <div style="grid-column:1 / -1;">
+                <label class="field-label">Student Photo</label>
+                <input class="field-input" id="new-student-photo" type="file" accept="image/png,image/jpeg">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+              <button class="ann-del" onclick="clearStudentForm()" id="student-cancel-label" style="font-size:12px;">Clear</button>
+              <button class="ann-del" onclick="openStudentDeleteModal()" id="student-delete-btn" style="display:none;font-size:12px;color:var(--red);">Delete Student</button>
+              <button class="post-btn" onclick="saveStudent()" id="student-save-label">Add Student</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━━ IMPORT STUDENT RECORDS (.xlsx) ━━━ -->
+      <div class="tab-panel" id="tab-importStudents">
+        <div class="page-header"><h2>Import Student Records</h2><p>Upload an exported .xlsx student list, review the matches, then import.</p></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">1. Choose File</span></div>
+          <div class="card-body">
+            <input class="field-input" id="imp-file" type="file" accept=".xlsx" style="margin-bottom:12px;">
+            <button class="post-btn" onclick="impPreview()">Upload &amp; Preview</button>
+            <div id="imp-status" style="margin-top:10px;font-size:12px;color:var(--text-3);"></div>
+          </div>
+        </div>
+        <div class="card" id="imp-review-card" style="display:none;">
+          <div class="card-head">
+            <span class="card-title" id="imp-review-title">2. Review &amp; Import</span>
+            <button class="post-btn" onclick="impCommit()" id="imp-commit-btn">Import Selected Students</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="padding:12px 18px;font-size:12px;color:var(--text-3);">First Name, Surname, Class, and Class Arm are required per row. Rows missing any of these are unchecked and highlighted — fix them or leave them out.</div>
+            <div style="overflow-x:auto;padding:0 18px 14px;max-height:560px;overflow-y:auto;">
+              <table class="data-table">
+                <thead><tr><th></th><th>#</th><th>Name</th><th>Gender</th><th>Class</th><th>Class Arm</th><th>Parent Email</th><th>Status</th></tr></thead>
+                <tbody id="imp-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="imp-result-card" style="display:none;"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-enrollmentHistory">
+        <div class="page-header"><h2>Enrollment History</h2><p>When each student was enrolled, most recent first.</p></div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Enrollment History</span>
+            <select class="ctrl-select" id="eh-class" style="width:auto;" onchange="ehLoad()"><option value="">All Classes</option></select>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Gender</th><th>Class</th><th>Status</th><th>Enrolled</th></tr></thead>
+                <tbody id="eh-tbody"><tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-studentsRegistry">
+        <div class="page-header"><h2>Students Registry</h2><p>Printable / exportable roster of all students.</p></div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Students Registry</span>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <select class="ctrl-select" id="sr-class" style="width:auto;" onchange="srLoad()"><option value="">All Classes</option></select>
+              <select class="ctrl-select" id="sr-status" style="width:auto;" onchange="srLoad()">
+                <option value="active">Active</option>
+                <option value="graduated">Graduated</option>
+                <option value="left">Left</option>
+              </select>
+              <button class="del-btn" onclick="srPrint()">Print Registry</button>
+              <button class="post-btn" onclick="srExportCsv()">Export CSV</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table" id="sr-table">
+                <thead><tr><th>#</th><th>Reg No</th><th>Name</th><th>Gender</th><th>Class</th><th>Parent Email</th><th>Enrolled</th></tr></thead>
+                <tbody id="sr-tbody"><tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-communicationBook">
+        <div class="page-header"><h2>Communication Book</h2><p>Log of communication with students and parents.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Filter</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;">
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="cbk-class" style="width:100%;" onchange="cbkOnClassChange()"><option value="">All Classes</option></select></div>
+              <div><label class="field-label">Student</label><select class="ctrl-select" id="cbk-student" style="width:100%;" onchange="cbkLoad()"><option value="">All Students</option></select></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Entries</span><button class="post-btn" onclick="cbkOpenNew()">+ Add Entry</button></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Date</th><th>Student</th><th>Category</th><th>Message</th><th>Added By</th><th>Action</th></tr></thead>
+                <tbody id="cbk-tbody"><tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="cbk-new-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:460px;max-width:92vw;">
+            <div class="card-head"><span class="card-title">Add Communication Book Entry</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cbkCloseNew()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Student *</label>
+              <select class="ctrl-select" id="cbkn-student" style="width:100%;"></select>
+              <label class="field-label" style="margin-top:12px;">Category</label>
+              <input type="text" class="field-input" id="cbkn-category" style="width:100%;" placeholder="e.g. Behavioral, Academic, General">
+              <label class="field-label" style="margin-top:12px;">Message *</label>
+              <textarea class="field-input" id="cbkn-message" rows="4" style="width:100%;resize:vertical;"></textarea>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="cbkSubmitNew()">Save Entry</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-extracurricularGroups">
+        <div class="page-header"><h2>Extracurricular Groups</h2><p>Clubs, teams, and other extracurricular groups.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Groups</span><button class="post-btn" onclick="ecgOpenNew()">+ New Group</button></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Group</th><th>Description</th><th>Teacher in Charge</th><th>Members</th><th>Action</th></tr></thead>
+                <tbody id="ecg-tbody"><tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="ecg-detail-card" style="display:none;">
+          <div class="card-head"><span class="card-title" id="ecg-detail-title">Group</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="ecgCloseDetail()">&larr; Back to Groups</button></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:2fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+              <div><label class="field-label">Add Student to Group</label><select class="ctrl-select" id="ecg-add-student" style="width:100%;"></select></div>
+              <button class="post-btn" onclick="ecgAssignStudent()">Add</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Class</th><th>Action</th></tr></thead>
+                <tbody id="ecg-detail-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="ecg-new-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:440px;max-width:92vw;">
+            <div class="card-head"><span class="card-title">New Extracurricular Group</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="ecgCloseNew()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Group Name *</label>
+              <input type="text" class="field-input" id="ecgn-name" style="width:100%;" placeholder="e.g. Debate Club">
+              <label class="field-label" style="margin-top:12px;">Description</label>
+              <textarea class="field-input" id="ecgn-description" rows="3" style="width:100%;resize:vertical;"></textarea>
+              <label class="field-label" style="margin-top:12px;">Teacher in Charge</label>
+              <select class="ctrl-select" id="ecgn-teacher" style="width:100%;"><option value="">— None —</option></select>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="ecgSubmitNew()">Save Group</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-studentTags">
+        <div class="page-header"><h2>Student Tags</h2><p>Group and filter students with custom tags (e.g. Bus Student, Scholarship).</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Tags</span><button class="post-btn" onclick="stOpenNewTag()">+ New Tag</button></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Tag</th><th>Students</th><th>Added</th><th>Action</th></tr></thead>
+                <tbody id="st-tbody"><tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="st-detail-card" style="display:none;">
+          <div class="card-head"><span class="card-title" id="st-detail-title">Tag</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="stCloseDetail()">&larr; Back to Tags</button></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:2fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+              <div><label class="field-label">Add Student to Tag</label><select class="ctrl-select" id="st-add-student" style="width:100%;"></select></div>
+              <button class="post-btn" onclick="stAssignStudent()">Add</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Class</th><th>Action</th></tr></thead>
+                <tbody id="st-detail-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="st-new-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:420px;max-width:92vw;">
+            <div class="card-head"><span class="card-title">New Student Tag</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="stCloseNewTag()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Tag Name *</label>
+              <input type="text" class="field-input" id="stn-name" style="width:100%;" placeholder="e.g. Bus Student">
+              <label class="field-label" style="margin-top:12px;">Color (optional)</label>
+              <input type="color" class="field-input" id="stn-color" style="width:100%;height:38px;" value="#2563eb">
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="stSubmitNewTag()">Save Tag</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-classAllocation">
+        <div class="page-header"><h2>Class Allocation / Transfer / Graduation</h2><p>Promote, transfer, or graduate students in bulk.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Promote / Transfer Students</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;">
+              <div><label class="field-label">From Class</label><select class="ctrl-select" id="ca-from-class" style="width:100%;" onchange="caLoadStudents()"></select></div>
+              <div><label class="field-label">To Class</label><select class="ctrl-select" id="ca-to-class" style="width:100%;"></select></div>
+            </div>
+            <div id="ca-students-wrap" style="margin-top:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;"><input type="checkbox" id="ca-select-all" onchange="caToggleAll(this)"> Select All</label>
+              </div>
+              <div id="ca-students-list" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;display:flex;flex-direction:column;gap:6px;">
+                <span style="font-size:12px;color:var(--text-3);">Select a class to load students.</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px;">
+              <button class="post-btn" onclick="caPromote()">Promote / Transfer Selected</button>
+              <button class="del-btn" onclick="caGraduate('graduated')">Graduate Selected</button>
+              <button class="del-btn" onclick="caGraduate('left')">Mark as Left Selected</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Graduated / Left Students</span>
+            <select class="ctrl-select" id="ca-status-filter" style="width:auto;" onchange="caLoadStatusList()">
+              <option value="graduated">Graduated</option>
+              <option value="left">Left</option>
+            </select>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Last Class</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="ca-status-tbody"><tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="ca-reinstate-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:420px;max-width:92vw;">
+            <div class="card-head"><span class="card-title">Reinstate Student</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="caCloseReinstate()">Close</button></div>
+            <div class="card-body">
+              <input type="hidden" id="car-student-id">
+              <label class="field-label">Assign to Class *</label>
+              <select class="ctrl-select" id="car-class" style="width:100%;"></select>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="caSubmitReinstate()">Reinstate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ALL STAFF -->
       <div class="tab-panel" id="tab-staff">
         <div class="staff-employee-page">
@@ -2790,6 +3294,49 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                 <button class="post-btn" onclick="saveStaff()" id="staff-save-label">Add Staff</button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="staff-profile-modal" id="staff-profile-modal" role="dialog" aria-modal="true" aria-labelledby="staff-profile-name">
+        <div class="staff-profile-dialog">
+          <div class="staff-profile-head">
+            <div><h2 id="staff-profile-name">Staff Profile</h2><div class="staff-profile-role" id="staff-profile-role"></div></div>
+            <button type="button" class="staff-profile-close" onclick="closeStaffProfile()" aria-label="Close staff profile">&times;</button>
+          </div>
+          <div class="staff-profile-tabs">
+            <button type="button" class="staff-profile-tab active" data-profile-tab="profile" onclick="renderStaffProfileTab('profile')">Profile</button>
+            <button type="button" class="staff-profile-tab" data-profile-tab="subjects" onclick="renderStaffProfileTab('subjects')">Subjects</button>
+            <button type="button" class="staff-profile-tab" data-profile-tab="formClass" onclick="renderStaffProfileTab('formClass')">Form Class</button>
+            <button type="button" class="staff-profile-tab" data-profile-tab="activity" onclick="renderStaffProfileTab('activity')">Activity</button>
+          </div>
+          <div class="staff-profile-body" id="staff-profile-body"></div>
+        </div>
+      </div>
+      <div class="teacher-subjects-modal" id="teacher-subjects-modal" role="dialog" aria-modal="true" aria-labelledby="teacher-subjects-title">
+        <div class="teacher-subjects-dialog">
+          <div class="teacher-subjects-head">
+            <strong id="teacher-subjects-title">Teacher Subjects</strong>
+            <button type="button" class="staff-profile-close" onclick="closeTeacherSubjectsManager()" aria-label="Close teacher subjects">&times;</button>
+          </div>
+          <div class="teacher-subjects-body">
+            <div class="teacher-subjects-actions">
+              <span>Bulk Manage Roles</span>
+              <select class="ctrl-select" id="staff-bulk-role"><option value="">Select role...</option><option value="subject_teacher">Subject Teacher</option><option value="class_teacher">Class Teacher</option></select>
+              <button type="button" class="post-btn" onclick="bulkManageStaffRoles()">Apply to All</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Subject</th><th>Class</th><th>Role</th><th>Action</th></tr></thead>
+                <tbody id="teacher-subjects-tbody"></tbody>
+              </table>
+            </div>
+            <div class="teacher-subjects-add">
+              <div><label class="field-label">Subject</label><select class="ctrl-select" id="staff-new-subject-subject"></select></div>
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="staff-new-subject-class"></select></div>
+              <div><label class="field-label">Role</label><select class="ctrl-select" id="staff-new-subject-role"><option value="subject_teacher">Subject Teacher</option><option value="class_teacher">Class Teacher</option></select></div>
+              <button type="button" class="post-btn" onclick="assignStaffSubject()">Assign New Subject</button>
+            </div>
+            <div class="teacher-subjects-footer"><button type="button" class="ann-del" onclick="closeTeacherSubjectsManager()">Done</button></div>
           </div>
         </div>
       </div>
@@ -3029,7 +3576,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <div class="tab-panel" id="tab-gradingSystems">
         <div class="page-header"><h2>Grading Systems</h2><p>Configure grade boundaries and remarks for result sheets.</p></div>
         <div class="card">
-          <div class="card-head"><span class="card-title">Grade Scale</span><button class="post-btn" style="margin-left:auto" onclick="showToast('Save grading system coming soon','info')">Save Changes</button></div>
+          <div class="card-head"><span class="card-title">Grade Scale</span><button class="post-btn" style="margin-left:auto" onclick="saveGradingSystem()">Save Changes</button></div>
           <div class="card-body" style="padding:0;">
             <div style="overflow-x:auto;padding:0 18px 14px;">
               <table class="data-table" id="grading-table">
@@ -3076,7 +3623,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <div id="sd-divisions-card" style="display:none;" class="card">
           <div class="card-head">
             <span class="card-title" id="sd-divisions-title">Assessments / Score Divisions</span>
-            <button class="post-btn" style="margin-left:auto" onclick="showToast('Edit score divisions coming soon','info')">&#x270E; Edit Score Divisions</button>
+            <button class="post-btn" id="sd-edit-btn" style="margin-left:auto" onclick="sdToggleEdit()">&#x270E; Edit Score Divisions</button>
           </div>
           <div class="card-body" style="padding:0;">
             <div style="overflow-x:auto;padding:0 18px 14px;">
@@ -3132,38 +3679,19 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-body" style="padding:0 18px 14px;">
             <div style="margin:16px 0 8px;display:flex;align-items:center;gap:10px;">
               <span style="font-size:13px;font-weight:700;color:#2563eb;">Affective Skills</span>
-              <button class="post-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="showToast('Edit skills set coming soon','info')">&#x270E; Edit Skills Set</button>
+              <button class="post-btn" id="skills-affective-edit-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="skillsToggleEdit('affective')">&#x270E; Edit Skills Set</button>
             </div>
             <table class="data-table" style="margin-bottom:20px;">
               <thead><tr><th>#</th><th>Skill Name</th><th>Description</th></tr></thead>
-              <tbody>
-                <tr><td>1</td><td>Punctuality</td><td></td></tr>
-                <tr><td>2</td><td>Attentiveness</td><td></td></tr>
-                <tr><td>3</td><td>Neatness</td><td></td></tr>
-                <tr><td>4</td><td>Honesty</td><td></td></tr>
-                <tr><td>5</td><td>Politeness</td><td></td></tr>
-                <tr><td>6</td><td>Perseverance</td><td></td></tr>
-                <tr><td>7</td><td>Relationship with Others</td><td></td></tr>
-                <tr><td>8</td><td>Organization Ability</td><td></td></tr>
-              </tbody>
+              <tbody id="skills-affective-tbody"><tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-3);">Loading…</td></tr></tbody>
             </table>
             <div style="margin:16px 0 8px;display:flex;align-items:center;gap:10px;">
               <span style="font-size:13px;font-weight:700;color:#e88c2e;">Psychomotor Skills</span>
-              <button class="post-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="showToast('Edit skills set coming soon','info')">&#x270E; Edit Skills Set</button>
+              <button class="post-btn" id="skills-psychomotor-edit-btn" style="margin-left:auto;padding:4px 14px;font-size:11px" onclick="skillsToggleEdit('psychomotor')">&#x270E; Edit Skills Set</button>
             </div>
             <table class="data-table">
               <thead><tr><th>#</th><th>Skill Name</th><th>Description</th></tr></thead>
-              <tbody>
-                <tr><td>9</td><td>Hand Writing</td><td></td></tr>
-                <tr><td>10</td><td>Drawing and Painting</td><td></td></tr>
-                <tr><td>11</td><td>Speech / Verbal Fluency</td><td></td></tr>
-                <tr><td>12</td><td>Quantitative Reasoning</td><td></td></tr>
-                <tr><td>13</td><td>Processing Speed</td><td></td></tr>
-                <tr><td>14</td><td>Retentiveness</td><td></td></tr>
-                <tr><td>15</td><td>Visual Memory</td><td></td></tr>
-                <tr><td>16</td><td>Public Speaking</td><td></td></tr>
-                <tr><td>17</td><td>Sports and Games</td><td></td></tr>
-              </tbody>
+              <tbody id="skills-psychomotor-tbody"><tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-3);">Loading…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -3345,7 +3873,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="card-body" style="padding:24px;">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
                 <span style="font-size:13px;">Automatically set students' promotion status (for annual reports)</span>
-                <button class="rsp-toggle on" style="margin-left:auto" onclick="rspToggle(this,'autoPromo')"><span>ON</span></button>
+                <button class="rsp-toggle on" id="promo-auto-toggle" style="margin-left:auto" onclick="promoToggleAuto(this)"><span>ON</span></button>
               </div>
               <div style="margin-bottom:20px;">
                 <label class="field-label">Set promotion status to "Promoted" when student's "Total Score Average" is up to:</label>
@@ -3359,17 +3887,19 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
                   <div style="text-align:center;">
                     <div style="font-weight:600;margin-bottom:10px;color:var(--green)">Promoted</div>
-                    <div style="width:80px;height:80px;border-radius:50%;background:#16a34a22;border:2px dashed #16a34a;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;">✓</div>
-                    <button class="ann-del" style="font-size:11px;" onclick="showToast('Image upload coming soon','info')">Select image</button>
+                    <div id="promo-img-yes-wrap" style="width:80px;height:80px;border-radius:50%;background:#16a34a22;border:2px dashed #16a34a;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;overflow:hidden;">✓</div>
+                    <input type="file" id="promo-img-yes-input" accept="image/png,image/jpeg" style="display:none;" onchange="promoPreviewImage(this,'promo-img-yes-wrap')">
+                    <button class="ann-del" style="font-size:11px;" onclick="document.getElementById('promo-img-yes-input').click()">Select image</button>
                   </div>
                   <div style="text-align:center;">
                     <div style="font-weight:600;margin-bottom:10px;color:#f87171">Not-promoted</div>
-                    <div style="width:80px;height:80px;border-radius:50%;background:#f8717122;border:2px dashed #f87171;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;">✗</div>
-                    <button class="ann-del" style="font-size:11px;" onclick="showToast('Image upload coming soon','info')">Select image</button>
+                    <div id="promo-img-no-wrap" style="width:80px;height:80px;border-radius:50%;background:#f8717122;border:2px dashed #f87171;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:28px;overflow:hidden;">✗</div>
+                    <input type="file" id="promo-img-no-input" accept="image/png,image/jpeg" style="display:none;" onchange="promoPreviewImage(this,'promo-img-no-wrap')">
+                    <button class="ann-del" style="font-size:11px;" onclick="document.getElementById('promo-img-no-input').click()">Select image</button>
                   </div>
                 </div>
               </div>
-              <div style="text-align:center;"><button class="post-btn" style="padding:10px 32px" onclick="showToast('Promotion criteria saved','success')">Save Changes</button></div>
+              <div style="text-align:center;"><button class="post-btn" style="padding:10px 32px" onclick="savePromotionCriteria()">Save Changes</button></div>
             </div>
           </div>
         </div>
@@ -3393,6 +3923,30 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <!-- PUBLISH RESULTS -->
       <div class="tab-panel" id="tab-publish">
         <div class="gb-breadcrumb">Dashboard <span style="padding:0 6px;">&gt;</span> Result Broad Sheet</div>
+
+        <!-- Pending vetting: every result must be vetted here before it can be published -->
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-head"><span class="card-title">Result Uploads &mdash; Vetting</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Class</th>
+                    <th>Exam</th>
+                    <th>Subject</th>
+                    <th>Teacher</th>
+                    <th>Entries</th>
+                    <th>Status</th>
+                    <th>&nbsp;</th>
+                  </tr>
+                </thead>
+                <tbody id="vetting-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="batch-review-panel" style="margin-bottom:18px;"></div>
 
         <!-- Filter card -->
         <div class="bs-filter-card">
@@ -3425,24 +3979,17 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <label><input type="checkbox" id="bs-archived"> Include Archived Students</label>
           </div>
           <div style="text-align:center;margin-top:14px;">
-            <div style="display:inline-flex;gap:10px;flex-wrap:wrap;justify-content:center;">
-              <button class="bs-view-results-btn" onclick="viewBroadsheet()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                View Results
-              </button>
-              <button class="bs-publish-btn" id="bs-publish-btn" onclick="publishBroadsheet()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-                <span id="bs-publish-label">Publish</span>
-              </button>
-            </div>
-            <div id="bs-publish-email-note" style="margin-top:8px;font-size:11px;color:var(--text-3);"></div>
+            <button class="bs-view-results-btn" onclick="viewBroadsheet()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              View Results
+            </button>
           </div>
         </div>
 
         <!-- Results section (hidden until View Results clicked) -->
         <div id="bs-results-section" class="bs-results-wrap" style="display:none;">
 
-          <!-- Action buttons -->
+          <!-- Action buttons: Publish sits beside the "View Results" link, and only once results are loaded -->
           <div class="bs-action-row">
             <button id="bs-unpublish-btn" class="bs-unpublish-btn" style="display:none;" onclick="unpublishBroadsheet()">
               &#x270F; Unpublish this Result
@@ -3450,6 +3997,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <button class="bs-ext-view-btn" onclick="previewBroadsheetResults()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               View Results
+            </button>
+            <button class="bs-publish-btn" id="bs-publish-btn" onclick="publishBroadsheet()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+              <span id="bs-publish-label">Publish</span>
             </button>
           </div>
 
@@ -3685,7 +4236,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <div><label class="field-label">End Time</label><input class="field-input" id="sched-exam-end" type="time"></div>
             </div>
             <div style="margin-bottom:14px;"><label class="field-label">Venue / Room</label><input class="field-input" id="sched-exam-venue" placeholder="e.g. Main Hall, Room 3A"></div>
-            <button class="post-btn" onclick="showToast('Exam scheduling coming soon','info')">Add to Timetable</button>
+            <button class="post-btn" onclick="submitScheduleExam()">Add to Timetable</button>
           </div>
         </div>
       </div>
@@ -3696,15 +4247,315 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card-body" style="padding:0;">
             <div style="overflow-x:auto;padding:0 18px 14px;">
               <table class="data-table">
-                <thead><tr><th>Date</th><th>Time</th><th>Exam Title</th><th>Class</th><th>Subject</th><th>Venue</th></tr></thead>
-                <tbody><tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">No exams scheduled yet.</td></tr></tbody>
+                <thead><tr><th>Date</th><th>Time</th><th>Exam Title</th><th>Class</th><th>Subject</th><th>Venue</th><th>Action</th></tr></thead>
+                <tbody id="examTimetable-tbody"><tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
         </div>
       </div>
-      <div class="tab-panel" id="tab-eclass">
-        <div class="page-header"><h2>E-Class</h2><p>Digital classroom activities</p></div>
+      <div class="tab-panel" id="tab-questionBank">
+        <div class="page-header"><h2>Question Bank</h2><p>Build and manage CBT questions by class and subject.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Select Question Bank</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;align-items:end;">
+              <div><label class="field-label">Class *</label><select class="ctrl-select" id="qb-class"><option value="">Select Class</option></select></div>
+              <div><label class="field-label">Subject *</label><select class="ctrl-select" id="qb-subject"><option value="">Select Subject</option></select></div>
+              <div><button class="post-btn" onclick="qbGoToBank()">Go to Question Bank &rsaquo;</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="qb-bank-card" style="display:none;">
+          <div class="card-head">
+            <span class="card-title" id="qb-bank-title">QUESTION BANK</span>
+            <span style="display:flex;gap:8px;align-items:center;">
+              <button class="post-btn" onclick="qbOpenNewQuestion()">+ Add New Question</button>
+              <span style="font-size:11px;color:var(--blue);cursor:default;" title="&#39;Question Group&#39; can be used to organize questions that share a common reference point, e.g. a reading passage with the questions that follow it.">What is Question Group? &#9432;</span>
+            </span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <select class="ctrl-select" id="qb-bulk-action" style="width:auto;">
+                  <option value="">Action on selected</option>
+                  <option value="archive">Archive</option>
+                  <option value="unarchive">Unarchive</option>
+                  <option value="delete">Delete</option>
+                  <option value="print">Print as Question Paper</option>
+                </select>
+                <button class="post-btn" style="padding:6px 14px;" onclick="qbApplyBulk()">Apply</button>
+              </div>
+              <button class="del-btn" style="padding:6px 14px;" onclick="qbToggleFilters()">&#9660; Filter Questions</button>
+            </div>
+            <div id="qb-filters" style="display:none;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;">
+              <div><label class="field-label">Taken Status</label><select class="ctrl-select" id="qbf-taken" style="width:100%;" onchange="qbRender()"><option value="">All</option><option value="1">Taken</option><option value="0">Not Taken</option></select></div>
+              <div><label class="field-label">Vetted Status</label><select class="ctrl-select" id="qbf-vetted" style="width:100%;" onchange="qbRender()"><option value="">All</option><option value="1">Vetted</option><option value="0">Not Vetted</option></select></div>
+              <div><label class="field-label">Archived Status</label><select class="ctrl-select" id="qbf-archived" style="width:100%;" onchange="qbRender()"><option value="0" selected>Not Archived</option><option value="1">Archived</option><option value="">All</option></select></div>
+              <div><label class="field-label">Tag</label><select class="ctrl-select" id="qbf-tag" style="width:100%;" onchange="qbRender()"><option value="">All Tags</option></select></div>
+              <div><label class="field-label">Added From</label><input type="date" class="field-input" id="qbf-from" style="width:100%;" onchange="qbRender()"></div>
+              <div><label class="field-label">Added To</label><input type="date" class="field-input" id="qbf-to" style="width:100%;" onchange="qbRender()"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <select class="ctrl-select" id="qb-per-page" style="width:auto;" onchange="qbRender()">
+                  <option value="25">25</option><option value="50">50</option><option value="100">100</option>
+                </select>
+                <span style="font-size:12px;color:var(--text-2);">records per page</span>
+              </div>
+              <input type="search" class="field-input" id="qb-search" placeholder="Search" style="max-width:220px;" oninput="qbRender()">
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th style="width:30px;"><input type="checkbox" id="qb-select-all" onchange="qbToggleAll(this)"></th><th>Question / Question Group</th><th>Type</th><th>Options</th><th>Vetted</th><th>Taken Before in Any Exam?</th><th>Added</th><th>Action</th></tr></thead>
+                <tbody id="qb-tbody"><tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">Select a class and subject, then click "Go to Question Bank".</td></tr></tbody>
+              </table>
+            </div>
+            <div id="qb-pagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:var(--text-2);"></div>
+          </div>
+        </div>
+        <div id="qb-question-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:560px;max-width:92vw;max-height:90vh;overflow:auto;">
+            <div class="card-head"><span class="card-title" id="qbn-modal-title">Add New Question</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="qbCloseNewQuestion()">Close</button></div>
+            <div class="card-body">
+              <input type="hidden" id="qbn-id">
+              <label class="field-label">Question Type</label>
+              <select class="ctrl-select" id="qbn-type" style="width:100%;" onchange="qbToggleOptionsUI()">
+                <option value="Multiple Choice Question">Multiple Choice Question</option>
+                <option value="Fill in the Gap / Subjective">Fill in the Gap / Subjective</option>
+                <option value="Explanatory Answer / Theory">Explanatory Answer / Theory</option>
+              </select>
+              <label class="field-label" style="margin-top:12px;">Question Text *</label>
+              <textarea class="field-input" id="qbn-text" rows="3" style="width:100%;resize:vertical;"></textarea>
+              <label class="field-label" style="margin-top:12px;">Helper / Hint (If Any)</label>
+              <input type="text" class="field-input" id="qbn-hint" style="width:100%;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Tags - Comma separated (Optional)</label><input type="text" class="field-input" id="qbn-tags" style="width:100%;"></div>
+                <div><label class="field-label">Mark *</label><input type="number" class="field-input" id="qbn-marks" style="width:100%;" min="0" step="0.5" value="1"></div>
+              </div>
+              <div id="qbn-options-wrap" style="margin-top:12px;">
+                <label class="field-label">Number of Options</label>
+                <select class="ctrl-select" id="qbn-option-count" style="width:100%;" onchange="qbRenderOptionRows()">
+                  <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                  <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
+                </select>
+                <div id="qbn-option-rows" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <span style="font-size:11px;color:var(--text-3);">Select the radio beside the correct option.</span>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Answer Explanation (Optional)</label>
+              <textarea class="field-input" id="qbn-explanation" rows="2" style="width:100%;resize:vertical;"></textarea>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="qbSubmitQuestion()" id="qbn-save-btn">Save Question</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-instructionSets">
+        <div class="page-header"><h2>Instruction Sets</h2><p>Exam/CBT custom instruction sets.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Exam/CBT Custom Instruction Sets</span><button class="post-btn" onclick="isOpenNew()">+ Add</button></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Title</th><th>Instructions</th><th>Added</th><th>Action</th></tr></thead>
+                <tbody id="is-tbody"><tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="is-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:480px;max-width:92vw;max-height:88vh;overflow:auto;">
+            <div class="card-head"><span class="card-title">Add Exam/CBT Instruction Set</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="isCloseNew()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Title *</label>
+              <input type="text" class="field-input" id="isn-title" style="width:100%;">
+              <label class="field-label" style="margin-top:12px;">Instruction *</label>
+              <textarea class="field-input" id="isn-text" rows="6" style="width:100%;resize:vertical;"></textarea>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="isSubmitNew()">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-cbtSchedules">
+        <div class="page-header"><h2>CBT Schedules</h2><p>Create and view computer-based test schedules.</p></div>
+        <div class="card" id="cs-list-card">
+          <div class="card-head"><span class="card-title">Select Exam Schedule to View</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;">
+              <div><label class="field-label">Session</label><select class="ctrl-select" id="cs-session"><option value="">All</option></select></div>
+              <div><label class="field-label">For Exam</label><select class="ctrl-select" id="cs-for-exam"><option value="">All</option></select></div>
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="cs-class"><option value="">All</option></select></div>
+            </div>
+            <button class="post-btn" style="margin-top:16px;" onclick="csLoadSchedules()">View</button>
+          </div>
+        </div>
+        <div class="card" id="cs-list-card-2">
+          <div class="card-head">
+            <span class="card-title" id="cs-list-title">TESTS &amp; EXAM SCHEDULES</span>
+            <button class="post-btn" onclick="csOpenNew()">+ New Exam Schedule</button>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+              <select class="ctrl-select" id="cs-mode-filter" style="width:auto;" onchange="csLoadSchedules()">
+                <option value="Computer Based">Computer Based</option>
+                <option value="Paper Based">Paper Based</option>
+                <option value="Others">Others</option>
+              </select>
+              <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;"><input type="checkbox" id="cs-archived" onchange="csLoadSchedules()"> View Archived</label>
+            </div>
+            <div id="cs-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">
+              <div style="padding:20px;text-align:center;color:var(--text-3);grid-column:1/-1;">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="cs-detail-card" style="display:none;">
+          <div class="card-head">
+            <span class="card-title" id="cs-detail-title">Schedule</span>
+            <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csdClose()">&larr; Back to Schedules</button>
+          </div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:14px;">
+              <div><label class="field-label">Class</label><select class="ctrl-select" id="csd-class" style="width:100%;" onchange="csdOnClassChange()"></select></div>
+              <div><label class="field-label">Class Arm</label><select class="ctrl-select" id="csd-arm" style="width:100%;" onchange="csdLoadSubjects()"></select></div>
+              <div><label class="field-label">Mode</label><select class="ctrl-select" id="csd-mode" style="width:100%;" onchange="csdLoadSubjects()">
+                <option value="All">All</option><option value="Computer Based">Computer Based</option><option value="Paper Based">Paper Based</option><option value="Others">Others</option>
+              </select></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+              <button class="post-btn" onclick="csdOpenAddSubjects()">+ Add Exam Subjects</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <select class="ctrl-select" id="csd-bulk-action" style="width:auto;"><option value="">Action on Selected</option><option value="delete">Delete Selected</option></select>
+                <button class="post-btn" style="padding:6px 14px;" onclick="csdApplyBulk()">Apply</button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th style="width:26px;"><input type="checkbox" id="csd-select-all" onchange="csdToggleAll(this)"></th><th>Date &amp; Time</th><th>Subject</th><th>Class / Candidates</th><th>Exam Mode</th><th>Duration &amp; Questions</th><th>Venue</th><th>Supervisor</th><th>Visible?</th><th>Status</th><th>Options</th></tr></thead>
+                <tbody id="csd-tbody"><tr><td colspan="11" style="padding:20px;text-align:center;color:var(--text-3)">Select a class to view scheduled subjects.</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="cs-new-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:520px;max-width:92vw;max-height:88vh;overflow:auto;">
+            <div class="card-head"><span class="card-title">New Exam Schedule</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csCloseNew()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Title *</label>
+              <input type="text" class="field-input" id="csn-title" style="width:100%;" placeholder="e.g. Third Term Examination, 2025/2026 Session">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Session *</label><input type="text" class="field-input" id="csn-session" style="width:100%;" placeholder="2025-2026"></div>
+                <div><label class="field-label">Term *</label><input type="text" class="field-input" id="csn-term" style="width:100%;" placeholder="THIRD TERM"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">For Exam</label><select class="ctrl-select" id="csn-for-exam" style="width:100%;"><option value="">All</option></select></div>
+                <div><label class="field-label">Start Date *</label><input type="date" class="field-input" id="csn-start-date" style="width:100%;"></div>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Classes *</label>
+              <div id="csn-classes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;"></div>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="csSubmitNew()">Create Schedule</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="csd-add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:560px;max-width:92vw;max-height:90vh;overflow:auto;">
+            <div class="card-head"><span class="card-title">Add Subject to Test / Exam Schedule</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csdCloseAddSubjects()">Close</button></div>
+            <div class="card-body">
+              <label class="field-label">Class Arm(s) Involved (leave blank for whole class)</label>
+              <div id="csda-arms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;max-height:100px;overflow:auto;"></div>
+              <label class="field-label" style="margin-top:12px;">Subject(s) *</label>
+              <div id="csda-subjects" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;max-height:140px;overflow:auto;"></div>
+              <label class="field-label" style="margin-top:12px;">Duration (per subject, minutes) *</label>
+              <input type="number" class="field-input" id="csda-duration" style="width:100%;" min="1" value="30">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Test / Exam Date</label><input type="date" class="field-input" id="csda-date" style="width:100%;"></div>
+                <div><label class="field-label">Time</label><input type="time" class="field-input" id="csda-time" style="width:100%;"></div>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Supervisor in Charge *</label>
+              <select class="ctrl-select" id="csda-supervisor" style="width:100%;"></select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Examination Mode *</label><select class="ctrl-select" id="csda-mode" style="width:100%;">
+                  <option value="Computer Based">Computer Based (CBT)</option><option value="Paper Based">Paper Based</option><option value="Others">Others</option>
+                </select></div>
+                <div><label class="field-label">Venue</label><input type="text" class="field-input" id="csda-venue" style="width:100%;" placeholder="e.g. ICT ROOM"></div>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Schedule Visible to Students / Candidates *</label>
+              <select class="ctrl-select" id="csda-visible" style="width:100%;"><option value="1">Yes</option><option value="0">No</option></select>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="csdSubmitAddSubjects()">Add Subject</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="csd-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;">
+          <div class="card" style="width:480px;max-width:92vw;max-height:90vh;overflow:auto;">
+            <div class="card-head"><span class="card-title">Manage CBT / Edit Schedule</span><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csdCloseEdit()">Close</button></div>
+            <div class="card-body">
+              <input type="hidden" id="csde-id">
+              <label class="field-label">Duration (minutes) *</label>
+              <input type="number" class="field-input" id="csde-duration" style="width:100%;" min="1">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Test / Exam Date</label><input type="date" class="field-input" id="csde-date" style="width:100%;"></div>
+                <div><label class="field-label">Time</label><input type="time" class="field-input" id="csde-time" style="width:100%;"></div>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Supervisor in Charge</label>
+              <select class="ctrl-select" id="csde-supervisor" style="width:100%;"></select>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div><label class="field-label">Examination Mode *</label><select class="ctrl-select" id="csde-mode" style="width:100%;">
+                  <option value="Computer Based">Computer Based (CBT)</option><option value="Paper Based">Paper Based</option><option value="Others">Others</option>
+                </select></div>
+                <div><label class="field-label">Venue</label><input type="text" class="field-input" id="csde-venue" style="width:100%;"></div>
+              </div>
+              <label class="field-label" style="margin-top:12px;">Schedule Visible to Students / Candidates</label>
+              <select class="ctrl-select" id="csde-visible" style="width:100%;"><option value="1">Yes</option><option value="0">No</option></select>
+              <button class="post-btn" style="margin-top:16px;width:100%;" onclick="csdSubmitEdit()">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-cbtScores">
+        <div class="page-header"><h2>CBT Scores</h2><p>View and record computer-based test scores.</p></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Select Options</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;">
+              <div><label class="field-label">Exam *</label><select class="ctrl-select" id="csc-exam" onchange="cscOnExamChange()"><option value="">Select</option></select></div>
+              <div><label class="field-label">Class *</label><select class="ctrl-select" id="csc-class" onchange="cscOnClassChange()"><option value="">Select Class</option></select></div>
+              <div><label class="field-label">Class Division</label><select class="ctrl-select" id="csc-arm" onchange="cscOnClassChange()"><option value="">All</option></select></div>
+              <div><label class="field-label">CBT / Subject *</label><select class="ctrl-select" id="csc-subject"><option value="">Select Exam First</option></select></div>
+            </div>
+            <button class="post-btn" style="margin-top:16px;" onclick="cscViewScores()">&#10003; View CBT Scores</button>
+          </div>
+        </div>
+        <div class="card" id="csc-results-card" style="display:none;">
+          <div class="card-head"><span class="card-title" id="csc-results-title">CBT Scores</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Student</th><th>Score</th><th>Total Marks</th><th>Qns Presented</th><th>Qns Attempted</th><th>%</th><th>Recorded</th><th>Action</th></tr></thead>
+                <tbody id="csc-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="csc-upload-card" style="display:none;">
+          <div class="card-head"><span class="card-title">Upload Scores to Results Gradebook</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;">
+              <div><label class="field-label">Exam Type *</label><select class="ctrl-select" id="cscu-exam-type" style="width:100%;"></select></div>
+              <div><label class="field-label">Re-scale to New Total (optional)</label><input type="number" class="field-input" id="cscu-new-total" style="width:100%;" placeholder="e.g. 40" min="1"></div>
+            </div>
+            <button class="post-btn" style="margin-top:16px;" onclick="cscUpload()">&#8593; Upload Scores to Results Gradebook</button>
+            <span style="font-size:11px;color:var(--text-3);display:block;margin-top:8px;">Rescales and writes each student's CBT score into the Exam component of the Results Grade Book for the selected exam type. Existing Continuous Assessment scores are never touched.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-examPractice">
+        <div class="page-header"><h2>Exam Practice</h2><p>Self-paced CBT practice for students.</p></div>
         <div class="card"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
       </div>
       <div class="tab-panel" id="tab-invoiceList">
@@ -3920,6 +4771,59 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </div>
         </div>
       </div>
+      <div id="account-settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeAccountSettings()">
+        <div class="card" style="width:min(440px,95%);max-height:88vh;overflow-y:auto;padding:0;">
+          <div class="card-head"><span class="card-title">Account Settings</span><button class="cog-modal-close" onclick="closeAccountSettings()">&#x2715;</button></div>
+
+          <div class="as-tabs">
+            <button class="as-tab active" id="as-tab-view" onclick="switchAsTab('view',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg> My Profile</button>
+            <button class="as-tab" id="as-tab-edit" onclick="switchAsTab('edit',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5a1.5 1.5 0 0 1 2 0l1 1a1.5 1.5 0 0 1 0 2L5 14 2 14.5 2.5 11.5z"/><line x1="9" y1="4" x2="12" y2="7"/></svg> Edit Profile</button>
+            <button class="as-tab" id="as-tab-password" onclick="switchAsTab('password',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg> Password</button>
+          </div>
+
+          <div class="as-panel active" id="as-panel-view">
+            <div class="as-hero">
+              <div class="avatar as-hero-avatar" id="as-avatar">--</div>
+              <div class="as-hero-name" id="as-name">--</div>
+              <div class="as-hero-badge" id="as-role">--</div>
+            </div>
+            <div class="as-info-table" id="as-info-table"></div>
+          </div>
+
+          <div class="as-panel" id="as-panel-edit">
+            <div class="card-body" style="padding:20px;">
+              <label class="field-label">Contact Email</label>
+              <input class="field-input" id="as-email" placeholder="you@example.com" style="margin-bottom:16px;">
+              <button class="bs-print-btn" style="width:100%;" onclick="saveAccountEmail()">Save Changes</button>
+            </div>
+          </div>
+
+          <div class="as-panel" id="as-panel-password">
+            <div class="card-body" style="padding:20px;">
+              <label class="field-label">Current Password</label>
+              <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-current"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-current',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+              <label class="field-label">New Password</label>
+              <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-new"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-new',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+              <label class="field-label">Confirm New Password</label>
+              <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-confirm"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-confirm',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+              <button class="bs-print-btn" style="width:100%;" onclick="changeAccountPassword()">Update Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="admission-convert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeConvertModal()">
+        <div class="card" style="width:min(420px,95%);padding:0;">
+          <div class="card-head"><span class="card-title">Convert to Student</span><button class="cog-modal-close" onclick="closeConvertModal()">&#x2715;</button></div>
+          <div class="card-body" style="padding:20px;">
+            <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;" id="adm-convert-name"></p>
+            <label class="field-label">New Student ID *</label>
+            <input class="field-input" id="adm-convert-id" placeholder="STU-2026-0001" style="margin-bottom:14px;">
+            <label class="field-label">Initials</label>
+            <input class="field-input" id="adm-convert-initials" placeholder="Optional" style="margin-bottom:18px;">
+            <button class="bs-print-btn" style="width:100%;" onclick="submitConvertApplication()">Create Student Record</button>
+          </div>
+        </div>
+      </div>
       <div id="verify-payment-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeVerifyPaymentModal()">
         <div class="card" style="width:min(420px,95%);padding:0;">
           <div class="card-head"><span class="card-title">Verify Payment</span><button class="cog-modal-close" onclick="closeVerifyPaymentModal()">&#x2715;</button></div>
@@ -3977,8 +4881,8 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;gap:10px;">
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
-              <button class="bs-export-btn" style="position:static;" onclick="showToast('Export coming soon')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
+              <button class="bs-export-btn" style="position:static;" onclick="exportTableToCsv('#fsp-table', 'successful-payments.csv')">Export (All) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
+              <button class="bs-export-btn" style="position:static;" onclick="exportTableToCsv('#fsp-table', 'successful-payments.csv')">Export (Page) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;flex-wrap:wrap;gap:10px;">
@@ -3989,7 +4893,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <input class="bs-search-input" id="fsp-search" placeholder="Search" style="width:220px;" oninput="fspRenderTable()">
           </div>
           <div style="overflow-x:auto;">
-            <table class="data-table" style="width:100%;">
+            <table class="data-table" style="width:100%;" id="fsp-table">
               <thead><tr>
                 <th>#</th><th>Payment Date &amp; Time</th><th>Payment for</th><th>Class</th>
                 <th>Fee Type</th><th>Amount</th><th>Payment Method</th>
@@ -4250,7 +5154,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         </div>
         <div id="ie-view-expHeads" style="display:none;">
           <div class="page-header"><h2>Expense Heads / Categories</h2><p>Manage expense categories and budget heads</p></div>
-          <div class="card"><div class="card-body" style="font-size:12px;color:var(--text-2);"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div></div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Add Category</span></div>
+            <div class="card-body" style="display:flex;gap:10px;">
+              <input class="field-input" id="exp-head-name" placeholder="e.g. Utilities" style="flex:1;">
+              <button class="post-btn" onclick="financeCategoryAdd('expense')">+ Add</button>
+            </div>
+          </div>
+          <div class="card" style="margin-top:14px;">
+            <div class="card-head"><span class="card-title">Expense Categories</span></div>
+            <div class="card-body" style="padding:0;">
+              <table class="data-table"><thead><tr><th>#</th><th>Name</th><th>Action</th></tr></thead>
+                <tbody id="exp-heads-tbody"><tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3);">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -4315,7 +5233,21 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         </div>
         <div id="ie-view-incomeHeads" style="display:none;">
           <div class="page-header"><h2>Income Heads / Categories</h2><p>Manage income categories and revenue heads</p></div>
-          <div class="card"><div class="card-body" style="font-size:12px;color:var(--text-2);"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div></div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Add Category</span></div>
+            <div class="card-body" style="display:flex;gap:10px;">
+              <input class="field-input" id="inc-head-name" placeholder="e.g. School Fees" style="flex:1;">
+              <button class="post-btn" onclick="financeCategoryAdd('income')">+ Add</button>
+            </div>
+          </div>
+          <div class="card" style="margin-top:14px;">
+            <div class="card-head"><span class="card-title">Income Categories</span></div>
+            <div class="card-body" style="padding:0;">
+              <table class="data-table"><thead><tr><th>#</th><th>Name</th><th>Action</th></tr></thead>
+                <tbody id="inc-heads-tbody"><tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3);">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -5123,7 +6055,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="card-body" style="padding:0;">
               <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Class</th><th style="text-align:center;">Present</th><th style="text-align:center;">Absent</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Class</th><th style="text-align:center;">Present</th><th style="text-align:center;">Absent</th><th style="text-align:center;">Late</th><th style="text-align:center;">Permission</th></tr></thead>
                   <tbody id="mda-tbody"></tbody>
                 </table>
               </div>
@@ -5139,7 +6071,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card" style="margin-bottom:18px;">
             <div class="card-head"><span style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;"><span><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span> Select Class to View Attendance Report</span></div>
             <div class="card-body">
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:20px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;">
                 <div>
                   <label class="field-label">Class <span style="color:var(--red);">*</span></label>
                   <select id="dar-class" class="ctrl-select" onchange="darLoadArms()" style="width:100%;">
@@ -5147,22 +6079,22 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   </select>
                 </div>
                 <div>
-                  <label class="field-label">Class Arm <span style="color:var(--red);">*</span></label>
+                  <label class="field-label">Class Arm</label>
                   <select id="dar-arm" class="ctrl-select" style="width:100%;">
                     <option value="">-Select Class First-</option>
                   </select>
                 </div>
                 <div>
-                  <label class="field-label">Academic Session <span style="color:var(--red);">*</span></label>
+                  <label class="field-label">Academic Session</label>
                   <select id="dar-session" class="ctrl-select" style="width:100%;"></select>
                 </div>
                 <div>
-                  <label class="field-label">Term <span style="color:var(--red);">*</span></label>
-                  <select id="dar-term" class="ctrl-select" style="width:100%;">
-                    <option value="FIRST TERM">FIRST TERM</option>
-                    <option value="SECOND TERM">SECOND TERM</option>
-                    <option value="THIRD TERM" selected>THIRD TERM</option>
-                  </select>
+                  <label class="field-label">From Date <span style="color:var(--red);">*</span></label>
+                  <input type="date" id="dar-from" class="ctrl-select" style="width:100%;">
+                </div>
+                <div>
+                  <label class="field-label">To Date <span style="color:var(--red);">*</span></label>
+                  <input type="date" id="dar-to" class="ctrl-select" style="width:100%;">
                 </div>
               </div>
               <div style="text-align:center;">
@@ -5175,7 +6107,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="card-body" style="padding:0;">
               <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Days Present</th><th>Days Absent</th><th>Total Days</th><th>Attendance %</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Present</th><th>Absent</th><th>Late</th><th>Permission</th><th>Total Marked</th><th>Attendance %</th></tr></thead>
                   <tbody id="dar-tbody"></tbody>
                 </table>
               </div>
@@ -5203,9 +6135,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   </select>
                 </div>
                 <div style="flex:1;min-width:160px;">
-                  <label class="field-label">Class Arm <span style="color:var(--red);">*</span></label>
+                  <label class="field-label">Class Arm</label>
                   <select id="mla-arm" class="ctrl-select" style="width:100%;">
                     <option value="">Select Class Fir...</option>
+                  </select>
+                </div>
+                <div style="flex:1;min-width:160px;">
+                  <label class="field-label">Subject <span style="color:var(--red);">*</span></label>
+                  <select id="mla-subject" class="ctrl-select" style="width:100%;">
+                    <option value="">Select Class First</option>
                   </select>
                 </div>
                 <div style="flex:1;min-width:160px;">
@@ -5225,7 +6163,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="card-body" style="padding:0;">
               <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Class</th><th style="text-align:center;">Present</th><th style="text-align:center;">Absent</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Class</th><th style="text-align:center;">Present</th><th style="text-align:center;">Absent</th><th style="text-align:center;">Late</th><th style="text-align:center;">Permission</th></tr></thead>
                   <tbody id="mla-tbody"></tbody>
                 </table>
               </div>
@@ -5241,7 +6179,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           <div class="card" style="margin-bottom:18px;">
             <div class="card-head"><span style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;"><span><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span> Select Class to View Attendance Report</span></div>
             <div class="card-body">
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:20px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;">
                 <div>
                   <label class="field-label">Class <span style="color:var(--red);">*</span></label>
                   <select id="lar-class" class="ctrl-select" onchange="larLoadArms()" style="width:100%;">
@@ -5249,22 +6187,24 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   </select>
                 </div>
                 <div>
-                  <label class="field-label">Class Arm <span style="color:var(--red);">*</span></label>
+                  <label class="field-label">Class Arm</label>
                   <select id="lar-arm" class="ctrl-select" style="width:100%;">
                     <option value="">-Select Class First-</option>
                   </select>
                 </div>
                 <div>
-                  <label class="field-label">Academic Session <span style="color:var(--red);">*</span></label>
-                  <select id="lar-session" class="ctrl-select" style="width:100%;"></select>
+                  <label class="field-label">Subject</label>
+                  <select id="lar-subject" class="ctrl-select" style="width:100%;">
+                    <option value="">All Subjects</option>
+                  </select>
                 </div>
                 <div>
-                  <label class="field-label">Term <span style="color:var(--red);">*</span></label>
-                  <select id="lar-term" class="ctrl-select" style="width:100%;">
-                    <option value="FIRST TERM">FIRST TERM</option>
-                    <option value="SECOND TERM">SECOND TERM</option>
-                    <option value="THIRD TERM" selected>THIRD TERM</option>
-                  </select>
+                  <label class="field-label">From Date <span style="color:var(--red);">*</span></label>
+                  <input type="date" id="lar-from" class="ctrl-select" style="width:100%;">
+                </div>
+                <div>
+                  <label class="field-label">To Date <span style="color:var(--red);">*</span></label>
+                  <input type="date" id="lar-to" class="ctrl-select" style="width:100%;">
                 </div>
               </div>
               <div style="text-align:center;">
@@ -5277,7 +6217,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="card-body" style="padding:0;">
               <div style="overflow-x:auto;">
                 <table class="data-table" style="width:100%;">
-                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Days Present</th><th>Days Absent</th><th>Total Days</th><th>Attendance %</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>Reg No.</th><th>Present</th><th>Absent</th><th>Late</th><th>Permission</th><th>Total Marked</th><th>Attendance %</th></tr></thead>
                   <tbody id="lar-tbody"></tbody>
                 </table>
               </div>
@@ -5423,6 +6363,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   <select class="ctrl-select" id="class-category-filter" style="width:auto;min-width:170px;" onchange="renderClassesTable()">
                     <option value="">All Class Categories</option>
                   </select>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;">
+                    <input type="checkbox" id="class-show-archived" onchange="renderClassesTable()"> Show Archived
+                  </label>
                   <input class="search-input" id="class-search" placeholder="Search classes..." oninput="renderClassesTable()" style="margin-left:auto;">
                 </div>
                 <div style="overflow-x:auto;">
@@ -5595,7 +6538,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <div class="card" style="margin-bottom:16px;">
           <div class="card-head"><span class="card-title">Select Class List to View Result</span></div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
               <div>
                 <label class="field-label">Class</label>
                 <select class="ctrl-select" id="src-class" onchange="srcPopulateArms()"></select>
@@ -5603,6 +6546,14 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               <div>
                 <label class="field-label">Class Arm</label>
                 <select class="ctrl-select" id="src-arm"></select>
+              </div>
+              <div>
+                <label class="field-label">Exam</label>
+                <select class="ctrl-select" id="src-examtype">
+                  <option value="">— Select Exam —</option>
+                  <option>Mid-Term Exam</option>
+                  <option>Final Exam</option>
+                </select>
               </div>
             </div>
             <button class="post-btn" onclick="srcLoadList()">Load List</button>
@@ -5629,7 +6580,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <div class="card" style="margin-bottom:16px;">
           <div class="card-head"><span class="card-title">Class Bulk Result Checker</span></div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
               <div>
                 <label class="field-label">Exam Session</label>
                 <select class="ctrl-select" id="crc-session"></select>
@@ -5640,7 +6591,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               </div>
               <div>
                 <label class="field-label">Exam Class</label>
-                <select class="ctrl-select" id="crc-class" onchange="crcCheckAvailability()"></select>
+                <select class="ctrl-select" id="crc-class" onchange="crcLoadArms()"></select>
+              </div>
+              <div>
+                <label class="field-label">Class Arm</label>
+                <select class="ctrl-select" id="crc-arm" onchange="crcCheckAvailability()"></select>
               </div>
             </div>
             <div id="crc-availability" style="margin-bottom:14px;display:none;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
@@ -5674,15 +6629,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
               </div>
               <div>
                 <label class="field-label">Class *</label>
-                <select class="ctrl-select" id="gb-class"></select>
+                <select class="ctrl-select" id="gb-class" onchange="gbLoadArms()"></select>
               </div>
               <div>
-                <label class="field-label">Class Division *</label>
-                <select class="ctrl-select" id="gb-division"></select>
+                <label class="field-label" id="gb-arm-label">Class Arm</label>
+                <select class="ctrl-select" id="gb-arm" onchange="renderGradebookTable()"></select>
               </div>
               <div>
                 <label class="field-label">Subject *</label>
-                <select class="ctrl-select" id="gb-subject"></select>
+                <select class="ctrl-select" id="gb-subject" onchange="renderGradebookTable()"></select>
               </div>
             </div>
             <div class="gb-filter-actions">
@@ -5695,7 +6650,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="gb-entry-head">
               <div>
                 <div class="gb-entry-title" id="gb-selected-class">Selected Class Students</div>
-                <div class="gb-entry-line" id="gb-selected-subject">Score Entry for Subject : <strong>-</strong></div>
+                <div class="gb-entry-line" id="gb-selected-subject">Score Entry for All Subjects</div>
                 <div class="gb-entry-line" id="gb-selected-exam">Exam : -</div>
                 <div class="gb-entry-line" id="gb-batch-status">Choose a class, exam, and subject, then manage student scores.</div>
               </div>
@@ -5705,7 +6660,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
             <div class="gb-tools">
               <button type="button" class="gb-offline-btn" onclick="toggleOfflinePanel()">Work Offline (Using Excel) <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><polyline points="4,6 8,10 12,6"/></svg></button>
               <input class="gb-search" id="gb-search" placeholder="Search" oninput="filterGradebookRows()">
-              <span></span>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;">
+                <input type="checkbox" id="gb-show-excluded" onchange="renderGradebookTable()"> Show Excluded Students
+              </label>
             </div>
             <div class="gb-offline-panel" id="gb-offline-panel">
               <div class="gb-offline-cards">
@@ -5760,6 +6717,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   <tr>
                     <th>#</th>
                     <th>Student</th>
+                    <th>Subject</th>
                     <th>Mid Term Test (40%)<small>Max Score : 40</small></th>
                     <th>Examination (60%)<small>Max Score : 60</small></th>
                     <th>Total Score<small>Max Total Score : 100</small></th>
@@ -5771,7 +6729,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
                   </tr>
                 </thead>
                 <tbody id="gb-score-tbody">
-                  <tr><td colspan="9" style="padding:18px;color:var(--text-3);">Choose a class, exam, and subject, then click Manage Students Scores.</td></tr>
+                  <tr><td colspan="11" style="padding:18px;color:var(--text-3);">Choose a class and exam, then click Manage Students Scores.</td></tr>
                 </tbody>
               </table>
             </div>

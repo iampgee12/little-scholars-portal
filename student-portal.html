@@ -50,7 +50,7 @@ body {
   background:var(--black-2); border-right:1px solid var(--border);
   display:flex; flex-direction:column;
   position:fixed; top:0; left:0; bottom:0; z-index:50;
-  animation:slideIn 0.35s ease both;
+  animation:slideIn 0.35s ease backwards;
 }
 @keyframes slideIn { from{transform:translateX(-240px);opacity:0} to{transform:translateX(0);opacity:1} }
 
@@ -72,7 +72,9 @@ body {
   background:var(--black-3); border:1px solid var(--border);
   border-radius:var(--radius); padding:11px 13px;
   display:flex; align-items:center; gap:10px;
+  cursor:pointer; transition:all var(--transition);
 }
+.user-pill:hover { border-color:var(--border-2); background:var(--black-4); }
 .avatar {
   width:32px; height:32px; border-radius:50%;
   background:var(--green-bg); border:1.5px solid var(--green);
@@ -101,7 +103,7 @@ body {
 }
 .nav-item:hover { background:var(--black-3); color:var(--text-1); }
 .nav-item.active { background:var(--green-bg); color:var(--green); border-color:rgba(34,197,94,0.2); }
-.nav-icon { width:15px; text-align:center; font-size:13px; opacity:0.85; }
+.nav-icon { width:15px; display:inline-flex; align-items:center; justify-content:center; opacity:0.85; }
 .nav-badge {
   margin-left:auto; background:var(--red); color:#fff;
   font-size:10px; font-weight:700; font-family:'DM Mono',monospace;
@@ -119,8 +121,93 @@ body {
 }
 .signout-btn:hover { border-color:var(--red); color:var(--red); }
 
+/* ── DESKTOP SIDEBAR TOGGLE ── */
+.desk-toggle {
+  display:flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:var(--radius-sm);
+  background:transparent; border:0; cursor:pointer;
+  color:var(--text-2); flex-shrink:0;
+  transition:background 0.18s, color 0.18s;
+}
+.desk-toggle:hover { background:var(--black-3); color:var(--text-1); }
+#main-sidebar { transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); }
+.sidebar-collapsed #main-sidebar { transform:translateX(-100%); }
+.sidebar-collapsed .main { margin-left:0 !important; transition:margin-left 0.35s cubic-bezier(0.4,0,0.2,1); }
+@media (max-width:768px) { .desk-toggle { display:none; } }
+
+/* ── HAMBURGER BUTTON (hidden on desktop) ── */
+.mob-hamburger { display:none; align-items:center; justify-content:center; background:none; border:none; border-radius:6px; padding:4px 8px; cursor:pointer; color:var(--text-2); flex-shrink:0; margin-right:6px; }
+.mob-hamburger:hover { background:var(--black-3); }
+.mob-hamburger svg { display:block; }
+@keyframes mobNavIn { from { opacity:0; transform:translateX(-22px); } to { opacity:1; transform:translateX(0); } }
+.mob-hamburger svg line { transform-box: fill-box; transform-origin: center; transition: transform 0.5s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease; }
+.mob-hamburger.is-open svg line:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.mob-hamburger.is-open svg line:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.mob-hamburger.is-open svg line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* ── SIDEBAR OVERLAY (mobile) ── */
+.sidebar-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1100; opacity:0; visibility:hidden; transition: opacity 0.6s ease, visibility 0.6s ease; }
+.sidebar-overlay.open { opacity:1; visibility:visible; }
+
+/* ── TABLET & MOBILE (≤768px) ── */
+@media (max-width: 768px) {
+  .mob-hamburger { display:flex; }
+  #main-sidebar {
+    position:fixed !important; top:0 !important; left:0 !important; bottom:0 !important;
+    width:280px !important; height:100vh !important; z-index:1150 !important;
+    transform:translateX(-100%) !important;
+    transition:transform 0.6s cubic-bezier(0.4,0,0.2,1) !important;
+    overflow-y:auto !important;
+  }
+  #main-sidebar.mob-open { transform:translateX(0) !important; }
+  .main { margin-left:0 !important; width:100% !important; }
+  .page-header { padding:12px 16px !important; }
+  .page-header h2 { font-size:16px !important; }
+  .card { border-radius:8px !important; }
+  .stats-row { grid-template-columns:1fr 1fr !important; }
+  .grid-2, .grid-3-1 { grid-template-columns:1fr !important; }
+}
+@media (max-width: 480px) {
+  .stats-row { grid-template-columns:1fr !important; }
+  .page-header h2 { font-size:15px !important; }
+}
+
+/* ── FORM FIELDS / MODAL ── */
+.field-label { display:block; font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px; font-family:'DM Mono',monospace; }
+.field-input { width:100%; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); outline:none; transition:all var(--transition); }
+.field-input:focus { border-color:rgba(34,197,94,0.45); }
+.cog-modal-close { width:30px; height:30px; border:1px solid var(--border-2); background:var(--black-3); color:var(--text-2); border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all var(--transition); flex-shrink:0; line-height:1; }
+.cog-modal-close:hover { background:var(--red-bg); border-color:var(--red); color:var(--red); }
+
+/* ── ACCOUNT SETTINGS (profile) ── */
+.as-tabs { display:flex; border-bottom:1px solid var(--border); }
+.as-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:12px 8px; background:none; border:none; border-bottom:2px solid transparent; font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:var(--text-3); cursor:pointer; transition:all var(--transition); }
+.as-tab:hover { color:var(--text-1); }
+.as-tab.active { color:var(--green); border-bottom-color:var(--green); }
+.as-panel { display:none; }
+.as-panel.active { display:block; }
+.as-hero { padding:26px 20px 18px; text-align:center; background:var(--black-3); border-bottom:1px solid var(--border); }
+.as-hero-avatar { width:64px; height:64px; font-size:20px; margin:0 auto 10px; }
+.as-hero-name { font-size:15px; font-weight:700; color:var(--text-1); }
+.as-hero-badge { display:inline-block; margin-top:7px; background:var(--green-bg); border:1px solid rgba(34,197,94,0.2); color:var(--green); font-size:10px; font-weight:700; padding:3px 11px; border-radius:20px; font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:0.4px; }
+.as-info-table { padding:4px 0; }
+.as-info-row { display:flex; justify-content:space-between; gap:10px; padding:10px 20px; font-size:12px; border-bottom:1px solid var(--border); }
+.as-info-row:nth-child(even) { background:var(--black-3); }
+.as-info-row:last-child { border-bottom:none; }
+.as-info-key { color:var(--text-3); font-weight:600; }
+.as-info-val { color:var(--text-1); font-weight:600; text-align:right; }
+.as-pw-wrap { position:relative; margin-bottom:14px; }
+.as-pw-wrap .field-input { padding-right:38px; }
+.as-pw-eye { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-3); padding:4px; display:flex; }
+.as-pw-eye:hover { color:var(--text-1); }
+.act-btn { padding:9px 18px; border-radius:var(--radius-sm); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all var(--transition); border:1px solid transparent; }
+.btn-save { background:var(--green); color:var(--black); }
+.btn-save:hover { background:#16a34a; }
+.toast { display:none; position:fixed; bottom:24px; right:24px; background:var(--black-2); border:1px solid var(--green); border-radius:var(--radius); padding:12px 18px; font-size:13px; font-weight:600; color:var(--green); z-index:999; font-family:'DM Mono',monospace; box-shadow:0 8px 32px rgba(0,0,0,0.5); animation:toastUp 0.3s ease; }
+@keyframes toastUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
 /* ── MAIN ── */
-.main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; }
+.main { margin-left:240px; flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh; animation:fadeIn 0.4s ease 0.15s both; transition:margin-left 0.35s cubic-bezier(0.4,0,0.2,1); }
 @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
 .topbar {
@@ -335,11 +422,11 @@ body {
 </style>
 </head>
 <body>
-
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 <div class="portal-wrap">
 
   <!-- ══ SIDEBAR ══ -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="main-sidebar">
     <div class="sidebar-logo">
       <div class="logo-mark-sm">LS</div>
       <div>
@@ -348,7 +435,7 @@ body {
       </div>
     </div>
 
-    <div class="user-pill">
+    <div class="user-pill" onclick="openAccountSettings()" title="Account settings">
       <div class="avatar" id="s-avatar">AO</div>
       <div>
         <div class="u-name"  id="s-name">Loading…</div>
@@ -359,14 +446,12 @@ body {
 
     <div class="nav-group">
       <div class="nav-label">Main</div>
-      <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon">▣</span> Dashboard</div>
-      <div class="nav-item" onclick="switchTab('timetable',this)"><span class="nav-icon">◫</span> Timetable</div>
-      <div class="nav-item" onclick="switchTab('assignments',this)"><span class="nav-icon">◳</span> Assignments</div>
-      <div class="nav-item" onclick="switchTab('courses',this)"><span class="nav-icon">◈</span> Courses &amp; Grades</div>
-      <div class="nav-item" onclick="switchTab('results',this)"><span class="nav-icon">◉</span> Exam Results</div>
-      <div class="nav-label" style="margin-top:8px;">Account</div>
-      <div class="nav-item"><span class="nav-icon">○</span> Profile</div>
-      <div class="nav-item"><span class="nav-icon">◌</span> Settings</div>
+      <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1"/><rect x="9" y="9" width="5.5" height="5.5" rx="1"/></svg></span> Dashboard</div>
+      <div class="nav-item" onclick="switchTab('timetable',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/></svg></span> Timetable</div>
+      <div class="nav-item" onclick="switchTab('assignments',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1.5"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="10.5" y2="10"/><line x1="5.5" y1="4.5" x2="8" y2="4.5"/></svg></span> Assignments</div>
+      <div class="nav-item" onclick="switchTab('courses',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5L1.5 6 8 9.5 14.5 6 8 2.5z"/><path d="M4 8v4c0 1 1.8 1.8 4 1.8s4-.8 4-1.8V8"/><line x1="14.5" y1="6" x2="14.5" y2="10"/></svg></span> Courses &amp; Grades</div>
+      <div class="nav-item" onclick="switchTab('results',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11.5,6"/></svg></span> Exam Results</div>
+      <a class="nav-item" href="student-cbt.html" target="_blank" rel="noopener" style="text-decoration:none;"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="9.5" rx="1.5"/><line x1="5" y1="14.5" x2="11" y2="14.5"/><line x1="8" y1="11.5" x2="8" y2="14.5"/></svg></span> CBT</a>
     </div>
 
     <div class="sidebar-footer">
@@ -377,6 +462,16 @@ body {
   <!-- ══ MAIN ══ -->
   <div class="main">
     <div class="topbar">
+      <button class="desk-toggle" id="desk-toggle" onclick="deskToggleSidebar()" aria-label="Toggle sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <button class="mob-hamburger" id="mob-hamburger" onclick="mobToggleSidebar()" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
       <span class="topbar-title" id="topbar-title">Dashboard</span>
       <span class="topbar-sep">/</span>
       <span class="topbar-sub"  id="topbar-sub">Wednesday, 13 May 2026</span>
@@ -385,8 +480,8 @@ body {
           <div class="tsi-row"><span class="tsi-label">Academic Session</span><span class="tsi-val" id="tsi-session">—</span></div>
           <div class="tsi-row"><span class="tsi-label">Active Term</span><span class="tsi-val tsi-term" id="tsi-term">—</span></div>
         </div>
-        <div class="icon-btn">🔔<span class="notif-dot"></span></div>
-        <div class="icon-btn">✉</div>
+        <div class="icon-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5a5 5 0 0 0-5 5v2.8l-1 1.7h12l-1-1.7V6.5a5 5 0 0 0-5-5z"/><line x1="6.5" y1="13" x2="9.5" y2="13"/></svg><span class="notif-dot"></span></div>
+        <div class="icon-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5h13v9h-13z"/><path d="M1.5 3.5 8 8.5l6.5-5"/></svg></div>
       </div>
     </div>
 
@@ -400,19 +495,19 @@ body {
         </div>
         <div class="stats-row">
           <div class="stat-card ac-green">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);">📅</div></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--green-bg);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/></svg></div></div>
             <div class="stat-value" id="stat-attendance">—</div><div class="stat-label">Attendance Rate</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);">📚</div></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--blue-bg);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5C6.5 2.5 4 2 1.5 2.5v9.5c2.5-.5 5 0 6.5 1 1.5-1 4-1.5 6.5-1V2.5C12 2 9.5 2.5 8 3.5z"/><line x1="8" y1="3.5" x2="8" y2="13"/></svg></div></div>
             <div class="stat-value" id="stat-subjects">—</div><div class="stat-label" id="stat-subjects-label">Subjects</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);">📝</div></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--red-bg);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1.5"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="10.5" y2="10"/><line x1="5.5" y1="4.5" x2="8" y2="4.5"/></svg></div></div>
             <div class="stat-value" style="color:var(--red);" id="stat-assignments">—</div><div class="stat-label">Assignments Due</div>
           </div>
           <div class="stat-card">
-            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);">⭐</div><span class="stat-delta delta-up" id="stat-position">—</span></div>
+            <div class="stat-top"><div class="stat-icon-wrap" style="background:var(--amber-bg);"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="8,1.5 9.9,5.6 14.5,6.1 11.1,9.2 12,13.7 8,11.4 4,13.7 4.9,9.2 1.5,6.1 6.1,5.6"/></svg></div><span class="stat-delta delta-up" id="stat-position">—</span></div>
             <div class="stat-value" style="color:var(--amber);" id="stat-grade">—</div><div class="stat-label">Overall Grade</div>
           </div>
         </div>
@@ -530,7 +625,7 @@ body {
           <div class="card">
             <div class="card-head"><span class="card-title">All Subjects</span></div>
             <div class="card-body" id="course-rows">
-              <div class="empty-state"><div class="empty-icon">◈</div><div class="empty-title">Loading…</div></div>
+              <div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="10" height="12.5" rx="1.5"/><line x1="5.5" y1="7" x2="10.5" y2="7"/><line x1="5.5" y1="10" x2="10.5" y2="10"/><line x1="5.5" y1="4.5" x2="8" y2="4.5"/></svg></div><div class="empty-title">Loading…</div></div>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:12px;">
@@ -548,7 +643,7 @@ body {
               <div class="card-head"><span class="card-title">Form Teacher's Note</span></div>
               <div class="card-body">
                 <div class="empty-state" style="padding:20px 8px;">
-                  <div class="empty-icon">✎</div>
+                  <div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5a1.5 1.5 0 0 1 2 0l1 1a1.5 1.5 0 0 1 0 2L5 14 2 14.5 2.5 11.5z"/><line x1="9" y1="4" x2="12" y2="7"/></svg></div>
                   <div class="empty-title">Not Yet Available</div>
                   <div class="empty-desc">Your form teacher has not added a note for this term yet.</div>
                 </div>
@@ -566,16 +661,59 @@ body {
           <button class="result-tab" onclick="switchResult('Final Exam',this)">Final Exam</button>
         </div>
         <div id="result-midterm">
-          <div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Loading…</div></div>
+          <div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11.5,6"/></svg></div><div class="empty-title">Loading…</div></div>
         </div>
         <div id="result-final" style="display:none;">
-          <div class="empty-state"><div class="empty-icon">◉</div><div class="empty-title">Loading…</div></div>
+          <div class="empty-state"><div class="empty-icon"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11.5,6"/></svg></div><div class="empty-title">Loading…</div></div>
         </div>
       </div>
 
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /portal-wrap -->
+
+<div class="toast" id="toast"></div>
+
+<div id="account-settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeAccountSettings()">
+  <div class="card" style="width:min(440px,95%);max-height:88vh;overflow-y:auto;padding:0;">
+    <div class="card-head"><span class="card-title">Account Settings</span><button class="cog-modal-close" onclick="closeAccountSettings()">&#x2715;</button></div>
+
+    <div class="as-tabs">
+      <button class="as-tab active" id="as-tab-view" onclick="switchAsTab('view',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg> My Profile</button>
+      <button class="as-tab" id="as-tab-edit" onclick="switchAsTab('edit',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5a1.5 1.5 0 0 1 2 0l1 1a1.5 1.5 0 0 1 0 2L5 14 2 14.5 2.5 11.5z"/><line x1="9" y1="4" x2="12" y2="7"/></svg> Edit Profile</button>
+      <button class="as-tab" id="as-tab-password" onclick="switchAsTab('password',this)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg> Password</button>
+    </div>
+
+    <div class="as-panel active" id="as-panel-view">
+      <div class="as-hero">
+        <div class="avatar as-hero-avatar" id="as-avatar">--</div>
+        <div class="as-hero-name" id="as-name">--</div>
+        <div class="as-hero-badge" id="as-role">--</div>
+      </div>
+      <div class="as-info-table" id="as-info-table"></div>
+    </div>
+
+    <div class="as-panel" id="as-panel-edit">
+      <div class="card-body" style="padding:20px;">
+        <label class="field-label">Contact Email</label>
+        <input class="field-input" id="as-email" placeholder="you@example.com" style="margin-bottom:16px;">
+        <button class="act-btn btn-save" style="width:100%;" onclick="saveAccountEmail()">Save Changes</button>
+      </div>
+    </div>
+
+    <div class="as-panel" id="as-panel-password">
+      <div class="card-body" style="padding:20px;">
+        <label class="field-label">Current Password</label>
+        <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-current"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-current',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+        <label class="field-label">New Password</label>
+        <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-new"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-new',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+        <label class="field-label">Confirm New Password</label>
+        <div class="as-pw-wrap"><input type="password" class="field-input" id="as-pw-confirm"><button type="button" class="as-pw-eye" onclick="toggleAsPw('as-pw-confirm',this)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg></button></div>
+        <button class="act-btn btn-save" style="width:100%;" onclick="changeAccountPassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="student-api.js"></script>
 </body>
