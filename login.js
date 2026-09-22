@@ -173,9 +173,76 @@ async function handleLogin() {
   }
 }
 
+function openForgotModal() {
+  const idEl = document.getElementById('forgot-id');
+  idEl.value = selectedRole ? document.getElementById('sid').value : '';
+  const alertEl = document.getElementById('forgot-alert');
+  alertEl.classList.remove('show');
+  alertEl.style.color = '';
+  alertEl.style.background = '';
+  alertEl.style.borderColor = '';
+  document.getElementById('forgot-modal').style.display = 'flex';
+}
+
+function closeForgotModal() {
+  document.getElementById('forgot-modal').style.display = 'none';
+}
+
+async function submitForgotPassword() {
+  const idEl = document.getElementById('forgot-id');
+  const alertEl = document.getElementById('forgot-alert');
+  const btn = document.getElementById('forgot-btn');
+  const btnTxt = document.getElementById('forgot-btn-txt');
+  const id = idEl.value.trim();
+
+  alertEl.classList.remove('show');
+  if (!id) {
+    alertEl.style.color = '';
+    alertEl.style.background = '';
+    alertEl.style.borderColor = '';
+    alertEl.textContent = 'Please enter your ID.';
+    alertEl.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btnTxt.textContent = 'Sending...';
+  try {
+    const res = await fetch('/api/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+    alertEl.style.color = 'var(--green)';
+    alertEl.style.background = 'var(--green-bg)';
+    alertEl.style.borderColor = 'rgba(22,163,74,0.2)';
+    alertEl.textContent = data.message || 'If an email address is on file, a reset link has been sent.';
+    alertEl.classList.add('show');
+  } catch (err) {
+    alertEl.style.color = '';
+    alertEl.style.background = '';
+    alertEl.style.borderColor = '';
+    alertEl.textContent = err.message.includes('Failed to fetch')
+      ? 'Cannot reach the server. Make sure the Node server is running.'
+      : err.message;
+    alertEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btnTxt.textContent = 'Send Reset Link';
+  }
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && selectedRole) handleLogin();
-  if (e.key === 'Escape') goBack();
+  if (e.key === 'Escape') {
+    if (document.getElementById('forgot-modal').style.display === 'flex') {
+      closeForgotModal();
+    } else {
+      goBack();
+    }
+  }
 });
 
 // Clear any stale session on page load

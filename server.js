@@ -642,6 +642,8 @@ function createSchema() {
   ensureColumn('users', 'signature_path', 'TEXT');
   ensureColumn('users', 'email', 'TEXT');
   ensureColumn('users', 'active', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn('users', 'reset_token', 'TEXT');
+  ensureColumn('users', 'reset_token_expires', 'TEXT');
   ensureColumn('students', 'parent_email', 'TEXT');
   ensureColumn('students', 'photo_path', 'TEXT');
   ensureColumn('result_batches', 'vetted_at', 'TEXT');
@@ -3197,6 +3199,70 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'New password must be at least 4 characters' });
     }
     run('UPDATE users SET password = ? WHERE id = ?', hashPassword(newPassword), user.id);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/forgot-password') {
+    const body = await readJson(req);
+    const id = String(body.id || '').trim().toUpperCase();
+    const genericMessage = 'If that ID has an email address on file, a reset link has been sent to it.';
+    if (!id) return sendJson(res, 400, { error: 'Enter your ID' });
+
+    const rateKey = `FORGOT-${id}`;
+    const rateLimit = loginRateLimitStatus(rateKey);
+    if (!rateLimit.allowed) {
+      return sendJson(res, 429, { error: rateLimit.message });
+    }
+
+    const user = one('SELECT * FROM users WHERE id = ?', id);
+    if (!user || !user.email) {
+      recordFailedLogin(rateKey);
+      return sendJson(res, 200, { ok: true, message: genericMessage });
+    }
+    resetLoginAttempts(rateKey);
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    run('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?', token, expires, user.id);
+
+    const config = smtpConfigStatus();
+    if (config.configured) {
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      const link = `${proto}://${req.headers.host}/reset-password.html?token=${token}`;
+      const message = [
+        `From: ${config.from}`,
+        `To: ${user.email}`,
+        'Subject: Reset your Little Scholars password',
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        `Hello,\r\n\r\nA password reset was requested for account ${user.id}. Click the link below to set a new password. This link expires in 30 minutes.\r\n\r\n${link}\r\n\r\nIf you did not request this, you can safely ignore this email.\r\n\r\nRegards,\r\nUnique Children School`,
+      ].join('\r\n');
+      smtpSend({
+        host: config.host, port: config.port,
+        user: process.env.SMTP_USER || '', pass: process.env.SMTP_PASS || '',
+        from: config.from, to: user.email, message,
+      }).catch(() => {});
+    }
+    return sendJson(res, 200, { ok: true, message: genericMessage });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/reset-password') {
+    const body = await readJson(req);
+    const token = String(body.token || '').trim();
+    const newPassword = String(body.newPassword || '');
+    if (!token) return sendJson(res, 400, { error: 'Missing reset token' });
+    if (newPassword.length < 4) {
+      return sendJson(res, 400, { error: 'New password must be at least 4 characters' });
+    }
+    const user = one('SELECT * FROM users WHERE reset_token = ?', token);
+    if (!user || !user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+      return sendJson(res, 400, { error: 'This reset link is invalid or has expired. Request a new one.' });
+    }
+    run(
+      'UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
+      hashPassword(newPassword), user.id
+    );
     return sendJson(res, 200, { ok: true });
   }
 
