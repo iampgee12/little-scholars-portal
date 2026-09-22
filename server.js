@@ -225,6 +225,19 @@ function setMeta(key, value) {
 
 // Grade-based fallback comment: the highest min_score band the average
 // qualifies for, e.g. a band of 80-100 beats a band of 0-100 for a 92%.
+function attendanceCounts(studentId, sessionType) {
+  const total = one('SELECT COUNT(*) AS c FROM attendance_records WHERE person_id = ? AND session_type = ?', studentId, sessionType).c;
+  const present = one(
+    "SELECT COUNT(*) AS c FROM attendance_records WHERE person_id = ? AND session_type = ? AND status IN ('present','late')",
+    studentId, sessionType
+  ).c;
+  const absent = one(
+    "SELECT COUNT(*) AS c FROM attendance_records WHERE person_id = ? AND session_type = ? AND status = 'absent'",
+    studentId, sessionType
+  ).c;
+  return { total, present, absent };
+}
+
 function commentBankMatch(avgPct) {
   if (avgPct === null || avgPct === undefined) return null;
   const row = one(
@@ -6817,7 +6830,9 @@ async function handleApi(req, res, url) {
       });
       const suggestedComment = commentBankMatch(s.avgPct)
         || valueFromMeta('head_comment_default', 'Great work! Your diligence in your academics is impressive.');
-      return { ...s, position: posMap[s.id] || '—', teacherComment, headComment, suggestedComment };
+      const dailyAttendance = attendanceCounts(s.id, 'daily');
+      const lessonAttendance = attendanceCounts(s.id, 'lesson');
+      return { ...s, position: posMap[s.id] || '—', teacherComment, headComment, suggestedComment, dailyAttendance, lessonAttendance };
     });
 
     // Per-subject rank: where a student placed among classmates in just that

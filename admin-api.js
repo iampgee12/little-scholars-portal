@@ -3964,6 +3964,7 @@ async function crcBulkView() {
 let _bsData = null;
 let _bsView = 'full';
 let _bsStudentsById = {};
+let _bsCommentBank = null;
 
 let GRADE_SCALE = [
   { min:80, grade:'A', remark:'Excellent', gradePoint:5.0 },
@@ -4250,6 +4251,12 @@ async function loadBroadsheet() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     _bsData = data;
+    if (!_bsCommentBank) {
+      try {
+        const cb = await apiFetch('/api/admin/comment-bank');
+        _bsCommentBank = cb.comments || [];
+      } catch (e) { _bsCommentBank = []; }
+    }
     renderBroadsheetPills(data);
     renderBroadsheetTable(data);
     renderBroadsheetSummary(data);
@@ -4259,15 +4266,12 @@ async function loadBroadsheet() {
   }
 }
 
-const PILL_COLORS = ['#2563eb','#16a34a','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#9a3412'];
-
 function renderBroadsheetPills(data) {
   const bar = document.getElementById('bs-pills');
   if (!bar) return;
-  bar.innerHTML = (data.subjects||[]).map((s,i)=>{
-    const color = PILL_COLORS[i % PILL_COLORS.length];
+  bar.innerHTML = (data.subjects||[]).map(s=>{
     const label = s.name.length>13 ? s.name.slice(0,12)+'…' : s.name;
-    return `<span class="bs-pill" style="background:${color}" title="${s.name}">${label}</span>`;
+    return `<span class="bs-pill" title="${s.name}">${label}</span>`;
   }).join('');
 }
 
@@ -4299,11 +4303,18 @@ async function saveHeadComment(studentId, textareaEl) {
 }
 
 function autoFillHeadRemark(studentId) {
-  const textarea = document.getElementById(`bs-head-remark-${studentId}`);
+  const select = document.getElementById(`bs-head-remark-${studentId}`);
   const student = _bsStudentsById[studentId];
-  if (!textarea || !student) return;
-  textarea.value = student.suggestedComment || '';
-  saveHeadComment(studentId, textarea);
+  if (!select || !student) return;
+  const suggestion = student.suggestedComment || '';
+  if (suggestion && !Array.from(select.options).some(o => o.value === suggestion)) {
+    const opt = document.createElement('option');
+    opt.value = suggestion;
+    opt.textContent = suggestion.length > 60 ? suggestion.slice(0,60)+'…' : suggestion;
+    select.insertBefore(opt, select.firstChild);
+  }
+  select.value = suggestion;
+  saveHeadComment(studentId, select);
 }
 
 function renderBroadsheetTable(data) {
@@ -4325,6 +4336,22 @@ function renderBroadsheetTable(data) {
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   }
 
+  function remarkSelectHtml(studentId, currentValue) {
+    const bank = _bsCommentBank || [];
+    const current = currentValue || '';
+    const matchesBank = bank.some(c => c.text === current);
+    const customOption = (!matchesBank && current)
+      ? `<option value="${escapeHtml(current)}" selected>${escapeHtml(current.length > 60 ? current.slice(0,60)+'…' : current)}</option>`
+      : '';
+    const bankOptions = bank.map(c =>
+      `<option value="${escapeHtml(c.text)}" ${c.text === current ? 'selected' : ''}>${escapeHtml(c.text.length > 60 ? c.text.slice(0,60)+'…' : c.text)}</option>`
+    ).join('');
+    return `<select class="bs-remark-select" id="bs-head-remark-${escapeHtml(studentId)}" data-student-id="${escapeHtml(studentId)}" onchange="saveHeadComment('${escapeHtml(studentId)}', this)">
+      ${!current ? '<option value="">- Select Preset Comment -</option>' : ''}
+      ${customOption}${bankOptions}
+    </select>`;
+  }
+
   function getGradeLetter(score) {
     if (score == null || score === '') return '—';
     const n = (Number(score) / subjMax) * 100;
@@ -4340,7 +4367,7 @@ function renderBroadsheetTable(data) {
     <th class="bs-sticky bs-sticky-h bs-th-name" rowspan="3" style="vertical-align:bottom;padding-bottom:8px;text-align:left;">Students &#x2193;</th>
     <th class="bs-sticky bs-sticky-h bs-th-reg" rowspan="3" style="vertical-align:bottom;padding-bottom:8px;">Reg. No.</th>`;
   subj.forEach(s => {
-    thGroup += `<th class="bs-th-subj" colspan="${subjCols}">${escapeHtml(s.name)}</th>`;
+    thGroup += `<th class="bs-th-subj" colspan="${subjCols}">${escapeHtml(s.name)}<button type="button" class="bs-subj-edit-btn" title="Edit assessment setup for ${escapeHtml(s.name)}" onclick="switchTab('scoreDivisions', document.querySelector('[data-tab=scoreDivisions]'))">&#x270E;</button></th>`;
   });
   thGroup += `
     <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;min-width:55px;">Grand<br>Total</th>
@@ -4350,7 +4377,7 @@ function renderBroadsheetTable(data) {
     <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;">Position</th>
     <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;min-width:180px;">Form Teacher's Remark</th>
     <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;min-width:180px;">Head of School's Remark</th>
-    <th class="bs-th-subj" colspan="3" style="min-width:90px;">Cognitive<br>Skills Report</th>
+    <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;min-width:70px;">Cognitive<br>Skills Report</th>
     <th class="bs-th-subj" colspan="3" style="min-width:90px;">Daily Attendance<br>Report</th>
     <th class="bs-th-subj" colspan="3" style="min-width:90px;">Lesson Attendance<br>Report</th>
     <th rowspan="3" style="vertical-align:bottom;padding-bottom:8px;">Preview<br>Result</th>`;
@@ -4368,8 +4395,8 @@ function renderBroadsheetTable(data) {
       thSub += `<th class="bs-th-rotated">Total Score<small style="display:block;font-size:8px;">(${subjMax})</small></th>`;
     });
   }
-  // Cognitive + Attendance sub-cols (T/P/A)
-  for (let i = 0; i < 3; i++) {
+  // Attendance sub-cols (T/P/A) — Daily then Lesson
+  for (let i = 0; i < 2; i++) {
     thSub += `<th class="bs-th-rotated">T<small style="display:block;font-size:8px;">Total</small></th>
       <th class="bs-th-rotated">P<small style="display:block;font-size:8px;">Present</small></th>
       <th class="bs-th-rotated">A<small style="display:block;font-size:8px;">Absent</small></th>`;
@@ -4386,7 +4413,7 @@ function renderBroadsheetTable(data) {
   } else {
     subj.forEach(() => { thLimit += `<th style="font-size:9px;color:var(--text-3);padding:2px 4px;">(${subjMax})</th>`; });
   }
-  for (let i = 0; i < 9; i++) thLimit += `<th></th>`;
+  for (let i = 0; i < 6; i++) thLimit += `<th></th>`;
 
   // Compute grand totals for ranking
   const studentTotals = students.map(st => {
@@ -4461,12 +4488,12 @@ function renderBroadsheetTable(data) {
       <td style="text-align:center;"><span class="bs-pos-badge ${posClass}">${posLabel}</span></td>
       <td class="bs-remark-td" style="font-size:10px;color:var(--text-2);">${escapeHtml(st.teacherComment || '')}</td>
       <td class="bs-remark-td">
-        <textarea class="bs-remark-input" id="bs-head-remark-${escapeHtml(st.id)}" data-student-id="${escapeHtml(st.id)}" rows="2" style="width:100%;min-width:160px;font-size:10px;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;" onchange="saveHeadComment('${escapeHtml(st.id)}', this)">${escapeHtml(st.headComment || '')}</textarea>
+        ${remarkSelectHtml(st.id, st.headComment)}
         <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested remark based on this student's score" onclick="autoFillHeadRemark('${escapeHtml(st.id)}')">&#x21bb; Auto Remark</button>
       </td>
-      <td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td>
-      <td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td>
-      <td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td>
+      <td style="text-align:center;"><button class="bs-preview-btn" title="Open Cognitive Skills Assessment" onclick="switchTab('cognitiveSkills', document.querySelector('[data-tab=cognitiveSkills]'))">&#x1F393;</button></td>
+      <td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.absent ?? 0}</td>
+      <td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.absent ?? 0}</td>
       <td style="text-align:center;"><button class="bs-preview-btn" title="Preview result" onclick="previewStudentReport('${escapeHtml(st.id)}')">&#x1F50D;</button></td>
     </tr>`;
   });
