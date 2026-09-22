@@ -3965,19 +3965,26 @@ let _bsData = null;
 let _bsView = 'full';
 
 let GRADE_SCALE = [
-  { min:80, grade:'A', remark:'Excellent' },
-  { min:65, grade:'B', remark:'Very Good' },
-  { min:55, grade:'C', remark:'Good' },
-  { min:45, grade:'D', remark:'Fair' },
-  { min:0,  grade:'F', remark:'Fail' },
+  { min:80, grade:'A', remark:'Excellent', gradePoint:5.0 },
+  { min:65, grade:'B', remark:'Very Good', gradePoint:4.0 },
+  { min:55, grade:'C', remark:'Good', gradePoint:3.0 },
+  { min:45, grade:'D', remark:'Fair', gradePoint:2.0 },
+  { min:0,  grade:'F', remark:'Fail', gradePoint:0.0 },
 ];
 function bsGrade(pct) { return GRADE_SCALE.find(g => pct >= g.min) || GRADE_SCALE.at(-1); }
+
+// Older saved grade scales may predate the gradePoint field; fall back to the
+// conventional 5/4/3/2/0 scale by letter so GPA never silently comes out as 0.
+const GRADE_POINT_FALLBACK = { A: 5, B: 4, C: 3, D: 2, F: 0 };
+function gradePointFor(band) {
+  return Number.isFinite(band.gradePoint) ? band.gradePoint : (GRADE_POINT_FALLBACK[band.grade] ?? 0);
+}
 
 async function loadGradeScaleFromServer() {
   try {
     const data = await apiFetch('/api/admin/grade-scale');
     if (Array.isArray(data.gradeScale) && data.gradeScale.length) {
-      GRADE_SCALE = data.gradeScale.map(r => ({ min: Number(r.min), grade: r.grade, remark: r.remark }));
+      GRADE_SCALE = data.gradeScale.map(r => ({ min: Number(r.min), grade: r.grade, remark: r.remark, gradePoint: Number(r.gradePoint) }));
     }
     return data.gradeScale;
   } catch (err) {
@@ -4017,7 +4024,7 @@ async function saveGradingSystem() {
   }));
   try {
     const data = await apiFetch('/api/admin/grade-scale', { method: 'POST', body: JSON.stringify({ gradeScale: rows }) });
-    GRADE_SCALE = data.gradeScale.map(r => ({ min: Number(r.min), grade: r.grade, remark: r.remark }));
+    GRADE_SCALE = data.gradeScale.map(r => ({ min: Number(r.min), grade: r.grade, remark: r.remark, gradePoint: Number(r.gradePoint) }));
     renderGradingTable(data.gradeScale);
     showToast('Grading system saved');
   } catch (err) {
@@ -4333,7 +4340,7 @@ function renderBroadsheetTable(data) {
   let thSub = '';
   if (!minimal) {
     subj.forEach(() => {
-      thSub += `<th class="bs-th-rotated">CA (30%)<small style="display:block;font-size:8px;">(30)</small></th>
+      thSub += `<th class="bs-th-rotated">Mid-Term Test (30%)<small style="display:block;font-size:8px;">(30)</small></th>
         <th class="bs-th-rotated">Examination (70%)<small style="display:block;font-size:8px;">(70)</small></th>
         <th class="bs-th-rotated">Total Score<small style="display:block;font-size:8px;">(100)</small></th>`;
     });
@@ -4377,12 +4384,15 @@ function renderBroadsheetTable(data) {
   let tbody = '';
   students.forEach((st, idx) => {
     const scores = matrix[st.id] || {};
-    let grandTotal = 0, subjectCount = 0;
+    let grandTotal = 0, subjectCount = 0, gpaSum = 0;
 
     let scoreCells = '';
     subj.forEach(s => {
       const sc = scores[s.id];
-      if (sc && sc.tot != null) { grandTotal += sc.tot; subjectCount++; }
+      if (sc && sc.tot != null) {
+        grandTotal += sc.tot; subjectCount++;
+        gpaSum += gradePointFor(bsGrade((sc.tot / subjMax) * 100));
+      }
       const grade = sc && sc.tot != null ? getGradeLetter(sc.tot) : '';
       const hasScore = sc && sc.tot != null;
       if (minimal) {
@@ -4402,6 +4412,7 @@ function renderBroadsheetTable(data) {
     const maxPossible = subjectCount * subjMax;
     const avgPct = maxPossible > 0 ? (grandTotal / maxPossible * 100).toFixed(3) : '0.000';
     const avgNum = parseFloat(avgPct);
+    const gpa = subjectCount ? (gpaSum / subjectCount).toFixed(3) : '0.000';
     const g = bsGrade(avgNum);
     const pos = rankMap[st.id] || idx + 1;
     const posLabel = pos===1?'1st':pos===2?'2nd':pos===3?'3rd':`${pos}th`;
@@ -4414,7 +4425,7 @@ function renderBroadsheetTable(data) {
       <td class="bs-sticky bs-col-reg bs-td-reg">${escapeHtml(st.id||'—')}</td>
       ${scoreCells}
       <td class="bs-score-total" style="text-align:center;">${grandTotal}${subjectCount?`<br><small style="color:var(--text-3);font-size:9px;">/ ${subjectCount*subjMax}</small>`:''}</td>
-      <td style="text-align:center;font-weight:700;">${(grandTotal/Math.max(subjectCount,1)).toFixed(3)}</td>
+      <td style="text-align:center;font-weight:700;">${gpa}</td>
       <td class="bs-avg-cell">
         <div class="bs-avg-pct">${avgPct}%</div>
         <div class="bs-avg-sub">(${g.grade})</div>
