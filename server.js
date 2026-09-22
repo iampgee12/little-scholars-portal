@@ -2015,6 +2015,16 @@ function performanceGrade(avg) {
   return 'F (Needs Support)';
 }
 
+// Shared A-F band used for the per-subject "Grade Remarks" column and the
+// overall "Result Summary" line on the report card.
+function gradeBand(pct) {
+  if (pct >= 80) return { letter: 'A', word: 'Excellent' };
+  if (pct >= 70) return { letter: 'B', word: 'Very Good' };
+  if (pct >= 50) return { letter: 'C', word: 'Good' };
+  if (pct >= 40) return { letter: 'D', word: 'Fair' };
+  return { letter: 'F', word: 'Needs Support' };
+}
+
 function classReportRows(classCode, examType, studentId) {
   return all(
     `SELECT
@@ -2363,8 +2373,8 @@ function normaliseGender(gender) {
 }
 
 function reportScoreColumns(examType) {
-  if (examType === 'Mid-Term Exam') return ['CA (40)'];
-  return ['CA (30)', 'Examination (70)'];
+  if (examType === 'Mid-Term Exam') return ['Mid-Term Test (40)'];
+  return ['Mid-Term Test (30)', 'Examination (70)'];
 }
 
 function drawSkillTable(page, skills, ratings, x, top, width, rowH, fonts, colors, options = {}) {
@@ -2561,6 +2571,21 @@ function drawComments(page, formTeacher, fonts, colors) {
   text(page, `Head of School: ${headName}`, x + 7, secondTop - 29, 9.2, fonts.regular, { color: colors.black });
 }
 
+// Draws a table header cell whose label runs bottom-to-top (rotated 90deg),
+// for narrow score columns where horizontal text would be too cramped.
+function drawVerticalHeaderCell(page, { x, top, width, height, value = '', fill, border, borderWidth = 0.35, font, size = 7.2, color }) {
+  drawCell(page, { x, top, width, height, fill, border, borderWidth });
+  const label = String(value ?? '').trim();
+  if (!label) return;
+  const { degrees } = loadPdfLib();
+  const maxLen = height - 6;
+  const out = trimToFit(font, label, size, maxLen);
+  const renderedLen = textWidth(font, out, size);
+  const cx = x + (width / 2) + (size * 0.32);
+  const cy = (top - (height / 2)) - (renderedLen / 2);
+  page.drawText(out, { x: cx, y: cy, size, font, color, rotate: degrees(90) });
+}
+
 function drawWordCell(page, {
   x,
   top,
@@ -2614,7 +2639,7 @@ async function drawWordHeader(page, pdfDoc, fonts, colors) {
 async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors) {
   const x = 36;
   const top = 646;
-  const widths = [130, 80, 330];
+  const widths = [220, 100, 220];
   const rowH = 17;
   const classSize = String(one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count);
   const maxScore = rows.length * subjectMax;
@@ -2622,9 +2647,9 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     [`Name: ${student.name.toUpperCase()}`, `Performance Grade: ${performanceGrade(average)}`],
     [`Reg. No:${student.id}`, `Class Size: ${classSize}`],
     [`Gender: ${normaliseGender(student.gender)}`, `No. of Subjects: ${rows.length}`],
-    [`Age: ${valueFromMeta(`student_age_${student.id}`, '')}`, `Student Total Score: ${totalScore}        ${maxScore}`],
+    [`Age: ${valueFromMeta(`student_age_${student.id}`, '')}`, `Student Total Score: ${totalScore}/${maxScore}`],
     [`DOB: ${valueFromMeta(`student_dob_${student.id}`, '')}`, `Student Average(%): ${average}%`],
-    [`Class: ${student.classLabel}`, ''],
+    [`Class: ${student.classLabel}`, `Result Summary: ${gradeBand(average).word}`],
   ];
   infoRows.forEach((row, i) => {
     const rowTop = top - (i * rowH);
@@ -2637,24 +2662,29 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
   if (photo) {
     const photoX = x + widths[0];
     const photoWidth = widths[1];
-    const photoSize = 52;
+    const photoSize = 60;
     page.drawImage(photo, {
       x: photoX + ((photoWidth - photoSize) / 2),
-      y: top - 75,
+      y: top - (rowH * 3) - (photoSize / 2),
       width: photoSize,
       height: photoSize,
     });
   }
 }
 
-function reportSubjectRows(rows) {
-  const out = rows.slice(0, 18).map(row => ({
-    subject: row.subjectName,
-    ca: row.isAbsent ? 'ABS' : row.ca ?? '-',
-    exam: row.isAbsent ? 'ABS' : row.exam ?? '-',
-    total: row.isAbsent ? 'ABS' : row.total ?? '-',
-  }));
-  while (out.length < 18) out.push({ subject: '', ca: '', exam: '', total: '' });
+function reportSubjectRows(rows, examType) {
+  const max = maxScoreForExamType(examType);
+  const out = rows.slice(0, 18).map(row => {
+    const pct = (!row.isAbsent && row.total != null && max) ? (row.total / max) * 100 : null;
+    return {
+      subject: row.subjectName,
+      ca: row.isAbsent ? 'ABS' : row.ca ?? '-',
+      exam: row.isAbsent ? 'ABS' : row.exam ?? '-',
+      total: row.isAbsent ? 'ABS' : row.total ?? '-',
+      remark: row.isAbsent || pct == null ? '-' : `${gradeBand(pct).letter} - ${gradeBand(pct).word}`,
+    };
+  });
+  while (out.length < 18) out.push({ subject: '', ca: '', exam: '', total: '', remark: '' });
   return out;
 }
 
@@ -2662,13 +2692,16 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
   const x = 36;
   const top = 530;
   const isFinalExam = examType === 'Final Exam';
-  const widths = isFinalExam ? [115, 55, 55, 60, 170, 85] : [115, 55, 60, 170, 140];
+  const widths = isFinalExam ? [110, 34, 34, 42, 50, 185, 85] : [110, 44, 46, 54, 180, 106];
+  const headerH = 70;
   const rowH = 14.75;
-  const scoreHeaders = reportScoreColumns(examType).map(label => label.replace(/\s+\(/, '\n('));
-  const headers = ['Subject', ...scoreHeaders, `Total Score\n(${maxScoreForExamType(examType)})`, 'Affective / Psychomotor Skills', 'Rating'];
+  const scoreHeaders = reportScoreColumns(examType);
+  const headers = ['Subject', ...scoreHeaders, `Total Score (${maxScoreForExamType(examType)})`, 'Grade Remarks', 'Affective / Psychomotor Skills', 'Rating'];
+  const verticalHeaderCols = isFinalExam ? [1, 2, 3, 4] : [1, 2, 3];
   const totalColumn = isFinalExam ? 3 : 2;
-  const skillColumn = isFinalExam ? 4 : 3;
-  const subjectRows = reportSubjectRows(rows);
+  const remarkColumn = totalColumn + 1;
+  const skillColumn = remarkColumn + 1;
+  const subjectRows = reportSubjectRows(rows, examType);
   const affective = AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' }));
   const psychomotor = PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' }));
   const attendanceRows = [
@@ -2680,31 +2713,37 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
 
   let cursorX = x;
   headers.forEach((header, i) => {
-    drawWordCell(page, {
-      x: cursorX,
-      top,
-      width: widths[i],
-      height: rowH,
-      value: header,
-      fill: colors.headerGrey,
-      border: colors.grid,
-      font: fonts.bold,
-      size: i >= 1 && i <= (isFinalExam ? 3 : 2) ? 5.4 : i === 0 ? 8 : 6.8,
-      color: colors.black,
-      align: 'center',
-      pad: 3,
-      lineHeight: i >= 1 && i <= 3 ? 6 : 8,
-    });
+    if (verticalHeaderCols.includes(i)) {
+      drawVerticalHeaderCell(page, {
+        x: cursorX, top, width: widths[i], height: headerH, value: header,
+        fill: colors.headerGrey, border: colors.grid, font: fonts.bold, size: 7.2, color: colors.black,
+      });
+    } else {
+      drawWordCell(page, {
+        x: cursorX,
+        top,
+        width: widths[i],
+        height: headerH,
+        value: header,
+        fill: colors.headerGrey,
+        border: colors.grid,
+        font: fonts.bold,
+        size: i === 0 ? 8 : 6.8,
+        color: colors.black,
+        align: 'center',
+        pad: 3,
+      });
+    }
     cursorX += widths[i];
   });
 
   for (let i = 0; i < 24; i += 1) {
-    const rowTop = top - rowH - (i * rowH);
-    const subject = i < 18 ? subjectRows[i] : { subject: '', ca: '', exam: '', total: '' };
+    const rowTop = top - headerH - (i * rowH);
+    const subject = i < 18 ? subjectRows[i] : { subject: '', ca: '', exam: '', total: '', remark: '' };
     let cellX = x;
     const scoreValues = isFinalExam
-      ? [subject.subject, subject.ca, subject.exam, subject.total]
-      : [subject.subject, subject.ca, subject.total];
+      ? [subject.subject, subject.ca, subject.exam, subject.total, subject.remark]
+      : [subject.subject, subject.ca, subject.total, subject.remark];
     scoreValues.forEach((value, col) => {
       drawWordCell(page, {
         x: cellX,
@@ -2715,10 +2754,10 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
         fill: colors.white,
         border: colors.grid,
         font: col === totalColumn ? fonts.bold : fonts.regular,
-        size: col === 0 ? 7.4 : 7.6,
+        size: col === 0 ? 7.4 : col === remarkColumn ? 6.2 : 7.6,
         color: colors.black,
         align: col === 0 ? 'left' : 'center',
-        pad: 3,
+        pad: 2,
       });
       cellX += widths[col];
     });
@@ -2750,7 +2789,7 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
 
 function drawWordGradeKey(page, fonts, colors) {
   const x = 36;
-  const top = 136;
+  const top = 81;
   const height = 28;
   const widths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
   const values = [
