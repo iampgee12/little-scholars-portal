@@ -1,0 +1,15 @@
+.git
+node_modules
+.claude
+*.codex-backup-*
+
+# Secrets — never bake these into the image
+email-settings.env
+email-settings.env.example
+
+# Database and generated/user content — these live on the mounted volume,
+# not in the image
+school.sqlite
+school.sqlite.bak-*
+uploads/
+published_reports/
