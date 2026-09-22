@@ -1237,7 +1237,6 @@ function updateGradebookSummary(selection, batch) {
   const stateBox = document.getElementById('gb-readonly-box');
   const unpublish = document.getElementById('gb-unpublish-btn');
   const subjects = batch?.subjects || [];
-  const allVetted = subjects.length > 0 && subjects.every(subject => subject.vettedAt);
   if (classText) classText.textContent = `${selection.classLabel} Students`;
   if (subjectText) subjectText.textContent = selection.subjectName
     ? `Score Entry for ${selection.subjectName}`
@@ -1255,7 +1254,7 @@ function updateGradebookSummary(selection, batch) {
   const saved = document.getElementById('gb-batch-status');
   if (saved) {
     saved.textContent = batch && subjects.length
-      ? `${allVetted ? 'Vetted' : 'Uploaded'} across ${subjects.length} subject${subjects.length === 1 ? '' : 's'}`
+      ? `Uploaded across ${subjects.length} subject${subjects.length === 1 ? '' : 's'}`
       : 'No uploaded score batch found for this selection yet.';
   }
 }
@@ -1415,7 +1414,7 @@ async function saveGradebookScore(input) {
       : '-';
     const totalCell = row.querySelector('.gb-total');
     if (totalCell) totalCell.textContent = String(total);
-    if (status) status.textContent = 'Score saved. Results must be vetted again before publishing.';
+    if (status) status.textContent = 'Score saved.';
   } catch (err) {
     if (status) status.textContent = `Could not save score: ${err.message}`;
     showToast(err.message, 'warn');
@@ -1979,8 +1978,8 @@ function renderResultBatches() {
       <td>${escapeHtml(batch.subjectName)}</td>
       <td>${escapeHtml(batch.teacherName)}</td>
       <td style="font-family:'DM Mono',monospace;">${batch.entryCount}</td>
-      <td style="color:${batch.vettedAt ? 'var(--green)' : 'var(--amber)'};">${batch.vettedAt ? `Vetted ${escapeHtml(batch.vettedAt)}` : 'Pending vetting'}</td>
-      <td><button class="post-btn" style="padding:6px 10px;" onclick="openBatchReview(${batch.id})">${batch.vettedAt ? 'View' : 'Review'}</button></td>
+      <td style="color:var(--text-3);">${batch.savedAt ? `Uploaded ${escapeHtml(batch.savedAt)}` : '-'}</td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="openBatchReview(${batch.id})">View</button></td>
     </tr>`).join('');
   renderBatchReviewPanel();
 }
@@ -1998,7 +1997,7 @@ function renderBatchReviewPanel() {
     panel.innerHTML = `
       <div class="card-head"><span class="card-title">Review Uploaded Results</span></div>
       <div class="card-body" style="font-size:12px;color:var(--text-3);line-height:1.55;">
-        Select <strong>Review</strong> beside a teacher upload to see every student's score before vetting it.
+        Select <strong>View</strong> beside a teacher upload to see every student's score in it.
       </div>`;
     return;
   }
@@ -2013,8 +2012,6 @@ function renderBatchReviewPanel() {
 
   const columns = batchScoreColumns(batch.examType);
   const rows = batch.entries || [];
-  const statusText = batch.vettedAt ? `Vetted ${batch.vettedAt}` : 'Pending admin vetting';
-  const statusColor = batch.vettedAt ? 'var(--green)' : 'var(--amber)';
   const entryRows = rows.length ? rows.map((entry, index) => {
     const scoreCells = batch.examType === 'Final Exam'
       ? `<td style="text-align:center;font-family:'DM Mono',monospace;">${entry.ca ?? '-'}</td><td style="text-align:center;font-family:'DM Mono',monospace;">${entry.exam ?? '-'}</td><td style="text-align:center;font-family:'DM Mono',monospace;font-weight:700;">${entry.total ?? '-'}</td>`
@@ -2042,7 +2039,6 @@ function renderBatchReviewPanel() {
       </div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <div style="font-size:11px;color:var(--text-3);">Uploaded ${escapeHtml(batch.savedAt || '-')} • ${rows.length} student score${rows.length === 1 ? '' : 's'}</div>
-        <div style="font-size:12px;font-weight:700;color:${statusColor};">${escapeHtml(statusText)}</div>
       </div>
       <div style="overflow-x:auto;border:1px solid var(--black-4);border-radius:var(--radius-sm);">
         <table class="data-table">
@@ -2056,11 +2052,6 @@ function renderBatchReviewPanel() {
           </thead>
           <tbody>${entryRows}</tbody>
         </table>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;flex-wrap:wrap;">
-        ${batch.vettedAt
-          ? '<span style="font-size:12px;color:var(--text-3);align-self:center;">This upload is ready for publishing.</span>'
-          : `<button class="post-btn" onclick="vetReviewedBatch()">Vet Reviewed Upload</button>`}
       </div>
     </div>`;
 }
@@ -2140,20 +2131,6 @@ function renderEmailConfigStatus() {
       <div style="font-size:12px;font-weight:700;color:${color};">${escapeHtml(title)}</div>
       <div style="font-size:11px;color:var(--text-2);line-height:1.45;margin-top:3px;">${escapeHtml(detail)}</div>
     </div>`;
-}
-
-async function vetReviewedBatch() {
-  const id = state.batchReview?.id || state.reviewingBatchId;
-  if (!id) return showToast('Choose an upload to review first');
-  try {
-    const data = await apiFetch(`/api/admin/result-batches/${id}/vet`, { method: 'POST' });
-    state.setup = data.setup;
-    renderResultBatches();
-    await openBatchReview(id);
-    showToast('Reviewed result upload vetted');
-  } catch (err) {
-    showToast(err.message);
-  }
 }
 
 async function publishReports() {
@@ -2926,7 +2903,7 @@ const TAB_META = {
   dailyGradebook: { title: 'Daily Grade Book', sub: 'Daily Assessment Scores' },
   resultsGradebook: { title: 'Results Grade Book', sub: 'Result Score Entry' },
   cognitiveSkills: { title: 'Cognitive Skills Assessment', sub: 'Skills Assessment Records' },
-  publish: { title: 'Review And Publish Results', sub: 'Review, Vet, and Publish Student Reports' },
+  publish: { title: 'Review And Publish Results', sub: 'Review and Publish Student Reports' },
   emailQueue: { title: 'Results Email Delivery Queue', sub: 'Published Report Email Status' },
   settings: { title: 'Result Settings', sub: 'Staff, Students, and Result Assignments' },
   academics: { title: 'Academics', sub: 'Academic Activities' },

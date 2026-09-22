@@ -4402,21 +4402,6 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { batch });
   }
 
-  const vetMatch = url.pathname.match(/^\/api\/admin\/result-batches\/(\d+)\/vet$/);
-  if (req.method === 'POST' && vetMatch) {
-    const user = requireUser(req, res, 'admin');
-    if (!user) return;
-    const batch = one('SELECT id FROM result_batches WHERE id = ?', Number(vetMatch[1]));
-    if (!batch) return sendJson(res, 404, { error: 'Result batch not found' });
-    run(
-      'UPDATE result_batches SET vetted_at = ?, vetted_by = ? WHERE id = ?',
-      new Date().toISOString(),
-      user.id,
-      batch.id
-    );
-    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
-  }
-
   if (req.method === 'POST' && url.pathname === '/api/admin/reports/publish') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
@@ -4430,10 +4415,6 @@ async function handleApi(req, res, url) {
     const batches = classBatches(classCode, examType);
     if (!batches.length) {
       return sendJson(res, 400, { error: 'No teacher results have been submitted for that class and exam' });
-    }
-    const unvetted = batches.filter(batch => !batch.vettedAt);
-    if (unvetted.length) {
-      return sendJson(res, 400, { error: `Vet all result batches first: ${unvetted.map(b => b.subjectName).join(', ')}` });
     }
     const students = all(
       `SELECT id, name, parent_email AS parentEmail
