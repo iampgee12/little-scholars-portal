@@ -247,7 +247,7 @@ async function init() {
   document.getElementById('s-avatar').textContent = acct.initials;
   document.getElementById('s-name').textContent = acct.name;
   document.getElementById('s-grade').textContent = acct.grade || 'Student Portal';
-  document.title = `Little Scholars - ${acct.firstName}`;
+  document.title = `Unique Children's School - ${acct.firstName}`;
 
   const hr = new Date().getHours();
   const gr = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';

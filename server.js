@@ -3232,7 +3232,7 @@ async function handleApi(req, res, url) {
       const message = [
         `From: ${config.from}`,
         `To: ${user.email}`,
-        'Subject: Reset your Little Scholars password',
+        "Subject: Reset your Unique Children's School password",
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=utf-8',
         '',
@@ -6878,7 +6878,7 @@ async function handleApi(req, res, url) {
     const settings = {};
     SYS_KEYS.forEach(k => { settings[k] = valueFromMeta(k, ''); });
     // defaults for empty fields
-    if (!settings.school_name)    settings.school_name    = 'Little Scholars';
+    if (!settings.school_name)    settings.school_name    = "Unique Children's School";
     if (!settings.head_staff_title) settings.head_staff_title = 'Head of School';
     if (!settings.student_term)   settings.student_term   = 'student';
     if (!settings.reg_prefix)     settings.reg_prefix     = 'LS/{ADMISSION_YEAR}/';
@@ -8700,5 +8700,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Little Scholars portal running at http://localhost:${PORT}`);
+  console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
 });

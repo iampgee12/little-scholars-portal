@@ -306,7 +306,7 @@ async function init() {
     document.getElementById('t-name').textContent = teacher.name;
     const chipEl = document.getElementById('t-chip'); if (chipEl) chipEl.textContent = teacher.chip || teacher.name.toUpperCase();
     document.getElementById('t-greeting').textContent = `${greeting()}, ${teacher.firstName}.`;
-    document.title = `Little Scholars - ${teacher.name}`;
+    document.title = `Unique Children's School - ${teacher.name}`;
     loadTopbarSession();
 
     const subjects = [...new Set(state.contexts.map(ctx => ctx.subjectName))];

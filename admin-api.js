@@ -147,7 +147,7 @@ async function init() {
     document.getElementById('a-avatar').textContent = state.user.initials;
     document.getElementById('a-name').textContent = state.user.name;
     document.getElementById('a-greeting').textContent = `${greeting()}, ${state.user.firstName}.`;
-    document.title = `Little Scholars - ${state.user.name}`;
+    document.title = `Unique Children's School - ${state.user.name}`;
 
     await loadResultSetup();
     loadGradeScaleFromServer();
