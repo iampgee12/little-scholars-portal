@@ -6763,11 +6763,11 @@ async function handleApi(req, res, url) {
 
     const students = classArmId
       ? all(
-          `SELECT id, name, initials, gender, att FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
+          `SELECT id, name, initials, gender, att, photo_path AS photoPath FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
           classCode, classArmId
         )
       : all(
-          `SELECT id, name, initials, gender, att FROM students WHERE class_code = ? ORDER BY name`,
+          `SELECT id, name, initials, gender, att, photo_path AS photoPath FROM students WHERE class_code = ? ORDER BY name`,
           classCode
         );
     const batches = all(
@@ -6815,8 +6815,23 @@ async function handleApi(req, res, url) {
       const { teacherComment, headComment } = resolveReportComments({
         academicId: academic.id, studentId: s.id, examType, average: s.avgPct,
       });
-      return { ...s, position: posMap[s.id] || '—', teacherComment, headComment };
+      const suggestedComment = commentBankMatch(s.avgPct)
+        || valueFromMeta('head_comment_default', 'Great work! Your diligence in your academics is impressive.');
+      return { ...s, position: posMap[s.id] || '—', teacherComment, headComment, suggestedComment };
     });
+
+    // Per-subject rank: where a student placed among classmates in just that
+    // one subject, shown as a small badge under each subject's Total Score.
+    const subjectRanks = {};
+    for (const sub of subjects) {
+      const withScores = students
+        .map(st => ({ id: st.id, tot: scoreMatrix[st.id]?.[sub.id]?.tot }))
+        .filter(s => s.tot != null)
+        .sort((a, b) => b.tot - a.tot);
+      const ranks = {};
+      withScores.forEach((s, i) => { ranks[s.id] = i + 1; });
+      subjectRanks[sub.id] = ranks;
+    }
     const subjectStats = subjects.map(sub => {
       const scores = students.map(st => scoreMatrix[st.id]?.[sub.id]?.tot).filter(v => v != null);
       const total = scores.reduce((a, b) => a + b, 0);
@@ -6837,7 +6852,7 @@ async function handleApi(req, res, url) {
     const classScoreAvg  = subjects.length ? +(grandTotalAvgs / subjects.length).toFixed(2) : 0;
     const best = sorted[0] || null;
     return sendJson(res, 200, {
-      academic, examType, subjMax, subjects, students: rankedStudents, scoreMatrix, subjectStats,
+      academic, examType, subjMax, subjects, students: rankedStudents, scoreMatrix, subjectStats, subjectRanks,
       stats: {
         activeStudents: students.length,
         grandTotalSubjectScoreAverages: grandTotalAvgs,

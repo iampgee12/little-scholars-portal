@@ -3963,6 +3963,7 @@ async function crcBulkView() {
 
 let _bsData = null;
 let _bsView = 'full';
+let _bsStudentsById = {};
 
 let GRADE_SCALE = [
   { min:80, grade:'A', remark:'Excellent', gradePoint:5.0 },
@@ -4297,14 +4298,32 @@ async function saveHeadComment(studentId, textareaEl) {
   }
 }
 
+function autoFillHeadRemark(studentId) {
+  const textarea = document.getElementById(`bs-head-remark-${studentId}`);
+  const student = _bsStudentsById[studentId];
+  if (!textarea || !student) return;
+  textarea.value = student.suggestedComment || '';
+  saveHeadComment(studentId, textarea);
+}
+
 function renderBroadsheetTable(data) {
   const subj     = data.subjects || [];
   const students = data.students || [];
   const matrix   = data.scoreMatrix || {};
+  const subjectRanks = data.subjectRanks || {};
   const examType = data.examType || document.getElementById('bs-exam-sel')?.value || 'Final Exam';
   const isFinal  = examType === 'Final Exam';
   const subjMax  = data.subjMax || (isFinal ? 100 : 40);
   const minimal  = _bsView === 'minimal' || !isFinal;
+  _bsStudentsById = {};
+  students.forEach(st => { _bsStudentsById[st.id] = st; });
+
+  function ordinal(n) {
+    if (n == null) return '';
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
 
   function getGradeLetter(score) {
     if (score == null || score === '') return '—';
@@ -4395,16 +4414,18 @@ function renderBroadsheetTable(data) {
       }
       const grade = sc && sc.tot != null ? getGradeLetter(sc.tot) : '';
       const hasScore = sc && sc.tot != null;
+      const subjRank = hasScore ? subjectRanks[s.id]?.[st.id] : null;
+      const rankBadge = subjRank ? `<br><small class="bs-subj-rank">${ordinal(subjRank)}</small>` : '';
       if (minimal) {
         scoreCells += `<td style="text-align:center;">${hasScore
-          ? `<strong>${sc.tot}</strong><span class="bs-grade-badge">(${grade})</span>`
+          ? `<strong>${sc.tot}</strong><span class="bs-grade-badge">(${grade})</span>${rankBadge}`
           : '<span class="bs-excluded">—</span>'}</td>`;
       } else {
         const excluded = !hasScore;
         scoreCells += `<td style="text-align:center;">${excluded ? '<span class="bs-excluded">Excluded</span>' : (sc.ca ?? '—')}</td>`;
         scoreCells += `<td style="text-align:center;">${excluded ? '<span class="bs-excluded">—</span>' : (sc.ex ?? '—')}</td>`;
         scoreCells += `<td class="bs-score-total" style="text-align:center;">${hasScore
-          ? `<strong>${sc.tot}</strong><span class="bs-grade-badge">(${grade})</span>`
+          ? `<strong>${sc.tot}</strong><span class="bs-grade-badge">(${grade})</span>${rankBadge}`
           : '<span class="bs-excluded">—</span>'}</td>`;
       }
     });
@@ -4421,7 +4442,12 @@ function renderBroadsheetTable(data) {
 
     tbody += `<tr>
       <td class="bs-sticky bs-col-num">${idx + 1}</td>
-      <td class="bs-sticky bs-col-name bs-td-name">${escapeHtml(st.name)}</td>
+      <td class="bs-sticky bs-col-name bs-td-name">
+        ${st.photoPath
+          ? `<img class="bs-avatar" src="/${escapeHtml(st.photoPath)}" alt="">`
+          : `<span class="bs-avatar bs-avatar-fallback">${escapeHtml((st.initials || st.name || '?').slice(0,2))}</span>`}
+        <span>${escapeHtml(st.name)}</span>
+      </td>
       <td class="bs-sticky bs-col-reg bs-td-reg">${escapeHtml(st.id||'—')}</td>
       ${scoreCells}
       <td class="bs-score-total" style="text-align:center;">${grandTotal}${subjectCount?`<br><small style="color:var(--text-3);font-size:9px;">/ ${subjectCount*subjMax}</small>`:''}</td>
@@ -4435,7 +4461,8 @@ function renderBroadsheetTable(data) {
       <td style="text-align:center;"><span class="bs-pos-badge ${posClass}">${posLabel}</span></td>
       <td class="bs-remark-td" style="font-size:10px;color:var(--text-2);">${escapeHtml(st.teacherComment || '')}</td>
       <td class="bs-remark-td">
-        <textarea class="bs-remark-input" data-student-id="${escapeHtml(st.id)}" rows="2" style="width:100%;min-width:160px;font-size:10px;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;" onchange="saveHeadComment('${escapeHtml(st.id)}', this)">${escapeHtml(st.headComment || '')}</textarea>
+        <textarea class="bs-remark-input" id="bs-head-remark-${escapeHtml(st.id)}" data-student-id="${escapeHtml(st.id)}" rows="2" style="width:100%;min-width:160px;font-size:10px;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:4px;resize:vertical;" onchange="saveHeadComment('${escapeHtml(st.id)}', this)">${escapeHtml(st.headComment || '')}</textarea>
+        <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested remark based on this student's score" onclick="autoFillHeadRemark('${escapeHtml(st.id)}')">&#x21bb; Auto Remark</button>
       </td>
       <td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td>
       <td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td><td class="bs-att-cell" style="text-align:center;">—</td>
