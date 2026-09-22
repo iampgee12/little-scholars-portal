@@ -2263,50 +2263,6 @@ function rankOf(standings, studentId) {
   return { position: idx + 1, classSize: standings.length, avgPct: standings[idx].avgPct };
 }
 
-function adminBatchReview(batchId) {
-  const batch = one(
-    `SELECT
-       rb.id,
-       rb.class_code AS classCode,
-       c.label AS classLabel,
-       rb.exam_type AS examType,
-       rb.saved_at AS savedAtIso,
-       rb.vetted_at AS vettedAtIso,
-       rb.vetted_by AS vettedBy,
-       s.name AS subjectName,
-       u.name AS teacherName
-     FROM result_batches rb
-     JOIN classes c ON c.code = rb.class_code
-     JOIN subjects s ON s.id = rb.subject_id
-     JOIN users u ON u.id = rb.teacher_id
-     WHERE rb.id = ?
-       AND rb.academic_id = (SELECT id FROM academic_terms WHERE is_active = 1)`,
-    Number(batchId)
-  );
-  if (!batch) return null;
-  const entries = all(
-    `SELECT
-       st.id AS studentId,
-       st.name AS studentName,
-       st.gender,
-       re.ca_score AS ca,
-       re.exam_score AS exam,
-       re.total_score AS total
-     FROM result_entries re
-     JOIN students st ON st.id = re.student_id
-     WHERE re.batch_id = ?
-     ORDER BY st.name`,
-    Number(batchId)
-  );
-  return {
-    ...batch,
-    savedAt: formatSavedAt(batch.savedAtIso),
-    vettedAt: batch.vettedAtIso ? formatSavedAt(batch.vettedAtIso) : '',
-    entries,
-    entryCount: entries.length,
-  };
-}
-
 async function embedImageIfPresent(pdfDoc, relativePath) {
   const full = absoluteAssetPath(relativePath);
   if (!full || !fs.existsSync(full)) return null;
@@ -4391,15 +4347,6 @@ async function handleApi(req, res, url) {
     }
     run('UPDATE result_batches SET vetted_at = NULL, vetted_by = NULL WHERE id = ?', batchId);
     return sendJson(res, 200, { ok: true, gradebook: adminGradebook(batch.classCode, batch.examType) });
-  }
-
-  const batchReviewMatch = url.pathname.match(/^\/api\/admin\/result-batches\/(\d+)$/);
-  if (req.method === 'GET' && batchReviewMatch) {
-    const user = requireUser(req, res, 'admin');
-    if (!user) return;
-    const batch = adminBatchReview(Number(batchReviewMatch[1]));
-    if (!batch) return sendJson(res, 404, { error: 'Result batch not found' });
-    return sendJson(res, 200, { batch });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/admin/reports/publish') {

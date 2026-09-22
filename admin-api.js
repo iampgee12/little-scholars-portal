@@ -5,8 +5,6 @@ const state = {
   pendingDeleteStudentId: null,
   editingStaffId: null,
   editingAssignmentId: null,
-  reviewingBatchId: null,
-  batchReview: null,
   staffFilter: 'All Staff',
   gradebookBatch: null,
   cognitiveRatings: {},
@@ -184,7 +182,6 @@ async function loadResultSetup() {
   populateGradebookControls();
   populateCognitiveControls();
   renderAssignments();
-  renderResultBatches();
   renderPublications();
   renderEmailConfigStatus();
   renderEmailQueue();
@@ -1962,124 +1959,6 @@ async function deleteAssignment(id) {
   }
 }
 
-function renderResultBatches() {
-  const tbody = document.getElementById('vetting-tbody');
-  if (!tbody) return;
-  const batches = state.setup.resultBatches || [];
-  if (!batches.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-3);padding:16px;">No teacher result submissions yet.</td></tr>';
-    renderBatchReviewPanel();
-    return;
-  }
-  tbody.innerHTML = batches.map(batch => `
-    <tr>
-      <td>${escapeHtml(batch.classLabel)}</td>
-      <td>${escapeHtml(batch.examType)}</td>
-      <td>${escapeHtml(batch.subjectName)}</td>
-      <td>${escapeHtml(batch.teacherName)}</td>
-      <td style="font-family:'DM Mono',monospace;">${batch.entryCount}</td>
-      <td style="color:var(--text-3);">${batch.savedAt ? `Uploaded ${escapeHtml(batch.savedAt)}` : '-'}</td>
-      <td><button class="post-btn" style="padding:6px 10px;" onclick="openBatchReview(${batch.id})">View</button></td>
-    </tr>`).join('');
-  renderBatchReviewPanel();
-}
-
-function batchScoreColumns(examType) {
-  if (examType === 'Final Exam') return ['CA (30)', 'Exam (70)', 'Total (100)'];
-  return ['CA (30)', 'Total (30)'];
-}
-
-function renderBatchReviewPanel() {
-  const panel = document.getElementById('batch-review-panel');
-  if (!panel) return;
-  const batch = state.batchReview;
-  if (!batch) {
-    panel.innerHTML = `
-      <div class="card-head"><span class="card-title">Review Uploaded Results</span></div>
-      <div class="card-body" style="font-size:12px;color:var(--text-3);line-height:1.55;">
-        Select <strong>View</strong> beside a teacher upload to see every student's score in it.
-      </div>`;
-    return;
-  }
-
-  const isCurrent = (state.setup.resultBatches || []).some(item => Number(item.id) === Number(batch.id));
-  if (!isCurrent) {
-    state.batchReview = null;
-    state.reviewingBatchId = null;
-    renderBatchReviewPanel();
-    return;
-  }
-
-  const columns = batchScoreColumns(batch.examType);
-  const rows = batch.entries || [];
-  const entryRows = rows.length ? rows.map((entry, index) => {
-    const scoreCells = batch.examType === 'Final Exam'
-      ? `<td style="text-align:center;font-family:'DM Mono',monospace;">${entry.ca ?? '-'}</td><td style="text-align:center;font-family:'DM Mono',monospace;">${entry.exam ?? '-'}</td><td style="text-align:center;font-family:'DM Mono',monospace;font-weight:700;">${entry.total ?? '-'}</td>`
-      : `<td style="text-align:center;font-family:'DM Mono',monospace;">${entry.ca ?? '-'}</td><td style="text-align:center;font-family:'DM Mono',monospace;font-weight:700;">${entry.total ?? '-'}</td>`;
-    return `
-      <tr>
-        <td style="font-family:'DM Mono',monospace;color:var(--text-3);">${index + 1}</td>
-        <td><strong>${escapeHtml(entry.studentName)}</strong><div style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${escapeHtml(entry.studentId)}</div></td>
-        <td style="color:var(--text-3);">${escapeHtml(entry.gender === 'F' ? 'Female' : entry.gender === 'M' ? 'Male' : entry.gender || '-')}</td>
-        ${scoreCells}
-      </tr>`;
-  }).join('') : `<tr><td colspan="${columns.length + 3}" style="padding:14px;color:var(--text-3);">No student scores were found in this upload.</td></tr>`;
-
-  panel.innerHTML = `
-    <div class="card-head">
-      <span class="card-title">Review Uploaded Results</span>
-      <button class="post-btn" style="padding:6px 10px;background:var(--black-3);" onclick="closeBatchReview()">Close</button>
-    </div>
-    <div class="card-body">
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px;">
-        <div><div style="font-size:10px;color:var(--text-3);text-transform:uppercase;">Class</div><strong>${escapeHtml(batch.classLabel)}</strong></div>
-        <div><div style="font-size:10px;color:var(--text-3);text-transform:uppercase;">Exam</div><strong>${escapeHtml(batch.examType)}</strong></div>
-        <div><div style="font-size:10px;color:var(--text-3);text-transform:uppercase;">Subject</div><strong>${escapeHtml(batch.subjectName)}</strong></div>
-        <div><div style="font-size:10px;color:var(--text-3);text-transform:uppercase;">Teacher</div><strong>${escapeHtml(batch.teacherName)}</strong></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
-        <div style="font-size:11px;color:var(--text-3);">Uploaded ${escapeHtml(batch.savedAt || '-')} • ${rows.length} student score${rows.length === 1 ? '' : 's'}</div>
-      </div>
-      <div style="overflow-x:auto;border:1px solid var(--black-4);border-radius:var(--radius-sm);">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width:42px;">#</th>
-              <th>Student</th>
-              <th>Gender</th>
-              ${columns.map(column => `<th style="text-align:center;">${escapeHtml(column)}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>${entryRows}</tbody>
-        </table>
-      </div>
-    </div>`;
-}
-
-async function openBatchReview(id) {
-  state.reviewingBatchId = Number(id);
-  const panel = document.getElementById('batch-review-panel');
-  if (panel) {
-    panel.innerHTML = `
-      <div class="card-head"><span class="card-title">Review Uploaded Results</span></div>
-      <div class="card-body" style="font-size:12px;color:var(--text-3);">Loading uploaded student scores...</div>`;
-  }
-  try {
-    const data = await apiFetch(`/api/admin/result-batches/${id}`);
-    state.batchReview = data.batch;
-    renderBatchReviewPanel();
-    document.getElementById('batch-review-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (err) {
-    showToast(err.message);
-  }
-}
-
-function closeBatchReview() {
-  state.reviewingBatchId = null;
-  state.batchReview = null;
-  renderBatchReviewPanel();
-}
-
 function renderPublications() {
   const tbody = document.getElementById('publications-tbody');
   if (!tbody) {
@@ -2466,7 +2345,6 @@ async function deleteStudent(id) {
     populateStudents();
     populateParents();
     populateAdminControls();
-    renderResultBatches();
     renderPublications();
     if (state.editingStudentId === id) {
       clearStudentForm();
@@ -3084,7 +2962,6 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'publish') {
     const sec = document.getElementById('bs-results-section');
     if (sec) sec.style.display = 'none';
-    renderResultBatches();
     renderPublications();
     populateBroadsheetControls();
   }
