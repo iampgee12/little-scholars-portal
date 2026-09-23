@@ -657,6 +657,17 @@ function createSchema() {
   ensureColumn('users', 'active', 'INTEGER NOT NULL DEFAULT 1');
   ensureColumn('users', 'reset_token', 'TEXT');
   ensureColumn('users', 'reset_token_expires', 'TEXT');
+  ensureColumn('academic_terms', 'start_date', 'TEXT');
+  ensureColumn('academic_terms', 'end_date', 'TEXT');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS term_holidays (
+      id INTEGER PRIMARY KEY,
+      academic_id INTEGER NOT NULL REFERENCES academic_terms(id) ON DELETE CASCADE,
+      holiday_date TEXT NOT NULL,
+      label TEXT NOT NULL,
+      UNIQUE(academic_id, holiday_date)
+    );
+  `);
   ensureColumn('students', 'parent_email', 'TEXT');
   ensureColumn('students', 'photo_path', 'TEXT');
   ensureColumn('result_batches', 'vetted_at', 'TEXT');
@@ -1672,6 +1683,82 @@ function classHasArms(classCode) {
 
 function activeAcademic() {
   return one('SELECT id, session_label AS sessionLabel, term_label AS termLabel FROM academic_terms WHERE is_active = 1');
+}
+
+// Anonymous Gregorian algorithm (Meeus/Jones/Butcher) for the date of Easter
+// Sunday in a given year — needed since Good Friday / Easter Monday shift
+// every year and can't just be hardcoded.
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+// Nigeria's fixed-date public holidays plus the Easter-derived ones. Islamic
+// holidays (Eid el-Fitr, Eid el-Kabir) follow the lunar calendar and can't be
+// computed reliably in advance, so those are left for the admin to add by
+// hand, same as any other school-specific closure day.
+function nigerianFixedHolidays(year) {
+  const easter = easterSunday(year);
+  const goodFriday = new Date(easter); goodFriday.setUTCDate(easter.getUTCDate() - 2);
+  const easterMonday = new Date(easter); easterMonday.setUTCDate(easter.getUTCDate() + 1);
+  return [
+    { date: `${year}-01-01`, label: "New Year's Day" },
+    { date: isoDate(goodFriday), label: 'Good Friday' },
+    { date: isoDate(easterMonday), label: 'Easter Monday' },
+    { date: `${year}-05-01`, label: "Workers' Day" },
+    { date: `${year}-05-27`, label: "Children's Day" },
+    { date: `${year}-06-12`, label: 'Democracy Day' },
+    { date: `${year}-10-01`, label: 'Independence Day' },
+    { date: `${year}-12-25`, label: 'Christmas Day' },
+    { date: `${year}-12-26`, label: 'Boxing Day' },
+  ];
+}
+
+// Idempotent: only inserts holidays that fall inside the range and aren't
+// already there (UNIQUE(academic_id, holiday_date) makes repeat calls safe).
+function seedHolidaysForRange(academicId, startDate, endDate) {
+  const startYear = Number(startDate.slice(0, 4));
+  const endYear = Number(endDate.slice(0, 4));
+  for (let y = startYear; y <= endYear; y++) {
+    for (const h of nigerianFixedHolidays(y)) {
+      if (h.date < startDate || h.date > endDate) continue;
+      try {
+        run('INSERT INTO term_holidays (academic_id, holiday_date, label) VALUES (?, ?, ?)', academicId, h.date, h.label);
+      } catch (err) { /* already exists */ }
+    }
+  }
+}
+
+// Counts weekdays (Mon-Fri) in [startDate, endDate] minus any that are
+// marked as a holiday. Returns null if the term has no date range set yet.
+function computeSchoolDays(academicId) {
+  const term = one('SELECT start_date AS startDate, end_date AS endDate FROM academic_terms WHERE id = ?', academicId);
+  if (!term || !term.startDate || !term.endDate) return null;
+  const holidays = new Set(all('SELECT holiday_date AS d FROM term_holidays WHERE academic_id = ?', academicId).map(r => r.d));
+  let count = 0;
+  const cursor = new Date(`${term.startDate}T00:00:00Z`);
+  const end = new Date(`${term.endDate}T00:00:00Z`);
+  while (cursor <= end) {
+    const dow = cursor.getUTCDay();
+    if (dow !== 0 && dow !== 6 && !holidays.has(isoDate(cursor))) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return count;
 }
 
 function studentRowsForClass(classCode) {
@@ -2865,7 +2952,8 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   const totalScore = rowTotals.reduce((sum, value) => sum + value, 0);
   const subjectMax = maxScoreForExamType(examType);
   const average = countedRows.length ? Math.round((totalScore / (countedRows.length * subjectMax)) * 100) : 0;
-  const schoolDays = Number(valueFromMeta('school_days', 102));
+  const computedSchoolDays = computeSchoolDays(academic.id);
+  const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
   const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
   const absent = Math.max(0, schoolDays - present);
   const formTeacher = rows.find(row => row.teacherSignaturePath) || rows[0] || {};
@@ -6863,6 +6951,70 @@ async function handleApi(req, res, url) {
     run('UPDATE academic_terms SET is_active = 0');
     run('UPDATE academic_terms SET is_active = 1 WHERE id = ?', row.id);
     return sendJson(res, 200, { ok: true, id: row.id });
+  }
+
+  const termDatesMatch = url.pathname.match(/^\/api\/admin\/academic-sessions\/(\d+)\/dates$/);
+  if (req.method === 'PUT' && termDatesMatch) {
+    const admin = requireUser(req, res, 'admin');
+    if (!admin) return;
+    const id = Number(termDatesMatch[1]);
+    const term = one('SELECT id FROM academic_terms WHERE id = ?', id);
+    if (!term) return sendJson(res, 404, { error: 'Session not found' });
+    const body = await readJson(req);
+    const startDate = cleanText(body.startDate);
+    const endDate = cleanText(body.endDate);
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRe.test(startDate) || !dateRe.test(endDate)) {
+      return sendJson(res, 400, { error: 'Start and end date are required' });
+    }
+    if (endDate < startDate) return sendJson(res, 400, { error: 'End date must be after start date' });
+    run('UPDATE academic_terms SET start_date = ?, end_date = ? WHERE id = ?', startDate, endDate, id);
+    seedHolidaysForRange(id, startDate, endDate);
+    const holidays = all('SELECT id, holiday_date AS date, label FROM term_holidays WHERE academic_id = ? ORDER BY holiday_date', id);
+    return sendJson(res, 200, { ok: true, startDate, endDate, schoolDays: computeSchoolDays(id), holidays });
+  }
+
+  const termHolidaysMatch = url.pathname.match(/^\/api\/admin\/academic-sessions\/(\d+)\/holidays$/);
+  if (req.method === 'GET' && termHolidaysMatch) {
+    const admin = requireUser(req, res, 'admin');
+    if (!admin) return;
+    const id = Number(termHolidaysMatch[1]);
+    const term = one('SELECT id, start_date AS startDate, end_date AS endDate FROM academic_terms WHERE id = ?', id);
+    if (!term) return sendJson(res, 404, { error: 'Session not found' });
+    const holidays = all('SELECT id, holiday_date AS date, label FROM term_holidays WHERE academic_id = ? ORDER BY holiday_date', id);
+    return sendJson(res, 200, { startDate: term.startDate, endDate: term.endDate, schoolDays: computeSchoolDays(id), holidays });
+  }
+  if (req.method === 'POST' && termHolidaysMatch) {
+    const admin = requireUser(req, res, 'admin');
+    if (!admin) return;
+    const id = Number(termHolidaysMatch[1]);
+    const term = one('SELECT id, start_date AS startDate, end_date AS endDate FROM academic_terms WHERE id = ?', id);
+    if (!term) return sendJson(res, 404, { error: 'Session not found' });
+    const body = await readJson(req);
+    const date = cleanText(body.date);
+    const label = cleanText(body.label) || 'Holiday';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return sendJson(res, 400, { error: 'A valid date is required' });
+    if (term.startDate && (date < term.startDate || date > term.endDate)) {
+      return sendJson(res, 400, { error: 'Date must fall within the term\'s start and end date' });
+    }
+    try {
+      run('INSERT INTO term_holidays (academic_id, holiday_date, label) VALUES (?, ?, ?)', id, date, label);
+    } catch (err) {
+      return sendJson(res, 409, { error: 'That date is already marked as a holiday' });
+    }
+    const holidays = all('SELECT id, holiday_date AS date, label FROM term_holidays WHERE academic_id = ? ORDER BY holiday_date', id);
+    return sendJson(res, 200, { ok: true, schoolDays: computeSchoolDays(id), holidays });
+  }
+
+  const deleteHolidayMatch = url.pathname.match(/^\/api\/admin\/academic-sessions\/(\d+)\/holidays\/(\d+)$/);
+  if (req.method === 'DELETE' && deleteHolidayMatch) {
+    const admin = requireUser(req, res, 'admin');
+    if (!admin) return;
+    const id = Number(deleteHolidayMatch[1]);
+    const holidayId = Number(deleteHolidayMatch[2]);
+    run('DELETE FROM term_holidays WHERE id = ? AND academic_id = ?', holidayId, id);
+    const holidays = all('SELECT id, holiday_date AS date, label FROM term_holidays WHERE academic_id = ? ORDER BY holiday_date', id);
+    return sendJson(res, 200, { ok: true, schoolDays: computeSchoolDays(id), holidays });
   }
 
   const activateSessionMatch = url.pathname.match(/^\/api\/admin\/academic-sessions\/(\d+)\/activate$/);

@@ -306,6 +306,19 @@ body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; bor
 .bs-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:6px; }
 .bs-avatar-fallback { display:inline-flex; align-items:center; justify-content:center; background:#e2e8f0; color:#64748b; font-size:9px; font-weight:700; text-transform:uppercase; }
 .bs-subj-rank { display:inline-block; margin-top:2px; padding:1px 6px; border-radius:8px; background:#f3f4f6; border:1px solid #e5e7eb; color:#555; font-weight:700; font-size:8.5px; }
+
+/* School Calendar month grid */
+.cal-month { margin-bottom:22px; }
+.cal-month-title { font-size:13px; font-weight:700; color:var(--text-1); margin-bottom:8px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.cal-dow { text-align:center; font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; padding-bottom:2px; }
+.cal-day { position:relative; aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:6px; font-size:11px; font-family:'DM Mono',monospace; border:1px solid var(--border); background:var(--black-2); color:var(--text-2); cursor:default; }
+.cal-day.cal-empty { border:none; background:transparent; }
+.cal-day.cal-weekend { background:var(--black-3); color:var(--text-3); }
+.cal-day.cal-schoolday { cursor:pointer; }
+.cal-day.cal-schoolday:hover { border-color:var(--blue,#2563eb); }
+.cal-day.cal-holiday { background:rgba(220,38,38,0.12); border-color:rgba(220,38,38,0.4); color:#dc2626; font-weight:700; cursor:pointer; }
+.cal-day .cal-holiday-dot { position:absolute; bottom:2px; width:4px; height:4px; border-radius:50%; background:#dc2626; }
 .bs-att-cell { min-width:80px; font-size:10px; line-height:1.7; color:#555; }
 .bs-att-cell span { display:block; }
 .bs-preview-btn { background:none; border:none; color:#999; font-size:15px; cursor:pointer; padding:2px 6px; border-radius:4px; transition:color var(--transition); }
@@ -4160,6 +4173,41 @@ body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; bor
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px;">
               <span id="at-sessions-info" style="font-size:11px;color:var(--text-3)">Showing 0 to 0 of 0 entries</span>
               <div style="display:flex;gap:4px;" id="at-sessions-pages"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- School Calendar -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><span class="card-title">School Calendar &mdash; Active Term</span></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:16px;">
+              <div><label class="field-label">Term Start Date</label><input class="field-input" type="date" id="cal-start-date"></div>
+              <div><label class="field-label">Term End Date</label><input class="field-input" type="date" id="cal-end-date"></div>
+              <button class="post-btn" onclick="saveCalendarDates()">Save Dates</button>
+            </div>
+            <div id="cal-days-summary" style="display:none;background:var(--green-bg,rgba(22,163,74,.08));border:1px solid rgba(22,163,74,.25);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px;">
+              Total School Days: <strong id="cal-days-count" style="font-family:'DM Mono',monospace;">0</strong>
+              <span style="color:var(--text-3);"> (weekdays in range, minus holidays below)</span>
+            </div>
+            <div id="cal-no-dates" style="font-size:12px;color:var(--text-3);margin-bottom:16px;">Set a start and end date above to build the calendar for this term.</div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+              <span style="font-size:12px;font-weight:700;color:var(--text-2);">Click any weekday to mark/unmark it as a closed day</span>
+              <button class="post-btn" style="padding:6px 12px;font-size:11px;" onclick="openAddHolidayModal()">&#xff0b; Add Custom Closed Day</button>
+            </div>
+            <div id="cal-months"></div>
+          </div>
+        </div>
+
+        <!-- Add Custom Closed Day Modal -->
+        <div id="cal-holiday-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeAddHolidayModal()">
+          <div class="card" style="width:min(380px,94vw);padding:0;">
+            <div class="card-head"><span class="card-title">Add Custom Closed Day</span><button class="cog-modal-close" onclick="closeAddHolidayModal()">&#x2715;</button></div>
+            <div class="card-body">
+              <div style="margin-bottom:12px;"><label class="field-label">Date</label><input class="field-input" type="date" id="cal-holiday-date"></div>
+              <div style="margin-bottom:16px;"><label class="field-label">Reason</label><input class="field-input" id="cal-holiday-label" placeholder="e.g. Mid-Term Break"></div>
+              <button class="post-btn" style="width:100%;" onclick="saveCustomHoliday()">Save</button>
             </div>
           </div>
         </div>

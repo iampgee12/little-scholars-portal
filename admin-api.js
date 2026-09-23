@@ -3012,7 +3012,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'classes') populateClasses();
   if (tab === 'subjects') populateSubjects();
   if (tab === 'systemSettings') loadSystemSettings();
-  if (tab === 'academicTerms') loadAcademicTermsTab();
+  if (tab === 'academicTerms') { loadAcademicTermsTab(); loadCalendarTab(); }
   if (tab === 'scoreDivisions') sdInit();
   if (tab === 'commentsBank') cbLoadComments();
   if (tab === 'resultPrefs') { switchRspTab('sheet'); renderSignaturesPanel(); }
@@ -5543,6 +5543,147 @@ function atGoPage(p) {
   const totalPages = Math.max(1, Math.ceil(_atFiltered.length / perPage));
   _atPage = Math.max(1, Math.min(p, totalPages));
   atRenderSessions();
+}
+
+// ── SCHOOL CALENDAR ──
+let _calAcademicId = null;
+let _calData = { startDate: '', endDate: '', schoolDays: null, holidays: [] };
+
+async function loadCalendarTab() {
+  const active = (state.setup && state.setup.academic) || _atSessions.find(s => s.isActive);
+  if (!active) return;
+  _calAcademicId = active.id;
+  try {
+    const data = await apiFetch(`/api/admin/academic-sessions/${_calAcademicId}/holidays`);
+    _calData = data;
+    renderCalendarPanel();
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
+function renderCalendarPanel() {
+  document.getElementById('cal-start-date').value = _calData.startDate || '';
+  document.getElementById('cal-end-date').value = _calData.endDate || '';
+
+  const summary = document.getElementById('cal-days-summary');
+  const noDates = document.getElementById('cal-no-dates');
+  if (_calData.startDate && _calData.endDate) {
+    summary.style.display = '';
+    noDates.style.display = 'none';
+    document.getElementById('cal-days-count').textContent = _calData.schoolDays ?? '0';
+  } else {
+    summary.style.display = 'none';
+    noDates.style.display = '';
+  }
+
+  renderCalendarMonths();
+}
+
+async function saveCalendarDates() {
+  const startDate = document.getElementById('cal-start-date').value;
+  const endDate = document.getElementById('cal-end-date').value;
+  if (!startDate || !endDate) return showToast('Choose both a start and end date', true);
+  try {
+    const data = await apiFetch(`/api/admin/academic-sessions/${_calAcademicId}/dates`, {
+      method: 'PUT', body: JSON.stringify({ startDate, endDate }),
+    });
+    _calData = data;
+    renderCalendarPanel();
+    showToast('Term dates saved — Nigerian public holidays in range were added automatically');
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
+function renderCalendarMonths() {
+  const wrap = document.getElementById('cal-months');
+  if (!_calData.startDate || !_calData.endDate) { wrap.innerHTML = ''; return; }
+
+  const holidayMap = {};
+  (_calData.holidays || []).forEach(h => { holidayMap[h.date] = h; });
+
+  const start = new Date(_calData.startDate + 'T00:00:00Z');
+  const end = new Date(_calData.endDate + 'T00:00:00Z');
+  const dow = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  let html = '';
+  let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  const lastMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+
+  while (cursor <= lastMonth) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth();
+    const firstDow = new Date(Date.UTC(year, month, 1)).getUTCDay();
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+    html += `<div class="cal-month"><div class="cal-month-title">${monthNames[month]} ${year}</div><div class="cal-grid">`;
+    dow.forEach(d => { html += `<div class="cal-dow">${d}</div>`; });
+    for (let i = 0; i < firstDow; i++) html += `<div class="cal-day cal-empty"></div>`;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayDate = new Date(Date.UTC(year, month, day));
+      const inRange = iso >= _calData.startDate && iso <= _calData.endDate;
+      const weekday = dayDate.getUTCDay();
+      const isWeekend = weekday === 0 || weekday === 6;
+      const holiday = holidayMap[iso];
+      if (!inRange) {
+        html += `<div class="cal-day cal-empty"></div>`;
+      } else if (holiday) {
+        html += `<div class="cal-day cal-holiday" title="${escapeHtml(holiday.label)} — click to remove" onclick="toggleCalendarDay('${iso}')">${day}<span class="cal-holiday-dot"></span></div>`;
+      } else if (isWeekend) {
+        html += `<div class="cal-day cal-weekend" title="Weekend">${day}</div>`;
+      } else {
+        html += `<div class="cal-day cal-schoolday" title="School day — click to mark closed" onclick="toggleCalendarDay('${iso}')">${day}</div>`;
+      }
+    }
+    html += `</div></div>`;
+    cursor = new Date(Date.UTC(year, month + 1, 1));
+  }
+  wrap.innerHTML = html;
+}
+
+async function toggleCalendarDay(iso) {
+  const existing = (_calData.holidays || []).find(h => h.date === iso);
+  try {
+    let data;
+    if (existing) {
+      data = await apiFetch(`/api/admin/academic-sessions/${_calAcademicId}/holidays/${existing.id}`, { method: 'DELETE' });
+    } else {
+      data = await apiFetch(`/api/admin/academic-sessions/${_calAcademicId}/holidays`, {
+        method: 'POST', body: JSON.stringify({ date: iso, label: 'Closed Day' }),
+      });
+    }
+    _calData = { ..._calData, schoolDays: data.schoolDays, holidays: data.holidays };
+    renderCalendarPanel();
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
+function openAddHolidayModal() {
+  document.getElementById('cal-holiday-date').value = _calData.startDate || '';
+  document.getElementById('cal-holiday-label').value = '';
+  document.getElementById('cal-holiday-modal').style.display = 'flex';
+}
+function closeAddHolidayModal() { document.getElementById('cal-holiday-modal').style.display = 'none'; }
+
+async function saveCustomHoliday() {
+  const date = document.getElementById('cal-holiday-date').value;
+  const label = document.getElementById('cal-holiday-label').value.trim() || 'Closed Day';
+  if (!date) return showToast('Choose a date', true);
+  try {
+    const data = await apiFetch(`/api/admin/academic-sessions/${_calAcademicId}/holidays`, {
+      method: 'POST', body: JSON.stringify({ date, label }),
+    });
+    _calData = { ..._calData, schoolDays: data.schoolDays, holidays: data.holidays };
+    renderCalendarPanel();
+    closeAddHolidayModal();
+    showToast('Closed day added');
+  } catch (e) {
+    showToast(e.message, true);
+  }
 }
 
 // id-in-html → meta key mapping
