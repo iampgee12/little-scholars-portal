@@ -68,6 +68,15 @@
   .cbt-option:hover { background: var(--black-3); }
   .cbt-submit-btn { display: block; width: 100%; background: var(--green); color: #fff; border: none; border-radius: var(--radius); padding: 14px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 10px; }
 
+  .cbt-question-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .cbt-qnum { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--black); color: var(--text-2); font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .cbt-qnum:hover { border-color: var(--blue); }
+  .cbt-qnum-answered { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+  .cbt-qnum-active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .cbt-nav-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
+  .cbt-btn-secondary { background: var(--black-3); color: var(--text-2); border: 1px solid var(--border); }
+  .cbt-btn:disabled { opacity: .4; cursor: not-allowed; }
+
   .cbt-result-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px 24px; text-align: center; max-width: 420px; margin: 40px auto; }
   .cbt-result-big { font-family: 'DM Mono', monospace; font-size: 40px; font-weight: 700; color: var(--blue); margin: 14px 0 6px; }
 </style>
@@ -94,8 +103,8 @@
         <div id="cbt-exam-title">Question Paper</div>
         <div id="cbt-timer" class="cbt-timer">--:--</div>
       </div>
+      <div id="cbt-question-nav" class="cbt-question-nav"></div>
       <div id="cbt-questions"></div>
-      <button class="cbt-submit-btn" onclick="confirmSubmit()">Submit Exam</button>
     </div>
 
     <div id="cbt-result-view" style="display:none;">

@@ -91,6 +91,7 @@ async function startExam(scheduleSubjectId) {
     currentExam = {
       id: scheduleSubjectId,
       ...data,
+      currentIndex: 0,
       answersMap: new Map((data.answers || []).map(a => [a.questionId, a.selectedOption])),
     };
     renderExamView();
@@ -103,15 +104,38 @@ async function startExam(scheduleSubjectId) {
   }
 }
 
+// One question per screen: a numbered strip to jump to any question (green
+// once answered, blue for the one currently open), plus Previous/Next
+// buttons under the question itself — Next becomes Submit on the last one.
 function renderExamView() {
+  renderQuestionNav();
+  renderCurrentQuestion();
+}
+
+function renderQuestionNav() {
+  const nav = document.getElementById('cbt-question-nav');
+  if (!currentExam.questions.length) { nav.innerHTML = ''; return; }
+  nav.innerHTML = currentExam.questions.map((q, i) => {
+    const answered = currentExam.answersMap.has(q.id);
+    const active = i === currentExam.currentIndex;
+    const cls = ['cbt-qnum', answered ? 'cbt-qnum-answered' : '', active ? 'cbt-qnum-active' : ''].filter(Boolean).join(' ');
+    return `<button class="${cls}" onclick="goToQuestion(${i})">${i + 1}</button>`;
+  }).join('');
+}
+
+function renderCurrentQuestion() {
   const wrap = document.getElementById('cbt-questions');
   if (!currentExam.questions.length) {
     wrap.innerHTML = '<div class="cbt-empty">No questions have been added to this exam yet.</div>';
     return;
   }
-  wrap.innerHTML = currentExam.questions.map((q, i) => `
+  const i = currentExam.currentIndex;
+  const q = currentExam.questions[i];
+  const isLast = i === currentExam.questions.length - 1;
+  wrap.innerHTML = `
     <div class="cbt-question-card">
-      <div class="cbt-question-text"><strong>${i + 1}.</strong> ${escapeHtml(q.questionText)} <span class="cbt-muted">(${q.marks} mark${Number(q.marks) === 1 ? '' : 's'})</span></div>
+      <div class="cbt-question-text"><strong>Question ${i + 1} of ${currentExam.questions.length}</strong> <span class="cbt-muted">(${q.marks} mark${Number(q.marks) === 1 ? '' : 's'})</span></div>
+      <div class="cbt-question-text">${escapeHtml(q.questionText)}</div>
       <div class="cbt-options">
         ${q.options.map((opt, j) => `
           <label class="cbt-option">
@@ -121,11 +145,24 @@ function renderExamView() {
         `).join('')}
       </div>
     </div>
-  `).join('');
+    <div class="cbt-nav-buttons">
+      <button class="cbt-btn cbt-btn-secondary" onclick="goToQuestion(${i - 1})" ${i === 0 ? 'disabled' : ''}>&larr; Previous</button>
+      ${isLast
+        ? `<button class="cbt-btn cbt-submit-btn" style="margin:0;width:auto;" onclick="confirmSubmit()">Submit Exam</button>`
+        : `<button class="cbt-btn" onclick="goToQuestion(${i + 1})">Next &rarr;</button>`}
+    </div>
+  `;
+}
+
+function goToQuestion(i) {
+  if (!currentExam || i < 0 || i >= currentExam.questions.length) return;
+  currentExam.currentIndex = i;
+  renderExamView();
 }
 
 async function saveAnswer(questionId, selectedOption) {
   currentExam.answersMap.set(questionId, selectedOption);
+  renderQuestionNav();
   try {
     await apiFetch(`/api/student/cbt/exams/${currentExam.id}/answer`, {
       method: 'POST',

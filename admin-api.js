@@ -5378,7 +5378,10 @@ async function cscViewScores() {
         <td><input type="number" class="field-input" style="width:60px;" id="csc-attempted-${escapeHtml(r.studentId)}" value="${r.questionsAttempted ?? ''}" min="0"></td>
         <td>${pct != null ? pct + '%' : '—'}</td>
         <td>${escapeHtml((r.recordedAt || '').slice(0, 10)) || '—'}</td>
-        <td><button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore('${r.studentId}')">Save</button></td>
+        <td>
+          <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore('${r.studentId}')">Save</button>
+          ${r.submittedAt ? `<button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
+        </td>
       </tr>`;
     }).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students / match found</td></tr>';
   } catch (err) {
@@ -5399,6 +5402,16 @@ async function cscSaveScore(studentId) {
       body: JSON.stringify({ scheduleSubjectId, studentId, score, totalMarks, questionsPresented, questionsAttempted }),
     });
     showToast('Score saved');
+    cscViewScores();
+  } catch (err) { showToast(err.message); }
+}
+
+async function cscAllowRetake(studentId) {
+  const scheduleSubjectId = document.getElementById('csc-subject').value;
+  if (!confirm('Clear this student\'s submitted attempt so they can sit the exam again? Their previous answers will be gone.')) return;
+  try {
+    await apiFetch(`/api/admin/cbt/schedule-subjects/${scheduleSubjectId}/students/${encodeURIComponent(studentId)}/retake`, { method: 'POST' });
+    showToast('Retake allowed — the student can start this exam again');
     cscViewScores();
   } catch (err) { showToast(err.message); }
 }

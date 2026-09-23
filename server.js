@@ -390,7 +390,7 @@ function createSchema() {
       helper_hint TEXT,
       tags TEXT,
       answer_explanation TEXT,
-      vetted INTEGER NOT NULL DEFAULT 0,
+      vetted INTEGER NOT NULL DEFAULT 1,
       taken_before INTEGER NOT NULL DEFAULT 0,
       archived INTEGER NOT NULL DEFAULT 0,
       created_by TEXT REFERENCES users(id),
@@ -1591,6 +1591,10 @@ if (IS_PROD) {
 migratePlaintextPasswords();
 backfillMissingStudentUsers();
 loadGradeScale();
+// One-time cleanup: CBT questions used to need a manual admin "vet" step
+// before they were usable. That approval step was removed — any question
+// created before this change should still work immediately.
+run('UPDATE cbt_questions SET vetted = 1 WHERE vetted = 0');
 
 function sendJson(res, status, data, extraHeaders = {}) {
   const body = JSON.stringify(data);
@@ -4608,6 +4612,122 @@ async function handleApi(req, res, url) {
     return res.end(pdfBytes);
   }
 
+  // ── TEACHER: CBT QUESTION AUTHORING ─────────────────────────────────
+  // A teacher may add/edit/delete multiple-choice CBT questions for any
+  // class+subject they're assigned to (class_teacher or subject_teacher —
+  // either grants access). Questions go live immediately (no vetting step).
+  if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/context') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const rows = all(
+      `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel, ta.subject_id AS subjectId, s.name AS subjectName
+       FROM teacher_assignments ta
+       JOIN classes c ON c.code = ta.class_code
+       JOIN subjects s ON s.id = ta.subject_id
+       WHERE ta.teacher_id = ?
+       ORDER BY c.label, s.name`,
+      user.id
+    );
+    return sendJson(res, 200, { context: rows });
+  }
+
+  function teacherOwnsCbtContext(teacherId, classCode, subjectId) {
+    return !!one(
+      'SELECT id FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ? LIMIT 1',
+      teacherId, classCode, subjectId
+    );
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/questions') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const subjectId = Number(url.searchParams.get('subjectId'));
+    if (!classCode || !subjectId) return sendJson(res, 400, { error: 'Class and subject are required' });
+    if (!teacherOwnsCbtContext(user.id, classCode, subjectId)) {
+      return sendJson(res, 403, { error: 'You are not assigned to this class/subject' });
+    }
+    const rows = all(
+      `SELECT q.id, q.question_text AS questionText, q.marks, q.options, q.archived,
+              q.created_by AS createdBy, u.name AS createdByName, q.created_at AS createdAt
+       FROM cbt_questions q
+       LEFT JOIN users u ON u.id = q.created_by
+       WHERE q.class_code = ? AND q.subject_id = ? AND q.question_type = 'Multiple Choice Question'
+       ORDER BY q.created_at DESC`,
+      classCode, subjectId
+    ).map(r => ({
+      ...r,
+      options: (() => { try { return r.options ? JSON.parse(r.options) : []; } catch { return []; } })(),
+      isMine: r.createdBy === user.id,
+    }));
+    return sendJson(res, 200, { questions: rows });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/questions') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const subjectId = Number(body.subjectId);
+    const questionText = cleanText(body.questionText);
+    const marks = Number(body.marks) || 1;
+    const options = Array.isArray(body.options)
+      ? body.options.map(o => ({ text: cleanText(o.text), correct: !!o.correct })).filter(o => o.text)
+      : [];
+    if (!classCode || !subjectId || !questionText) {
+      return sendJson(res, 400, { error: 'Class, subject, and question text are required' });
+    }
+    if (!teacherOwnsCbtContext(user.id, classCode, subjectId)) {
+      return sendJson(res, 403, { error: 'You are not assigned to this class/subject' });
+    }
+    if (!options.length || options.length > 6) {
+      return sendJson(res, 400, { error: 'Add 1 to 6 answer options' });
+    }
+    if (!options.some(o => o.correct)) {
+      return sendJson(res, 400, { error: 'Mark one option as the correct answer' });
+    }
+    run(
+      `INSERT INTO cbt_questions (class_code, subject_id, question_type, question_text, marks, options, vetted, created_by, created_at)
+       VALUES (?, ?, 'Multiple Choice Question', ?, ?, ?, 1, ?, ?)`,
+      classCode, subjectId, questionText, marks, JSON.stringify(options), user.id, new Date().toISOString()
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+
+  const teacherCbtQuestionMatch = url.pathname.match(/^\/api\/teacher\/cbt\/questions\/(\d+)$/);
+  if (req.method === 'PUT' && teacherCbtQuestionMatch) {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const id = Number(teacherCbtQuestionMatch[1]);
+    const existing = one('SELECT created_by AS createdBy FROM cbt_questions WHERE id = ?', id);
+    if (!existing) return sendJson(res, 404, { error: 'Question not found' });
+    if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only edit questions you added yourself' });
+    const body = await readJson(req);
+    const questionText = cleanText(body.questionText);
+    const marks = Number(body.marks) || 1;
+    const options = Array.isArray(body.options)
+      ? body.options.map(o => ({ text: cleanText(o.text), correct: !!o.correct })).filter(o => o.text)
+      : [];
+    if (!questionText) return sendJson(res, 400, { error: 'Question text is required' });
+    if (!options.length || options.length > 6) return sendJson(res, 400, { error: 'Add 1 to 6 answer options' });
+    if (!options.some(o => o.correct)) return sendJson(res, 400, { error: 'Mark one option as the correct answer' });
+    run(
+      'UPDATE cbt_questions SET question_text = ?, marks = ?, options = ? WHERE id = ?',
+      questionText, marks, JSON.stringify(options), id
+    );
+    return sendJson(res, 200, { ok: true });
+  }
+  if (req.method === 'DELETE' && teacherCbtQuestionMatch) {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const id = Number(teacherCbtQuestionMatch[1]);
+    const existing = one('SELECT created_by AS createdBy FROM cbt_questions WHERE id = ?', id);
+    if (!existing) return sendJson(res, 404, { error: 'Question not found' });
+    if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only delete questions you added yourself' });
+    run('DELETE FROM cbt_questions WHERE id = ?', id);
+    return sendJson(res, 200, { ok: true });
+  }
+
   const reportMatch = url.pathname.match(/^\/api\/admin\/reports\/(\d+)\/pdf$/);
   if (req.method === 'GET' && reportMatch) {
     const user = requireUser(req, res, 'admin');
@@ -5827,8 +5947,8 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Subject does not exist' });
     }
     run(
-      `INSERT INTO cbt_questions (class_code, subject_id, question_type, question_text, marks, options, helper_hint, tags, answer_explanation, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO cbt_questions (class_code, subject_id, question_type, question_text, marks, options, helper_hint, tags, answer_explanation, vetted, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       classCode, subjectId, questionType, questionText, marks,
       options.length ? JSON.stringify(options) : null,
       helperHint || null, tags || null, answerExplanation || null,
@@ -6227,13 +6347,32 @@ async function handleApi(req, res, url) {
       SELECT st.id AS studentId, st.name, st.initials,
              sc.id AS scoreId, sc.score, sc.total_marks AS totalMarks,
              sc.questions_presented AS questionsPresented, sc.questions_attempted AS questionsAttempted,
-             sc.recorded_at AS recordedAt
+             sc.recorded_at AS recordedAt,
+             at.submitted_at AS submittedAt
       FROM students st
       LEFT JOIN cbt_scores sc ON sc.student_id = st.id AND sc.schedule_subject_id = ?
+      LEFT JOIN cbt_attempts at ON at.student_id = st.id AND at.schedule_subject_id = ?
       WHERE st.class_code = ?
       ORDER BY st.name
-    `, scheduleSubjectId, subjectRow.classCode);
+    `, scheduleSubjectId, scheduleSubjectId, subjectRow.classCode);
     return sendJson(res, 200, { scores: rows });
+  }
+
+  // Admin override: a student's exam is normally locked forever after they
+  // submit (one attempt per student per exam). This clears just that one
+  // student's attempt for just this one exam so they can sit it again — for
+  // a specific documented reason (tech issue, illness, etc.), not a general
+  // retake policy.
+  const cbtRetakeMatch = url.pathname.match(/^\/api\/admin\/cbt\/schedule-subjects\/(\d+)\/students\/([^/]+)\/retake$/);
+  if (req.method === 'POST' && cbtRetakeMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const scheduleSubjectId = Number(cbtRetakeMatch[1]);
+    const studentId = decodeURIComponent(cbtRetakeMatch[2]).toUpperCase();
+    const attempt = one('SELECT id FROM cbt_attempts WHERE schedule_subject_id = ? AND student_id = ?', scheduleSubjectId, studentId);
+    if (!attempt) return sendJson(res, 404, { error: 'This student has no attempt on this exam to reset' });
+    run('DELETE FROM cbt_attempts WHERE id = ?', attempt.id);
+    return sendJson(res, 200, { ok: true });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/admin/cbt/scores') {

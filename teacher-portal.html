@@ -446,6 +446,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
       <div class="nav-item" onclick="switchTab('classResultChecker',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg></span> Class Result Checker</div>
       <div class="nav-item" onclick="switchTab('resultsGradebook',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="1.5" y1="14" x2="14.5" y2="14"/><rect x="2" y="9" width="3" height="5"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="3" width="3" height="11"/></svg></span> Results Grade Book</div>
       <div class="nav-item" onclick="switchTab('cognitiveSkills',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5a5 5 0 0 0-5 5v2.8l-1 1.7h12l-1-1.7V6.5a5 5 0 0 0-5-5z"/><line x1="6.5" y1="13" x2="9.5" y2="13"/></svg></span> Cognitive Skills Assessment</div>
+      <div class="nav-item" onclick="switchTab('cbtQuestions',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="9.5" rx="1.5"/><line x1="5" y1="14.5" x2="11" y2="14.5"/><line x1="8" y1="11.5" x2="8" y2="14.5"/></svg></span> My CBT Questions</div>
       <div class="nav-item" onclick="switchTab('cbtGradebook',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="2" width="14" height="9.5" rx="1.5"/><line x1="5" y1="14.5" x2="11" y2="14.5"/><line x1="8" y1="11.5" x2="8" y2="14.5"/></svg></span> CBT Grade Book</div>
       <div class="nav-item" onclick="switchTab('dailyGradebook',this)"><span class="nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="2" y1="6" x2="14" y2="6"/></svg></span> Daily Grade Book</div>
       <div class="nav-label" style="margin-top:8px;">School</div>
@@ -662,6 +663,43 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
           </select>
         </div>
         <div id="cog-results"></div>
+      </div>
+
+      <!-- ━━━ MY CBT QUESTIONS ━━━ -->
+      <div class="tab-panel" id="tab-cbtQuestions">
+        <div class="page-header"><h2>My CBT Questions</h2><p>Add multiple-choice questions for the classes and subjects you teach. New questions go live immediately.</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-body" style="display:flex;gap:14px;align-items:end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:220px;">
+              <label class="field-label">Class / Subject</label>
+              <select class="ctrl-select" id="cbtq-context" onchange="cbtqLoadQuestions()"></select>
+            </div>
+            <button class="post-btn" onclick="cbtqOpenModal()">&#xff0b; Add Question</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Questions</span></div>
+          <div class="card-body" style="padding:0;">
+            <div id="cbtq-list" style="padding:20px;color:var(--text-3);font-size:13px;">Choose a class/subject above.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add/Edit CBT Question Modal -->
+      <div id="cbtq-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;" onclick="if(event.target===this)cbtqCloseModal()">
+        <div class="card" style="width:min(520px,95%);max-height:88vh;overflow-y:auto;padding:0;">
+          <div class="card-head"><span class="card-title" id="cbtq-modal-title">Add Question</span><button class="cog-modal-close" onclick="cbtqCloseModal()">&#x2715;</button></div>
+          <div class="card-body">
+            <label class="field-label">Question</label>
+            <textarea class="field-input" id="cbtq-text" rows="3" style="margin-bottom:12px;"></textarea>
+            <label class="field-label">Marks</label>
+            <input class="field-input" type="number" id="cbtq-marks" value="1" min="1" style="margin-bottom:14px;max-width:120px;">
+            <label class="field-label">Options (mark the correct one)</label>
+            <div id="cbtq-options"></div>
+            <button type="button" class="post-btn" style="margin:8px 0 16px;" onclick="cbtqAddOptionRow()">&#xff0b; Add Option</button>
+            <button class="post-btn" style="width:100%;" onclick="cbtqSaveQuestion()">Save Question</button>
+          </div>
+        </div>
       </div>
 
       <!-- ━━━ CBT GRADE BOOK (stub) ━━━ -->

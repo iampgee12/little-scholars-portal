@@ -1515,6 +1515,7 @@ const TAB_META = {
   classResultChecker: { title: 'Class Result Checker', sub: 'Class Publication Status' },
   resultsGradebook: { title: 'Results Grade Book', sub: 'Review, Mark Absent / Exclude' },
   cognitiveSkills: { title: 'Cognitive Skills Assessment', sub: 'Affective & Psychomotor Ratings' },
+  cbtQuestions: { title: 'My CBT Questions', sub: 'Add questions for your classes and subjects' },
   cbtGradebook: { title: 'CBT Grade Book', sub: 'Computer-Based Test Scores' },
   dailyGradebook: { title: 'Daily Grade Book', sub: 'Day-to-Day Scoring' },
   announcements: { title: 'Announcements', sub: 'School Notices' },
@@ -1533,6 +1534,7 @@ function switchTab(tab, trigger) {
   if (tab === 'classResultChecker') crcInit();
   if (tab === 'resultsGradebook') gbInit();
   if (tab === 'cognitiveSkills') cogInit();
+  if (tab === 'cbtQuestions') cbtqInit();
 }
 
 function mobStaggerItems(sidebar) {
@@ -1697,6 +1699,146 @@ async function signOut() {
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
   window.location.href = 'index.html';
+}
+
+// ── MY CBT QUESTIONS ──
+let _cbtqContext = [];
+let _cbtqQuestions = [];
+let _cbtqEditingId = null;
+
+async function cbtqInit() {
+  try {
+    const data = await apiFetch('/api/teacher/cbt/context');
+    _cbtqContext = data.context || [];
+    const sel = document.getElementById('cbtq-context');
+    if (!_cbtqContext.length) {
+      sel.innerHTML = '<option value="">No classes/subjects assigned to you yet</option>';
+      document.getElementById('cbtq-list').innerHTML = '<div style="padding:20px;color:var(--text-3);">You have no class/subject assignments yet — ask the admin to assign you first.</div>';
+      return;
+    }
+    sel.innerHTML = _cbtqContext.map((c, i) =>
+      `<option value="${i}">${escapeHtml(c.classLabel)} — ${escapeHtml(c.subjectName)}</option>`
+    ).join('');
+    cbtqLoadQuestions();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function cbtqCurrentContext() {
+  const idx = Number(document.getElementById('cbtq-context').value);
+  return _cbtqContext[idx];
+}
+
+async function cbtqLoadQuestions() {
+  const ctx = cbtqCurrentContext();
+  const list = document.getElementById('cbtq-list');
+  if (!ctx) { list.innerHTML = '<div style="padding:20px;color:var(--text-3);">Choose a class/subject above.</div>'; return; }
+  list.innerHTML = '<div style="padding:20px;color:var(--text-3);">Loading…</div>';
+  try {
+    const data = await apiFetch(`/api/teacher/cbt/questions?classCode=${encodeURIComponent(ctx.classCode)}&subjectId=${ctx.subjectId}`);
+    _cbtqQuestions = data.questions || [];
+    cbtqRenderList();
+  } catch (err) {
+    list.innerHTML = `<div style="padding:20px;color:var(--red);">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function cbtqRenderList() {
+  const list = document.getElementById('cbtq-list');
+  if (!_cbtqQuestions.length) {
+    list.innerHTML = '<div style="padding:20px;color:var(--text-3);">No questions yet for this class/subject — add the first one.</div>';
+    return;
+  }
+  list.innerHTML = _cbtqQuestions.map(q => {
+    const correct = (q.options || []).find(o => o.correct);
+    const actions = q.isMine
+      ? `<button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqOpenModal(${q.id})">Edit</button>
+         <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqDeleteQuestion(${q.id})">Delete</button>`
+      : `<span style="font-size:11px;color:var(--text-3);">Added by ${escapeHtml(q.createdByName || 'someone else')}</span>`;
+    return `<div style="padding:14px 18px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${escapeHtml(q.questionText)}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">${q.marks} mark${Number(q.marks) === 1 ? '' : 's'} &middot; Correct answer: ${escapeHtml(correct ? correct.text : '—')}</div>
+      <div>${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+function cbtqOptionRowHtml(text, correct) {
+  const idx = document.querySelectorAll('#cbtq-options .cbtq-opt-row').length;
+  return `<div class="cbtq-opt-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+    <input type="radio" name="cbtq-correct" ${correct ? 'checked' : ''} title="Mark as correct answer">
+    <input class="field-input" style="flex:1;" value="${escapeHtml(text || '')}" placeholder="Option ${idx + 1}">
+    <button type="button" class="del-btn" style="padding:4px 8px;" onclick="this.closest('.cbtq-opt-row').remove()">&#x2715;</button>
+  </div>`;
+}
+
+function cbtqAddOptionRow(text, correct) {
+  document.getElementById('cbtq-options').insertAdjacentHTML('beforeend', cbtqOptionRowHtml(text, correct));
+}
+
+function cbtqOpenModal(id) {
+  _cbtqEditingId = id || null;
+  document.getElementById('cbtq-modal-title').textContent = id ? 'Edit Question' : 'Add Question';
+  document.getElementById('cbtq-options').innerHTML = '';
+  if (id) {
+    const q = _cbtqQuestions.find(x => x.id === id);
+    if (!q) return;
+    document.getElementById('cbtq-text').value = q.questionText;
+    document.getElementById('cbtq-marks').value = q.marks;
+    (q.options || []).forEach(o => cbtqAddOptionRow(o.text, o.correct));
+  } else {
+    document.getElementById('cbtq-text').value = '';
+    document.getElementById('cbtq-marks').value = 1;
+    cbtqAddOptionRow('', false);
+    cbtqAddOptionRow('', false);
+  }
+  document.getElementById('cbtq-modal').style.display = 'flex';
+}
+
+function cbtqCloseModal() {
+  document.getElementById('cbtq-modal').style.display = 'none';
+}
+
+async function cbtqSaveQuestion() {
+  const ctx = cbtqCurrentContext();
+  const questionText = document.getElementById('cbtq-text').value.trim();
+  const marks = Number(document.getElementById('cbtq-marks').value) || 1;
+  const rows = Array.from(document.querySelectorAll('#cbtq-options .cbtq-opt-row'));
+  const options = rows.map(row => ({
+    text: row.querySelector('.field-input').value.trim(),
+    correct: row.querySelector('input[type=radio]').checked,
+  })).filter(o => o.text);
+
+  if (!questionText) return showToast('Enter the question text');
+  if (!options.length) return showToast('Add at least one option');
+  if (!options.some(o => o.correct)) return showToast('Mark one option as correct');
+
+  const payload = { classCode: ctx.classCode, subjectId: ctx.subjectId, questionText, marks, options };
+  try {
+    if (_cbtqEditingId) {
+      await apiFetch(`/api/teacher/cbt/questions/${_cbtqEditingId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('Question updated');
+    } else {
+      await apiFetch('/api/teacher/cbt/questions', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Question added');
+    }
+    cbtqCloseModal();
+    cbtqLoadQuestions();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function cbtqDeleteQuestion(id) {
+  if (!confirm('Delete this question?')) return;
+  try {
+    await apiFetch(`/api/teacher/cbt/questions/${id}`, { method: 'DELETE' });
+    showToast('Question deleted');
+    cbtqLoadQuestions();
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 init();
