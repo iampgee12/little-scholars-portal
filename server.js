@@ -6832,6 +6832,27 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, id: result.lastInsertRowid });
   }
 
+  // Combines create-if-needed + activate into one step, for the Session/Term
+  // dropdown picker (no more free-text session/term entry).
+  if (req.method === 'POST' && url.pathname === '/api/admin/academic-sessions/set-current') {
+    const admin = requireUser(req, res, 'admin');
+    if (!admin) return;
+    const body = await readJson(req);
+    const sessionLabel = cleanText(body.sessionLabel);
+    const termLabel = cleanText(body.termLabel);
+    if (!sessionLabel || !termLabel) return sendJson(res, 400, { error: 'Session and term are required' });
+    if (!/^\d{4}\/\d{4}$/.test(sessionLabel)) return sendJson(res, 400, { error: 'Session must be in the form 2026/2027' });
+    if (!['Term 1', 'Term 2', 'Term 3'].includes(termLabel)) return sendJson(res, 400, { error: 'Term must be Term 1, Term 2, or Term 3' });
+    let row = one('SELECT id FROM academic_terms WHERE session_label = ? AND term_label = ?', sessionLabel, termLabel);
+    if (!row) {
+      const result = run('INSERT INTO academic_terms (session_label, term_label, is_active) VALUES (?, ?, 0)', sessionLabel, termLabel);
+      row = { id: result.lastInsertRowid };
+    }
+    run('UPDATE academic_terms SET is_active = 0');
+    run('UPDATE academic_terms SET is_active = 1 WHERE id = ?', row.id);
+    return sendJson(res, 200, { ok: true, id: row.id });
+  }
+
   const activateSessionMatch = url.pathname.match(/^\/api\/admin\/academic-sessions\/(\d+)\/activate$/);
   if (req.method === 'PUT' && activateSessionMatch) {
     const admin = requireUser(req, res, 'admin');

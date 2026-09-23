@@ -5395,34 +5395,6 @@ function atFilterTable(tbodyId, q) {
   });
 }
 
-function openCreateTermModal() { openCreateSessionModal(); }
-
-function openNewPeriodModal() {
-  const sel = document.getElementById('at-period-session');
-  if (sel && state.setup) {
-    sel.innerHTML = (state.setup.academic ? [`<option>${state.setup.academic.session_label || '2025-2026'}</option>`] : []).join('');
-  }
-  document.getElementById('at-period-modal').style.display = 'flex';
-}
-function closeNewPeriodModal() { document.getElementById('at-period-modal').style.display = 'none'; }
-function saveNewPeriod() {
-  const session = document.getElementById('at-period-session').value;
-  const term    = document.getElementById('at-period-term').value;
-  const start   = document.getElementById('at-period-start').value;
-  const end     = document.getElementById('at-period-end').value;
-  if (!session || !term || !start || !end) { showToast('All fields are required', 'warn'); return; }
-  const tbody = document.getElementById('at-calendar-tbody');
-  const rows  = tbody.querySelectorAll('tr[data-period]').length;
-  tbody.innerHTML = tbody.innerHTML.replace('<td colspan="6"', '<td colspan="6" style="display:none"');
-  const tr = document.createElement('tr');
-  tr.setAttribute('data-period','1');
-  tr.innerHTML = `<td>${rows+1}</td><td>${session}</td><td>${term}</td><td>${start}</td><td>${end}</td><td><button class="bs-preview-btn" onclick="this.closest('tr').remove();showToast('Period deleted','info')">Delete</button></td>`;
-  tbody.appendChild(tr);
-  tbody.querySelector('tr td[colspan="6"]')?.parentElement.remove();
-  closeNewPeriodModal();
-  showToast('Calendar period saved', 'success');
-}
-
 // ── ACADEMIC TERMS TAB STATE ──
 let _atSessions = [];
 let _atFiltered = [];
@@ -5489,7 +5461,7 @@ function atRenderSessions() {
   }
 
   tbody.innerHTML = slice.map((s, idx) => {
-    const [startY, endY] = (s.sessionLabel || '').split('-');
+    const [startY, endY] = (s.sessionLabel || '').split('/');
     const statusBadge = s.isActive
       ? '<span style="background:#dbeafe;color:#1d4ed8;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #bfdbfe;">Active Academic Session</span>'
       : '';
@@ -5602,25 +5574,26 @@ async function saveSystemSettings() {
   }
 }
 
-async function createAcademicSession() {
-  const sessionLabel = document.getElementById('ss-new-session').value.trim();
-  const termLabel = document.getElementById('ss-new-term').value.trim();
-  if (!sessionLabel || !termLabel) return showToast('Please enter both session and term labels', true);
-  try {
-    await apiFetch('/api/admin/academic-sessions', { method: 'POST', body: JSON.stringify({ sessionLabel, termLabel }) });
-    document.getElementById('ss-new-session').value = '';
-    document.getElementById('ss-new-term').value = '';
-    showToast('Session created');
-    loadAcademicTermsTab();
-  } catch (e) {
-    showToast(e.message, true);
-  }
+// Nigerian school sessions run roughly September-to-July, so the session
+// "rolls over" to a new start year from September. Generates a window wide
+// enough to always include the current session plus several years ahead,
+// recomputed live from today's date so it never needs manual upkeep.
+function rollingAcademicSessions() {
+  const now = new Date();
+  const currentStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const sessions = [];
+  for (let y = currentStartYear - 3; y <= currentStartYear + 5; y++) sessions.push(`${y}/${y + 1}`);
+  return { sessions, currentStartYear };
 }
 
 function openCreateSessionModal() {
+  const { sessions, currentStartYear } = rollingAcademicSessions();
+  const active = _atSessions.find(s => s.isActive);
+  const defaultSession = active ? active.sessionLabel : `${currentStartYear}/${currentStartYear + 1}`;
+  const sel = document.getElementById('ss-modal-session');
+  sel.innerHTML = sessions.map(s => `<option ${s === defaultSession ? 'selected' : ''}>${s}</option>`).join('');
+  document.getElementById('ss-modal-term').value = (active && active.termLabel) || 'Term 1';
   document.getElementById('ss-modal').style.display = 'flex';
-  document.getElementById('ss-modal-session').value = '';
-  document.getElementById('ss-modal-term').value = '';
 }
 
 function closeSessionModal() {
@@ -5628,14 +5601,14 @@ function closeSessionModal() {
 }
 
 async function createSessionFromModal() {
-  const sessionLabel = document.getElementById('ss-modal-session').value.trim();
-  const termLabel = document.getElementById('ss-modal-term').value.trim();
-  if (!sessionLabel || !termLabel) return showToast('Please enter both session and term labels', true);
+  const sessionLabel = document.getElementById('ss-modal-session').value;
+  const termLabel = document.getElementById('ss-modal-term').value;
   try {
-    await apiFetch('/api/admin/academic-sessions', { method: 'POST', body: JSON.stringify({ sessionLabel, termLabel }) });
+    await apiFetch('/api/admin/academic-sessions/set-current', { method: 'POST', body: JSON.stringify({ sessionLabel, termLabel }) });
     closeSessionModal();
-    showToast('Session created');
+    showToast('Current session and term updated');
     loadAcademicTermsTab();
+    loadResultSetup();
   } catch (e) {
     showToast(e.message, true);
   }
