@@ -734,6 +734,13 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
         <label class="field-label">Contact Email</label>
         <input class="field-input" id="as-email" placeholder="you@example.com" style="margin-bottom:16px;">
         <button class="act-btn btn-save" style="width:100%;" onclick="saveAccountEmail()">Save Changes</button>
+
+        <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--border);">
+          <label class="field-label">My Signature (appears on result sheets)</label>
+          <div style="margin-bottom:10px;"><img id="as-sig-preview" style="max-height:50px;max-width:180px;display:none;border:1px solid var(--border);border-radius:6px;background:#fff;padding:4px;" alt="Current signature"></div>
+          <input class="field-input" type="file" accept="image/*" id="as-signature-file" style="margin-bottom:10px;">
+          <button class="act-btn btn-save" style="width:100%;" onclick="saveAccountSignature()">Save Signature</button>
+        </div>
       </div>
     </div>
 

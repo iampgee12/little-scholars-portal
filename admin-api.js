@@ -2042,6 +2042,48 @@ async function publishReports() {
   }
 }
 
+function renderSignaturesPanel() {
+  const setup = state.setup;
+  if (!setup) return;
+  const settings = setup.settings || {};
+
+  const headPreview = document.getElementById('head-sig-preview');
+  if (headPreview) {
+    if (settings.headSignaturePath) { headPreview.src = '/' + settings.headSignaturePath; headPreview.style.display = ''; }
+    else { headPreview.style.display = 'none'; }
+  }
+  const headName = document.getElementById('head-name');
+  if (headName && !headName.value) headName.value = settings.headOfSchoolName || '';
+
+  const teacherSel = document.getElementById('signature-teacher');
+  if (teacherSel) {
+    const teachers = setup.teachers || [];
+    const prevValue = teacherSel.value;
+    teacherSel.innerHTML = '<option value="">— Select Teacher —</option>' +
+      teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`).join('');
+    if (prevValue && teachers.some(t => t.id === prevValue)) teacherSel.value = prevValue;
+    if (!teacherSel.dataset.wired) {
+      teacherSel.dataset.wired = '1';
+      teacherSel.addEventListener('change', renderTeacherSigPreview);
+    }
+    renderTeacherSigPreview();
+  }
+}
+
+function renderTeacherSigPreview() {
+  const teacherSel = document.getElementById('signature-teacher');
+  const wrap = document.getElementById('teacher-sig-preview-wrap');
+  const img = document.getElementById('teacher-sig-preview');
+  if (!teacherSel || !wrap || !img) return;
+  const teacher = (state.setup.teachers || []).find(t => t.id === teacherSel.value);
+  if (teacher && teacher.signaturePath) {
+    img.src = '/' + teacher.signaturePath;
+    wrap.style.display = '';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
 async function uploadHeadSignature() {
   try {
     const dataUrl = await fileToDataUrl('head-signature-file');
@@ -2056,6 +2098,7 @@ async function uploadHeadSignature() {
     });
     state.setup = data.setup;
     document.getElementById('head-signature-file').value = '';
+    renderSignaturesPanel();
     showToast('Head signature uploaded');
   } catch (err) {
     showToast(err.message);
@@ -2074,6 +2117,7 @@ async function uploadTeacherSignature() {
     });
     state.setup = data.setup;
     document.getElementById('teacher-signature-file').value = '';
+    renderSignaturesPanel();
     showToast('Teacher signature uploaded');
   } catch (err) {
     showToast(err.message);
@@ -2971,7 +3015,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'academicTerms') loadAcademicTermsTab();
   if (tab === 'scoreDivisions') sdInit();
   if (tab === 'commentsBank') cbLoadComments();
-  if (tab === 'resultPrefs') switchRspTab('sheet');
+  if (tab === 'resultPrefs') { switchRspTab('sheet'); renderSignaturesPanel(); }
   if (tab === 'scheduleExam') populateScheduleExamSelects();
   if (tab === 'examTimetable') loadExamTimetable();
   if (tab === 'questionBank') qbInit();

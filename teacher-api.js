@@ -1582,6 +1582,40 @@ function switchAsTab(tab, btn) {
   document.querySelectorAll('.as-panel').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById(`as-panel-${tab}`).classList.add('active');
+  if (tab === 'edit') renderAccountSigPreview();
+}
+
+function renderAccountSigPreview() {
+  const preview = document.getElementById('as-sig-preview');
+  if (!preview) return;
+  if (state.user?.signaturePath) { preview.src = '/' + state.user.signaturePath; preview.style.display = ''; }
+  else { preview.style.display = 'none'; }
+}
+
+function fileToDataUrl(inputId) {
+  const input = document.getElementById(inputId);
+  const file = input?.files?.[0];
+  if (!file) return Promise.resolve('');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveAccountSignature() {
+  try {
+    const dataUrl = await fileToDataUrl('as-signature-file');
+    if (!dataUrl) return showToast('Choose a signature image');
+    const data = await apiFetch('/api/account/signature', { method: 'POST', body: JSON.stringify({ dataUrl }) });
+    state.user.signaturePath = data.signaturePath;
+    document.getElementById('as-signature-file').value = '';
+    renderAccountSigPreview();
+    showToast('Signature saved');
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function toggleAsPw(inputId, btn) {

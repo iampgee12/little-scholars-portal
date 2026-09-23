@@ -1646,6 +1646,7 @@ function publicUser(row) {
     chip: row.chip,
     grade: row.grade,
     email: row.email || '',
+    signaturePath: row.signature_path || '',
   };
 }
 
@@ -3208,6 +3209,17 @@ async function handleApi(req, res, url) {
     }
     run('UPDATE users SET password = ? WHERE id = ?', hashPassword(newPassword), user.id);
     return sendJson(res, 200, { ok: true });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/account/signature') {
+    const user = requireUser(req, res);
+    if (!user) return;
+    const body = await readJson(req);
+    const dataUrl = cleanText(body.dataUrl);
+    if (!dataUrl) return sendJson(res, 400, { error: 'Signature image is required' });
+    const stored = saveDataUrl(dataUrl, `signature-${user.id}`);
+    run('UPDATE users SET signature_path = ? WHERE id = ?', stored, user.id);
+    return sendJson(res, 200, { ok: true, signaturePath: stored });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/forgot-password') {

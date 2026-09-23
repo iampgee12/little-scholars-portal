@@ -3799,6 +3799,29 @@ body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; bor
           <div class="rsp-note">
             <strong>NOTE:</strong> Changes made here will reflect on new results when published, but may not reflect instantly on already published results. After making changes here, you may need to clear the results cache to allow them to pick up the new changes.
           </div>
+
+          <div class="card" style="margin-top:18px;">
+            <div class="card-head"><span class="card-title">Signatures</span></div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Head of School</div>
+                  <div style="margin-bottom:10px;"><img id="head-sig-preview" style="max-height:50px;max-width:180px;display:none;border:1px solid var(--border);border-radius:6px;background:#fff;padding:4px;" alt="Current head of school signature"></div>
+                  <div style="margin-bottom:10px;"><label class="field-label">Name</label><input class="field-input" id="head-name" placeholder="e.g. Mrs. Jane Adeyemi"></div>
+                  <div style="margin-bottom:10px;"><label class="field-label">Signature Image</label><input class="field-input" type="file" accept="image/*" id="head-signature-file"></div>
+                  <button class="post-btn" onclick="uploadHeadSignature()">Save Head of School Signature</button>
+                </div>
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Set a Teacher's Signature</div>
+                  <div style="margin-bottom:10px;"><label class="field-label">Teacher</label><select class="ctrl-select" id="signature-teacher"></select></div>
+                  <div id="teacher-sig-preview-wrap" style="margin-bottom:10px;display:none;"><img id="teacher-sig-preview" style="max-height:50px;max-width:180px;border:1px solid var(--border);border-radius:6px;background:#fff;padding:4px;" alt="Current teacher signature"></div>
+                  <div style="margin-bottom:10px;"><label class="field-label">Signature Image</label><input class="field-input" type="file" accept="image/*" id="teacher-signature-file"></div>
+                  <button class="post-btn" onclick="uploadTeacherSignature()">Save Teacher Signature</button>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Teachers can also upload their own signature from their own portal, under Account Settings.</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Report Comments Settings -->
