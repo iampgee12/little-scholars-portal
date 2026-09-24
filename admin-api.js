@@ -1348,14 +1348,14 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td>${escapeHtml(subject.name)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input" type="number" min="0" max="${caMax}" value="${escapeHtml(String(ca))}" data-score="ca" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input" type="number" min="0" max="${caMax}" value="${escapeHtml(String(ca))}" data-score="ca" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${caScaled}</div>
         </td>
         <td class="gb-exam-column" style="display:${isFinal ? '' : 'none'};">
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input gb-exam-input" type="number" min="0" max="${examMax}" value="${escapeHtml(String(exam))}" data-score="exam" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input gb-exam-input" type="number" min="0" max="${examMax}" value="${escapeHtml(String(exam))}" data-score="exam" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${examScaled}</div>
