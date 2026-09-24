@@ -2121,13 +2121,42 @@ function performanceGrade(avg) {
 }
 
 // Shared A-F band used for the per-subject "Grade Remarks" column and the
-// overall "Result Summary" line on the report card.
+// overall "Result Summary" line on the report card. `point` is the 0-5 scale
+// used for Grade Point Average, matching the broadsheet's GRADE_SCALE.
 function gradeBand(pct) {
-  if (pct >= 80) return { letter: 'A', word: 'Excellent' };
-  if (pct >= 70) return { letter: 'B', word: 'Very Good' };
-  if (pct >= 50) return { letter: 'C', word: 'Good' };
-  if (pct >= 40) return { letter: 'D', word: 'Fair' };
-  return { letter: 'F', word: 'Needs Support' };
+  if (pct >= 80) return { letter: 'A', word: 'Excellent', point: 5 };
+  if (pct >= 70) return { letter: 'B', word: 'Very Good', point: 4 };
+  if (pct >= 50) return { letter: 'C', word: 'Good', point: 3 };
+  if (pct >= 40) return { letter: 'D', word: 'Fair', point: 2 };
+  return { letter: 'F', word: 'Needs Support', point: 0 };
+}
+
+// For a Final Exam report, which earlier terms in the SAME session (if any)
+// should show up as cumulative columns — Term 2's report shows Term 1,
+// Term 3's report shows Term 1 and Term 2.
+function priorTermsInSession(sessionLabel, currentTermLabel) {
+  const order = ['Term 1', 'Term 2', 'Term 3'];
+  const idx = order.indexOf(currentTermLabel);
+  if (idx <= 0) return [];
+  return order.slice(0, idx)
+    .map(label => one('SELECT id, term_label AS termLabel FROM academic_terms WHERE session_label = ? AND term_label = ?', sessionLabel, label))
+    .filter(Boolean);
+}
+
+// { [subjectId]: totalScore } for one student's Final Exam results in a
+// specific earlier term — used to populate the cumulative columns.
+function priorTermSubjectTotals(classCode, studentId, academicId) {
+  const rows = all(
+    `SELECT rb.subject_id AS subjectId, re.total_score AS total
+     FROM result_batches rb
+     JOIN result_entries re ON re.batch_id = rb.id
+     WHERE rb.class_code = ? AND rb.exam_type = 'Final Exam' AND rb.academic_id = ?
+       AND re.student_id = ? AND re.is_excluded = 0 AND re.is_absent = 0`,
+    classCode, academicId, studentId
+  );
+  const map = {};
+  rows.forEach(r => { map[r.subjectId] = r.total; });
+  return map;
 }
 
 function classReportRows(classCode, examType, studentId) {
@@ -2135,6 +2164,7 @@ function classReportRows(classCode, examType, studentId) {
     `SELECT
        rb.id AS batchId,
        rb.vetted_at AS vettedAt,
+       rb.subject_id AS subjectId,
        s.name AS subjectName,
        u.name AS teacherName,
        u.signature_path AS teacherSignaturePath,
@@ -2697,7 +2727,7 @@ async function drawWordHeader(page, pdfDoc, fonts, colors) {
   drawCenteredText(page, 'Motto: -', centerX, top - 57, 6.8, fonts.italic, colors.black);
 }
 
-async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors) {
+async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraRow = null) {
   const x = 36;
   const top = 646;
   const widths = [220, 100, 220];
@@ -2712,13 +2742,15 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     [`DOB: ${valueFromMeta(`student_dob_${student.id}`, '')}`, `Student Average(%): ${average}%`],
     [`Class: ${student.classLabel}`, `Result Summary: ${gradeBand(average).word}`],
   ];
+  if (extraRow) infoRows.push(extraRow);
+  const rowCount = infoRows.length;
   infoRows.forEach((row, i) => {
     const rowTop = top - (i * rowH);
     drawWordCell(page, { x, top: rowTop, width: widths[0], height: rowH, value: row[0], fill: colors.white, border: colors.grid, font: fonts.bold, size: 8.2, color: colors.black, pad: 4 });
     drawWordCell(page, { x: x + widths[0] + widths[1], top: rowTop, width: widths[2], height: rowH, value: row[1], fill: colors.white, border: colors.grid, font: fonts.bold, size: 8.2, color: colors.black, pad: 4 });
   });
 
-  drawCell(page, { x: x + widths[0], top, width: widths[1], height: rowH * 6, fill: colors.white, border: colors.grid, borderWidth: 0.35 });
+  drawCell(page, { x: x + widths[0], top, width: widths[1], height: rowH * rowCount, fill: colors.white, border: colors.grid, borderWidth: 0.35 });
   const photo = await embedImageIfPresent(pdfDoc, student.photo_path) || await embedImageIfPresent(pdfDoc, 'report_assets/student-placeholder.png');
   if (photo) {
     const photoX = x + widths[0];
@@ -2726,43 +2758,68 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     const photoSize = 60;
     page.drawImage(photo, {
       x: photoX + ((photoWidth - photoSize) / 2),
-      y: top - (rowH * 3) - (photoSize / 2),
+      y: top - (rowH * (rowCount / 2)) - (photoSize / 2),
       width: photoSize,
       height: photoSize,
     });
   }
+  return rowH * (rowCount - 6);
 }
 
-function reportSubjectRows(rows, examType) {
+function reportSubjectRows(rows, examType, priorTerms = [], priorTermData = {}) {
   const max = maxScoreForExamType(examType);
   const out = rows.slice(0, 18).map(row => {
     const pct = (!row.isAbsent && row.total != null && max) ? (row.total / max) * 100 : null;
+    const priorTotals = priorTerms.map(t => {
+      const val = priorTermData[t.id]?.[row.subjectId];
+      return val == null ? '-' : val;
+    });
     return {
       subject: row.subjectName,
       ca: row.isAbsent ? 'ABS' : row.ca ?? '-',
       exam: row.isAbsent ? 'ABS' : row.exam ?? '-',
       total: row.isAbsent ? 'ABS' : row.total ?? '-',
       remark: row.isAbsent || pct == null ? '-' : `${gradeBand(pct).letter} - ${gradeBand(pct).word}`,
+      priorTotals,
     };
   });
-  while (out.length < 18) out.push({ subject: '', ca: '', exam: '', total: '', remark: '' });
+  while (out.length < 18) out.push({ subject: '', ca: '', exam: '', total: '', remark: '', priorTotals: priorTerms.map(() => '') });
   return out;
 }
 
-function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts, colors) {
+const PRIOR_TERM_COLUMN_LABELS = ['First Term', 'Second Term'];
+
+function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts, colors, priorTerms = [], priorTermData = {}, topOffset = 0) {
   const x = 36;
-  const top = 530;
+  const top = 530 - topOffset;
   const isFinalExam = examType === 'Final Exam';
-  const widths = isFinalExam ? [110, 34, 34, 42, 50, 185, 85] : [110, 44, 46, 54, 180, 106];
+  const priorCount = isFinalExam ? priorTerms.length : 0;
+  // Base widths (no prior-term columns) are exactly the original layout —
+  // Term 1's Final Exam report, and every Mid-Term report, is unchanged.
+  const baseWidths = isFinalExam ? [110, 34, 34, 42, 50, 185, 85] : [110, 44, 46, 54, 180, 106];
+  const priorWidthPlans = { 1: [40], 2: [40, 40] };
+  const priorShrink = { 1: { subject: 0, remark: 0, skill: 30, rating: 10 }, 2: { subject: 5, remark: 5, skill: 55, rating: 15 } };
+  let widths = baseWidths;
+  if (priorCount > 0) {
+    const shrink = priorShrink[priorCount];
+    const priorWidths = priorWidthPlans[priorCount];
+    widths = [
+      baseWidths[0] - shrink.subject, baseWidths[1], baseWidths[2], baseWidths[3],
+      ...priorWidths,
+      baseWidths[4] - shrink.remark, baseWidths[5] - shrink.skill, baseWidths[6] - shrink.rating,
+    ];
+  }
   const headerH = 70;
   const rowH = 14.75;
   const scoreHeaders = reportScoreColumns(examType);
-  const headers = ['Subject', ...scoreHeaders, `Total Score (${maxScoreForExamType(examType)})`, 'Grade Remarks', 'Affective / Psychomotor Skills', 'Rating'];
-  const verticalHeaderCols = isFinalExam ? [1, 2, 3, 4] : [1, 2, 3];
+  const priorHeaders = priorTerms.map((t, i) => PRIOR_TERM_COLUMN_LABELS[i] || t.termLabel);
+  const headers = ['Subject', ...scoreHeaders, `Total Score (${maxScoreForExamType(examType)})`, ...priorHeaders, 'Grade Remarks', 'Affective / Psychomotor Skills', 'Rating'];
   const totalColumn = isFinalExam ? 3 : 2;
-  const remarkColumn = totalColumn + 1;
+  const remarkColumn = totalColumn + 1 + priorCount;
   const skillColumn = remarkColumn + 1;
-  const subjectRows = reportSubjectRows(rows, examType);
+  const verticalHeaderCols = [];
+  for (let i = 1; i <= remarkColumn; i += 1) verticalHeaderCols.push(i);
+  const subjectRows = reportSubjectRows(rows, examType, priorTerms, priorTermData);
   const affective = AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' }));
   const psychomotor = PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' }));
   const attendanceRows = [
@@ -2800,10 +2857,10 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
 
   for (let i = 0; i < 24; i += 1) {
     const rowTop = top - headerH - (i * rowH);
-    const subject = i < 18 ? subjectRows[i] : { subject: '', ca: '', exam: '', total: '', remark: '' };
+    const subject = i < 18 ? subjectRows[i] : { subject: '', ca: '', exam: '', total: '', remark: '', priorTotals: priorTerms.map(() => '') };
     let cellX = x;
     const scoreValues = isFinalExam
-      ? [subject.subject, subject.ca, subject.exam, subject.total, subject.remark]
+      ? [subject.subject, subject.ca, subject.exam, subject.total, ...subject.priorTotals, subject.remark]
       : [subject.subject, subject.ca, subject.total, subject.remark];
     scoreValues.forEach((value, col) => {
       drawWordCell(page, {
@@ -2848,9 +2905,9 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
   }
 }
 
-function drawWordGradeKey(page, fonts, colors) {
+function drawWordGradeKey(page, fonts, colors, topOffset = 0) {
   const x = 36;
-  const top = 81;
+  const top = 81 - topOffset;
   const height = 28;
   const widths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
   const values = [
@@ -2956,6 +3013,26 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   const totalScore = rowTotals.reduce((sum, value) => sum + value, 0);
   const subjectMax = maxScoreForExamType(examType);
   const average = countedRows.length ? Math.round((totalScore / (countedRows.length * subjectMax)) * 100) : 0;
+
+  // Cumulative columns + GPA only apply to the Final Exam report (the one
+  // representing a term's overall result) — Mid-Term stays exactly as is.
+  let priorTerms = [];
+  let priorTermData = {};
+  let cumulativeGPA = null;
+  if (examType === 'Final Exam') {
+    priorTerms = priorTermsInSession(academic.sessionLabel, academic.termLabel);
+    priorTerms.forEach(t => { priorTermData[t.id] = priorTermSubjectTotals(classCode, studentId, t.id); });
+    const gpaSamples = [gradeBand(average).point];
+    priorTerms.forEach(t => {
+      const values = Object.values(priorTermData[t.id]);
+      if (values.length) {
+        const priorAvg = Math.round((values.reduce((a, b) => a + b, 0) / (values.length * subjectMax)) * 100);
+        gpaSamples.push(gradeBand(priorAvg).point);
+      }
+    });
+    cumulativeGPA = (gpaSamples.reduce((a, b) => a + b, 0) / gpaSamples.length).toFixed(3);
+  }
+
   const computedSchoolDays = computeSchoolDays(academic.id);
   const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
   const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
@@ -2997,9 +3074,10 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   const page1 = pdfDoc.addPage([612, 792]);
   await drawWordHeader(page1, pdfDoc, fonts, colors);
   drawCenteredText(page1, reportHeading(academic, examType), 306, 674, 10, fonts.bold, colors.black);
-  await drawWordStudentInfo(page1, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors);
-  drawWordMainTable(page1, rows, examType, skillRating, { schoolDays, present, absent, percent: student.att || 0 }, fonts, colors);
-  drawWordGradeKey(page1, fonts, colors);
+  const extraInfoRow = cumulativeGPA != null ? ['', `Cumulative Grade Point Average: ${cumulativeGPA}`] : null;
+  const topOffset = await drawWordStudentInfo(page1, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraInfoRow);
+  drawWordMainTable(page1, rows, examType, skillRating, { schoolDays, present, absent, percent: student.att || 0 }, fonts, colors, priorTerms, priorTermData, topOffset);
+  drawWordGradeKey(page1, fonts, colors, topOffset);
 
   const { teacherComment, headComment } = resolveReportComments({
     academicId: academic.id, studentId: student.id, examType, average,
