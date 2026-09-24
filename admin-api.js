@@ -3022,6 +3022,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'instructionSets') isInit();
   if (tab === 'cbtSchedules') csInit();
   if (tab === 'cbtScores') cscInit();
+  if (tab === 'cbtGradebook') cbtgbInit();
   if (tab === 'studentTags') stInit();
   if (tab === 'classAllocation') caInit();
   if (tab === 'enrollmentHistory') ehInit();
@@ -5404,6 +5405,66 @@ async function cscSaveScore(studentId) {
     showToast('Score saved');
     cscViewScores();
   } catch (err) { showToast(err.message); }
+}
+
+// ── CBT GRADE BOOK (read-only, auto-filled from actual submissions) ──
+async function cbtgbInit() {
+  const schedSel = document.getElementById('cbtgb-schedule');
+  try {
+    const data = await apiFetch('/api/admin/cbt/schedules');
+    const schedules = (data.schedules || []).filter(s => !s.archived);
+    schedSel.innerHTML = schedules.length
+      ? '<option value="">— Select —</option>' + schedules.map(s => `<option value="${s.id}">${escapeHtml(s.title)} (${escapeHtml(s.termLabel)}, ${escapeHtml(s.sessionLabel)})</option>`).join('')
+      : '<option value="">No CBT schedules yet</option>';
+  } catch (err) { showToast(err.message); }
+  document.getElementById('cbtgb-class').innerHTML = '<option value="">Select a schedule first</option>';
+  document.getElementById('cbtgb-table-wrap').innerHTML = '<div style="padding:20px;color:var(--text-3);">Choose a CBT schedule and class above.</div>';
+}
+
+async function cbtgbOnScheduleChange() {
+  const scheduleId = document.getElementById('cbtgb-schedule').value;
+  const classSel = document.getElementById('cbtgb-class');
+  document.getElementById('cbtgb-table-wrap').innerHTML = '<div style="padding:20px;color:var(--text-3);">Choose a class above.</div>';
+  if (!scheduleId) { classSel.innerHTML = '<option value="">Select a schedule first</option>'; return; }
+  try {
+    const data = await apiFetch(`/api/admin/cbt/schedules/${scheduleId}/subjects`);
+    const byClass = new Map();
+    (data.subjects || []).forEach(s => byClass.set(s.classCode, s.classLabel));
+    classSel.innerHTML = byClass.size
+      ? '<option value="">— Select —</option>' + Array.from(byClass, ([code, label]) => `<option value="${code}">${escapeHtml(label)}</option>`).join('')
+      : '<option value="">No classes in this schedule</option>';
+  } catch (err) { showToast(err.message); }
+}
+
+async function cbtgbLoad() {
+  const scheduleId = document.getElementById('cbtgb-schedule').value;
+  const classCode = document.getElementById('cbtgb-class').value;
+  const wrap = document.getElementById('cbtgb-table-wrap');
+  if (!scheduleId || !classCode) { wrap.innerHTML = '<div style="padding:20px;color:var(--text-3);">Choose a CBT schedule and class above.</div>'; return; }
+  wrap.innerHTML = '<div style="padding:20px;color:var(--text-3);">Loading…</div>';
+  try {
+    const data = await apiFetch(`/api/admin/cbt/gradebook?classCode=${classCode}&scheduleId=${scheduleId}`);
+    const subjects = data.subjects || [];
+    const students = data.students || [];
+    if (!subjects.length) { wrap.innerHTML = '<div style="padding:20px;color:var(--text-3);">No CBT subjects scheduled for this class in this schedule.</div>'; return; }
+    let html = `<table class="data-table" style="width:100%;"><thead><tr><th>Student</th>${subjects.map(s => `<th style="text-align:center;">${escapeHtml(s.subjectName)}</th>`).join('')}<th style="text-align:center;">Total</th><th style="text-align:center;">Average</th></tr></thead><tbody>`;
+    students.forEach(st => {
+      const scores = data.scoreMatrix[st.id] || {};
+      let total = 0, max = 0, count = 0;
+      const cells = subjects.map(s => {
+        const cell = scores[s.subjectId];
+        if (!cell) return '<td style="text-align:center;color:var(--text-3);">—</td>';
+        total += cell.score; max += cell.totalMarks; count++;
+        return `<td style="text-align:center;">${cell.score} / ${cell.totalMarks}</td>`;
+      }).join('');
+      const avg = max ? Math.round((total / max) * 100) : null;
+      html += `<tr><td>${escapeHtml(st.name)}</td>${cells}<td style="text-align:center;font-weight:700;">${count ? total : '—'}</td><td style="text-align:center;">${avg != null ? avg + '%' : '—'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  } catch (err) {
+    wrap.innerHTML = `<div style="padding:20px;color:var(--red);">${escapeHtml(err.message)}</div>`;
+  }
 }
 
 async function cscAllowRetake(studentId) {

@@ -6336,6 +6336,37 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { options: rows });
   }
 
+  // Read-only grid (students x subjects) of actual CBT submissions for a
+  // class within one CBT schedule — auto-filled, nothing typed in here.
+  if (req.method === 'GET' && url.pathname === '/api/admin/cbt/gradebook') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const scheduleId = Number(url.searchParams.get('scheduleId'));
+    if (!classCode || !scheduleId) return sendJson(res, 400, { error: 'Class and CBT schedule are required' });
+    const subjectRows = all(
+      `SELECT DISTINCT css.id AS scheduleSubjectId, css.subject_id AS subjectId, s.name AS subjectName, css.status
+       FROM cbt_schedule_subjects css
+       JOIN subjects s ON s.id = css.subject_id
+       WHERE css.schedule_id = ? AND css.class_code = ?
+       ORDER BY s.name`,
+      scheduleId, classCode
+    );
+    const students = all('SELECT id, name FROM students WHERE class_code = ? ORDER BY name', classCode);
+    const scoreMatrix = {};
+    for (const sub of subjectRows) {
+      const rows = all(
+        'SELECT student_id AS studentId, score, total_marks AS totalMarks FROM cbt_scores WHERE schedule_subject_id = ?',
+        sub.scheduleSubjectId
+      );
+      rows.forEach(r => {
+        if (!scoreMatrix[r.studentId]) scoreMatrix[r.studentId] = {};
+        scoreMatrix[r.studentId][sub.subjectId] = { score: r.score, totalMarks: r.totalMarks };
+      });
+    }
+    return sendJson(res, 200, { subjects: subjectRows, students, scoreMatrix });
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/admin/cbt/scores') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;

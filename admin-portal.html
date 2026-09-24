@@ -6600,8 +6600,24 @@ body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; bor
         <div id="crc-results-area"></div>
       </div>
       <div class="tab-panel" id="tab-cbtGradebook">
-        <div class="page-header"><h2>CBT Grade Book</h2><p>Computer-based test scores</p></div>
-        <div class="card"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:12px;"><svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-3);opacity:.4;"><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8"/><line x1="8" y1="11" x2="8" y2="11.5"/></svg><span style="font-size:15px;font-weight:700;color:var(--text-2);">Coming Soon</span><span style="font-size:12px;color:var(--text-3);">This section is under development.</span></div></div>
+        <div class="page-header"><h2>CBT Grade Book</h2><p>Automatic — shows scores students have actually submitted on the CBT platform. Nothing is typed in here.</p></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-body" style="display:flex;gap:14px;align-items:end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <label class="field-label">CBT Schedule</label>
+              <select class="ctrl-select" id="cbtgb-schedule" onchange="cbtgbOnScheduleChange()"></select>
+            </div>
+            <div style="flex:1;min-width:200px;">
+              <label class="field-label">Class</label>
+              <select class="ctrl-select" id="cbtgb-class" onchange="cbtgbLoad()"></select>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body" style="padding:0;overflow-x:auto;">
+            <div id="cbtgb-table-wrap" style="padding:20px;color:var(--text-3);font-size:13px;">Choose a CBT schedule and class above.</div>
+          </div>
+        </div>
       </div>
       <div class="tab-panel" id="tab-dailyGradebook">
         <div class="page-header"><h2>Daily Grade Book</h2><p>Daily assessment scores</p></div>
