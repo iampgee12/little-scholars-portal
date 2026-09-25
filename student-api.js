@@ -244,7 +244,7 @@ async function init() {
   }
   const acct = session.user;
   currentUser = acct;
-  document.getElementById('s-avatar').textContent = acct.initials;
+  renderUserAvatar(document.getElementById('s-avatar'), acct);
   document.getElementById('s-name').textContent = acct.name;
   document.getElementById('s-grade').textContent = acct.grade || 'Student Portal';
   document.title = `Unique Children's School - ${acct.firstName}`;
@@ -266,6 +266,7 @@ async function init() {
 }
 
 const TAB_META = {
+  profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: "Today's summary" },
   timetable: { title: 'Timetable', sub: 'Class Schedule' },
   assignments: { title: 'Assignments', sub: 'Coming soon' },
@@ -281,6 +282,7 @@ function switchTab(tab, trigger) {
   const m = TAB_META[tab] || {};
   document.getElementById('topbar-title').textContent = m.title || tab;
   if (m.sub) document.getElementById('topbar-sub').textContent = m.sub;
+  if (tab === 'profile') profileInit();
 }
 
 function switchResult(examType, btn) {
@@ -354,26 +356,57 @@ document.addEventListener('click', function(e) {
   if (leafLink) setTimeout(mobCloseSidebar, 180);
 });
 
-// ── ACCOUNT SETTINGS ──
-function openAccountSettings() {
+
+
+// ── PROFILE PAGE ──
+function renderUserAvatar(el, u) {
+  if (!el) return;
+  if (u?.photoPath) el.innerHTML = `<img src="/${escapeHtml(u.photoPath)}" alt="">`;
+  else el.textContent = u?.initials || '';
+}
+
+function fmtProfileDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function profileInit() {
   const u = currentUser || {};
-  document.getElementById('as-avatar').textContent = u.initials || '';
+  renderUserAvatar(document.getElementById('as-avatar'), u);
   document.getElementById('as-name').textContent = u.name || '';
-  document.getElementById('as-role').textContent = u.role === 'student' ? 'Student' : (u.role || '');
-  document.getElementById('as-email').value = u.email || '';
+  document.getElementById('as-role').textContent = 'Student';
+  const rows = [
+    ['Name', u.name],
+    ['Student ID', u.id],
+    ['Class', u.grade],
+    ['Date of Birth', fmtProfileDate(u.dob)],
+    ['Gender', u.gender],
+    ['Religion', u.religion],
+    ['Blood Group', u.bloodGroup],
+    ['Phone', u.phone],
+    ['Email', u.email],
+    ['Address', u.address],
+  ];
+  document.getElementById('as-info-table').innerHTML = rows.map(([k, v]) =>
+    `<div class="as-info-row"><span class="as-info-key">${k}</span><span class="as-info-val">${escapeHtml(String(v || '—'))}</span></div>`
+  ).join('');
+
+  renderUserAvatar(document.getElementById('pf-photo-preview'), u);
+  document.getElementById('pf-photo-file').value = '';
+  document.getElementById('pf-name').value = u.name || '';
+  document.getElementById('pf-dob').value = u.dob || '';
+  document.getElementById('pf-gender').value = u.gender || '';
+  document.getElementById('pf-religion').value = u.religion || '';
+  document.getElementById('pf-blood').value = u.bloodGroup || '';
+  document.getElementById('pf-phone').value = u.phone || '';
+  document.getElementById('pf-email').value = u.email || '';
+  document.getElementById('pf-address').value = u.address || '';
+
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
   document.getElementById('as-pw-confirm').value = '';
-
-  const rows = [['Student ID', u.id || '—'], ['Role', u.role === 'student' ? 'Student' : (u.role || '—')]];
-  if (u.grade) rows.push(['Class', u.grade]);
-  rows.push(['Email', u.email || 'Not set']);
-  document.getElementById('as-info-table').innerHTML = rows.map(([k, v]) =>
-    `<div class="as-info-row"><span class="as-info-key">${k}</span><span class="as-info-val">${escapeHtml(String(v))}</span></div>`
-  ).join('');
-
   switchAsTab('view', document.getElementById('as-tab-view'));
-  document.getElementById('account-settings-modal').style.display = 'flex';
 }
 
 function switchAsTab(tab, btn) {
@@ -381,6 +414,54 @@ function switchAsTab(tab, btn) {
   document.querySelectorAll('.as-panel').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   document.getElementById(`as-panel-${tab}`).classList.add('active');
+}
+
+function fileToDataUrl(inputId) {
+  const input = document.getElementById(inputId);
+  const file = input?.files?.[0];
+  if (!file) return Promise.resolve('');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function previewProfilePhoto() {
+  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const el = document.getElementById('pf-photo-preview');
+  if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
+  else renderUserAvatar(el, currentUser);
+}
+
+async function saveProfile(btn) {
+  const val = id => document.getElementById(id)?.value.trim() || '';
+  btn.disabled = true;
+  try {
+    const body = {
+      name: val('pf-name'),
+      dob: val('pf-dob'),
+      dateOfAppointment: val('pf-doa'),
+      gender: val('pf-gender'),
+      religion: val('pf-religion'),
+      bloodGroup: val('pf-blood'),
+      phone: val('pf-phone'),
+      email: val('pf-email'),
+      address: val('pf-address'),
+      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+    };
+    const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
+    currentUser = data.user;
+    renderUserAvatar(document.getElementById('s-avatar'), data.user);
+    document.getElementById('s-name').textContent = data.user.name;
+    profileInit();
+    showToast('Profile updated');
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function toggleAsPw(inputId, btn) {
@@ -392,20 +473,7 @@ function toggleAsPw(inputId, btn) {
     : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l12 12"/><path d="M1 8s2.5-4.5 7-4.5c1.1 0 2.1.25 3 .65M15 8s-1 1.8-2.9 3.15M9.4 9.4a2 2 0 0 1-2.8-2.8"/></svg>';
 }
 
-function closeAccountSettings() {
-  document.getElementById('account-settings-modal').style.display = 'none';
-}
 
-async function saveAccountEmail() {
-  const email = document.getElementById('as-email').value.trim();
-  try {
-    const data = await apiFetch('/api/account', { method: 'PUT', body: JSON.stringify({ email }) });
-    currentUser = data.user;
-    showToast('Email updated');
-  } catch (err) {
-    showToast(err.message);
-  }
-}
 
 async function changeAccountPassword() {
   const currentPassword = document.getElementById('as-pw-current').value;

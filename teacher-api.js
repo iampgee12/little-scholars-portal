@@ -302,7 +302,7 @@ async function init() {
     state.contexts = setup.contexts || [];
 
     const teacher = setup.teacher || state.user;
-    document.getElementById('t-avatar').textContent = teacher.initials;
+    renderUserAvatar(document.getElementById('t-avatar'), state.user);
     document.getElementById('t-name').textContent = teacher.name;
     const chipEl = document.getElementById('t-chip'); if (chipEl) chipEl.textContent = teacher.chip || teacher.name.toUpperCase();
     document.getElementById('t-greeting').textContent = `${greeting()}, ${teacher.firstName}.`;
@@ -1507,6 +1507,7 @@ async function cogSave() {
 }
 
 const TAB_META = {
+  profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: 'Wednesday, 13 May 2026' },
   students: { title: 'Students', sub: 'Class Roster' },
   results: { title: 'Results Entry', sub: 'Enter Examination Scores' },
@@ -1535,6 +1536,7 @@ function switchTab(tab, trigger) {
   if (tab === 'resultsGradebook') gbInit();
   if (tab === 'cognitiveSkills') cogInit();
   if (tab === 'cbtQuestions') cbtqInit();
+  if (tab === 'profile') profileInit();
 }
 
 function mobStaggerItems(sidebar) {
@@ -1554,45 +1556,9 @@ function deskToggleSidebar() {
   document.body.classList.toggle('sidebar-collapsed');
 }
 
-function openAccountSettings() {
-  const u = state.user || {};
-  document.getElementById('as-avatar').textContent = u.initials || '';
-  document.getElementById('as-name').textContent = u.name || '';
-  document.getElementById('as-role').textContent = u.role === 'teacher' ? 'Teacher' : (u.role || '');
-  document.getElementById('as-email').value = u.email || '';
-  document.getElementById('as-pw-current').value = '';
-  document.getElementById('as-pw-new').value = '';
-  document.getElementById('as-pw-confirm').value = '';
 
-  const rows = [['Staff ID', u.id || '—'], ['Role', u.role === 'teacher' ? 'Teacher' : (u.role || '—')]];
-  if (u.teacherType) rows.push(['Type', u.teacherType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())]);
-  rows.push(['Email', u.email || 'Not set']);
-  document.getElementById('as-info-table').innerHTML = rows.map(([k, v]) =>
-    `<div class="as-info-row"><span class="as-info-key">${k}</span><span class="as-info-val">${escapeHtml(String(v))}</span></div>`
-  ).join('');
 
-  switchAsTab('view', document.getElementById('as-tab-view'));
-  document.getElementById('account-settings-modal').style.display = 'flex';
-}
 
-function closeAccountSettings() {
-  document.getElementById('account-settings-modal').style.display = 'none';
-}
-
-function switchAsTab(tab, btn) {
-  document.querySelectorAll('.as-tab').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.as-panel').forEach(p => p.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  document.getElementById(`as-panel-${tab}`).classList.add('active');
-  if (tab === 'edit') renderAccountSigPreview();
-}
-
-function renderAccountSigPreview() {
-  const preview = document.getElementById('as-sig-preview');
-  if (!preview) return;
-  if (state.user?.signaturePath) { preview.src = '/' + state.user.signaturePath; preview.style.display = ''; }
-  else { preview.style.display = 'none'; }
-}
 
 function fileToDataUrl(inputId) {
   const input = document.getElementById(inputId);
@@ -1606,17 +1572,105 @@ function fileToDataUrl(inputId) {
   });
 }
 
-async function saveAccountSignature() {
+
+// ── PROFILE PAGE ──
+function renderUserAvatar(el, u) {
+  if (!el) return;
+  if (u?.photoPath) el.innerHTML = `<img src="/${escapeHtml(u.photoPath)}" alt="">`;
+  else el.textContent = u?.initials || '';
+}
+
+function fmtProfileDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function profileInit() {
+  const u = state.user || {};
+  renderUserAvatar(document.getElementById('as-avatar'), u);
+  document.getElementById('as-name').textContent = u.name || '';
+  document.getElementById('as-role').textContent = u.teacherType ? u.teacherType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Teacher';
+  const rows = [
+    ['Name', u.name],
+    ['Date of Birth', fmtProfileDate(u.dob)],
+    ['Gender', u.gender],
+    ['Religion', u.religion],
+    ['Blood Group', u.bloodGroup],
+    ['Phone', u.phone],
+    ['Email', u.email],
+    ['Address', u.address],
+    ['Staff No.', u.id],
+    ['Date of Appointment', fmtProfileDate(u.dateOfAppointment)],
+    ['Designation', u.teacherType ? u.teacherType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Teacher'],
+  ];
+  document.getElementById('as-info-table').innerHTML = rows.map(([k, v]) =>
+    `<div class="as-info-row"><span class="as-info-key">${k}</span><span class="as-info-val">${escapeHtml(String(v || '—'))}</span></div>`
+  ).join('');
+
+  renderUserAvatar(document.getElementById('pf-photo-preview'), u);
+  document.getElementById('pf-photo-file').value = '';
+  document.getElementById('pf-name').value = u.name || '';
+  document.getElementById('pf-dob').value = u.dob || '';
+  document.getElementById('pf-doa').value = u.dateOfAppointment || '';
+  document.getElementById('pf-gender').value = u.gender || '';
+  document.getElementById('pf-religion').value = u.religion || '';
+  document.getElementById('pf-blood').value = u.bloodGroup || '';
+  document.getElementById('pf-phone').value = u.phone || '';
+  document.getElementById('pf-email').value = u.email || '';
+  document.getElementById('pf-address').value = u.address || '';
+  document.getElementById('pf-signature-file').value = '';
+  const sig = document.getElementById('as-sig-preview');
+  if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
+  else sig.style.display = 'none';
+
+  document.getElementById('as-pw-current').value = '';
+  document.getElementById('as-pw-new').value = '';
+  document.getElementById('as-pw-confirm').value = '';
+  switchAsTab('view', document.getElementById('as-tab-view'));
+}
+
+function switchAsTab(tab, btn) {
+  document.querySelectorAll('.as-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.as-panel').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById(`as-panel-${tab}`).classList.add('active');
+}
+
+async function previewProfilePhoto() {
+  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const el = document.getElementById('pf-photo-preview');
+  if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
+  else renderUserAvatar(el, state.user);
+}
+
+async function saveProfile(btn) {
+  const val = id => document.getElementById(id)?.value.trim() || '';
+  btn.disabled = true;
   try {
-    const dataUrl = await fileToDataUrl('as-signature-file');
-    if (!dataUrl) return showToast('Choose a signature image');
-    const data = await apiFetch('/api/account/signature', { method: 'POST', body: JSON.stringify({ dataUrl }) });
-    state.user.signaturePath = data.signaturePath;
-    document.getElementById('as-signature-file').value = '';
-    renderAccountSigPreview();
-    showToast('Signature saved');
+    const body = {
+      name: val('pf-name'),
+      dob: val('pf-dob'),
+      dateOfAppointment: val('pf-doa'),
+      gender: val('pf-gender'),
+      religion: val('pf-religion'),
+      bloodGroup: val('pf-blood'),
+      phone: val('pf-phone'),
+      email: val('pf-email'),
+      address: val('pf-address'),
+      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      signatureDataUrl: await fileToDataUrl('pf-signature-file'),
+    };
+    const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
+    state.user = data.user;
+    renderUserAvatar(document.getElementById('t-avatar'), data.user);
+    document.getElementById('t-name').textContent = data.user.name;
+    profileInit();
+    showToast('Profile updated');
   } catch (err) {
     showToast(err.message);
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -1629,16 +1683,6 @@ function toggleAsPw(inputId, btn) {
     : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l12 12"/><path d="M1 8s2.5-4.5 7-4.5c1.1 0 2.1.25 3 .65M15 8s-1 1.8-2.9 3.15M9.4 9.4a2 2 0 0 1-2.8-2.8"/></svg>';
 }
 
-async function saveAccountEmail() {
-  const email = document.getElementById('as-email').value.trim();
-  try {
-    const data = await apiFetch('/api/account', { method: 'PUT', body: JSON.stringify({ email }) });
-    state.user = data.user;
-    showToast('Email updated');
-  } catch (err) {
-    showToast(err.message);
-  }
-}
 
 async function changeAccountPassword() {
   const currentPassword = document.getElementById('as-pw-current').value;

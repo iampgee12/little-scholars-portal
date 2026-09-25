@@ -657,6 +657,10 @@ function createSchema() {
   ensureColumn('users', 'active', 'INTEGER NOT NULL DEFAULT 1');
   ensureColumn('users', 'reset_token', 'TEXT');
   ensureColumn('users', 'reset_token_expires', 'TEXT');
+  // Self-service profile fields (Profile page in every portal).
+  for (const col of ['dob', 'date_of_appointment', 'gender', 'religion', 'blood_group', 'address', 'phone', 'photo_path']) {
+    ensureColumn('users', col, 'TEXT');
+  }
   ensureColumn('academic_terms', 'start_date', 'TEXT');
   ensureColumn('academic_terms', 'end_date', 'TEXT');
   db.exec(`
@@ -1662,8 +1666,37 @@ function publicUser(row) {
     grade: row.grade,
     email: row.email || '',
     signaturePath: row.signature_path || '',
+    ...profileFields(row),
   };
 }
+
+// Students' gender, photo and DOB already live on their students row / the
+// report-sheet meta, so the profile reads (and writes) those same sources —
+// one value shows on both the Profile page and the printed result sheet.
+function profileFields(row) {
+  const fields = {
+    dob: row.dob || '',
+    dateOfAppointment: row.date_of_appointment || '',
+    gender: row.gender || '',
+    religion: row.religion || '',
+    bloodGroup: row.blood_group || '',
+    address: row.address || '',
+    phone: row.phone || '',
+    photoPath: row.photo_path || '',
+  };
+  if (row.role === 'student') {
+    const st = one('SELECT gender, photo_path FROM students WHERE id = ?', row.id);
+    if (st) {
+      fields.gender = st.gender === 'F' ? 'Female' : st.gender === 'M' ? 'Male' : (st.gender || '');
+      fields.photoPath = st.photo_path || '';
+    }
+  }
+  return fields;
+}
+
+const PROFILE_GENDERS = ['Male', 'Female'];
+const PROFILE_BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const STAFF_TITLES = ['mr', 'mrs', 'ms', 'miss', 'dr', 'prof', 'engr', 'chief', 'rev', 'pastor', 'barr', 'alhaji', 'alhaja', 'sir', 'madam'];
 
 function requireUser(req, res, role) {
   const user = sessionUser(req);
@@ -1949,13 +1982,19 @@ function saveDataUrl(dataUrl, prefix, dir = UPLOAD_DIR) {
   const fileName = `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
   const absolute = path.join(dir, fileName);
   fs.writeFileSync(absolute, Buffer.from(match[2], 'base64'));
-  return path.relative(ROOT, absolute).replace(/\\/g, '/');
+  return path.relative(DATA_DIR, absolute).replace(/\\/g, '/');
 }
 
+// Stored paths are relative to DATA_DIR (uploads, published reports — on Fly
+// that's the /data volume, outside the app dir) or to ROOT (bundled assets
+// such as report_assets/). Locally both are the same folder.
 function absoluteAssetPath(relativePath) {
   if (!relativePath) return '';
-  const full = path.resolve(ROOT, relativePath);
-  return full.startsWith(ROOT) ? full : '';
+  for (const base of [DATA_DIR, ROOT]) {
+    const full = path.resolve(base, relativePath);
+    if (full.startsWith(base + path.sep) && fs.existsSync(full)) return full;
+  }
+  return '';
 }
 
 // ── Minimal dependency-free .xlsx reader ──
@@ -3365,6 +3404,75 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, user: publicUser(one('SELECT * FROM users WHERE id = ?', user.id)) });
   }
 
+  if (req.method === 'PUT' && url.pathname === '/api/account/profile') {
+    const user = requireUser(req, res);
+    if (!user) return;
+    const body = await readJson(req);
+    const isStudent = user.role === 'student';
+    const isoDate = (v, label) => {
+      const d = cleanText(v);
+      if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error(`${label} must be a valid date`);
+      return d;
+    };
+    let dob, doa;
+    try {
+      dob = isoDate(body.dob, 'Date of birth');
+      doa = isStudent ? '' : isoDate(body.dateOfAppointment, 'Date of appointment');
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    const name = cleanText(body.name).replace(/\s+/g, ' ');
+    const gender = cleanText(body.gender);
+    const bloodGroup = cleanText(body.bloodGroup);
+    const email = cleanText(body.email).toLowerCase();
+    const phone = cleanText(body.phone);
+    if (!isStudent && !name) return sendJson(res, 400, { error: 'Name is required' });
+    if (gender && !PROFILE_GENDERS.includes(gender)) return sendJson(res, 400, { error: 'Choose a valid gender' });
+    if (bloodGroup && !PROFILE_BLOOD_GROUPS.includes(bloodGroup)) return sendJson(res, 400, { error: 'Choose a valid blood group' });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { error: 'Enter a valid email address' });
+    if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) return sendJson(res, 400, { error: 'Enter a valid phone number' });
+
+    let photoPath = null;
+    let signaturePath = null;
+    try {
+      if (body.photoDataUrl) photoPath = saveDataUrl(body.photoDataUrl, `photo-${user.id}`);
+      if (body.signatureDataUrl) signaturePath = saveDataUrl(body.signatureDataUrl, `signature-${user.id}`);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+
+    db.exec('BEGIN');
+    try {
+      run(
+        `UPDATE users SET dob = ?, date_of_appointment = ?, religion = ?, blood_group = ?, address = ?, phone = ?, email = ?
+         WHERE id = ?`,
+        dob, doa, cleanText(body.religion), bloodGroup, cleanText(body.address), phone, email, user.id
+      );
+      if (signaturePath) run('UPDATE users SET signature_path = ? WHERE id = ?', signaturePath, user.id);
+      if (isStudent) {
+        // Name stays admin-controlled for pupils (it prints on official results).
+        if (gender) run('UPDATE students SET gender = ? WHERE id = ?', gender === 'Female' ? 'F' : 'M', user.id);
+        if (photoPath) run('UPDATE students SET photo_path = ? WHERE id = ?', photoPath, user.id);
+        const [y, m, d] = dob ? dob.split('-') : [];
+        setMeta(`student_dob_${user.id}`, dob ? `${d}/${m}/${y}` : '');
+      } else {
+        // "Mr. Emeka Obi" → greets as "Mr. Obi", avatar "EO".
+        const parts = name.split(' ');
+        const hasTitle = parts.length > 1 && STAFF_TITLES.includes(parts[0].replace(/\.$/, '').toLowerCase());
+        const rest = hasTitle ? parts.slice(1) : parts;
+        const firstName = hasTitle ? `${parts[0]} ${rest[rest.length - 1]}` : rest[0];
+        const initials = (rest.length > 1 ? rest[0][0] + rest[rest.length - 1][0] : rest[0][0]).toUpperCase();
+        run('UPDATE users SET name = ?, first_name = ?, initials = ?, gender = ? WHERE id = ?', name, firstName, initials, gender, user.id);
+        if (photoPath) run('UPDATE users SET photo_path = ? WHERE id = ?', photoPath, user.id);
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, user: publicUser(one('SELECT * FROM users WHERE id = ?', user.id)) });
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/account/password') {
     const user = requireUser(req, res);
     if (!user) return;
@@ -4587,7 +4695,7 @@ async function handleApi(req, res, url) {
         student.id,
         classCode,
         examType,
-        path.relative(ROOT, pdfPath).replace(/\\/g, '/'),
+        path.relative(DATA_DIR, pdfPath).replace(/\\/g, '/'),
         student.parentEmail || '',
         mail.status,
         mail.error || '',
@@ -9075,6 +9183,28 @@ function serveStatic(req, res, url) {
   } catch {
     res.writeHead(400);
     res.end('Bad request');
+    return;
+  }
+  // Uploaded images live in UPLOAD_DIR, which on Fly is the /data volume
+  // rather than the app folder.
+  if (pathname.startsWith('/uploads/')) {
+    const uploadPath = path.resolve(UPLOAD_DIR, `.${pathname.slice('/uploads'.length)}`);
+    const imageTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
+    const type = imageTypes[path.extname(uploadPath).toLowerCase()];
+    if (!type || !uploadPath.startsWith(UPLOAD_DIR + path.sep)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not found');
+      return;
+    }
+    fs.readFile(uploadPath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Not found');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': type });
+      res.end(data);
+    });
     return;
   }
   const filePath = path.resolve(ROOT, `.${pathname}`);
