@@ -2096,10 +2096,39 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .crc-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
 .crc-count { font-size:12px; color:var(--text-3); font-weight:600; }
 .crc-row { display:grid; grid-template-columns:minmax(0,1fr) 230px; gap:16px; align-items:start; margin-bottom:22px; }
-.crc-sheet { background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px; min-height:200px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
-.crc-sheet canvas { width:100%; height:auto; display:block; }
-.crc-sheet canvas + canvas { margin-top:8px; border-top:1px dashed #cbd5e1; padding-top:8px; }
-.crc-sheet-loading { padding:80px 16px; text-align:center; color:var(--text-3); font-size:13px; }
+.crc-sheet { background:#f1f5f9; border:1px solid var(--border); border-radius:10px; padding:10px; min-width:0; }
+.crc-empty-note { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-size:12.5px; font-weight:600; border-radius:6px; padding:8px 12px; margin-bottom:8px; }
+/* On-screen report sheet: the PDF's layout in points; --pt scales with width */
+.rs-sheet { display:flex; flex-direction:column; gap:10px; }
+.rs-page { container-type:inline-size; position:relative; width:100%; aspect-ratio:612 / 792; background:#fff; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,.08); overflow:hidden; font-family:Helvetica, Arial, sans-serif; color:#0a0a0a; }
+.rs-page { --pt:calc(100cqw / 612); }
+.rs-block { position:absolute; left:calc(var(--pt)*36); }
+.rs-row, .rs-head, .rs-info { display:flex; }
+.rs-col { display:flex; flex-direction:column; }
+.rs-cell { box-sizing:border-box; border:calc(var(--pt)*0.35) solid #a6a6a6; margin:0 calc(var(--pt)*-0.35) calc(var(--pt)*-0.35) 0; display:flex; align-items:center; padding:0 calc(var(--pt)*2); font-size:calc(var(--pt)*7.8); line-height:1.15; overflow:hidden; background:#fff; flex-shrink:0; }
+.rs-cell > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.rs-center { justify-content:center; text-align:center; }
+.rs-b { font-weight:700; }
+.rs-italic { font-style:italic; }
+.rs-head .rs-cell { justify-content:center; }
+.rs-head-mid { flex-direction:column; }
+.rs-school { text-align:center; line-height:1.2; }
+.rs-school-name { font-size:calc(var(--pt)*15); font-weight:700; color:#2e78b3; line-height:1; margin-bottom:calc(var(--pt)*2); }
+.rs-school-line { font-size:calc(var(--pt)*7.2); }
+.rs-heading { position:absolute; left:0; right:0; text-align:center; font-size:calc(var(--pt)*10); font-weight:700; line-height:1; }
+.rs-info-cell { font-size:calc(var(--pt)*8.2); padding:0 calc(var(--pt)*4); }
+.rs-photo { justify-content:center; }
+.rs-photo img { width:calc(var(--pt)*60); height:calc(var(--pt)*60); object-fit:cover; }
+.rs-th { background:#d9d9d9; font-weight:700; font-size:calc(var(--pt)*6.8); padding:0 calc(var(--pt)*3); }
+.rs-th > span { white-space:normal; }
+.rs-vert { justify-content:center; padding:calc(var(--pt)*1) 0; }
+.rs-vert > span { writing-mode:vertical-rl; transform:rotate(180deg); font-size:calc(var(--pt)*6.9); letter-spacing:calc(var(--pt)*-0.1); white-space:nowrap; max-height:100%; }
+.rs-section { background:#f0f0f0; }
+.rs-section > span { white-space:pre; }
+.rs-comment { font-size:calc(var(--pt)*8); padding:0 calc(var(--pt)*5); }
+.rs-sig { position:absolute; left:calc(var(--pt)*70); bottom:calc(var(--pt)*4); width:calc(var(--pt)*70); height:calc(var(--pt)*18); object-fit:contain; }
+.rs-next { position:absolute; left:calc(var(--pt)*36); font-size:calc(var(--pt)*9.5); font-weight:700; }
+.rs-chart { display:block; }
 .crc-actions { position:sticky; top:12px; background:var(--black-2, #fff); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px; }
 .crc-who { display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--text-1); padding-bottom:6px; border-bottom:1px solid var(--border); margin-bottom:2px; }
 .crc-who span { font-size:11px; color:var(--text-3); font-family:'DM Mono',monospace; }

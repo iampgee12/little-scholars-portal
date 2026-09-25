@@ -3854,31 +3854,13 @@ function crcCheckAvailability() {
   }
 }
 
-// Bulk result viewer: every pupil's real report sheet (the same PDF the
-// school prints), stacked, each with its own actions — mirrors the
+// Bulk result viewer: every pupil in the class, each with a live HTML copy of
+// their report sheet (same data and layout as the printed PDF, built from
+// /api/admin/reports/class-sheets) and its own actions — mirrors the
 // schoolsfocus "Bulk Students Result Checker".
-let _crc = null; // { classCode, examType, classArmId, classLabel, data }
+let _crc = null; // { classCode, examType, classArmId, classLabel, data, sheets }
 const _crcPdfCache = {};
 let _crcRenderToken = 0;
-
-const PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
-let _pdfjsPromise = null;
-function loadPdfJs() {
-  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
-  if (!_pdfjsPromise) {
-    _pdfjsPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = PDFJS_BASE + 'pdf.min.js';
-      s.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
-        resolve(window.pdfjsLib);
-      };
-      s.onerror = () => { _pdfjsPromise = null; reject(new Error('Could not load the PDF viewer')); };
-      document.head.appendChild(s);
-    });
-  }
-  return _pdfjsPromise;
-}
 
 async function crcBulkView() {
   const classCode = document.getElementById('crc-class').value;
@@ -3892,30 +3874,30 @@ async function crcBulkView() {
   const token = ++_crcRenderToken;
 
   try {
-    const armParam = classArmId ? `&classArmId=${encodeURIComponent(classArmId)}` : '';
-    const data = await apiFetch(`/api/admin/broadsheet?classCode=${encodeURIComponent(classCode)}&examType=${encodeURIComponent(examType)}${armParam}`);
-    const students = (data.students || []).filter(st => Object.keys(data.scoreMatrix?.[st.id] || {}).length);
-    if (!students.length) {
-      area.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">No student results available.</div></div>';
+    const qs = new URLSearchParams({ classCode, examType });
+    if (classArmId) qs.set('classArmId', classArmId);
+    const [data, sheetData] = await Promise.all([
+      apiFetch(`/api/admin/broadsheet?${qs}`),
+      apiFetch(`/api/admin/reports/class-sheets?${qs}`),
+    ]);
+    if (token !== _crcRenderToken) return; // a newer search replaced this one
+    const sheets = sheetData.sheets || [];
+    if (!sheets.length) {
+      area.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">No pupils in this class.</div></div>';
       return;
     }
     const classLabel = (state.setup.classes || []).find(c => c.code === classCode)?.label || classCode;
-    _crc = { classCode, examType, classArmId, classLabel, data };
+    _crc = { classCode, examType, classArmId, classLabel, data, sheets };
     Object.keys(_crcPdfCache).forEach(k => delete _crcPdfCache[k]);
+    const withResults = sheets.filter(s => s.hasResults).length;
 
     area.innerHTML = `
       <div class="crc-toolbar">
-        <span class="crc-count">${students.length} result${students.length === 1 ? '' : 's'} · ${escapeHtml(classLabel)} · ${escapeHtml(examType)}</span>
-        <button class="bs-print-btn" id="crc-print-all" onclick="crcPrintAll(this)">&#x1F5A8; Print all Results</button>
+        <span class="crc-count">${sheets.length} pupil${sheets.length === 1 ? '' : 's'} · ${withResults} with results · ${escapeHtml(classLabel)} · ${escapeHtml(examType)}</span>
+        <button class="bs-print-btn" id="crc-print-all" onclick="crcPrintAll(this)" ${withResults ? '' : 'disabled'}>&#x1F5A8; Print all Results</button>
       </div>
-      ${students.map(st => crcRowHtml(st)).join('')}
+      ${sheets.map(sheet => crcRowHtml(sheet)).join('')}
       <button class="crc-top-btn" onclick="document.getElementById('tab-classResultChecker').scrollIntoView({behavior:'smooth'})">&#x2191; Back to Top</button>`;
-
-    const pdfjs = await loadPdfJs();
-    for (const st of students) {
-      if (token !== _crcRenderToken) return; // a newer search replaced this one
-      await crcRenderSheet(pdfjs, st.id);
-    }
   } catch (e) {
     if (token === _crcRenderToken) {
       area.innerHTML = `<div class="card"><div class="card-body" style="padding:24px;color:#f87171;text-align:center">${escapeHtml(e.message)}</div></div>`;
@@ -3923,24 +3905,29 @@ async function crcBulkView() {
   }
 }
 
-function crcRowHtml(st) {
-  const id = escapeHtml(st.id);
-  const parentEmail = st.parentEmail ? escapeHtml(st.parentEmail) : '';
+function crcRowHtml(sheet) {
+  const id = escapeHtml(sheet.studentId);
+  const st = crcStudent(sheet.studentId);
+  const parentEmail = sheet.parentEmail ? escapeHtml(sheet.parentEmail) : '';
+  const off = sheet.hasResults ? '' : 'disabled title="No scores entered yet for this exam"';
   return `<div class="crc-row" id="crc-row-${id}">
-    <div class="crc-sheet" id="crc-sheet-${id}"><div class="crc-sheet-loading">Loading ${escapeHtml(st.name)}'s result…</div></div>
+    <div class="crc-sheet">
+      ${sheet.hasResults ? '' : `<div class="crc-empty-note">No ${escapeHtml(_crc.examType)} scores have been entered for ${escapeHtml(sheet.name)} yet.</div>`}
+      ${crcSheetHtml(sheet)}
+    </div>
     <div class="crc-actions">
-      <div class="crc-who"><strong>${escapeHtml(st.name)}</strong><span>${id} · Position ${escapeHtml(String(st.position))}</span></div>
-      <button class="crc-act" onclick="crcAnalysis('${id}')">&#x1F4CA; Result Analysis</button>
-      <button class="crc-act" onclick="crcPrint('${id}', this)">&#x1F5A8; Print Result</button>
+      <div class="crc-who"><strong>${escapeHtml(sheet.name)}</strong><span>${id}${sheet.hasResults && st ? ` · Position ${escapeHtml(String(st.position))}` : ''}</span></div>
+      <button class="crc-act" onclick="crcAnalysis('${id}')" ${off}>&#x1F4CA; Result Analysis</button>
+      <button class="crc-act" onclick="crcPrint('${id}', this)" ${off}>&#x1F5A8; Print Result</button>
       <div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)">&#x1F4C4; Get as PDF &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x1F4C4; Get as PDF &#x25BE;</button>
         <div class="crc-dd-menu">
           <button onclick="crcViewPdf('${id}')">View PDF</button>
           <button onclick="crcDownloadPdf('${id}')">Download PDF</button>
         </div>
       </div>
       <div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)">&#x2709; Send to Email &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x2709; Send to Email &#x25BE;</button>
         <div class="crc-dd-menu">
           ${parentEmail
             ? `<button onclick="crcEmail('${id}', '')">To Parent / Guardian<small>${parentEmail}</small></button>`
@@ -3949,7 +3936,7 @@ function crcRowHtml(st) {
         </div>
       </div>
       <div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)">&#x1F4AC; To WhatsApp &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x1F4AC; To WhatsApp &#x25BE;</button>
         <div class="crc-dd-menu">
           <button onclick="crcWhatsApp('${id}', '')">Send from My Phone / Device</button>
           <button onclick="crcWhatsAppOther('${id}')">To Other WhatsApp Number</button>
@@ -3958,6 +3945,127 @@ function crcRowHtml(st) {
       <button class="crc-act" onclick="crcFees('${id}')">&#x1F4B3; Student's Fees</button>
     </div>
   </div>`;
+}
+
+// ── On-screen report sheet ──
+// Positions and sizes are the PDF's own, in points (1pt = var(--pt), which
+// scales with the sheet's width), so the page looks like the printed one but
+// is real, sharp text at any zoom.
+const RS_CHART_COLORS = ['#4a75bf', '#ed7329', '#999999', '#ffbf24', '#5c9ed1', '#6ead4a', '#29457f', '#9e4012', '#616161', '#a17a00', '#2b5e8f', '#4a7536'];
+
+function rsCell(value, { w, h, cls = '', style = '' }) {
+  return `<div class="rs-cell ${cls}" style="width:calc(var(--pt)*${w});height:calc(var(--pt)*${h});${style}"><span>${escapeHtml(String(value ?? ''))}</span></div>`;
+}
+
+function rsHeader() {
+  return `<div class="rs-block rs-head" style="top:calc(var(--pt)*36)">
+    <div class="rs-cell" style="width:calc(var(--pt)*70);height:calc(var(--pt)*58)"><img src="/report_assets/school-logo.png" alt="" style="width:calc(var(--pt)*62);height:calc(var(--pt)*41)"></div>
+    <div class="rs-cell rs-head-mid" style="width:calc(var(--pt)*400);height:calc(var(--pt)*58)">
+      <div class="rs-school"></div>
+    </div>
+    <div class="rs-cell" style="width:calc(var(--pt)*70);height:calc(var(--pt)*58)"><img src="/report_assets/coat-of-arms.png" alt="" style="width:calc(var(--pt)*44);height:calc(var(--pt)*44)"></div>
+  </div>`;
+}
+
+function rsSchoolLines(school) {
+  return `<div class="rs-school-name">${escapeHtml(school.name)}</div>
+    ${school.lines.map(l => `<div class="rs-school-line">${escapeHtml(l)}</div>`).join('')}
+    <div class="rs-school-line rs-italic">${escapeHtml(school.motto)}</div>`;
+}
+
+function crcSheetHtml(s) {
+  const header = rsHeader().replace('<div class="rs-school"></div>', `<div class="rs-school">${rsSchoolLines(s.school)}</div>`);
+  const extraRows = s.infoRows.length - 6; // Cumulative GPA row pushes the table down
+  const offset = 17 * extraRows;
+
+  // Student info: left column, photo, right column
+  const info = `<div class="rs-block rs-info" style="top:calc(var(--pt)*146)">
+    <div class="rs-col">${s.infoRows.map(r => rsCell(r[0], { w: 220, h: 17, cls: 'rs-b rs-info-cell' })).join('')}</div>
+    <div class="rs-cell rs-photo" style="width:calc(var(--pt)*100);height:calc(var(--pt)*${17 * s.infoRows.length})"><img src="/${escapeHtml(s.photoPath)}" alt=""></div>
+    <div class="rs-col">${s.infoRows.map(r => rsCell(r[1], { w: 220, h: 17, cls: 'rs-b rs-info-cell' })).join('')}</div>
+  </div>`;
+
+  // Main table: subject scores on the left, skills + attendance on the right
+  const t = s.table;
+  const { widths } = t;
+  const skillCol = t.remarkColumn + 1;
+  const headRow = t.headers.map((h, i) => t.verticalCols.includes(i)
+    ? `<div class="rs-cell rs-th rs-vert" style="width:calc(var(--pt)*${widths[i]});height:calc(var(--pt)*70)"><span>${escapeHtml(h)}</span></div>`
+    : rsCell(h, { w: widths[i], h: 70, cls: 'rs-th rs-center', style: i === 0 ? 'font-size:calc(var(--pt)*8)' : '' })).join('');
+  const sideRow = i => {
+    const sw = widths[skillCol];
+    const rw = widths[skillCol + 1];
+    const section = label => rsCell(label, { w: sw + rw, h: 14.75, cls: 'rs-b rs-section' });
+    const pair = (a, b) => rsCell(a, { w: sw, h: 14.75, cls: 'rs-side' }) + rsCell(b, { w: rw, h: 14.75, cls: 'rs-side rs-center' });
+    if (i === 0) return section('Affective Skills Rating   (Scale of 1-to-5)');
+    if (i <= 8) return pair(s.affective[i - 1].label, s.affective[i - 1].rating);
+    if (i === 9) return section('Psychomotor Skills Rating   (Scale of  1-to-5)');
+    if (i <= 18) return pair(s.psychomotor[i - 10].label, s.psychomotor[i - 10].rating);
+    if (i === 19) return section('Attendance Report');
+    const a = s.attendance[i - 20] || ['', ''];
+    return pair(a[0], a[1]);
+  };
+  const bodyRows = Array.from({ length: 24 }, (_, i) => {
+    const values = i < 18 ? t.rows[i] : Array(t.remarkColumn + 1).fill('');
+    const cells = values.map((v, col) => rsCell(v, {
+      w: widths[col], h: 14.75,
+      cls: [col === 0 ? '' : 'rs-center', col === t.totalColumn ? 'rs-b' : ''].join(' '),
+      style: `font-size:calc(var(--pt)*${col === 0 ? 7.4 : col === t.remarkColumn ? 6.2 : 7.6})`,
+    })).join('');
+    return `<div class="rs-row">${cells}${sideRow(i)}</div>`;
+  }).join('');
+  const table = `<div class="rs-block" style="top:calc(var(--pt)*${262 + offset})"><div class="rs-row">${headRow}</div>${bodyRows}</div>`;
+
+  const keyWidths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
+  const gradeKey = `<div class="rs-block rs-row" style="top:calc(var(--pt)*${711 + offset})">${s.gradeKey.map((v, i) =>
+    rsCell(v, { w: keyWidths[i], h: 28, cls: `rs-center ${i === 0 ? 'rs-b' : ''}`, style: `font-size:calc(var(--pt)*${i === 0 ? 6.2 : 6.8})` })).join('')}</div>`;
+
+  const page1 = `<div class="rs-page">${header}
+    <div class="rs-heading" style="top:calc(var(--pt)*109)">${escapeHtml(s.heading)}</div>
+    ${info}${table}${gradeKey}</div>`;
+
+  const c = s.comments;
+  const sig = path => path ? `<img class="rs-sig" src="/${escapeHtml(path)}" alt="">` : '';
+  const commentBlock = (top, comment, nameLine, sigLabel, sigPath) => `<div class="rs-block" style="top:calc(var(--pt)*${top})">
+    ${rsCell(comment, { w: 540, h: 24, cls: 'rs-comment' })}
+    <div class="rs-row">${rsCell(nameLine, { w: 324, h: 24, cls: 'rs-comment' })}
+      <div class="rs-cell rs-center rs-comment" style="width:calc(var(--pt)*216);height:calc(var(--pt)*24);position:relative"><span>${escapeHtml(sigLabel)}</span>${sig(sigPath)}</div></div>
+  </div>`;
+
+  const page2 = `<div class="rs-page">${header}
+    <div class="rs-block" style="top:calc(var(--pt)*116)">${rsChartSvg(s.chart)}</div>
+    ${commentBlock(466, `Form Teacher's Comment :  ${c.teacherComment}`, `Form Teacher :${c.formTeacherName}`, "Form Teacher's Signature:", c.teacherSignaturePath)}
+    ${commentBlock(538, `Head of School Comment:  ${c.headComment}`, `Head of School: ${c.headName}`, "Head of School's Signature :", c.headSignaturePath)}
+    <div class="rs-next" style="top:calc(var(--pt)*610)">${escapeHtml(s.nextTermLine)}</div>
+  </div>`;
+
+  return `<div class="rs-sheet">${page1}${page2}</div>`;
+}
+
+// Bar chart drawn in the PDF's own coordinates (box 540 × 300pt).
+function rsChartSvg(chart) {
+  const W = 540, H = 300;
+  const plotX = 52, plotW = W - 72, plotH = H - 130;
+  const plotBottom = H - 82; // SVG y of the x-axis
+  const grid = [0, 20, 40, 60, 80, 100, 120].map(mark => {
+    const y = plotBottom - (plotH * mark / 120);
+    return `<line x1="${plotX}" y1="${y}" x2="${plotX + plotW}" y2="${y}" stroke="#cccccc" stroke-width="0.35"/>
+      <text x="40" y="${y + 2.5}" text-anchor="end" font-size="7" fill="#525252">${mark}</text>`;
+  }).join('');
+  const slot = plotW / Math.max(chart.length, 1);
+  const barW = Math.min(12, slot * 0.32);
+  const bars = chart.map((row, i) => {
+    const score = Math.max(0, Math.min(120, Number(row.total || 0)));
+    const h = plotH * score / 120;
+    const bx = plotX + (slot * i) + ((slot - barW) / 2);
+    const lx = bx - 4, ly = plotBottom + 14;
+    return `<rect x="${bx}" y="${plotBottom - h}" width="${barW}" height="${h}" fill="${RS_CHART_COLORS[i % RS_CHART_COLORS.length]}"/>
+      <text x="${lx}" y="${ly}" font-size="6.8" fill="#525252" transform="rotate(-48 ${lx} ${ly})">${escapeHtml(row.subject.length > 22 ? row.subject.slice(0, 21) + '…' : row.subject)}</text>`;
+  }).join('');
+  return `<svg class="rs-chart" viewBox="0 0 ${W} ${H}" style="width:calc(var(--pt)*540);height:calc(var(--pt)*300)" font-family="Helvetica, Arial, sans-serif">
+    <rect x="0.2" y="0.2" width="${W - 0.4}" height="${H - 0.4}" fill="#fff" stroke="#a6a6a6" stroke-width="0.35"/>
+    <text x="${W / 2}" y="28" text-anchor="middle" font-size="14" fill="#525252">Chart Title</text>
+    ${grid}${bars}</svg>`;
 }
 
 function crcStudent(id) {
@@ -3974,32 +4082,6 @@ async function crcPdfBlob(id) {
   }
   _crcPdfCache[id] = await res.blob();
   return _crcPdfCache[id];
-}
-
-async function crcRenderSheet(pdfjs, id) {
-  const holder = document.getElementById(`crc-sheet-${id}`);
-  if (!holder) return;
-  try {
-    const blob = await crcPdfBlob(id);
-    const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
-    const width = holder.clientWidth || 700;
-    const canvases = [];
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n);
-      const base = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: (width / base.width) * Math.min(window.devicePixelRatio || 1, 2) });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      canvases.push(canvas);
-    }
-    holder.innerHTML = '';
-    canvases.forEach(c => holder.appendChild(c));
-    doc.destroy();
-  } catch (err) {
-    holder.innerHTML = `<div class="crc-sheet-loading" style="color:#dc2626;">${escapeHtml(err.message)}</div>`;
-  }
 }
 
 function crcToggleDd(btn) {

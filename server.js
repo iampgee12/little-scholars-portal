@@ -2762,18 +2762,27 @@ async function drawWordHeader(page, pdfDoc, fonts, colors) {
   if (coat) page.drawImage(coat, { x: x + widths[0] + widths[1] + 13, y: top - 52, width: 44, height: 44 });
 
   const centerX = x + widths[0] + (widths[1] / 2);
-  drawCenteredText(page, 'UNIQUE CHILDREN SCHOOL', centerX, top - 15, 15, fonts.bold, colors.blue);
-  drawCenteredText(page, 'BLOCK 12, PLOT 350 NORUS CLOSE, OMOLE ESTATE PHASE 1', centerX, top - 28, 7.3, fonts.regular, colors.black);
-  drawCenteredText(page, 'Website : uniquegroupofschools.com     Phone : 08034106866', centerX, top - 39, 7.2, fonts.regular, colors.black);
-  drawCenteredText(page, 'Email: info@uniquegroupofschools.com', centerX, top - 49, 7.2, fonts.regular, colors.black);
-  drawCenteredText(page, 'Motto: -', centerX, top - 57, 6.8, fonts.italic, colors.black);
+  const [address, contact, email] = REPORT_SCHOOL_HEADER.lines;
+  drawCenteredText(page, REPORT_SCHOOL_HEADER.name, centerX, top - 15, 15, fonts.bold, colors.blue);
+  drawCenteredText(page, address, centerX, top - 28, 7.3, fonts.regular, colors.black);
+  drawCenteredText(page, contact, centerX, top - 39, 7.2, fonts.regular, colors.black);
+  drawCenteredText(page, email, centerX, top - 49, 7.2, fonts.regular, colors.black);
+  drawCenteredText(page, REPORT_SCHOOL_HEADER.motto, centerX, top - 57, 6.8, fonts.italic, colors.black);
 }
 
-async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraRow = null) {
-  const x = 36;
-  const top = 646;
-  const widths = [220, 100, 220];
-  const rowH = 17;
+// Shared by the PDF and the on-screen result sheet (Class Result Checker) so
+// the two always show the same wording and numbers.
+const REPORT_SCHOOL_HEADER = {
+  name: 'UNIQUE CHILDREN SCHOOL',
+  lines: [
+    'BLOCK 12, PLOT 350 NORUS CLOSE, OMOLE ESTATE PHASE 1',
+    'Website : uniquegroupofschools.com     Phone : 08034106866',
+    'Email: info@uniquegroupofschools.com',
+  ],
+  motto: 'Motto: -',
+};
+
+function reportInfoRows(student, rows, totalScore, average, subjectMax, extraRow = null) {
   const classSize = String(one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count);
   const maxScore = rows.length * subjectMax;
   const infoRows = [
@@ -2785,6 +2794,15 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     [`Class: ${student.classLabel}`, `Result Summary: ${gradeBand(average).word}`],
   ];
   if (extraRow) infoRows.push(extraRow);
+  return infoRows;
+}
+
+async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraRow = null) {
+  const x = 36;
+  const top = 646;
+  const widths = [220, 100, 220];
+  const rowH = 17;
+  const infoRows = reportInfoRows(student, rows, totalScore, average, subjectMax, extraRow);
   const rowCount = infoRows.length;
   infoRows.forEach((row, i) => {
     const rowTop = top - (i * rowH);
@@ -2831,9 +2849,7 @@ function reportSubjectRows(rows, examType, priorTerms = [], priorTermData = {}) 
 
 const PRIOR_TERM_COLUMN_LABELS = ['First Term', 'Second Term'];
 
-function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts, colors, priorTerms = [], priorTermData = {}, topOffset = 0) {
-  const x = 36;
-  const top = 530 - topOffset;
+function reportTableLayout(examType, priorTerms = []) {
   const isFinalExam = examType === 'Final Exam';
   const priorCount = isFinalExam ? priorTerms.length : 0;
   // Base widths (no prior-term columns) are exactly the original layout —
@@ -2851,8 +2867,6 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
       baseWidths[4] - shrink.remark, baseWidths[5] - shrink.skill, baseWidths[6] - shrink.rating,
     ];
   }
-  const headerH = 70;
-  const rowH = 14.75;
   const scoreHeaders = reportScoreColumns(examType);
   const priorHeaders = priorTerms.map((t, i) => PRIOR_TERM_COLUMN_LABELS[i] || t.termLabel);
   const headers = ['Subject', ...scoreHeaders, `Total Score (${maxScoreForExamType(examType)})`, ...priorHeaders, 'Grade Remarks', 'Affective / Psychomotor Skills', 'Rating'];
@@ -2861,15 +2875,34 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
   const skillColumn = remarkColumn + 1;
   const verticalHeaderCols = [];
   for (let i = 1; i <= remarkColumn; i += 1) verticalHeaderCols.push(i);
-  const subjectRows = reportSubjectRows(rows, examType, priorTerms, priorTermData);
-  const affective = AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' }));
-  const psychomotor = PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' }));
-  const attendanceRows = [
+  return { isFinalExam, widths, headers, totalColumn, remarkColumn, skillColumn, verticalHeaderCols };
+}
+
+function reportSkillRows(skillRating) {
+  return {
+    affective: AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' })),
+    psychomotor: PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' })),
+  };
+}
+
+function reportAttendanceRows(attendance) {
+  return [
     ['No. of School Days :', attendance.schoolDays],
     ['No. of Days Present :', attendance.present],
     ['No. of Days Absent :', attendance.absent],
     ['% Attendance :', `${attendance.percent}%`],
   ];
+}
+
+function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts, colors, priorTerms = [], priorTermData = {}, topOffset = 0) {
+  const x = 36;
+  const top = 530 - topOffset;
+  const { isFinalExam, widths, headers, totalColumn, remarkColumn, skillColumn, verticalHeaderCols } = reportTableLayout(examType, priorTerms);
+  const headerH = 70;
+  const rowH = 14.75;
+  const subjectRows = reportSubjectRows(rows, examType, priorTerms, priorTermData);
+  const { affective, psychomotor } = reportSkillRows(skillRating);
+  const attendanceRows = reportAttendanceRows(attendance);
 
   let cursorX = x;
   headers.forEach((header, i) => {
@@ -2947,20 +2980,22 @@ function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts,
   }
 }
 
+const REPORT_GRADE_KEY = [
+  'Key to Grades',
+  '70-100:5 Grade Points.',
+  '60-69:4 Grade Points.',
+  '50-59:3 Grade Points.',
+  '45-49:2 Grade Points.',
+  '40-44:1 Grade Point.',
+  '0-39:0 Grade Points.',
+];
+
 function drawWordGradeKey(page, fonts, colors, topOffset = 0) {
   const x = 36;
   const top = 81 - topOffset;
   const height = 28;
   const widths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
-  const values = [
-    'Key to Grades',
-    '70-100:5 Grade Points.',
-    '60-69:4 Grade Points.',
-    '50-59:3 Grade Points.',
-    '45-49:2 Grade Points.',
-    '40-44:1 Grade Point.',
-    '0-39:0 Grade Points.',
-  ];
+  const values = REPORT_GRADE_KEY;
   let cursorX = x;
   values.forEach((value, i) => {
     drawWordCell(page, { x: cursorX, top, width: widths[i], height, value, fill: colors.white, border: colors.grid, font: i === 0 ? fonts.bold : fonts.regular, size: i === 0 ? 6.2 : 6.8, color: colors.black, align: 'center', pad: 3 });
@@ -2974,7 +3009,7 @@ async function drawWordComments(page, pdfDoc, formTeacher, fonts, colors, teache
   const leftW = 324;
   const rightW = 216;
   const rowH = 24;
-  const headName = valueFromMeta('head_of_school_name', 'James Idoko Ajah');
+  const headName = reportHeadName();
 
   const teacherTop = 326;
   drawWordCell(page, { x, top: teacherTop, width, height: rowH, value: `Form Teacher's Comment :  ${teacherComment}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
@@ -3032,8 +3067,9 @@ function drawWordScoreChart(page, rows, fonts, colors, degrees) {
   });
 }
 
-async function generateReportPdf({ studentId, classCode, examType }) {
-  const { PDFDocument, StandardFonts, rgb, degrees } = loadPdfLib();
+// Everything a report sheet shows, gathered once. `allowEmpty` lets the
+// on-screen bulk viewer show a pupil who has no scores yet (the PDF refuses).
+function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   const academic = activeAcademic();
   const student = one(
     `SELECT s.*, c.label AS classLabel, u.grade
@@ -3047,7 +3083,7 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   if (!student) throw new Error('Student not found for selected class');
 
   const rows = classReportRows(classCode, examType, studentId);
-  if (!rows.length) throw new Error(`No ${examType} results found for ${student.name}`);
+  if (!rows.length && !allowEmpty) throw new Error(`No ${examType} results found for ${student.name}`);
   const skillRating = skillRatingForReport(student.id, classCode, examType);
 
   const countedRows = rows.filter(row => !row.isAbsent);
@@ -3080,6 +3116,77 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
   const absent = Math.max(0, schoolDays - present);
   const formTeacher = rows.find(row => row.teacherSignaturePath) || rows[0] || {};
+  const { teacherComment, headComment } = resolveReportComments({
+    academicId: academic.id, studentId: student.id, examType, average,
+  });
+  return {
+    academic, student, rows, skillRating, totalScore, subjectMax, average,
+    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
+    teacherComment, headComment,
+  };
+}
+
+function reportHeadName() {
+  return valueFromMeta('head_of_school_name', 'James Idoko Ajah');
+}
+
+function reportNextTermLine() {
+  return `NEXT TERM BEGINS: ${String(valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026')).toUpperCase()}`;
+}
+
+// The report sheet as plain data, for the on-screen (HTML) version in the
+// Class Result Checker. Uses the same helpers as generateReportPdf.
+function reportSheetData(ctx, examType) {
+  const {
+    academic, student, rows, skillRating, totalScore, subjectMax, average,
+    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
+    teacherComment, headComment,
+  } = ctx;
+  const layout = reportTableLayout(examType, priorTerms);
+  const assetOrEmpty = p => (p && absoluteAssetPath(p) ? p : '');
+  return {
+    studentId: student.id,
+    name: student.name,
+    parentEmail: student.parent_email || '',
+    hasResults: rows.length > 0,
+    school: REPORT_SCHOOL_HEADER,
+    heading: reportHeading(academic, examType),
+    infoRows: reportInfoRows(student, rows, totalScore, average, subjectMax,
+      cumulativeGPA != null ? ['', `Cumulative Grade Point Average: ${cumulativeGPA}`] : null),
+    photoPath: assetOrEmpty(student.photo_path) || 'report_assets/student-placeholder.png',
+    table: {
+      headers: layout.headers,
+      widths: layout.widths,
+      verticalCols: layout.verticalHeaderCols,
+      totalColumn: layout.totalColumn,
+      remarkColumn: layout.remarkColumn,
+      rows: reportSubjectRows(rows, examType, priorTerms, priorTermData).map(r => (layout.isFinalExam
+        ? [r.subject, r.ca, r.exam, r.total, ...r.priorTotals, r.remark]
+        : [r.subject, r.ca, r.total, r.remark])),
+    },
+    ...reportSkillRows(skillRating),
+    attendance: reportAttendanceRows({ schoolDays, present, absent, percent: student.att || 0 }),
+    gradeKey: REPORT_GRADE_KEY,
+    chart: rows.slice(0, 18).map(r => ({ subject: r.subjectName || '', total: Number(r.total || 0) })),
+    comments: {
+      teacherComment,
+      formTeacherName: formTeacher.teacherName || '',
+      teacherSignaturePath: assetOrEmpty(formTeacher.teacherSignaturePath),
+      headComment,
+      headName: reportHeadName(),
+      headSignaturePath: assetOrEmpty(valueFromMeta('head_signature_path', '')),
+    },
+    nextTermLine: reportNextTermLine(),
+  };
+}
+
+async function generateReportPdf({ studentId, classCode, examType }) {
+  const { PDFDocument, StandardFonts, rgb, degrees } = loadPdfLib();
+  const {
+    academic, student, rows, skillRating, totalScore, subjectMax, average,
+    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
+    teacherComment, headComment,
+  } = reportContext({ studentId, classCode, examType });
 
   const pdfDoc = await PDFDocument.create();
   const fonts = {
@@ -3121,15 +3228,11 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   drawWordMainTable(page1, rows, examType, skillRating, { schoolDays, present, absent, percent: student.att || 0 }, fonts, colors, priorTerms, priorTermData, topOffset);
   drawWordGradeKey(page1, fonts, colors, topOffset);
 
-  const { teacherComment, headComment } = resolveReportComments({
-    academicId: academic.id, studentId: student.id, examType, average,
-  });
-
   const page2 = pdfDoc.addPage([612, 792]);
   await drawWordHeader(page2, pdfDoc, fonts, colors);
   drawWordScoreChart(page2, rows, fonts, colors, degrees);
   await drawWordComments(page2, pdfDoc, formTeacher, fonts, colors, teacherComment, headComment);
-  text(page2, `NEXT TERM BEGINS: ${String(valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026')).toUpperCase()}`, 36, 174, 9.5, fonts.bold, { color: colors.black });
+  text(page2, reportNextTermLine(), 36, 174, 9.5, fonts.bold, { color: colors.black });
 
   return Buffer.from(await pdfDoc.save());
 }
@@ -4795,6 +4898,27 @@ async function handleApi(req, res, url) {
     const mail = await sendParentEmail({ to, studentName: student.name, pdfBytes });
     if (mail.status !== 'sent') return sendJson(res, 502, { error: mail.error || 'Email could not be sent' });
     return sendJson(res, 200, { ok: true, to });
+  }
+
+  // Class Result Checker bulk view: every pupil in the class (with or without
+  // scores yet) as on-screen report sheet data.
+  if (req.method === 'GET' && url.pathname === '/api/admin/reports/class-sheets') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const examType = cleanText(url.searchParams.get('examType'));
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (!classCode || !validateExamType(examType)) {
+      return sendJson(res, 400, { error: 'Class and exam type are required' });
+    }
+    if (!activeAcademic()) return sendJson(res, 400, { error: 'No active academic term' });
+    const students = classArmId
+      ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
+      : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
+    const sheets = students.map(st => reportSheetData(
+      reportContext({ studentId: st.id, classCode, examType, allowEmpty: true }), examType
+    ));
+    return sendJson(res, 200, { sheets });
   }
 
   // Class Result Checker → "Print all Results": every pupil's report in one PDF.
