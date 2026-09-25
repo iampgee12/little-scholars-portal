@@ -156,7 +156,7 @@ async function init() {
     clearStudentForm();
     populateStaff();
     renderAnnouncements();
-    bootstrapClassResultLink();
+    if (!restoreTabFromUrl()) bootstrapClassResultLink();
   } catch (err) {
     showToast(err.message);
   }
@@ -2946,7 +2946,18 @@ function filterAdminSidebar(query) {
 function syncSidebarForTab(tab, trigger) {
   const direct = document.querySelector(`.sub-nav-item[data-tab="${tab}"]`);
   const item = trigger?.classList?.contains('sub-nav-item') ? trigger : direct;
-  if (!item) return;
+  if (!item) {
+    // A page with no menu entry (My Profile): nothing in the menu is "here".
+    document.querySelectorAll('.sub-nav-item.active').forEach(nav => nav.classList.remove('active'));
+    return;
+  }
+  // Unfold the collapsible group holding the item (e.g. Finance → Fees Logs &
+  // Reports) so the highlighted page is actually visible after a refresh.
+  const group = item.closest('.result-gradebook-children');
+  if (group && !group.classList.contains('open')) {
+    const toggle = group.previousElementSibling;
+    if (toggle?.getAttribute('onclick')?.includes('toggleDropdown')) toggle.click();
+  }
   document.querySelectorAll('.sub-nav-item').forEach(nav => nav.classList.remove('active'));
   item.classList.add('active');
   const menu = item.closest('.sub-menu');
@@ -2959,12 +2970,30 @@ function syncSidebarForTab(tab, trigger) {
   });
 }
 
+
+// Keep the open page in the address (…#tabName) so a refresh reopens it with
+// its menu item highlighted — the user always sees where they are.
+function rememberTab(tab) {
+  if (location.hash !== `#${tab}`) history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
+  document.querySelector('.user-pill')?.classList.toggle('pill-active', tab === 'profile');
+}
+
+function restoreTabFromUrl() {
+  const tab = location.hash.slice(1);
+  if (!/^[A-Za-z]+$/.test(tab) || !document.getElementById(`tab-${tab}`)) return false;
+  // A "View Results" link (?crcClass=…) reruns its own search instead.
+  if (tab === 'classResultChecker' && new URLSearchParams(location.search).has('crcClass')) return false;
+  switchTab(tab, document.querySelector(`.sub-nav-item[data-tab="${tab}"]`));
+  return true;
+}
+
 function switchTab(tab, trigger, titleOverride, subOverride) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const panel = document.getElementById(`tab-${tab}`);
   if (!panel) return;
   panel.classList.add('active');
+  rememberTab(tab);
   if (trigger?.classList?.contains('nav-item')) trigger.classList.add('active');
   syncSidebarForTab(tab, trigger);
   const meta = TAB_META[tab] || {};

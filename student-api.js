@@ -274,11 +274,26 @@ const TAB_META = {
   results: { title: 'Exam Results', sub: '' },
 };
 
+// Keep the open page in the address (…#tabName) so a refresh reopens it with
+// its menu item highlighted — the user always sees where they are.
+function rememberTab(tab) {
+  if (location.hash !== `#${tab}`) history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
+  document.querySelector('.user-pill')?.classList.toggle('pill-active', tab === 'profile');
+}
+
+function restoreTabFromUrl() {
+  const tab = location.hash.slice(1);
+  if (!/^[A-Za-z]+$/.test(tab) || !document.getElementById(`tab-${tab}`)) return false;
+  switchTab(tab, document.querySelector(`.nav-item[onclick*="switchTab('${tab}'"]`));
+  return true;
+}
+
 function switchTab(tab, trigger) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (trigger) trigger.classList.add('active');
+  rememberTab(tab);
   const m = TAB_META[tab] || {};
   document.getElementById('topbar-title').textContent = m.title || tab;
   if (m.sub) document.getElementById('topbar-sub').textContent = m.sub;
@@ -498,4 +513,4 @@ async function changeAccountPassword() {
   }
 }
 
-init();
+init().then(restoreTabFromUrl);
