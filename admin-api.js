@@ -4467,6 +4467,18 @@ function renderBsEmailNote() {
     : 'SMTP is not configured — reports will still publish, but parent emails will not be sent.';
 }
 
+// Review & Publish: a published result shows only Unpublish; an unpublished
+// one shows only Publish.
+function syncPublishButtons() {
+  const classCode = document.getElementById('bs-class-sel')?.value;
+  const examType = document.getElementById('bs-exam-sel')?.value;
+  const published = (state.setup.publishedResults || []).some(p => p.classCode === classCode && p.examType === examType);
+  const pubBtn = document.getElementById('bs-publish-btn');
+  const unpubBtn = document.getElementById('bs-unpublish-btn');
+  if (pubBtn) pubBtn.style.display = published ? 'none' : '';
+  if (unpubBtn) unpubBtn.style.display = published ? '' : 'none';
+}
+
 async function publishBroadsheet() {
   const classCode = document.getElementById('bs-class-sel')?.value;
   const examType = document.getElementById('bs-exam-sel')?.value;
@@ -4512,8 +4524,7 @@ async function publishBroadsheet() {
     if (skipped.length) msg += ` (${skipped.length} student${skipped.length === 1 ? '' : 's'} had no results, skipped)`;
     showToast(msg);
 
-    const unpubBtn = document.getElementById('bs-unpublish-btn');
-    if (unpubBtn) unpubBtn.style.display = count ? '' : 'none';
+    syncPublishButtons();
   } catch (err) {
     showToast(err.message);
   } finally {
@@ -4557,10 +4568,7 @@ function viewBroadsheet() {
     hdrTitle.textContent = `${clsLabel} Students Result for ${examLabel} (${session})  —  Master / Broad Sheet`;
   }
 
-  // Show/hide unpublish button based on published state
-  const published = (state.setup.publications||[]).some(p => p.classCode === classCode && p.examType === examLabel);
-  const unpubBtn = document.getElementById('bs-unpublish-btn');
-  if (unpubBtn) unpubBtn.style.display = published ? '' : 'none';
+  syncPublishButtons();
 
   loadBroadsheet();
 }
@@ -4582,7 +4590,7 @@ async function unpublishBroadsheet() {
     });
     state.setup = data.setup;
     showToast(`Unpublished ${data.unpublishedCount} report${data.unpublishedCount === 1 ? '' : 's'}`);
-    if (btn) btn.style.display = 'none';
+    syncPublishButtons();
   } catch (err) {
     showToast(err.message);
   } finally {
