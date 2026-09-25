@@ -3118,6 +3118,10 @@ function profileInit() {
   document.getElementById('pf-phone').value = u.phone || '';
   document.getElementById('pf-email').value = u.email || '';
   document.getElementById('pf-address').value = u.address || '';
+  document.getElementById('pf-signature-file').value = '';
+  const sig = document.getElementById('as-sig-preview');
+  if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
+  else sig.style.display = 'none';
 
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
@@ -3154,9 +3158,12 @@ async function saveProfile(btn) {
       email: val('pf-email'),
       address: val('pf-address'),
       photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;
+    // Keep Settings → Signatures in step without a reload.
+    if (state.setup?.settings) state.setup.settings.headSignaturePath = data.user.signaturePath;
     renderUserAvatar(document.getElementById('a-avatar'), data.user);
     document.getElementById('a-name').textContent = data.user.name;
     profileInit();

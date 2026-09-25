@@ -1691,6 +1691,9 @@ function profileFields(row) {
       fields.photoPath = st.photo_path || '';
     }
   }
+  // The admin's profile signature *is* the Head of School signature that
+  // prints on result sheets (same value as Settings → Signatures).
+  if (row.role === 'admin') fields.signaturePath = valueFromMeta('head_signature_path', '');
   return fields;
 }
 
@@ -3449,6 +3452,7 @@ async function handleApi(req, res, url) {
         dob, doa, cleanText(body.religion), bloodGroup, cleanText(body.address), phone, email, user.id
       );
       if (signaturePath) run('UPDATE users SET signature_path = ? WHERE id = ?', signaturePath, user.id);
+      if (signaturePath && user.role === 'admin') setMeta('head_signature_path', signaturePath);
       if (isStudent) {
         // Name stays admin-controlled for pupils (it prints on official results).
         if (gender) run('UPDATE students SET gender = ? WHERE id = ?', gender === 'Female' ? 'F' : 'M', user.id);

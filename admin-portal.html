@@ -2732,6 +2732,10 @@ body.bs-focus-mode .bs-focus-banner button { background:#0d6efd; color:#fff; bor
                 <div class="pf-field"><label class="field-label">Email</label><input type="email" class="field-input" id="pf-email" placeholder="you@example.com"></div>
                 <div class="pf-field pf-wide"><label class="field-label">Address</label><textarea class="field-input" id="pf-address" rows="2"></textarea></div>
               </div>
+              <div class="pf-section-title">Head of School Signature</div>
+              <div class="pf-hint" style="margin-bottom:8px;">Printed on every result sheet. Same signature as Settings → Signatures. PNG or JPG, ideally on a white background.</div>
+              <img id="as-sig-preview" alt="Head of School signature" class="pf-sig-preview" style="display:none;">
+              <input type="file" id="pf-signature-file" accept="image/png,image/jpeg" class="pf-file">
               <button class="bs-print-btn pf-save" onclick="saveProfile(this)">Save Changes</button>
             </div>
           </div>
