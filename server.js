@@ -3126,6 +3126,18 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   };
 }
 
+// Once a class's result for an exam is published, teachers can't change
+// anything that appears on it until the admin unpublishes.
+const RESULT_LOCKED_MESSAGE = 'This result has been published, so it can no longer be changed. Ask the admin to unpublish it first.';
+
+function resultIsPublished(classCode, examType) {
+  const academic = activeAcademic();
+  return !!(academic && one(
+    'SELECT id FROM report_publications WHERE academic_id = ? AND class_code = ? AND exam_type = ? LIMIT 1',
+    academic.id, classCode, examType
+  ));
+}
+
 function reportHeadName() {
   return valueFromMeta('head_of_school_name', 'James Idoko Ajah');
 }
@@ -3784,7 +3796,7 @@ async function handleApi(req, res, url) {
     const assignment = assignmentForTeacher(contextId, user.id);
     if (!assignment) return sendJson(res, 403, { error: 'This result context is not assigned to you' });
     return sendJson(res, 200, {
-      result: resultPayload(contextId, examType),
+      result: { ...resultPayload(contextId, examType), published: resultIsPublished(assignment.class_code, examType) },
     });
   }
 
@@ -3823,6 +3835,7 @@ async function handleApi(req, res, url) {
     }
     const student = one('SELECT id FROM students WHERE id = ? AND class_code = ?', studentId, assignment.class_code);
     if (!student) return sendJson(res, 400, { error: `Student ${studentId} is not in ${assignment.class_code}` });
+    if (resultIsPublished(assignment.class_code, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
 
     let values;
     try {
@@ -3910,6 +3923,7 @@ async function handleApi(req, res, url) {
     }
     const student = one('SELECT id FROM students WHERE id = ? AND class_code = ?', studentId, assignment.class_code);
     if (!student) return sendJson(res, 400, { error: `Student ${studentId} is not in ${assignment.class_code}` });
+    if (resultIsPublished(assignment.class_code, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
 
     const academic = activeAcademic();
     const updatedAt = new Date().toISOString();
@@ -3936,6 +3950,7 @@ async function handleApi(req, res, url) {
     }
     const assignment = assignmentForTeacher(contextId, user.id);
     if (!assignment) return sendJson(res, 403, { error: 'This result context is not assigned to you' });
+    if (resultIsPublished(assignment.class_code, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
     if (!incoming.length) return sendJson(res, 400, { error: 'At least one result entry is required' });
 
     let entries;
@@ -4036,11 +4051,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Student is not in this class' });
     }
     const academic = activeAcademic();
-    const published = one(
-      `SELECT id FROM report_publications WHERE academic_id = ? AND class_code = ? AND exam_type = ? LIMIT 1`,
-      academic.id, assignment.class_code, examType
-    );
-    if (published) return sendJson(res, 409, { error: 'Unpublish this result before editing student scores' });
+    if (resultIsPublished(assignment.class_code, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
 
     const existingBatch = one(
       'SELECT id FROM result_batches WHERE academic_id = ? AND assignment_id = ? AND exam_type = ?',
@@ -9364,7 +9375,13 @@ function adminSetupPayload() {
     website: valueFromMeta('school_website', 'uniquegroupofschools.com'),
   };
 
-  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
+  // Exact published class+exam pairs for the active term (publications above
+  // is only a recent-activity list), so Review & Publish shows the right button.
+  const publishedResults = academic
+    ? all('SELECT DISTINCT class_code AS classCode, exam_type AS examType FROM report_publications WHERE academic_id = ?', academic.id)
+    : [];
+
+  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
 function serveStatic(req, res, url) {

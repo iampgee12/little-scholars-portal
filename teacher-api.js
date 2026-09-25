@@ -288,6 +288,17 @@ async function loadTopbarSession() {
   } catch(e) {}
 }
 
+// Line under the teacher's name on the sidebar card: a class teacher sees
+// their class ("Year 6"); a subject teacher sees their subjects, or just
+// "Subject Teacher" once there are more than three.
+function teacherCardLabel(contexts) {
+  const classes = [...new Set(contexts.filter(c => c.teacherType === 'class_teacher').map(c => c.classLabel))];
+  if (classes.length) return classes.join(', ');
+  const subjects = [...new Set(contexts.map(c => c.subjectName))];
+  if (!subjects.length) return 'No assignments';
+  return subjects.length > 3 ? 'Subject Teacher' : subjects.join(', ');
+}
+
 async function init() {
   try {
     const session = await apiFetch('/api/session');
@@ -309,8 +320,7 @@ async function init() {
     document.title = `Unique Children's School - ${teacher.name}`;
     loadTopbarSession();
 
-    const subjects = [...new Set(state.contexts.map(ctx => ctx.subjectName))];
-    document.getElementById('t-subj').textContent = subjects.join(', ') || 'No assignments';
+    document.getElementById('t-subj').textContent = teacherCardLabel(state.contexts);
     document.getElementById('ctx-session').textContent = `${state.academic.sessionLabel} - ${state.academic.termLabel}`;
     document.getElementById('re-examtype').value = 'Mid-Term Exam';
 
@@ -546,6 +556,20 @@ function renderResultsGrid() {
         <div class="tbl-actions"><button class="act-btn btn-clear" onclick="clearSheet()">Clear All</button><button class="act-btn btn-exp" onclick="exportResultsCsv()">Export CSV</button><button class="act-btn btn-save" onclick="saveResults()">Save All</button></div>
       </div>
     </div>`;
+  applyResultLock();
+}
+
+// A published result is read-only for teachers (the server enforces this
+// too): grey out every score/rating box and hide the save/clear buttons.
+function applyResultLock() {
+  const saved = resultFor(state.currentContext.id, state.currentExam);
+  if (!saved.published) return;
+  const main = document.getElementById('results-main');
+  main.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.id !== 'grid-search-input') el.disabled = true;
+  });
+  main.querySelectorAll('.btn-save, .btn-clear, .ep-save-btn, .ep-clear-btn').forEach(btn => { btn.style.display = 'none'; });
+  main.insertAdjacentHTML('afterbegin', `<div class="result-locked-note">&#x1F512; This ${escapeHtml(state.currentExam)} result for ${escapeHtml(state.currentContext.classLabel)} has been published, so scores can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>`);
 }
 
 async function openStudentPanel(idx) {
@@ -613,6 +637,7 @@ function renderStudentPanel() {
         <button class="ep-save-btn" onclick="epSave('${student.id}', '${isCA ? 'ca' : 'both'}')">Save Score</button>
       </div>
     </div>`;
+  applyResultLock();
 }
 
 
