@@ -3797,7 +3797,7 @@ function crcInit() {
   const sessions = [...new Set((state.setup.resultBatches || []).map(b => b.classLabel ? b : null)
     .filter(Boolean).map(b => {
       const term = state.setup.academic;
-      return term ? `${term.session_label || ''}` : '';
+      return term ? `${term.sessionLabel || ''}` : '';
     }))].filter(Boolean);
 
   const sessionSel = document.getElementById('crc-session');
@@ -3807,7 +3807,7 @@ function crcInit() {
   // Derive unique session labels from academic_terms (use active term info)
   const academic = state.setup.academic;
   sessionSel.innerHTML = academic
-    ? `<option value="${academic.session_label || '2025-2026'}">${academic.session_label || '2025-2026'}</option>`
+    ? `<option value="${escapeHtml(academic.sessionLabel)}">${escapeHtml(academic.sessionLabel)}</option>`
     : '<option value="">No active session</option>';
 
   const exams = [...new Set((state.setup.resultBatches || []).map(b => b.examType))].filter(Boolean);
@@ -7018,7 +7018,7 @@ function sdInit() {
     (state.setup.classes||[]).map(c=>`<option value="${c.code}">${c.label}</option>`).join('');
   const academic = state.setup.academic;
   sessSel.innerHTML = academic
-    ? `<option value="${academic.session_label||'2025-2026'}">${academic.session_label||'2025-2026'}</option>`
+    ? `<option value="${escapeHtml(academic.sessionLabel)}">${escapeHtml(academic.sessionLabel)}</option>`
     : '<option value="">No active session</option>';
   const exams = [...new Set((state.setup.resultBatches||[]).map(b=>b.examType))].filter(Boolean);
   examSel.innerHTML = '<option value="">— Select Exam —</option>' +
