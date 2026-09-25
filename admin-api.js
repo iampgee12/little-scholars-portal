@@ -156,7 +156,7 @@ async function init() {
     clearStudentForm();
     populateStaff();
     renderAnnouncements();
-    bootstrapBroadsheetFocusMode();
+    bootstrapClassResultLink();
   } catch (err) {
     showToast(err.message);
   }
@@ -2827,6 +2827,8 @@ const TAB_META = {
   resultsGradebook: { title: 'Results Grade Book', sub: 'Result Score Entry' },
   cognitiveSkills: { title: 'Cognitive Skills Assessment', sub: 'Skills Assessment Records' },
   publish: { title: 'Review And Publish Results', sub: 'Review and Publish Student Reports' },
+  studentResultChecker: { title: 'Student Result Checker', sub: 'Look Up a Student Result' },
+  classResultChecker: { title: 'Class Result Checker', sub: 'Bulk Students Result Checker' },
   emailQueue: { title: 'Results Email Delivery Queue', sub: 'Published Report Email Status' },
   settings: { title: 'Result Settings', sub: 'Staff, Students, and Result Assignments' },
   academics: { title: 'Academics', sub: 'Academic Activities' },
@@ -3852,6 +3854,32 @@ function crcCheckAvailability() {
   }
 }
 
+// Bulk result viewer: every pupil's real report sheet (the same PDF the
+// school prints), stacked, each with its own actions — mirrors the
+// schoolsfocus "Bulk Students Result Checker".
+let _crc = null; // { classCode, examType, classArmId, classLabel, data }
+const _crcPdfCache = {};
+let _crcRenderToken = 0;
+
+const PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let _pdfjsPromise = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!_pdfjsPromise) {
+    _pdfjsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = PDFJS_BASE + 'pdf.min.js';
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => { _pdfjsPromise = null; reject(new Error('Could not load the PDF viewer')); };
+      document.head.appendChild(s);
+    });
+  }
+  return _pdfjsPromise;
+}
+
 async function crcBulkView() {
   const classCode = document.getElementById('crc-class').value;
   const examType  = document.getElementById('crc-exam').value;
@@ -3859,67 +3887,359 @@ async function crcBulkView() {
   if (!classCode || !examType) return;
 
   const area = document.getElementById('crc-results-area');
-  area.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-3)">Loading results…</div>';
+  area.innerHTML = `<div class="crc-fetching"><div class="crc-spinner"></div><div style="color:#0d6efd;font-weight:600;">Fetching results</div>
+    <div>Viewing results in bulk takes a bit more time to load.<br>Please be patient while the system fetches the results.</div></div>`;
+  const token = ++_crcRenderToken;
 
   try {
     const armParam = classArmId ? `&classArmId=${encodeURIComponent(classArmId)}` : '';
-    const data = await fetch(`/api/admin/broadsheet?classCode=${classCode}&examType=${encodeURIComponent(examType)}${armParam}`).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-
-    const students = data.students || [];
-    const subjects  = data.subjects || [];
-    const matrix    = data.scoreMatrix || {};
-
+    const data = await apiFetch(`/api/admin/broadsheet?classCode=${encodeURIComponent(classCode)}&examType=${encodeURIComponent(examType)}${armParam}`);
+    const students = (data.students || []).filter(st => Object.keys(data.scoreMatrix?.[st.id] || {}).length);
     if (!students.length) {
       area.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">No student results available.</div></div>';
       return;
     }
-
     const classLabel = (state.setup.classes || []).find(c => c.code === classCode)?.label || classCode;
+    _crc = { classCode, examType, classArmId, classLabel, data };
+    Object.keys(_crcPdfCache).forEach(k => delete _crcPdfCache[k]);
 
     area.innerHTML = `
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-        <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print all Results</button>
-      </div>` +
-      students.map(st => {
-        const scores = matrix[st.id] || {};
-        const rows = subjects.map(s => {
-          const sc = scores[s.id];
-          const tot = sc?.tot ?? null;
-          const g = tot != null ? bsGrade(tot) : null;
-          return `<tr>
-            <td style="text-align:left;font-weight:500">${s.name}</td>
-            <td>${sc?.ca ?? '—'}</td>
-            <td>${sc?.ex ?? '—'}</td>
-            <td style="font-weight:700">${tot ?? '—'}</td>
-            <td>${g?.grade ?? '—'}</td>
-            <td style="color:var(--text-3)">${g?.remark ?? '—'}</td>
-          </tr>`;
-        }).join('');
+      <div class="crc-toolbar">
+        <span class="crc-count">${students.length} result${students.length === 1 ? '' : 's'} · ${escapeHtml(classLabel)} · ${escapeHtml(examType)}</span>
+        <button class="bs-print-btn" id="crc-print-all" onclick="crcPrintAll(this)">&#x1F5A8; Print all Results</button>
+      </div>
+      ${students.map(st => crcRowHtml(st)).join('')}
+      <button class="crc-top-btn" onclick="document.getElementById('tab-classResultChecker').scrollIntoView({behavior:'smooth'})">&#x2191; Back to Top</button>`;
 
-        return `<div class="card crc-report-card">
-          <div class="card-head" style="flex-wrap:wrap;gap:8px;">
-            <span class="card-title">${st.name}</span>
-            <span style="color:var(--text-3);font-size:11px;font-family:'DM Mono',monospace">${st.id}</span>
-            <span style="margin-left:auto;font-size:12px;color:var(--text-2)">${classLabel} · ${examType}</span>
-          </div>
-          <div class="card-body" style="padding:0 0 2px;">
-            <table class="data-table">
-              <thead><tr><th style="text-align:left">Subject</th><th>C.A (40%)</th><th>Exam (60%)</th><th>Total</th><th>Grade</th><th>Remark</th></tr></thead>
-              <tbody>${rows}</tbody>
-              <tfoot><tr style="background:var(--surface-2)">
-                <td style="font-weight:700;text-align:left">Summary</td>
-                <td colspan="2"></td>
-                <td style="font-weight:700">${st.grandTotal}</td>
-                <td colspan="2" style="color:var(--text-3)">Avg: ${st.avgPct}% · Pos: ${st.position}</td>
-              </tr></tfoot>
-            </table>
-          </div>
-        </div>`;
-      }).join('');
-  } catch(e) {
-    area.innerHTML = `<div class="card"><div class="card-body" style="padding:24px;color:#f87171;text-align:center">${e.message}</div></div>`;
+    const pdfjs = await loadPdfJs();
+    for (const st of students) {
+      if (token !== _crcRenderToken) return; // a newer search replaced this one
+      await crcRenderSheet(pdfjs, st.id);
+    }
+  } catch (e) {
+    if (token === _crcRenderToken) {
+      area.innerHTML = `<div class="card"><div class="card-body" style="padding:24px;color:#f87171;text-align:center">${escapeHtml(e.message)}</div></div>`;
+    }
   }
+}
+
+function crcRowHtml(st) {
+  const id = escapeHtml(st.id);
+  const parentEmail = st.parentEmail ? escapeHtml(st.parentEmail) : '';
+  return `<div class="crc-row" id="crc-row-${id}">
+    <div class="crc-sheet" id="crc-sheet-${id}"><div class="crc-sheet-loading">Loading ${escapeHtml(st.name)}'s result…</div></div>
+    <div class="crc-actions">
+      <div class="crc-who"><strong>${escapeHtml(st.name)}</strong><span>${id} · Position ${escapeHtml(String(st.position))}</span></div>
+      <button class="crc-act" onclick="crcAnalysis('${id}')">&#x1F4CA; Result Analysis</button>
+      <button class="crc-act" onclick="crcPrint('${id}', this)">&#x1F5A8; Print Result</button>
+      <div class="crc-dd">
+        <button class="crc-act" onclick="crcToggleDd(this)">&#x1F4C4; Get as PDF &#x25BE;</button>
+        <div class="crc-dd-menu">
+          <button onclick="crcViewPdf('${id}')">View PDF</button>
+          <button onclick="crcDownloadPdf('${id}')">Download PDF</button>
+        </div>
+      </div>
+      <div class="crc-dd">
+        <button class="crc-act" onclick="crcToggleDd(this)">&#x2709; Send to Email &#x25BE;</button>
+        <div class="crc-dd-menu">
+          ${parentEmail
+            ? `<button onclick="crcEmail('${id}', '')">To Parent / Guardian<small>${parentEmail}</small></button>`
+            : '<button disabled>To Parent / Guardian<small>No parent email on file</small></button>'}
+          <button onclick="crcEmailOther('${id}')">To Other Email</button>
+        </div>
+      </div>
+      <div class="crc-dd">
+        <button class="crc-act" onclick="crcToggleDd(this)">&#x1F4AC; To WhatsApp &#x25BE;</button>
+        <div class="crc-dd-menu">
+          <button onclick="crcWhatsApp('${id}', '')">Send from My Phone / Device</button>
+          <button onclick="crcWhatsAppOther('${id}')">To Other WhatsApp Number</button>
+        </div>
+      </div>
+      <button class="crc-act" onclick="crcFees('${id}')">&#x1F4B3; Student's Fees</button>
+    </div>
+  </div>`;
+}
+
+function crcStudent(id) {
+  return _crc?.data.students.find(s => s.id === id);
+}
+
+async function crcPdfBlob(id) {
+  if (_crcPdfCache[id]) return _crcPdfCache[id];
+  const params = new URLSearchParams({ studentId: id, classCode: _crc.classCode, examType: _crc.examType });
+  const res = await fetch(`/api/admin/reports/preview?${params}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Could not generate this result');
+  }
+  _crcPdfCache[id] = await res.blob();
+  return _crcPdfCache[id];
+}
+
+async function crcRenderSheet(pdfjs, id) {
+  const holder = document.getElementById(`crc-sheet-${id}`);
+  if (!holder) return;
+  try {
+    const blob = await crcPdfBlob(id);
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const width = holder.clientWidth || 700;
+    const canvases = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: (width / base.width) * Math.min(window.devicePixelRatio || 1, 2) });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      canvases.push(canvas);
+    }
+    holder.innerHTML = '';
+    canvases.forEach(c => holder.appendChild(c));
+    doc.destroy();
+  } catch (err) {
+    holder.innerHTML = `<div class="crc-sheet-loading" style="color:#dc2626;">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function crcToggleDd(btn) {
+  const dd = btn.parentElement;
+  const open = !dd.classList.contains('open');
+  document.querySelectorAll('.crc-dd.open').forEach(d => d.classList.remove('open'));
+  if (open) dd.classList.add('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.crc-dd')) document.querySelectorAll('.crc-dd.open').forEach(d => d.classList.remove('open'));
+  else if (e.target.closest('.crc-dd-menu button')) e.target.closest('.crc-dd').classList.remove('open');
+});
+
+function crcPrintBlob(blob) {
+  let frame = document.getElementById('crc-print-frame');
+  if (frame) frame.remove();
+  frame = document.createElement('iframe');
+  frame.id = 'crc-print-frame';
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  const url = URL.createObjectURL(blob);
+  frame.onload = () => {
+    try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch { window.open(url, '_blank'); } // some browsers block printing PDFs in frames
+  };
+  frame.src = url;
+  document.body.appendChild(frame);
+}
+
+async function crcBusy(btn, fn) {
+  if (btn) btn.disabled = true;
+  try { await fn(); } catch (err) { showToast(err.message); } finally { if (btn) btn.disabled = false; }
+}
+
+function crcPrint(id, btn) {
+  return crcBusy(btn, async () => crcPrintBlob(await crcPdfBlob(id)));
+}
+
+function crcPrintAll(btn) {
+  return crcBusy(btn, async () => {
+    const label = btn.innerHTML;
+    btn.innerHTML = 'Preparing all results…';
+    try {
+      const params = new URLSearchParams({ classCode: _crc.classCode, examType: _crc.examType });
+      if (_crc.classArmId) params.set('classArmId', _crc.classArmId);
+      const res = await fetch(`/api/admin/reports/class-pdf?${params}`);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not prepare results');
+      crcPrintBlob(await res.blob());
+    } finally {
+      btn.innerHTML = label;
+    }
+  });
+}
+
+function crcFileName(id) {
+  const st = crcStudent(id);
+  return `${(st?.name || id).replace(/[^a-z0-9]+/gi, '_')}_${_crc.examType.replace(/[^a-z0-9]+/gi, '_')}_result.pdf`;
+}
+
+async function crcViewPdf(id) {
+  try { window.open(URL.createObjectURL(await crcPdfBlob(id)), '_blank'); } catch (err) { showToast(err.message); }
+}
+
+async function crcDownloadPdf(id) {
+  try {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await crcPdfBlob(id));
+    a.download = crcFileName(id);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function crcModal(title, bodyHtml, wide) {
+  crcCloseModal();
+  const m = document.createElement('div');
+  m.id = 'crc-modal';
+  m.className = 'crc-modal';
+  m.onclick = e => { if (e.target === m) crcCloseModal(); };
+  m.innerHTML = `<div class="card crc-modal-card${wide ? ' wide' : ''}">
+    <div class="card-head"><span class="card-title">${title}</span><button class="cog-modal-close" onclick="crcCloseModal()">&#x2715;</button></div>
+    <div class="crc-modal-body">${bodyHtml}</div></div>`;
+  document.body.appendChild(m);
+  return m;
+}
+function crcCloseModal() { document.getElementById('crc-modal')?.remove(); }
+
+async function crcEmail(id, to) {
+  const st = crcStudent(id);
+  showToast(`Sending ${st?.name || id}'s result…`);
+  try {
+    const data = await apiFetch('/api/admin/reports/email', {
+      method: 'POST',
+      body: JSON.stringify({ studentId: id, classCode: _crc.classCode, examType: _crc.examType, to }),
+    });
+    crcCloseModal();
+    showToast(`Result sent to ${data.to}`);
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function crcEmailOther(id) {
+  const st = crcStudent(id);
+  crcModal('Send Result to Email', `
+    <p class="crc-modal-note">Email <strong>${escapeHtml(st?.name || id)}</strong>'s ${escapeHtml(_crc.examType)} result as a PDF attachment.</p>
+    <label class="field-label">Email Address</label>
+    <input type="email" class="field-input" id="crc-other-email" placeholder="parent@example.com" style="width:100%;box-sizing:border-box;">
+    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcEmail('${escapeHtml(id)}', document.getElementById('crc-other-email').value.trim())">Send Result</button>`);
+  document.getElementById('crc-other-email').focus();
+}
+
+function crcWhatsAppText(id) {
+  const st = crcStudent(id);
+  return `Dear Parent, please find attached ${st?.name || id}'s ${_crc.examType} result (${_crc.classLabel}). - Unique Children's School`;
+}
+
+// WhatsApp can't receive a file through a link, so on phones we hand the PDF
+// to the share sheet (pick WhatsApp there); elsewhere we download the PDF and
+// open WhatsApp with the message ready, for the PDF to be attached.
+async function crcWhatsApp(id, phone) {
+  try {
+    const blob = await crcPdfBlob(id);
+    const file = new File([blob], crcFileName(id), { type: 'application/pdf' });
+    const text = crcWhatsAppText(id);
+    if (!phone && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text });
+      return;
+    }
+    await crcDownloadPdf(id);
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    crcCloseModal();
+    showToast('PDF downloaded — attach it in the WhatsApp chat');
+  } catch (err) {
+    if (err.name !== 'AbortError') showToast(err.message);
+  }
+}
+
+function crcWhatsAppOther(id) {
+  const st = crcStudent(id);
+  crcModal('Send Result to WhatsApp', `
+    <p class="crc-modal-note">Send <strong>${escapeHtml(st?.name || id)}</strong>'s result to a WhatsApp number. The PDF downloads and WhatsApp opens with a message ready — attach the PDF there.</p>
+    <label class="field-label">WhatsApp Number</label>
+    <input type="tel" class="field-input" id="crc-wa-number" placeholder="0803 123 4567" style="width:100%;box-sizing:border-box;">
+    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcWhatsAppSend('${escapeHtml(id)}')">Open WhatsApp</button>`);
+  document.getElementById('crc-wa-number').focus();
+}
+
+function crcWhatsAppSend(id) {
+  let digits = document.getElementById('crc-wa-number').value.replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = '234' + digits.slice(1); // local Nigerian format
+  if (digits.length < 10) return showToast('Enter a valid WhatsApp number');
+  crcWhatsApp(id, digits);
+}
+
+function crcAnalysis(id) {
+  const { data } = _crc;
+  const st = crcStudent(id);
+  if (!st) return;
+  const scores = data.scoreMatrix[id] || {};
+  const rows = data.subjects
+    .filter(sub => scores[sub.id]?.tot != null)
+    .map(sub => {
+      const tot = scores[sub.id].tot;
+      const avg = data.subjectStats.find(s => s.id === sub.id)?.average ?? 0;
+      return { name: sub.name, tot, avg, diff: +(tot - avg).toFixed(1), rank: data.subjectRanks?.[sub.id]?.[id], grade: bsGrade(tot) };
+    });
+  const byScore = [...rows].sort((a, b) => b.tot - a.tot);
+  const best = byScore.slice(0, 3);
+  const weak = byScore.slice(-3).reverse().filter(r => !best.includes(r));
+  const above = rows.filter(r => r.diff >= 0).length;
+  const overall = bsGrade(st.avgPct);
+  const classAvg = data.stats?.classScoreAverage ?? 0;
+  const list = arr => arr.map(r => `${escapeHtml(r.name)} (${r.tot})`).join(', ') || '—';
+  const summary = `${escapeHtml(st.name)} scored an average of <strong>${st.avgPct}%</strong> (${overall.grade} – ${escapeHtml(overall.remark)}), ` +
+    `placing <strong>${escapeHtml(String(st.position))} of ${data.students.length}</strong> in ${escapeHtml(_crc.classLabel)}. ` +
+    `The class average is ${classAvg}%, so this is <strong>${st.avgPct >= classAvg ? 'above' : 'below'}</strong> the class average. ` +
+    `${above} of ${rows.length} subjects are at or above the class average for that subject.`;
+
+  crcModal(`Result Analysis — ${escapeHtml(st.name)}`, `
+    <div class="crc-stats">
+      <div><span>Average</span><strong>${st.avgPct}%</strong></div>
+      <div><span>Position</span><strong>${escapeHtml(String(st.position))} / ${data.students.length}</strong></div>
+      <div><span>Total Score</span><strong>${st.grandTotal} / ${st.maxPossible}</strong></div>
+      <div><span>Overall Grade</span><strong>${overall.grade}</strong></div>
+    </div>
+    <p class="crc-modal-note">${summary}</p>
+    <p class="crc-modal-note"><strong>Strongest:</strong> ${list(best)}<br><strong>Needs attention:</strong> ${list(weak)}</p>
+    <div style="overflow-x:auto;"><table class="data-table crc-analysis-table">
+      <thead><tr><th style="text-align:left">Subject</th><th>Score</th><th>Class Avg</th><th>+/−</th><th>Subject Pos.</th><th>Grade</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td style="text-align:left">${escapeHtml(r.name)}</td><td><strong>${r.tot}</strong></td><td>${r.avg}</td>
+        <td style="color:${r.diff >= 0 ? '#16a34a' : '#dc2626'};font-weight:600">${r.diff >= 0 ? '+' : ''}${r.diff}</td>
+        <td>${r.rank ?? '—'}</td><td>${r.grade.grade}</td></tr>`).join('')}</tbody>
+    </table></div>`, true);
+}
+
+async function crcFees(id) {
+  const st = crcStudent(id);
+  const m = crcModal(`Fees — ${escapeHtml(st?.name || id)}`, '<div class="crc-modal-note">Loading fees…</div>', true);
+  try {
+    const data = await apiFetch(`/api/admin/fees/history?studentId=${encodeURIComponent(id)}`);
+    const s = data.students[0];
+    const body = m.querySelector('.crc-modal-body');
+    body.innerHTML = `
+      <div class="crc-stats">
+        <div><span>Invoiced</span><strong>${fmtNaira(s.totals.invoiced)}</strong></div>
+        <div><span>Paid</span><strong style="color:#16a34a">${fmtNaira(s.totals.paid)}</strong></div>
+        <div><span>Balance</span><strong style="color:${s.totals.balance > 0 ? '#dc2626' : '#16a34a'}">${fmtNaira(s.totals.balance)}</strong></div>
+      </div>
+      ${s.invoices.length ? `<div style="overflow-x:auto;"><table class="data-table">
+        <thead><tr><th style="text-align:left">Fee</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th><th>Status</th></tr></thead>
+        <tbody>${s.invoices.map(inv => `<tr>
+          <td style="text-align:left">${escapeHtml(inv.description || inv.feeType || '')}</td>
+          <td>${fmtNaira(inv.amount)}</td><td>${fmtNaira(inv.paid)}</td><td>${fmtNaira(inv.balance)}</td>
+          <td>${escapeHtml(inv.dueDate || '—')}</td>
+          <td style="text-transform:capitalize;font-weight:600;color:${inv.status === 'paid' ? '#16a34a' : inv.status === 'partial' ? '#d97706' : '#dc2626'}">${inv.status}${inv.overdue ? ' (overdue)' : ''}</td>
+        </tr>`).join('')}</tbody></table></div>`
+        : '<div class="crc-modal-note">No fee invoices for this pupil yet.</div>'}`;
+  } catch (err) {
+    m.querySelector('.crc-modal-body').innerHTML = `<div class="crc-modal-note" style="color:#dc2626">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// "View Results" on Review & Publish opens this checker in a new tab with the
+// class and exam already chosen (?crcClass=…&crcExam=…).
+function bootstrapClassResultLink() {
+  const params = new URLSearchParams(window.location.search);
+  const classCode = params.get('crcClass');
+  const examType = params.get('crcExam');
+  if (!classCode || !examType) return;
+  switchTab('classResultChecker', document.querySelector('[data-tab="classResultChecker"]'));
+  const examSel = document.getElementById('crc-exam');
+  if (![...examSel.options].some(o => o.value === examType)) examSel.add(new Option(examType, examType));
+  examSel.value = examType;
+  document.getElementById('crc-class').value = classCode;
+  crcLoadArms();
+  crcBulkView();
 }
 
 // ── BROADSHEET ──
@@ -4161,36 +4481,13 @@ async function unpublishBroadsheet() {
 
 function previewBroadsheetResults() {
   const classCode = document.getElementById('bs-class-sel')?.value;
-  const examLabel = document.getElementById('bs-exam-sel')?.value;
-  const session = document.getElementById('bs-session-sel')?.value || '';
-  if (!classCode || !examLabel) {
+  const examType = document.getElementById('bs-exam-sel')?.value;
+  if (!classCode || !examType) {
     showToast('Select a class and exam first');
     return;
   }
-  const params = new URLSearchParams({ bsFocus: '1', classCode, examType: examLabel, session });
+  const params = new URLSearchParams({ crcClass: classCode, crcExam: examType });
   window.open(`admin-portal.html?${params.toString()}`, '_blank', 'noopener');
-}
-
-// If opened via the "View Results" link with bsFocus params, jump straight into a
-// clean, read-only broadsheet view in this new tab (sidebar/filters/actions hidden).
-function bootstrapBroadsheetFocusMode() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('bsFocus') !== '1') return;
-  const classCode = params.get('classCode') || '';
-  const examType = params.get('examType') || '';
-  if (!classCode || !examType) return;
-
-  document.body.classList.add('bs-focus-mode');
-  switchTab('publish', document.querySelector('[data-tab="publish"]'));
-
-  const sessionSel = document.getElementById('bs-session-sel');
-  const examSel = document.getElementById('bs-exam-sel');
-  const classSel = document.getElementById('bs-class-sel');
-  if (sessionSel && params.get('session')) sessionSel.value = params.get('session');
-  if (examSel) examSel.value = examType;
-  if (classSel) classSel.value = classCode;
-
-  viewBroadsheet();
 }
 
 function setBsView(v) {

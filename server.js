@@ -3134,7 +3134,7 @@ async function generateReportPdf({ studentId, classCode, examType }) {
   return Buffer.from(await pdfDoc.save());
 }
 
-async function sendParentEmail({ to, studentName, pdfPath }) {
+async function sendParentEmail({ to, studentName, pdfPath, pdfBytes }) {
   const config = smtpConfigStatus();
   const host = process.env.SMTP_HOST;
   if (!config.configured) return { status: 'email_not_configured', error: `Email setup missing: ${config.missing.join(', ')}` };
@@ -3145,7 +3145,7 @@ async function sendParentEmail({ to, studentName, pdfPath }) {
   if (!to || !from) return { status: 'missing_email_address', error: 'Parent or sender email is missing' };
 
   const boundary = `----ls-${crypto.randomBytes(8).toString('hex')}`;
-  const pdf = fs.readFileSync(pdfPath).toString('base64').replace(/(.{76})/g, '$1\r\n');
+  const pdf = (pdfBytes || fs.readFileSync(pdfPath)).toString('base64').replace(/(.{76})/g, '$1\r\n');
   const message = [
     `From: ${from}`,
     `To: ${to}`,
@@ -3156,7 +3156,7 @@ async function sendParentEmail({ to, studentName, pdfPath }) {
     `--${boundary}`,
     'Content-Type: text/plain; charset=utf-8',
     '',
-    `Dear Parent,\r\n\r\nPlease find attached the published result report for ${studentName}.\r\n\r\nRegards,\r\nUnique Children School`,
+    `Dear Parent,\r\n\r\nPlease find attached the result report for ${studentName}.\r\n\r\nRegards,\r\nUnique Children School`,
     `--${boundary}`,
     'Content-Type: application/pdf',
     'Content-Transfer-Encoding: base64',
@@ -4764,6 +4764,69 @@ async function handleApi(req, res, url) {
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${studentId}-${examType.replace(/[^a-z0-9]+/gi, '_')}-preview.pdf"`,
+      'Content-Length': pdfBytes.length,
+    });
+    return res.end(pdfBytes);
+  }
+
+  // Class Result Checker → "Send to Email": generates the pupil's report and
+  // emails it to the parent on file, or to any address the admin types in.
+  if (req.method === 'POST' && url.pathname === '/api/admin/reports/email') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const studentId = cleanText(body.studentId).toUpperCase();
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const examType = cleanText(body.examType);
+    if (!studentId || !classCode || !validateExamType(examType)) {
+      return sendJson(res, 400, { error: 'Student, class, and exam type are required' });
+    }
+    const student = one('SELECT id, name, parent_email AS parentEmail FROM students WHERE id = ? AND class_code = ?', studentId, classCode);
+    if (!student) return sendJson(res, 404, { error: 'Student not found in this class' });
+    const to = cleanText(body.to || student.parentEmail).toLowerCase();
+    if (!to) return sendJson(res, 400, { error: 'No parent email on file for this pupil' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return sendJson(res, 400, { error: 'Enter a valid email address' });
+    let pdfBytes;
+    try {
+      pdfBytes = await generateReportPdf({ studentId, classCode, examType });
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message || 'Could not generate report' });
+    }
+    const mail = await sendParentEmail({ to, studentName: student.name, pdfBytes });
+    if (mail.status !== 'sent') return sendJson(res, 502, { error: mail.error || 'Email could not be sent' });
+    return sendJson(res, 200, { ok: true, to });
+  }
+
+  // Class Result Checker → "Print all Results": every pupil's report in one PDF.
+  if (req.method === 'GET' && url.pathname === '/api/admin/reports/class-pdf') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const examType = cleanText(url.searchParams.get('examType'));
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (!classCode || !validateExamType(examType)) {
+      return sendJson(res, 400, { error: 'Class and exam type are required' });
+    }
+    const students = classArmId
+      ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
+      : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
+    const { PDFDocument } = loadPdfLib();
+    const merged = await PDFDocument.create();
+    for (const st of students) {
+      if (!classReportRows(classCode, examType, st.id).length) continue;
+      try {
+        const doc = await PDFDocument.load(await generateReportPdf({ studentId: st.id, classCode, examType }));
+        const pages = await merged.copyPages(doc, doc.getPageIndices());
+        pages.forEach(p => merged.addPage(p));
+      } catch (err) {
+        console.error(`class-pdf: skipped ${st.id}: ${err.message}`);
+      }
+    }
+    if (!merged.getPageCount()) return sendJson(res, 404, { error: 'No results recorded for this class and exam' });
+    const pdfBytes = Buffer.from(await merged.save());
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${classCode}-${examType.replace(/[^a-z0-9]+/gi, '_')}-results.pdf"`,
       'Content-Length': pdfBytes.length,
     });
     return res.end(pdfBytes);
@@ -7164,11 +7227,11 @@ async function handleApi(req, res, url) {
 
     const students = classArmId
       ? all(
-          `SELECT id, name, initials, gender, att, photo_path AS photoPath FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
+          `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
           classCode, classArmId
         )
       : all(
-          `SELECT id, name, initials, gender, att, photo_path AS photoPath FROM students WHERE class_code = ? ORDER BY name`,
+          `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? ORDER BY name`,
           classCode
         );
     const batches = all(
