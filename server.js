@@ -3138,6 +3138,171 @@ function resultIsPublished(classCode, examType) {
   ));
 }
 
+// Everything the Review Results broadsheet shows for one class + exam.
+// Shared by the admin page and the class teacher's copy of it.
+function broadsheetPayload(classCode, examType, classArmId = null) {
+  const academic = activeAcademic();
+  const students = classArmId
+    ? all(
+        `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
+        classCode, classArmId
+      )
+    : all(
+        `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? ORDER BY name`,
+        classCode
+      );
+  const batches = all(
+    `SELECT rb.id, rb.subject_id AS subjectId,
+            s.name AS subjectName, s.code AS subjectCode,
+            u.name AS teacherName
+     FROM result_batches rb
+     JOIN subjects s ON s.id = rb.subject_id
+     JOIN users u ON u.id = rb.teacher_id
+     WHERE rb.class_code = ? AND rb.exam_type = ? AND rb.academic_id = ?`,
+    classCode, examType, academic.id
+  );
+  const seen = new Set();
+  const subjects = [];
+  for (const b of batches) {
+    if (!seen.has(b.subjectId)) { seen.add(b.subjectId); subjects.push({ id: b.subjectId, name: b.subjectName, code: b.subjectCode, teacherName: b.teacherName, batchId: b.id }); }
+  }
+  const scoreMatrix = {};
+  for (const sub of subjects) {
+    const entries = all(
+      `SELECT student_id AS sid, ca_score AS ca, exam_score AS ex, total_score AS tot, is_absent AS isAbsent
+       FROM result_entries WHERE batch_id = ? AND is_excluded = 0`,
+      sub.batchId
+    );
+    for (const e of entries) {
+      if (!scoreMatrix[e.sid]) scoreMatrix[e.sid] = {};
+      // Absent entries are kept out of the matrix entirely so every average/
+      // ranking calculation below (which only ever reads existing matrix
+      // entries) naturally treats them the same as "no score yet" — never
+      // counted, never dragging an average down.
+      if (!e.isAbsent) scoreMatrix[e.sid][sub.id] = { ca: e.ca, ex: e.ex, tot: e.tot };
+    }
+  }
+  const subjMax = maxScoreForExamType(examType);
+  const studentData = students.map(st => {
+    let grand = 0; let counted = 0;
+    for (const sub of subjects) { const s = scoreMatrix[st.id]?.[sub.id]; if (s) { grand += s.tot; counted++; } }
+    const maxPoss = counted * subjMax;
+    return { ...st, grandTotal: grand, maxPossible: maxPoss, avgPct: maxPoss > 0 ? +(grand / maxPoss * 100).toFixed(2) : 0 };
+  });
+  const sorted = [...studentData].sort((a, b) => b.grandTotal - a.grandTotal);
+  const posMap = {};
+  sorted.forEach((s, i) => { posMap[s.id] = i + 1; });
+  const rankedStudents = studentData.map(s => {
+    const { teacherComment, headComment } = resolveReportComments({
+      academicId: academic.id, studentId: s.id, examType, average: s.avgPct,
+    });
+    const saved = one(
+      'SELECT teacher_comment AS teacherComment, head_comment AS headComment FROM report_comments WHERE academic_id = ? AND student_id = ? AND exam_type = ?',
+      academic.id, s.id, examType
+    ) || {};
+    const suggestedComment = commentBankMatch(s.avgPct)
+      || valueFromMeta('head_comment_default', 'Great work! Your diligence in your academics is impressive.');
+    const dailyAttendance = attendanceCounts(s.id, 'daily');
+    const lessonAttendance = attendanceCounts(s.id, 'lesson');
+    return {
+      ...s, position: posMap[s.id] || '—', teacherComment, headComment, suggestedComment, dailyAttendance, lessonAttendance,
+      savedTeacherComment: saved.teacherComment || '', savedHeadComment: saved.headComment || '',
+      // Class teacher's "Auto": same bank match, but the teacher's default wording.
+      suggestedTeacherComment: commentBankMatch(s.avgPct)
+        || valueFromMeta('teacher_comment_default', 'Well done! Your result is remarkable. Do not relent in your efforts.'),
+    };
+  });
+
+  // Per-subject rank: where a student placed among classmates in just that
+  // one subject, shown as a small badge under each subject's Total Score.
+  const subjectRanks = {};
+  for (const sub of subjects) {
+    const withScores = students
+      .map(st => ({ id: st.id, tot: scoreMatrix[st.id]?.[sub.id]?.tot }))
+      .filter(s => s.tot != null)
+      .sort((a, b) => b.tot - a.tot);
+    const ranks = {};
+    withScores.forEach((s, i) => { ranks[s.id] = i + 1; });
+    subjectRanks[sub.id] = ranks;
+  }
+  const subjectStats = subjects.map(sub => {
+    const scores = students.map(st => scoreMatrix[st.id]?.[sub.id]?.tot).filter(v => v != null);
+    const total = scores.reduce((a, b) => a + b, 0);
+    const avg = scores.length ? +(total / scores.length).toFixed(2) : 0;
+    const max = scores.length ? Math.max(...scores) : 0;
+    const uniqueSorted = [...new Set(scores)].sort((a, b) => b - a);
+    const second = uniqueSorted[1] ?? null;
+    return {
+      ...sub,
+      totalScore: total,
+      studentCount: scores.length,
+      average: avg,
+      topStudents: students.filter(st => scoreMatrix[st.id]?.[sub.id]?.tot === max && max > 0).map(st => `${st.name} (${max})`),
+      secondStudents: second != null ? students.filter(st => scoreMatrix[st.id]?.[sub.id]?.tot === second).map(st => `${st.name} (${second})`) : [],
+    };
+  });
+  const grandTotalAvgs = +subjectStats.reduce((a, b) => a + b.average, 0).toFixed(2);
+  const classScoreAvg  = subjects.length ? +(grandTotalAvgs / subjects.length).toFixed(2) : 0;
+  const best = sorted[0] || null;
+  return {
+    academic, examType, subjMax, subjects, students: rankedStudents, scoreMatrix, subjectStats, subjectRanks,
+    published: resultIsPublished(classCode, examType),
+    schoolInfo: schoolInfoFromMeta(),
+    stats: {
+      activeStudents: students.length,
+      grandTotalSubjectScoreAverages: grandTotalAvgs,
+      classScoreAverage: classScoreAvg,
+      bestStudent: best ? { name: best.name, grandTotal: `${best.grandTotal} / ${best.maxPossible}`, average: best.avgPct } : null,
+    },
+  };
+}
+
+function isClassTeacherOf(teacherId, classCode) {
+  return !!one(
+    `SELECT id FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND teacher_type = 'class_teacher' LIMIT 1`,
+    teacherId, classCode
+  );
+}
+
+function schoolInfoFromMeta() {
+  return {
+    name: valueFromMeta('school_name', 'UNIQUE CHILDREN SCHOOL'),
+    address: valueFromMeta('school_address', 'Block 12, Plot 350 Norus Close, Omole Estate Phase 1'),
+    phone: valueFromMeta('school_phone', '08034106866'),
+    email: valueFromMeta('school_email', 'info@uniquegroupofschools.com'),
+    website: valueFromMeta('school_website', 'uniquegroupofschools.com'),
+  };
+}
+
+function classSheets(classCode, examType, classArmId = null) {
+  const students = classArmId
+    ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
+    : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
+  return students.map(st => reportSheetData(
+    reportContext({ studentId: st.id, classCode, examType, allowEmpty: true }), examType
+  ));
+}
+
+// Every pupil with results for this class + exam, merged into one PDF (null if none).
+async function classResultsPdf(classCode, examType, classArmId = null) {
+  const students = classArmId
+    ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
+    : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
+  const { PDFDocument } = loadPdfLib();
+  const merged = await PDFDocument.create();
+  for (const st of students) {
+    if (!classReportRows(classCode, examType, st.id).length) continue;
+    try {
+      const doc = await PDFDocument.load(await generateReportPdf({ studentId: st.id, classCode, examType }));
+      const pages = await merged.copyPages(doc, doc.getPageIndices());
+      pages.forEach(p => merged.addPage(p));
+    } catch (err) {
+      console.error(`class-pdf: skipped ${st.id}: ${err.message}`);
+    }
+  }
+  return merged.getPageCount() ? Buffer.from(await merged.save()) : null;
+}
+
 function reportHeadName() {
   return valueFromMeta('head_of_school_name', 'James Idoko Ajah');
 }
@@ -3879,64 +4044,6 @@ async function handleApi(req, res, url) {
   }
 
   // ── CLASS TEACHER'S COMMENT (per student, per exam) ─────────────────────
-  if (req.method === 'GET' && url.pathname === '/api/teacher/report-comments') {
-    const user = requireUser(req, res, 'teacher');
-    if (!user) return;
-    const contextId = url.searchParams.get('contextId');
-    const examType = url.searchParams.get('examType');
-    if (!contextId || !validateExamType(examType)) {
-      return sendJson(res, 400, { error: 'Valid contextId and examType are required' });
-    }
-    const assignment = assignmentForTeacher(contextId, user.id);
-    if (!assignment) return sendJson(res, 403, { error: 'This class is not assigned to you' });
-    if (assignment.teacher_type !== 'class_teacher') {
-      return sendJson(res, 403, { error: 'Only class teachers can write result comments' });
-    }
-    const academic = activeAcademic();
-    const rows = all(
-      `SELECT student_id AS studentId, teacher_comment AS comment, updated_at AS updatedAtIso
-       FROM report_comments WHERE academic_id = ? AND class_code = ? AND exam_type = ?`,
-      academic.id, assignment.class_code, examType
-    );
-    const comments = {};
-    rows.forEach(row => {
-      comments[row.studentId] = { comment: row.comment || '', updatedAt: formatSavedAt(row.updatedAtIso) };
-    });
-    return sendJson(res, 200, { comments });
-  }
-
-  if (req.method === 'POST' && url.pathname === '/api/teacher/report-comments') {
-    const user = requireUser(req, res, 'teacher');
-    if (!user) return;
-    const body = await readJson(req);
-    const contextId = Number(body.contextId);
-    const examType = cleanText(body.examType);
-    const studentId = cleanText(body.studentId).toUpperCase();
-    const comment = cleanText(body.comment);
-    if (!contextId || !validateExamType(examType) || !studentId) {
-      return sendJson(res, 400, { error: 'Student, class context, and exam type are required' });
-    }
-    const assignment = assignmentForTeacher(contextId, user.id);
-    if (!assignment) return sendJson(res, 403, { error: 'This class is not assigned to you' });
-    if (assignment.teacher_type !== 'class_teacher') {
-      return sendJson(res, 403, { error: 'Only class teachers can write result comments' });
-    }
-    const student = one('SELECT id FROM students WHERE id = ? AND class_code = ?', studentId, assignment.class_code);
-    if (!student) return sendJson(res, 400, { error: `Student ${studentId} is not in ${assignment.class_code}` });
-    if (resultIsPublished(assignment.class_code, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
-
-    const academic = activeAcademic();
-    const updatedAt = new Date().toISOString();
-    run(
-      `INSERT INTO report_comments (academic_id, student_id, class_code, exam_type, teacher_comment, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(academic_id, student_id, class_code, exam_type) DO UPDATE SET
-         teacher_comment = excluded.teacher_comment, updated_at = excluded.updated_at`,
-      academic.id, studentId, assignment.class_code, examType, comment || null, updatedAt
-    );
-    return sendJson(res, 200, { ok: true, comment, updatedAt: formatSavedAt(updatedAt) });
-  }
-
   if (req.method === 'POST' && url.pathname === '/api/teacher/results') {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
@@ -4923,13 +5030,19 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Class and exam type are required' });
     }
     if (!activeAcademic()) return sendJson(res, 400, { error: 'No active academic term' });
-    const students = classArmId
-      ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
-      : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
-    const sheets = students.map(st => reportSheetData(
-      reportContext({ studentId: st.id, classCode, examType, allowEmpty: true }), examType
-    ));
-    return sendJson(res, 200, { sheets });
+    return sendJson(res, 200, { sheets: classSheets(classCode, examType, classArmId) });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/teacher/reports/class-sheets') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const examType = cleanText(url.searchParams.get('examType'));
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (!classCode || !validateExamType(examType)) return sendJson(res, 400, { error: 'Class and exam type are required' });
+    if (!isClassTeacherOf(user.id, classCode)) return sendJson(res, 403, { error: 'You are not the class teacher for this class' });
+    if (!activeAcademic()) return sendJson(res, 400, { error: 'No active academic term' });
+    return sendJson(res, 200, { sheets: classSheets(classCode, examType, classArmId) });
   }
 
   // Class Result Checker → "Print all Results": every pupil's report in one PDF.
@@ -4942,29 +5055,87 @@ async function handleApi(req, res, url) {
     if (!classCode || !validateExamType(examType)) {
       return sendJson(res, 400, { error: 'Class and exam type are required' });
     }
-    const students = classArmId
-      ? all('SELECT id FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name', classCode, classArmId)
-      : all('SELECT id FROM students WHERE class_code = ? ORDER BY name', classCode);
-    const { PDFDocument } = loadPdfLib();
-    const merged = await PDFDocument.create();
-    for (const st of students) {
-      if (!classReportRows(classCode, examType, st.id).length) continue;
-      try {
-        const doc = await PDFDocument.load(await generateReportPdf({ studentId: st.id, classCode, examType }));
-        const pages = await merged.copyPages(doc, doc.getPageIndices());
-        pages.forEach(p => merged.addPage(p));
-      } catch (err) {
-        console.error(`class-pdf: skipped ${st.id}: ${err.message}`);
-      }
-    }
-    if (!merged.getPageCount()) return sendJson(res, 404, { error: 'No results recorded for this class and exam' });
-    const pdfBytes = Buffer.from(await merged.save());
+    const pdfBytes = await classResultsPdf(classCode, examType, classArmId);
+    if (!pdfBytes) return sendJson(res, 404, { error: 'No results recorded for this class and exam' });
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${classCode}-${examType.replace(/[^a-z0-9]+/gi, '_')}-results.pdf"`,
       'Content-Length': pdfBytes.length,
     });
     return res.end(pdfBytes);
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/teacher/reports/class-pdf') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const examType = cleanText(url.searchParams.get('examType'));
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (!classCode || !validateExamType(examType)) return sendJson(res, 400, { error: 'Class and exam type are required' });
+    if (!isClassTeacherOf(user.id, classCode)) return sendJson(res, 403, { error: 'You are not the class teacher for this class' });
+    const pdfBytes = await classResultsPdf(classCode, examType, classArmId);
+    if (!pdfBytes) return sendJson(res, 404, { error: 'No results recorded for this class and exam' });
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${classCode}-${examType.replace(/[^a-z0-9]+/gi, '_')}-results.pdf"`,
+      'Content-Length': pdfBytes.length,
+    });
+    return res.end(pdfBytes);
+  }
+
+  // Grading scale + comments bank, read-only, for the class teacher's
+  // Review Results and Class Comments pages.
+  if (req.method === 'GET' && url.pathname === '/api/teacher/grade-scale') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    return sendJson(res, 200, { gradeScale });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/teacher/comment-bank') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    return sendJson(res, 200, {
+      comments: all('SELECT id, min_score AS min, max_score AS max, comment AS text FROM comment_bank ORDER BY min_score DESC'),
+    });
+  }
+
+  // Class Comments page: save many pupils' class-teacher comments at once.
+  if (req.method === 'POST' && url.pathname === '/api/teacher/class-comments') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const examType = cleanText(body.examType);
+    const items = Array.isArray(body.comments) ? body.comments : [];
+    if (!classCode || !validateExamType(examType)) return sendJson(res, 400, { error: 'Class and exam type are required' });
+    if (!isClassTeacherOf(user.id, classCode)) return sendJson(res, 403, { error: 'You are not the class teacher for this class' });
+    if (resultIsPublished(classCode, examType)) return sendJson(res, 409, { error: RESULT_LOCKED_MESSAGE });
+    if (!items.length) return sendJson(res, 400, { error: 'No comments to save' });
+    const academic = activeAcademic();
+    if (!academic) return sendJson(res, 400, { error: 'No active academic term' });
+    const updatedAt = new Date().toISOString();
+    db.exec('BEGIN');
+    try {
+      for (const item of items) {
+        const studentId = cleanText(item.studentId).toUpperCase();
+        if (!one('SELECT id FROM students WHERE id = ? AND class_code = ?', studentId, classCode)) {
+          throw new Error(`Student ${studentId} is not in ${classCode}`);
+        }
+        const comment = cleanText(item.comment).slice(0, 500);
+        run(
+          `INSERT INTO report_comments (academic_id, student_id, class_code, exam_type, teacher_comment, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(academic_id, student_id, class_code, exam_type) DO UPDATE SET
+             teacher_comment = excluded.teacher_comment, updated_at = excluded.updated_at`,
+          academic.id, studentId, classCode, examType, comment || null, updatedAt
+        );
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      return sendJson(res, 400, { error: err.message });
+    }
+    return sendJson(res, 200, { ok: true, saved: items.length, updatedAt: formatSavedAt(updatedAt) });
   }
 
   // Same preview as the admin route above, but scoped to a teacher who is
@@ -7357,110 +7528,22 @@ async function handleApi(req, res, url) {
     const examType  = url.searchParams.get('examType');
     const classArmId = url.searchParams.get('classArmId') ? Number(url.searchParams.get('classArmId')) : null;
     if (!classCode || !examType) return sendJson(res, 400, { error: 'classCode and examType required' });
-    const academic = activeAcademic();
-    if (!academic) return sendJson(res, 400, { error: 'No active academic term' });
+    if (!activeAcademic()) return sendJson(res, 400, { error: 'No active academic term' });
+    return sendJson(res, 200, broadsheetPayload(classCode, examType, classArmId));
+  }
 
-    const students = classArmId
-      ? all(
-          `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? AND class_arm_id = ? ORDER BY name`,
-          classCode, classArmId
-        )
-      : all(
-          `SELECT id, name, initials, gender, att, photo_path AS photoPath, parent_email AS parentEmail FROM students WHERE class_code = ? ORDER BY name`,
-          classCode
-        );
-    const batches = all(
-      `SELECT rb.id, rb.subject_id AS subjectId,
-              s.name AS subjectName, s.code AS subjectCode,
-              u.name AS teacherName
-       FROM result_batches rb
-       JOIN subjects s ON s.id = rb.subject_id
-       JOIN users u ON u.id = rb.teacher_id
-       WHERE rb.class_code = ? AND rb.exam_type = ? AND rb.academic_id = ?`,
-      classCode, examType, academic.id
-    );
-    const seen = new Set();
-    const subjects = [];
-    for (const b of batches) {
-      if (!seen.has(b.subjectId)) { seen.add(b.subjectId); subjects.push({ id: b.subjectId, name: b.subjectName, code: b.subjectCode, teacherName: b.teacherName, batchId: b.id }); }
-    }
-    const scoreMatrix = {};
-    for (const sub of subjects) {
-      const entries = all(
-        `SELECT student_id AS sid, ca_score AS ca, exam_score AS ex, total_score AS tot, is_absent AS isAbsent
-         FROM result_entries WHERE batch_id = ? AND is_excluded = 0`,
-        sub.batchId
-      );
-      for (const e of entries) {
-        if (!scoreMatrix[e.sid]) scoreMatrix[e.sid] = {};
-        // Absent entries are kept out of the matrix entirely so every average/
-        // ranking calculation below (which only ever reads existing matrix
-        // entries) naturally treats them the same as "no score yet" — never
-        // counted, never dragging an average down.
-        if (!e.isAbsent) scoreMatrix[e.sid][sub.id] = { ca: e.ca, ex: e.ex, tot: e.tot };
-      }
-    }
-    const subjMax = maxScoreForExamType(examType);
-    const studentData = students.map(st => {
-      let grand = 0; let counted = 0;
-      for (const sub of subjects) { const s = scoreMatrix[st.id]?.[sub.id]; if (s) { grand += s.tot; counted++; } }
-      const maxPoss = counted * subjMax;
-      return { ...st, grandTotal: grand, maxPossible: maxPoss, avgPct: maxPoss > 0 ? +(grand / maxPoss * 100).toFixed(2) : 0 };
-    });
-    const sorted = [...studentData].sort((a, b) => b.grandTotal - a.grandTotal);
-    const posMap = {};
-    sorted.forEach((s, i) => { posMap[s.id] = i + 1; });
-    const rankedStudents = studentData.map(s => {
-      const { teacherComment, headComment } = resolveReportComments({
-        academicId: academic.id, studentId: s.id, examType, average: s.avgPct,
-      });
-      const suggestedComment = commentBankMatch(s.avgPct)
-        || valueFromMeta('head_comment_default', 'Great work! Your diligence in your academics is impressive.');
-      const dailyAttendance = attendanceCounts(s.id, 'daily');
-      const lessonAttendance = attendanceCounts(s.id, 'lesson');
-      return { ...s, position: posMap[s.id] || '—', teacherComment, headComment, suggestedComment, dailyAttendance, lessonAttendance };
-    });
-
-    // Per-subject rank: where a student placed among classmates in just that
-    // one subject, shown as a small badge under each subject's Total Score.
-    const subjectRanks = {};
-    for (const sub of subjects) {
-      const withScores = students
-        .map(st => ({ id: st.id, tot: scoreMatrix[st.id]?.[sub.id]?.tot }))
-        .filter(s => s.tot != null)
-        .sort((a, b) => b.tot - a.tot);
-      const ranks = {};
-      withScores.forEach((s, i) => { ranks[s.id] = i + 1; });
-      subjectRanks[sub.id] = ranks;
-    }
-    const subjectStats = subjects.map(sub => {
-      const scores = students.map(st => scoreMatrix[st.id]?.[sub.id]?.tot).filter(v => v != null);
-      const total = scores.reduce((a, b) => a + b, 0);
-      const avg = scores.length ? +(total / scores.length).toFixed(2) : 0;
-      const max = scores.length ? Math.max(...scores) : 0;
-      const uniqueSorted = [...new Set(scores)].sort((a, b) => b - a);
-      const second = uniqueSorted[1] ?? null;
-      return {
-        ...sub,
-        totalScore: total,
-        studentCount: scores.length,
-        average: avg,
-        topStudents: students.filter(st => scoreMatrix[st.id]?.[sub.id]?.tot === max && max > 0).map(st => `${st.name} (${max})`),
-        secondStudents: second != null ? students.filter(st => scoreMatrix[st.id]?.[sub.id]?.tot === second).map(st => `${st.name} (${second})`) : [],
-      };
-    });
-    const grandTotalAvgs = +subjectStats.reduce((a, b) => a + b.average, 0).toFixed(2);
-    const classScoreAvg  = subjects.length ? +(grandTotalAvgs / subjects.length).toFixed(2) : 0;
-    const best = sorted[0] || null;
-    return sendJson(res, 200, {
-      academic, examType, subjMax, subjects, students: rankedStudents, scoreMatrix, subjectStats, subjectRanks,
-      stats: {
-        activeStudents: students.length,
-        grandTotalSubjectScoreAverages: grandTotalAvgs,
-        classScoreAverage: classScoreAvg,
-        bestStudent: best ? { name: best.name, grandTotal: `${best.grandTotal} / ${best.maxPossible}`, average: best.avgPct } : null,
-      },
-    });
+  // Class teachers get the same broadsheet (read-only apart from their own
+  // comments) for the classes they are class teacher of — nobody else's.
+  if (req.method === 'GET' && url.pathname === '/api/teacher/broadsheet') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const examType = cleanText(url.searchParams.get('examType'));
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (!classCode || !validateExamType(examType)) return sendJson(res, 400, { error: 'Class and exam type are required' });
+    if (!isClassTeacherOf(user.id, classCode)) return sendJson(res, 403, { error: 'You are not the class teacher for this class' });
+    if (!activeAcademic()) return sendJson(res, 400, { error: 'No active academic term' });
+    return sendJson(res, 200, broadsheetPayload(classCode, examType, classArmId));
   }
 
   if (req.method === 'GET' && url.pathname === '/api/active-term') {
@@ -9367,13 +9450,7 @@ function adminSetupPayload() {
     headSignaturePath: valueFromMeta('head_signature_path', ''),
     nextTermBegins: valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026'),
   };
-  const schoolInfo = {
-    name: valueFromMeta('school_name', 'UNIQUE CHILDREN SCHOOL'),
-    address: valueFromMeta('school_address', 'Block 12, Plot 350 Norus Close, Omole Estate Phase 1'),
-    phone: valueFromMeta('school_phone', '08034106866'),
-    email: valueFromMeta('school_email', 'info@uniquegroupofschools.com'),
-    website: valueFromMeta('school_website', 'uniquegroupofschools.com'),
-  };
+  const schoolInfo = schoolInfoFromMeta();
 
   // Exact published class+exam pairs for the active term (publications above
   // is only a recent-activity list), so Review & Publish shows the right button.
