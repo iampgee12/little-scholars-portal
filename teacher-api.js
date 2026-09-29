@@ -50,7 +50,6 @@ const state = {
   students: [],
   resultsByKey: {},
   skillRatingsByKey: {},
-  commentsByKey: {},
   gridSearch: '',
   currentStudentIndex: null,
 };
@@ -177,15 +176,7 @@ async function loadSkillRatingsForContext(ctx = state.currentContext, examType =
   state.skillRatingsByKey[skillsKey(ctx.id, examType)] = data.ratings || {};
 }
 
-function commentFor(contextId, examType, studentId) {
-  return (state.commentsByKey[skillsKey(contextId, examType)] || {})[studentId]?.comment || '';
-}
 
-async function loadCommentsForContext(ctx = state.currentContext, examType = state.currentExam) {
-  if (!canRateSkills(ctx) || !examType) return;
-  const data = await apiFetch(`/api/teacher/report-comments?contextId=${encodeURIComponent(ctx.id)}&examType=${encodeURIComponent(examType)}`);
-  state.commentsByKey[skillsKey(ctx.id, examType)] = data.comments || {};
-}
 
 function uniqueStudents() {
   const seen = new Map();
@@ -288,6 +279,264 @@ async function loadTopbarSession() {
   } catch(e) {}
 }
 
+// ── CLASS TEACHER: Review Results + Class Comments ──
+// Settings for the shared Review Results / result-sheet code (results-review.js).
+// The server only ever returns classes this teacher is class teacher of.
+const RR = {
+  role: 'teacher',
+  api: '/api/teacher',
+  classLabel: code => classTeacherClasses().find(c => c.code === code)?.label || code || '',
+  sessionLabel: () => state.academic?.sessionLabel || '',
+  openTab: tab => switchTab(tab, teacherNavItem(tab)),
+  onBroadsheetLoaded: data => rvRenderStatus(data),
+};
+
+function teacherNavItem(tab) {
+  return document.querySelector(`.nav-item[onclick*="switchTab('${tab}'"]`);
+}
+
+function classTeacherClasses() {
+  const seen = new Map();
+  (state.contexts || []).filter(c => c.teacherType === 'class_teacher')
+    .forEach(c => { if (!seen.has(c.classCode)) seen.set(c.classCode, { code: c.classCode, label: c.classLabel }); });
+  return [...seen.values()];
+}
+
+function fillClassTeacherSelect(select) {
+  const classes = classTeacherClasses();
+  const previous = select.value;
+  select.innerHTML = classes.map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
+  if (classes.some(c => c.code === previous)) select.value = previous;
+}
+
+// Review Results — the admin's broadsheet page without Publish/Unpublish.
+function rvInit() {
+  const sessionSel = document.getElementById('bs-session-sel');
+  const examSel = document.getElementById('bs-exam-sel');
+  const session = state.academic?.sessionLabel || '';
+  sessionSel.innerHTML = `<option value="${escapeHtml(session)}">${escapeHtml(session)}</option>`;
+  if (!examSel.options.length) {
+    examSel.innerHTML = ['Mid-Term Exam', 'Final Exam'].map(e => `<option value="${e}">${e}</option>`).join('');
+    examSel.value = state.currentExam || 'Mid-Term Exam';
+  }
+  fillClassTeacherSelect(document.getElementById('bs-class-sel'));
+}
+
+function rvRenderStatus(data) {
+  const el = document.getElementById('rv-status');
+  if (!el) return;
+  el.className = `rv-status ${data.published ? 'published' : 'unpublished'}`;
+  el.textContent = data.published
+    ? '✔ Published — comments are locked'
+    : 'Not published yet — you can still edit comments';
+}
+
+async function saveTeacherRemark(studentId, select) {
+  const classCode = document.getElementById('bs-class-sel')?.value;
+  const examType = document.getElementById('bs-exam-sel')?.value;
+  if (!classCode || !examType) return;
+  try {
+    await apiFetch('/api/teacher/class-comments', {
+      method: 'POST',
+      body: JSON.stringify({ classCode, examType, comments: [{ studentId, comment: select.value }] }),
+    });
+    if (_bsStudentsById[studentId]) _bsStudentsById[studentId].savedTeacherComment = select.value;
+    showToast('Comment saved');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function autoFillTeacherRemark(studentId) {
+  const select = document.getElementById(`bs-teacher-remark-${studentId}`);
+  const suggestion = _bsStudentsById[studentId]?.suggestedTeacherComment || '';
+  if (!select || !suggestion) return;
+  if (![...select.options].some(o => o.value === suggestion)) {
+    select.insertBefore(new Option(suggestion.length > 60 ? suggestion.slice(0, 60) + '…' : suggestion, suggestion), select.firstChild);
+  }
+  select.value = suggestion;
+  saveTeacherRemark(studentId, select);
+}
+
+// "View Results": every pupil's result sheet in a new tab, like the admin's.
+function previewBroadsheetResults() {
+  const classCode = document.getElementById('bs-class-sel')?.value;
+  const examType = document.getElementById('bs-exam-sel')?.value;
+  if (!classCode || !examType) return showToast('Select a class and exam first');
+  const params = new URLSearchParams({ rsClass: classCode, rsExam: examType });
+  window.open(`teacher-portal.html?${params}#classSheets`, '_blank', 'noopener');
+}
+
+function bootstrapClassSheetsLink() {
+  const params = new URLSearchParams(location.search);
+  const classCode = params.get('rsClass');
+  const examType = params.get('rsExam');
+  if (!classCode || !examType) return false;
+  switchTab('classSheets', null);
+  document.getElementById('cs-title').textContent = `${RR.classLabel(classCode)} · ${examType} Result Sheets`;
+  crcBulkView({ classCode, examType, classArmId: '', area: document.getElementById('cs-results-area') });
+  return true;
+}
+
+// Class Comments — every pupil on one screen, one Save All.
+const cc = { data: null, bank: [], dirty: new Set() };
+
+function ccInit() {
+  fillClassTeacherSelect(document.getElementById('cc-class'));
+  const exam = document.getElementById('cc-exam');
+  if (!cc.data) exam.value = state.currentExam || 'Mid-Term Exam';
+  ccLoad();
+}
+
+async function ccLoad() {
+  const classCode = document.getElementById('cc-class').value;
+  const examType = document.getElementById('cc-exam').value;
+  const main = document.getElementById('cc-main');
+  if (!classCode) {
+    main.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">You are not class teacher of any class.</div></div>';
+    return;
+  }
+  if (cc.dirty.size && !confirm('You have unsaved comments. Discard them?')) return;
+  main.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">Loading pupils…</div></div>';
+  try {
+    const qs = new URLSearchParams({ classCode, examType });
+    const [data, bank] = await Promise.all([
+      apiFetch(`/api/teacher/broadsheet?${qs}`),
+      cc.bank.length ? Promise.resolve({ comments: cc.bank }) : apiFetch('/api/teacher/comment-bank'),
+    ]);
+    cc.data = { ...data, classCode };
+    cc.bank = bank.comments || [];
+    cc.dirty.clear();
+    ccRender();
+  } catch (err) {
+    main.innerHTML = `<div class="card"><div class="card-body" style="padding:24px;color:#dc2626;text-align:center">${escapeHtml(err.message)}</div></div>`;
+  }
+}
+
+function ccHasScores(st) {
+  return Object.keys(cc.data.scoreMatrix?.[st.id] || {}).length > 0;
+}
+
+function ccRender() {
+  const { students, published, examType } = cc.data;
+  const locked = !!published;
+  const presetOptions = cc.bank.map(c =>
+    `<option value="${escapeHtml(c.text)}">${escapeHtml(c.text.length > 70 ? c.text.slice(0, 70) + '…' : c.text)}</option>`).join('');
+  const rows = students.map((st, i) => {
+    const scored = ccHasScores(st);
+    const band = scored ? bsGrade(st.avgPct) : null;
+    const photo = st.photoPath
+      ? `<img src="/${escapeHtml(st.photoPath)}" alt="">`
+      : `<span class="stu-av">${escapeHtml(st.initials || '')}</span>`;
+    return `<div class="cc-row" id="cc-row-${escapeHtml(st.id)}">
+      <div class="cc-pupil">${photo}<div>
+        <div class="cc-name">${i + 1}. ${escapeHtml(st.name)}</div>
+        <div class="cc-meta">${escapeHtml(st.id)}${scored ? ` · Position ${escapeHtml(String(st.position))} of ${students.length}` : ''}</div>
+        <span class="cc-avg" style="color:${scored ? gradeColor(scoreToGrade(st.avgPct)) : 'var(--text-3)'}">${scored ? `${st.avgPct}% · ${escapeHtml(band.grade)} (${escapeHtml(band.remark)})` : 'No scores yet'}</span>
+      </div></div>
+      <div class="cc-edit">
+        <div class="cc-edit-top">
+          ${cc.bank.length ? `<select class="ctrl-select" onchange="ccUsePreset('${escapeHtml(st.id)}', this)" ${locked ? 'disabled' : ''}>
+            <option value="">Choose a ready-made comment…</option>${presetOptions}
+          </select>` : '<span class="cc-head" style="flex:1;align-self:center;">Type a comment below, or press Auto. (Ready-made comments appear here once the admin adds them to the Comments Bank.)</span>'}
+          <button type="button" class="act-btn btn-exp" onclick="ccAuto('${escapeHtml(st.id)}')" ${locked || !scored ? 'disabled' : ''} title="Pick a suitable comment from this pupil's score">&#x21bb; Auto</button>
+        </div>
+        <textarea id="cc-text-${escapeHtml(st.id)}" rows="2" maxlength="500" placeholder="Type the class teacher's comment for ${escapeHtml(st.name)}…" oninput="ccMarkDirty('${escapeHtml(st.id)}')" ${locked ? 'disabled' : ''}>${escapeHtml(st.savedTeacherComment || '')}</textarea>
+        <div class="cc-head"><strong>Head of School's comment:</strong> ${escapeHtml(st.headComment || '—')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const emptyCount = students.filter(st => !(st.savedTeacherComment || '').trim()).length;
+  document.getElementById('cc-main').innerHTML = `
+    ${locked ? `<div class="result-locked-note">&#x1F512; This ${escapeHtml(examType)} result has been published, so comments can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>` : ''}
+    <div class="cc-toolbar">
+      <span class="cc-saved">${students.length} pupil${students.length === 1 ? '' : 's'} · <span id="cc-empty-count">${emptyCount}</span> without a comment</span>
+      <span class="spacer"></span>
+      <span class="cc-dirty" id="cc-dirty" style="display:none;"></span>
+      ${locked ? '' : `<button class="act-btn btn-exp" onclick="ccAutoFillEmpty()">&#x21bb; Auto-fill empty comments</button>
+      <button class="act-btn btn-save" id="cc-save-btn" onclick="ccSaveAll(this)">Save All</button>`}
+    </div>
+    <div class="cc-list">${rows || '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">No pupils in this class.</div></div>'}</div>
+    ${locked || !students.length ? '' : `<div class="cc-toolbar" style="margin-top:12px;"><span class="spacer"></span><button class="act-btn btn-save" onclick="ccSaveAll(this)">Save All</button></div>`}`;
+  ccUpdateDirty();
+}
+
+function ccMarkDirty(studentId) {
+  cc.dirty.add(studentId);
+  document.getElementById(`cc-row-${studentId}`)?.classList.add('dirty');
+  ccUpdateDirty();
+}
+
+function ccUpdateDirty() {
+  const el = document.getElementById('cc-dirty');
+  if (el) {
+    el.style.display = cc.dirty.size ? '' : 'none';
+    el.textContent = `● ${cc.dirty.size} unsaved change${cc.dirty.size === 1 ? '' : 's'}`;
+  }
+  const empty = document.getElementById('cc-empty-count');
+  if (empty && cc.data) {
+    empty.textContent = cc.data.students.filter(st => !(document.getElementById(`cc-text-${st.id}`)?.value || '').trim()).length;
+  }
+}
+
+function ccSetText(studentId, text) {
+  const box = document.getElementById(`cc-text-${studentId}`);
+  if (!box || box.disabled) return;
+  box.value = text;
+  ccMarkDirty(studentId);
+}
+
+function ccUsePreset(studentId, select) {
+  if (select.value) ccSetText(studentId, select.value);
+  select.value = '';
+}
+
+function ccAuto(studentId) {
+  const st = cc.data.students.find(s => s.id === studentId);
+  if (st?.suggestedTeacherComment) ccSetText(studentId, st.suggestedTeacherComment);
+}
+
+function ccAutoFillEmpty() {
+  let filled = 0;
+  cc.data.students.forEach(st => {
+    const box = document.getElementById(`cc-text-${st.id}`);
+    if (box && !box.value.trim() && ccHasScores(st) && st.suggestedTeacherComment) {
+      ccSetText(st.id, st.suggestedTeacherComment);
+      filled++;
+    }
+  });
+  showToast(filled ? `Filled ${filled} comment${filled === 1 ? '' : 's'} — review them, then Save All` : 'No empty comments to fill for pupils with scores');
+}
+
+async function ccSaveAll(btn) {
+  if (!cc.dirty.size) return showToast('Nothing to save — all comments are up to date');
+  const comments = [...cc.dirty].map(studentId => ({ studentId, comment: document.getElementById(`cc-text-${studentId}`)?.value || '' }));
+  btn.disabled = true;
+  try {
+    await apiFetch('/api/teacher/class-comments', {
+      method: 'POST',
+      body: JSON.stringify({ classCode: cc.data.classCode, examType: cc.data.examType, comments }),
+    });
+    comments.forEach(({ studentId, comment }) => {
+      const st = cc.data.students.find(s => s.id === studentId);
+      if (st) st.savedTeacherComment = comment;
+      document.getElementById(`cc-row-${studentId}`)?.classList.remove('dirty');
+    });
+    cc.dirty.clear();
+    ccUpdateDirty();
+    showToast(`Saved ${comments.length} comment${comments.length === 1 ? '' : 's'}`);
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+window.addEventListener('beforeunload', e => {
+  if (cc.dirty.size) { e.preventDefault(); e.returnValue = ''; }
+});
+
 // Line under the teacher's name on the sidebar card: a class teacher sees
 // their class ("Year 6"); a subject teacher sees their subjects, or just
 // "Subject Teacher" once there are more than three.
@@ -321,6 +570,8 @@ async function init() {
     loadTopbarSession();
 
     document.getElementById('t-subj').textContent = teacherCardLabel(state.contexts);
+    document.querySelectorAll('.ct-only').forEach(el => { el.style.display = classTeacherClasses().length ? '' : 'none'; });
+    loadGradeScaleFromServer();
     document.getElementById('ctx-session').textContent = `${state.academic.sessionLabel} - ${state.academic.termLabel}`;
     document.getElementById('re-examtype').value = 'Mid-Term Exam';
 
@@ -1237,7 +1488,6 @@ function gbRenderClassOverview(classCode, examType, contexts) {
       <td class="c" style="font-weight:700;">${avgPct != null ? avgPct + '%' : '-'}</td>
       <td class="c" style="white-space:nowrap;">
         <button class="row-open-btn" onclick="previewTeacherReport('${escapeHtml(student.id)}','${escapeHtml(classCode)}','${escapeHtml(examType)}')" title="Preview the final PDF result">&#x1F50D; Preview</button>
-        ${isClassTeacherForClass(classCode) ? `<button class="row-open-btn" onclick="gbOpenCommentModal('${escapeHtml(student.id)}')" title="Write a comment based on overall performance">&#x1F4AC; Comment</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -1259,90 +1509,8 @@ function previewTeacherReport(studentId, classCode, examType) {
   window.open(`/api/teacher/reports/preview?${params.toString()}`, '_blank', 'noopener');
 }
 
-// Class Teacher's Comment, written against the student's OVERALL performance
-// across every subject in the class — not tied to any one subject context.
-async function gbOpenCommentModal(studentId) {
-  const classCode = document.getElementById('gb-class').value;
-  const examType = document.getElementById('gb-examtype').value;
-  const contexts = state.contexts.filter(ctx => ctx.classCode === classCode);
-  if (!contexts.length) return;
-  const anchorCtx = contexts[0];
-  const student = (anchorCtx.students || []).find(s => s.id === studentId);
-  if (!student) return;
 
-  await loadCommentsForContext(anchorCtx, examType);
 
-  const max = totalMaxForExamType(examType);
-  let total = 0;
-  let counted = 0;
-  const subjectRows = contexts.slice().sort((a, b) => a.subjectName.localeCompare(b.subjectName)).map(ctx => {
-    const result = resultFor(ctx.id, examType);
-    const rec = result.entries?.[studentId];
-    const isAbsent = !!rec?.isAbsent;
-    const isExcluded = !!rec?.isExcluded;
-    const score = rec ? rec.total : null;
-    if (!isAbsent && !isExcluded && score != null) { total += score; counted++; }
-    const scorePct = (!isAbsent && !isExcluded && score != null) ? pctForExam(score, examType) : null;
-    const grade = scorePct != null ? scoreToGrade(scorePct) : '-';
-    const display = isAbsent ? 'ABS' : isExcluded ? 'Excluded' : (score != null ? score : '-');
-    return { name: ctx.subjectName, display, grade };
-  });
-  const avgPct = counted ? Math.round((total / (counted * max)) * 100) : null;
-
-  state.gbCommentTarget = { studentId, examType, anchorContextId: anchorCtx.id };
-  document.getElementById('gb-comment-modal-title').textContent = `Comment — ${student.name}`;
-  const comment = commentFor(anchorCtx.id, examType, studentId);
-  document.getElementById('gb-comment-modal-body').innerHTML = `
-    <div style="padding:18px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <div class="stu-av" style="width:36px;height:36px;font-size:13px;">${escapeHtml(student.initials)}</div>
-        <div>
-          <div style="font-weight:700;font-size:14px;">${escapeHtml(student.name)}</div>
-          <div style="font-size:11px;color:var(--text-3);">${escapeHtml(student.id)} &middot; ${escapeHtml(examType)}</div>
-        </div>
-        <div style="margin-left:auto;text-align:right;">
-          <div style="font-size:20px;font-weight:700;color:${avgPct != null ? gradeColor(scoreToGrade(avgPct)) : 'var(--text-3)'};">${avgPct != null ? avgPct + '%' : '-'}</div>
-          <div style="font-size:10px;color:var(--text-3);">Overall Average</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:16px;">
-        ${subjectRows.map(r => `<div style="background:var(--black-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;">
-          <div style="font-size:10px;color:var(--text-3);margin-bottom:2px;">${escapeHtml(r.name)}</div>
-          <div style="font-size:13px;font-weight:700;">${r.display}${r.grade !== '-' ? ` <span style="font-size:10px;color:var(--text-3);">(${r.grade})</span>` : ''}</div>
-        </div>`).join('')}
-      </div>
-      <div style="font-size:12px;font-weight:700;margin-bottom:6px;">Class Teacher's Comment</div>
-      <div style="font-size:10px;color:var(--text-3);margin-bottom:8px;">Base this on the student's overall performance across all subjects, not one subject alone. Leave blank to auto-fill from the comments bank.</div>
-      <textarea id="gb-comment-input" rows="4" placeholder="e.g. A well-rounded term overall — keep up the consistent effort across subjects." style="width:100%;font-family:inherit;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;resize:vertical;">${escapeHtml(comment)}</textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-        <button class="ep-save-btn" onclick="gbSaveComment()">Save Comment</button>
-      </div>
-    </div>`;
-  document.getElementById('gb-comment-modal').style.display = 'flex';
-}
-
-function gbCloseCommentModal() {
-  document.getElementById('gb-comment-modal').style.display = 'none';
-  state.gbCommentTarget = null;
-}
-
-async function gbSaveComment() {
-  const target = state.gbCommentTarget;
-  if (!target) return;
-  const comment = document.getElementById('gb-comment-input')?.value || '';
-  try {
-    await apiFetch('/api/teacher/report-comments', {
-      method: 'POST',
-      body: JSON.stringify({ contextId: target.anchorContextId, examType: target.examType, studentId: target.studentId, comment }),
-    });
-    const key = skillsKey(target.anchorContextId, target.examType);
-    state.commentsByKey[key] = { ...(state.commentsByKey[key] || {}), [target.studentId]: { comment } };
-    showToast('Comment saved');
-    gbCloseCommentModal();
-  } catch (err) {
-    showToast(err.message);
-  }
-}
 
 function gbRender(ctx, examType) {
   const result = resultFor(ctx.id, examType);
@@ -1532,6 +1700,9 @@ async function cogSave() {
 }
 
 const TAB_META = {
+  reviewResults: { title: 'Review Results', sub: 'Your class broadsheet (read-only)' },
+  classComments: { title: 'Class Comments', sub: "Class teacher's comments" },
+  classSheets: { title: 'Result Sheets', sub: 'Every pupil in your class' },
   profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: 'Wednesday, 13 May 2026' },
   students: { title: 'Students', sub: 'Class Roster' },
@@ -1557,7 +1728,10 @@ function rememberTab(tab) {
 function restoreTabFromUrl() {
   const tab = location.hash.slice(1);
   if (!/^[A-Za-z]+$/.test(tab) || !document.getElementById(`tab-${tab}`)) return false;
-  switchTab(tab, document.querySelector(`.nav-item[onclick*="switchTab('${tab}'"]`));
+  if (tab === 'classSheets' && bootstrapClassSheetsLink()) return true;
+  const trigger = teacherNavItem(tab);
+  if (trigger && trigger.style.display === 'none') return false;
+  switchTab(tab, trigger);
   return true;
 }
 
@@ -1576,6 +1750,8 @@ function switchTab(tab, trigger) {
   if (tab === 'resultsGradebook') gbInit();
   if (tab === 'cognitiveSkills') cogInit();
   if (tab === 'cbtQuestions') cbtqInit();
+  if (tab === 'reviewResults') rvInit();
+  if (tab === 'classComments') ccInit();
   if (tab === 'profile') profileInit();
 }
 
