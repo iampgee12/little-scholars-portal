@@ -19,99 +19,187 @@
     --red:      #dc2626;
     --red-bg:   rgba(220,38,38,0.08);
     --amber:    #d97706;
-    --amber-bg: rgba(217,119,6,0.08);
+    --amber-bg: rgba(217,119,6,0.10);
     --blue:     #2563eb;
     --blue-bg:  rgba(37,99,235,0.08);
     --text-1:   #0f172a;
     --text-2:   #475569;
     --text-3:   #94a3b8;
-    --radius-sm: 6px;
-    --radius:    10px;
+    --radius-sm: 8px;
+    --radius:    12px;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'DM Sans', sans-serif; background: var(--black-2); color: var(--text-1); }
+  body { margin: 0; font-family: 'DM Sans', sans-serif; background: var(--black-2); color: var(--text-1); -webkit-tap-highlight-color: transparent; }
+  button { font-family: inherit; }
   header.cbt-header {
-    position: sticky; top: 0; z-index: 20;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 22px; background: var(--black); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 30;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 12px 18px; background: var(--black); border-bottom: 1px solid var(--border);
   }
   .cbt-header-left { display: flex; align-items: center; gap: 10px; font-weight: 700; }
-  .cbt-logo { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; font-family: 'DM Mono', monospace; }
-  .cbt-header-right { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--text-2); }
-  .cbt-link-btn { background: none; border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 7px 12px; font-size: 12px; font-family: inherit; color: var(--text-2); cursor: pointer; text-decoration: none; }
+  .cbt-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .cbt-header-right { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+  .cbt-link-btn { background: none; border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap; }
   .cbt-link-btn:hover { background: var(--black-3); }
-  main { max-width: 900px; margin: 0 auto; padding: 26px 20px 60px; }
-  h1 { font-size: 19px; margin: 0 0 4px; }
-  .cbt-sub { color: var(--text-2); font-size: 13px; margin: 0 0 20px; }
+  main { max-width: 900px; margin: 0 auto; padding: 22px 16px 120px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 0 0 6px; }
+  .cbt-sub { color: var(--text-2); font-size: 14px; margin: 0 0 18px; }
+  .cbt-muted { color: var(--text-3); font-size: 13px; }
+
+  /* Exam list */
+  .cbt-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-3); margin: 22px 0 10px; }
   .cbt-exam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
   .cbt-exam-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-  .cbt-exam-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 15px; }
-  .cbt-muted { color: var(--text-3); font-size: 12px; }
-  .cbt-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; font-family: 'DM Mono', monospace; white-space: nowrap; }
+  .cbt-exam-card.ready { border-color: #86efac; box-shadow: 0 0 0 3px var(--green-bg); }
+  .cbt-exam-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; font-size: 17px; font-weight: 700; }
+  .cbt-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cbt-fact { font-size: 12px; background: var(--black-3); color: var(--text-2); padding: 4px 9px; border-radius: 20px; }
+  .cbt-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
   .cbt-badge-live { background: var(--green-bg); color: var(--green); }
   .cbt-badge-upcoming { background: var(--amber-bg); color: var(--amber); }
   .cbt-badge-closed { background: var(--black-3); color: var(--text-3); }
   .cbt-badge-done { background: var(--blue-bg); color: var(--blue); }
-  .cbt-exam-card-foot { margin-top: 6px; }
-  .cbt-btn { background: var(--blue); color: #fff; border: none; border-radius: var(--radius-sm); padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
-  .cbt-btn:hover { opacity: .92; }
-  .cbt-score { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 14px; }
-  .cbt-empty { text-align: center; color: var(--text-3); padding: 50px 20px; }
+  .cbt-exam-card-foot { margin-top: 4px; }
+  .cbt-btn { background: var(--blue); color: #fff; border: none; border-radius: var(--radius-sm); padding: 12px 18px; font-size: 15px; font-weight: 700; cursor: pointer; min-height: 46px; }
+  .cbt-btn:hover { filter: brightness(.95); }
+  .cbt-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .cbt-btn-block { width: 100%; }
+  .cbt-btn-green { background: var(--green); }
+  .cbt-btn-secondary { background: var(--black); color: var(--text-1); border: 1px solid var(--border-2); }
+  .cbt-score { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 15px; }
+  .cbt-empty { text-align: center; color: var(--text-3); padding: 50px 20px; background: var(--black); border: 1px dashed var(--border-2); border-radius: var(--radius); }
 
-  .cbt-exam-bar { position: sticky; top: 61px; z-index: 15; display: flex; justify-content: space-between; align-items: center; background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; margin-bottom: 16px; }
-  #cbt-exam-title { font-weight: 700; font-size: 14px; }
-  .cbt-timer { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: var(--red); background: var(--red-bg); padding: 6px 14px; border-radius: var(--radius-sm); }
-  .cbt-question-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; }
-  .cbt-question-text { font-size: 14px; margin-bottom: 10px; line-height: 1.5; }
-  .cbt-options { display: flex; flex-direction: column; gap: 8px; }
-  .cbt-option { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
-  .cbt-option:hover { background: var(--black-3); }
-  .cbt-submit-btn { display: block; width: 100%; background: var(--green); color: #fff; border: none; border-radius: var(--radius); padding: 14px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 10px; }
+  /* Before-you-start screen */
+  .cbt-lobby { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 640px; margin: 0 auto; }
+  .cbt-lobby-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+  .cbt-lobby-fact { background: var(--black-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+  .cbt-lobby-fact strong { display: block; font-size: 22px; font-family: 'DM Mono', monospace; }
+  .cbt-lobby-fact span { font-size: 12px; color: var(--text-2); }
+  .cbt-instructions { background: var(--blue-bg); border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 14px; font-size: 14px; line-height: 1.6; }
+  .cbt-instructions h3 { font-size: 14px; margin: 0 0 6px; }
+  .cbt-instructions ul { margin: 0; padding-left: 20px; }
+  .cbt-instructions p { margin: 0; white-space: pre-line; }
+  .cbt-lobby-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .cbt-lobby-actions .cbt-btn { flex: 1; }
+  .cbt-resume-note { background: var(--amber-bg); color: #92400e; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 14px; font-weight: 600; }
 
-  .cbt-question-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-  .cbt-qnum { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--black); color: var(--text-2); font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; }
-  .cbt-qnum:hover { border-color: var(--blue); }
-  .cbt-qnum-answered { background: var(--green-bg); border-color: var(--green); color: var(--green); }
-  .cbt-qnum-active { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .cbt-nav-buttons { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
-  .cbt-btn-secondary { background: var(--black-3); color: var(--text-2); border: 1px solid var(--border); }
-  .cbt-btn:disabled { opacity: .4; cursor: not-allowed; }
+  /* Exam view */
+  .cbt-exam-bar { position: sticky; top: 57px; z-index: 20; background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; }
+  .cbt-exam-bar-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  #cbt-exam-title { font-weight: 700; font-size: 16px; }
+  .cbt-timer { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text-1); background: var(--black-3); padding: 6px 12px; border-radius: var(--radius-sm); white-space: nowrap; }
+  .cbt-timer.warn { color: var(--amber); background: var(--amber-bg); }
+  .cbt-timer.danger { color: #fff; background: var(--red); animation: cbtPulse 1s ease-in-out infinite; }
+  @keyframes cbtPulse { 50% { opacity: .7; } }
+  .cbt-progress { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--text-2); }
+  .cbt-progress-track { flex: 1; height: 8px; background: var(--black-3); border-radius: 8px; overflow: hidden; }
+  .cbt-progress-fill { height: 100%; background: var(--green); border-radius: 8px; transition: width .3s; }
+  .cbt-save-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .cbt-save-state.ok { color: var(--green); }
+  .cbt-save-state.busy { color: var(--text-3); }
+  .cbt-save-state.bad { color: var(--red); }
 
-  .cbt-result-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px 24px; text-align: center; max-width: 420px; margin: 40px auto; }
-  .cbt-result-big { font-family: 'DM Mono', monospace; font-size: 40px; font-weight: 700; color: var(--blue); margin: 14px 0 6px; }
+  .cbt-question-nav { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 10px; margin-bottom: 4px; scrollbar-width: thin; }
+  .cbt-qnum { position: relative; flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border-2); background: var(--black); color: var(--text-2); font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .cbt-qnum-answered { background: var(--green); border-color: var(--green); color: #fff; }
+  .cbt-qnum-flagged::after { content: ''; position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--amber); border: 2px solid #fff; }
+  .cbt-qnum-active { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .cbt-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-2); margin-bottom: 12px; }
+  .cbt-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -2px; margin-right: 5px; border: 2px solid var(--border-2); }
+  .cbt-legend .l-answered { background: var(--green); border-color: var(--green); }
+  .cbt-legend .l-flagged { background: var(--amber); border-color: var(--amber); }
+
+  .cbt-question-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 12px; }
+  .cbt-question-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; color: var(--text-2); }
+  .cbt-question-text { font-size: 19px; line-height: 1.55; margin-bottom: 18px; white-space: pre-line; }
+  .cbt-options { display: flex; flex-direction: column; gap: 10px; }
+  .cbt-option { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; font-size: 17px; padding: 14px 16px; min-height: 60px; border: 2px solid var(--border); border-radius: var(--radius); background: var(--black); color: var(--text-1); cursor: pointer; transition: border-color .12s, background .12s; }
+  .cbt-option:hover { border-color: #93c5fd; background: #f8fbff; }
+  .cbt-option-letter { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: var(--black-3); color: var(--text-2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'DM Mono', monospace; }
+  .cbt-option.selected { border-color: var(--blue); background: var(--blue-bg); }
+  .cbt-option.selected .cbt-option-letter { background: var(--blue); color: #fff; }
+  .cbt-question-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .cbt-tool-btn { background: none; border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 9px 14px; font-size: 14px; color: var(--text-2); cursor: pointer; min-height: 42px; }
+  .cbt-tool-btn.on { background: var(--amber-bg); border-color: var(--amber); color: #92400e; font-weight: 700; }
+
+  .cbt-nav-buttons { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--black); border-top: 1px solid var(--border); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .cbt-nav-inner { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; }
+  .cbt-nav-inner .cbt-btn { flex: 1; }
+  .cbt-kbd-hint { text-align: center; font-size: 12px; color: var(--text-3); margin-top: 6px; }
+  @media (max-width: 560px) {
+    header.cbt-header { padding: 10px 12px; }
+    .cbt-header-left .cbt-title-text, #cbt-student-name { display: none; }
+    .cbt-link-btn { padding: 7px 10px; }
+    .cbt-exam-bar { top: 53px; }
+  }
+  @media (max-width: 640px) { .cbt-kbd-hint { display: none; } .cbt-question-text { font-size: 18px; } .cbt-lobby-facts { grid-template-columns: 1fr 1fr 1fr; } .cbt-lobby { padding: 18px; } }
+
+  /* Review page */
+  .cbt-review-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+  .cbt-review-stat { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+  .cbt-review-stat strong { display: block; font-size: 24px; font-family: 'DM Mono', monospace; }
+  .cbt-review-stat.unanswered strong { color: var(--red); }
+  .cbt-review-stat.flagged strong { color: var(--amber); }
+  .cbt-review-stat.answered strong { color: var(--green); }
+  .cbt-review-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .cbt-review-grid .cbt-qnum { width: 100%; height: 48px; border-radius: var(--radius-sm); }
+  .cbt-warn-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
+
+  /* Toasts + result */
+  .cbt-toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 60; background: #0f172a; color: #fff; padding: 12px 18px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-width: calc(100% - 32px); text-align: center; }
+  .cbt-toast.warn { background: var(--amber); }
+  .cbt-toast.danger { background: var(--red); }
+  .cbt-result-card { background: var(--black); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 24px; text-align: center; max-width: 460px; margin: 30px auto; }
+  .cbt-result-emoji { font-size: 44px; }
+  .cbt-result-big { font-family: 'DM Mono', monospace; font-size: 44px; font-weight: 700; color: var(--blue); margin: 10px 0 4px; }
+  .cbt-result-pct { font-size: 18px; font-weight: 700; }
 </style>
 </head>
 <body>
   <header class="cbt-header">
-    <div class="cbt-header-left"><span class="cbt-logo">CBT</span><span>Computer Based Test</span></div>
+    <div class="cbt-header-left"><span class="cbt-logo">CBT</span><span class="cbt-title-text">Computer Based Test</span></div>
     <div class="cbt-header-right">
       <span id="cbt-student-name"></span>
-      <a href="student-portal.html" class="cbt-link-btn">&larr; Back to Portal</a>
-      <button class="cbt-link-btn" onclick="signOut()">Sign Out</button>
+      <a href="student-portal.html" class="cbt-link-btn" id="cbt-back-portal">&larr; Portal</a>
+      <button class="cbt-link-btn" id="cbt-signout" onclick="signOut()">Sign Out</button>
     </div>
   </header>
   <main>
     <div id="cbt-list-view">
-      <h1>Available CBT Exams</h1>
-      <p class="cbt-sub">Exams scheduled for your class. Start one when it's marked Live.</p>
-      <div id="cbt-empty-msg" class="cbt-empty" style="display:none;">No CBT exams are available for your class right now.</div>
-      <div id="cbt-exam-list" class="cbt-exam-grid"></div>
+      <h1 id="cbt-hello">My CBT Exams</h1>
+      <p class="cbt-sub">When an exam says <strong>Ready</strong>, tap it to begin. The timer only starts after you press <strong>Begin</strong>.</p>
+      <div id="cbt-exam-list"></div>
     </div>
+
+    <div id="cbt-lobby-view" style="display:none;"></div>
 
     <div id="cbt-exam-view" style="display:none;">
       <div class="cbt-exam-bar">
-        <div id="cbt-exam-title">Question Paper</div>
-        <div id="cbt-timer" class="cbt-timer">--:--</div>
+        <div class="cbt-exam-bar-row">
+          <div id="cbt-exam-title">Exam</div>
+          <div id="cbt-timer" class="cbt-timer" aria-live="off">--:--</div>
+        </div>
+        <div class="cbt-progress">
+          <span id="cbt-progress-text">0 of 0 answered</span>
+          <div class="cbt-progress-track"><div class="cbt-progress-fill" id="cbt-progress-fill" style="width:0"></div></div>
+          <span class="cbt-save-state ok" id="cbt-save-state" aria-live="polite">&#10003; Saved</span>
+        </div>
       </div>
-      <div id="cbt-question-nav" class="cbt-question-nav"></div>
+      <div id="cbt-question-nav" class="cbt-question-nav" role="navigation" aria-label="Questions"></div>
+      <div class="cbt-legend"><span><i class="l-answered"></i>Answered</span><span><i></i>Not answered</span><span><i class="l-flagged"></i>Marked for review</span></div>
       <div id="cbt-questions"></div>
+      <div id="cbt-review" style="display:none;"></div>
+      <div class="cbt-nav-buttons" id="cbt-nav-buttons">
+        <div class="cbt-nav-inner" id="cbt-nav-inner"></div>
+        <div class="cbt-kbd-hint">Keyboard: A–E choose an answer · ← → move between questions · F mark for review</div>
+      </div>
     </div>
 
     <div id="cbt-result-view" style="display:none;">
       <div class="cbt-result-card">
-        <h2>Exam Submitted</h2>
         <div id="cbt-result-score"></div>
-        <button class="cbt-btn" style="margin-top:18px;" onclick="showListView()">Back to Exams</button>
+        <button class="cbt-btn cbt-btn-block" style="margin-top:22px;" onclick="showListView()">Back to My Exams</button>
       </div>
     </div>
   </main>

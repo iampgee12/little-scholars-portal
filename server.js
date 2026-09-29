@@ -4411,6 +4411,9 @@ async function handleApi(req, res, url) {
              (SELECT COUNT(*) FROM cbt_questions q
                 WHERE q.class_code = ss.class_code AND q.subject_id = ss.subject_id
                   AND q.question_type = 'Multiple Choice Question' AND q.vetted = 1 AND q.archived = 0) AS questionCount,
+             (SELECT COALESCE(SUM(q.marks), 0) FROM cbt_questions q
+                WHERE q.class_code = ss.class_code AND q.subject_id = ss.subject_id
+                  AND q.question_type = 'Multiple Choice Question' AND q.vetted = 1 AND q.archived = 0) AS paperMarks,
              a.id AS attemptId, a.started_at AS startedAt, a.submitted_at AS submittedAt,
              sc2.score, sc2.total_marks AS totalMarks
       FROM cbt_schedule_subjects ss
@@ -4422,8 +4425,19 @@ async function handleApi(req, res, url) {
       ORDER BY ss.id DESC
     `, student.id, student.id, student.classCode);
 
+    // Admin "Instruction Sets" that apply to this pupil: for their class (or
+    // all classes) and for this subject (or all subjects).
+    const instructionSets = all(
+      `SELECT title, instructions, subject_id AS subjectId FROM cbt_instruction_sets
+       WHERE class_code IS NULL OR class_code = ? ORDER BY id`,
+      student.classCode
+    );
     const exams = rows.map(row => ({
       id: row.id,
+      instructions: instructionSets
+        .filter(set => set.subjectId == null || set.subjectId === row.subjectId)
+        .map(set => ({ title: set.title, text: set.instructions })),
+      paperMarks: row.paperMarks,
       subjectName: row.subjectName,
       scheduleTitle: row.scheduleTitle,
       sessionLabel: row.sessionLabel,
