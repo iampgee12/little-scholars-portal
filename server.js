@@ -5267,6 +5267,75 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // "Add Many Questions": save a whole pasted/uploaded paper at once. All or
+  // nothing — any invalid question rejects the batch with its number.
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/questions/bulk') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const subjectId = Number(body.subjectId);
+    const questions = Array.isArray(body.questions) ? body.questions : [];
+    if (!classCode || !subjectId) return sendJson(res, 400, { error: 'Class and subject are required' });
+    if (!teacherOwnsCbtContext(user.id, classCode, subjectId)) {
+      return sendJson(res, 403, { error: 'You are not assigned to this class/subject' });
+    }
+    if (!questions.length) return sendJson(res, 400, { error: 'No questions to add' });
+    if (questions.length > 200) return sendJson(res, 400, { error: 'Add at most 200 questions at a time' });
+    const cleaned = [];
+    for (const [i, q] of questions.entries()) {
+      const questionText = cleanText(q.questionText);
+      const marks = Math.max(1, Math.min(100, Number(q.marks) || 1));
+      const options = Array.isArray(q.options)
+        ? q.options.map(o => ({ text: cleanText(o.text), correct: !!o.correct })).filter(o => o.text)
+        : [];
+      const problem = !questionText ? 'has no question text'
+        : options.length < 2 || options.length > 6 ? 'needs 2 to 6 answer options'
+        : options.filter(o => o.correct).length !== 1 ? 'needs exactly one correct answer'
+        : '';
+      if (problem) return sendJson(res, 400, { error: `Question ${i + 1} ${problem}` });
+      cleaned.push({ questionText, marks, options });
+    }
+    const now = new Date().toISOString();
+    db.exec('BEGIN');
+    try {
+      cleaned.forEach(q => run(
+        `INSERT INTO cbt_questions (class_code, subject_id, question_type, question_text, marks, options, vetted, created_by, created_at)
+         VALUES (?, ?, 'Multiple Choice Question', ?, ?, ?, 1, ?, ?)`,
+        classCode, subjectId, q.questionText, q.marks, JSON.stringify(q.options), user.id, now
+      ));
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, added: cleaned.length });
+  }
+
+  // Word (.docx) upload for "Add Many Questions": returns the document's text,
+  // one paragraph per line, for the teacher to review before saving.
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/extract-text') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const match = cleanText(body.fileDataUrl).match(/^data:[^;]*;base64,(.+)$/);
+    if (!match) return sendJson(res, 400, { error: 'Upload a Word (.docx) file' });
+    let xml;
+    try {
+      xml = readZipEntries(Buffer.from(match[1], 'base64'), ['word/document.xml']).get('word/document.xml')?.toString('utf8');
+    } catch (err) {
+      return sendJson(res, 400, { error: 'Could not read this file — save it as a Word (.docx) document and try again' });
+    }
+    if (!xml) return sendJson(res, 400, { error: 'This does not look like a Word (.docx) document' });
+    const decode = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    // <w:p/> is an empty paragraph (a blank line) — keep it as one.
+    const lines = (xml.match(/<w:p\b[^>]*\/>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || []).map(p => decode(
+      p.replace(/<w:tab\/>/g, ' ').replace(/<w:br\/>/g, '\n').replace(/<w:t(?: [^>]*)?>([\s\S]*?)<\/w:t>/g, '\u0000$1\u0000')
+        .split('\u0000').filter((_, i) => i % 2 === 1).join('')
+    ));
+    return sendJson(res, 200, { text: lines.join('\n') });
+  }
+
   const teacherCbtQuestionMatch = url.pathname.match(/^\/api\/teacher\/cbt\/questions\/(\d+)$/);
   if (req.method === 'PUT' && teacherCbtQuestionMatch) {
     const user = requireUser(req, res, 'teacher');
