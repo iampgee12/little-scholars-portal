@@ -3061,6 +3061,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               <div>
                 <label class="field-label">Gender</label>
                 <select class="ctrl-select" id="new-student-gender">
+                  <option value="">Select…</option>
                   <option value="F">Female</option>
                   <option value="M">Male</option>
                 </select>
@@ -3120,10 +3121,11 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <button class="post-btn" onclick="impCommit()" id="imp-commit-btn">Import Selected Students</button>
           </div>
           <div class="card-body" style="padding:0;">
-            <div style="padding:12px 18px;font-size:12px;color:var(--text-3);">First Name, Surname, Class, and Class Arm are required per row. Rows missing any of these are unchecked and highlighted — fix them or leave them out.</div>
+            <div style="padding:12px 18px;font-size:12px;color:var(--text-3);">First name, surname and class are needed for each pupil (plus class arm where the class has arms). Rows with a problem are highlighted and say what is wrong — fix them right here in the table, or leave them unticked. Gender is optional.</div>
+            <div id="imp-summary" style="display:none;margin:0 18px 12px;padding:10px 12px;border-radius:8px;background:var(--amber-bg, #fffbeb);border:1px solid #fde68a;font-size:12.5px;color:var(--text-1);"></div>
             <div style="overflow-x:auto;padding:0 18px 14px;max-height:560px;overflow-y:auto;">
               <table class="data-table">
-                <thead><tr><th></th><th>#</th><th>Name</th><th>Gender</th><th>Class</th><th>Class Arm</th><th>Parent Email</th><th>Status</th></tr></thead>
+                <thead><tr><th></th><th>#</th><th>First Name</th><th>Surname</th><th>Gender</th><th>Class</th><th>Class Arm</th><th>Parent Email</th><th>Status</th></tr></thead>
                 <tbody id="imp-tbody"></tbody>
               </table>
             </div>

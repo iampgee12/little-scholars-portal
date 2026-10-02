@@ -56,6 +56,10 @@ const SKILL_GROUPS = [
   },
 ];
 
+function genderLabel(g) {
+  return g === 'F' ? 'Female' : g === 'M' ? 'Male' : '—';
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({
     '&': '&amp;',
@@ -368,7 +372,7 @@ function populateStudents() {
       <td>${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}<strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
       <td style="color:var(--text-2);">Class ${escapeHtml(student.classCode)}</td>
-      <td style="color:var(--text-3);">${student.gender === 'F' ? 'Female' : 'Male'}</td>
+      <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
       <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
       <td><span class="grade-pill ${gradeClass(student.avg)}">${grade}</span></td>
       <td><div class="att-bar"><div class="att-track"><div class="att-fill" style="width:${student.att}%;background:${student.att >= 90 ? 'var(--green)' : student.att >= 75 ? 'var(--amber)' : 'var(--red)'};"></div></div><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${student.att}%</span></div></td>
@@ -609,7 +613,7 @@ async function ehLoad() {
     tbody.innerHTML = rows.length ? rows.map(s => `
       <tr>
         <td>${escapeHtml(s.name)}</td>
-        <td>${s.gender === 'F' ? 'Female' : 'Male'}</td>
+        <td>${genderLabel(s.gender)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode)}</td>
         <td style="text-transform:capitalize;">${escapeHtml(s.status)}</td>
         <td>${s.enrolledAt ? escapeHtml(s.enrolledAt.slice(0, 10)) : '<span style="color:var(--text-3);">Unknown</span>'}</td>
@@ -645,7 +649,7 @@ async function srLoad() {
         <td>${i + 1}</td>
         <td>${escapeHtml(s.regNo)}</td>
         <td>${escapeHtml(s.name)}</td>
-        <td>${s.gender === 'F' ? 'Female' : 'Male'}</td>
+        <td>${genderLabel(s.gender)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode)}</td>
         <td>${escapeHtml(s.parentEmail || '—')}</td>
         <td>${s.enrolledAt ? escapeHtml(s.enrolledAt.slice(0, 10)) : '—'}</td>
@@ -663,7 +667,7 @@ function srPrint() {
 }
 function srExportCsv() {
   const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Parent Email', 'Enrolled'];
-  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, s.gender === 'F' ? 'Female' : 'Male', s.classLabel || s.classCode, s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
+  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -1637,7 +1641,7 @@ function renderCognitiveModalBody(student, rating, editMode, selection) {
   const infoRows = [
     ['Name',              student.name],
     ['Registration No.',  student.id],
-    ['Gender',            student.gender || '—'],
+    ['Gender',            genderLabel(student.gender)],
     ['Current Class',     classLabel],
     ['Exam Type',         selection.examType],
     ['Avg Score',         student.avg != null ? student.avg + '%' : '—'],
@@ -2288,7 +2292,8 @@ function editStudent(id) {
   password.value = '';
   password.placeholder = 'Leave blank to keep current password';
   password.readOnly = false;
-  document.getElementById('new-student-gender').value = student.gender || 'F';
+  // A pupil imported without a gender shows 'Select…' rather than a guessed Female.
+  document.getElementById('new-student-gender').value = student.gender || '';
   document.getElementById('new-student-class').value = student.classCode || '';
   stuLoadArms();
   document.getElementById('new-student-arm').value = student.classArmId || '';
@@ -2443,6 +2448,7 @@ async function impPreview() {
       body: JSON.stringify({ fileDataUrl }),
     });
     state.importClasses = data.classes || [];
+    state.importColumns = data.columns || {};
     state.importPreview = (data.preview || []).map(row => ({ ...row, included: row.ready }));
     renderImportPreview();
     const ready = state.importPreview.filter(r => r.ready).length;
@@ -2463,12 +2469,14 @@ function renderImportPreview() {
   const rows = state.importPreview || [];
   const card = document.getElementById('imp-review-card');
   card.style.display = rows.length ? '' : 'none';
+  renderImportSummary();
   document.getElementById('imp-tbody').innerHTML = rows.map((r, i) => {
-    const name = [r.firstName, r.otherNames, r.surname].filter(Boolean).join(' ') || '(no name)';
     return `<tr style="${r.ready ? '' : 'background:var(--red-bg);'}">
       <td><input type="checkbox" ${r.included ? 'checked' : ''} ${r.ready ? '' : 'disabled'} onchange="impToggleRow(${i}, this.checked)"></td>
       <td style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px;">${r.rowNumber}</td>
-      <td>${escapeHtml(name)}</td>
+      <td><input class="field-input" style="min-width:110px;${r.firstName ? '' : 'border-color:var(--red);'}" value="${escapeHtml(r.firstName)}" onchange="impUpdateRow(${i},'firstName',this.value.trim())" placeholder="First name">
+        ${r.otherNames ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px;">Middle: ${escapeHtml(r.otherNames)}</div>` : ''}</td>
+      <td><input class="field-input" style="min-width:110px;${r.surname ? '' : 'border-color:var(--red);'}" value="${escapeHtml(r.surname)}" onchange="impUpdateRow(${i},'surname',this.value.trim())" placeholder="Surname"></td>
       <td><select class="ctrl-select" style="min-width:70px;" onchange="impUpdateRow(${i},'gender',this.value)">
         <option value="" ${!r.gender ? 'selected' : ''}>—</option>
         <option value="F" ${r.gender === 'F' ? 'selected' : ''}>Female</option>
@@ -2480,9 +2488,50 @@ function renderImportPreview() {
         ${r.armWillCreate ? '<div style="font-size:10px;color:var(--amber);">will create this arm</div>' : ''}
       </td>
       <td style="font-size:11px;color:var(--text-3);">${escapeHtml(r.parentEmail || '-')}</td>
-      <td>${r.ready ? '<span class="chip-green">Ready</span>' : '<span class="chip-amber">Needs Review</span>'}</td>
+      <td>${r.ready ? '<span class="chip-green">Ready</span>' : `<span class="chip-amber">Needs Review</span>
+        <div style="font-size:10.5px;color:var(--red);margin-top:4px;line-height:1.35;max-width:190px;">${(r.issues || []).map(escapeHtml).join('<br>')}</div>`}</td>
     </tr>`;
   }).join('');
+}
+
+// How the file was read, plus the gender shortcut (gender is optional —
+// pupils without one import with it blank, to be set later).
+function renderImportSummary() {
+  const box = document.getElementById('imp-summary');
+  if (!box) return;
+  const rows = state.importPreview || [];
+  const cols = state.importColumns || {};
+  const noGender = rows.filter(r => !r.gender).length;
+  const notes = [];
+  if (cols.surnameFromOtherName) notes.push(`Surnames were read from the <strong>${escapeHtml(cols.surname)}</strong> column (there is no "Surname" column in this file).`);
+  if (!cols.gender) notes.push('This file has no Gender column.');
+  box.innerHTML = `${notes.length ? `<div style="margin-bottom:8px;">${notes.join(' ')}</div>` : ''}
+    ${noGender ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span><strong>${noGender}</strong> pupil${noGender === 1 ? ' has' : 's have'} no gender — ${noGender === 1 ? 'it' : 'they'} will import with gender blank (set it later on the pupil's record), or set it now:</span>
+      <select class="ctrl-select" id="imp-bulk-gender" style="min-width:110px;"><option value="">Choose…</option><option value="F">Female</option><option value="M">Male</option></select>
+      <button class="post-btn" style="padding:6px 12px;" onclick="impBulkGender()">Apply to ticked rows</button>
+    </div>` : ''}`;
+  box.style.display = notes.length || noGender ? '' : 'none';
+}
+
+function impBulkGender() {
+  const value = document.getElementById('imp-bulk-gender')?.value;
+  if (!value) return showToast('Choose Female or Male first');
+  const rows = (state.importPreview || []).filter(r => r.included);
+  if (!rows.length) return showToast('Tick the rows to apply it to first');
+  rows.forEach(r => { r.gender = value; });
+  renderImportPreview();
+  showToast(`Set ${rows.length} pupil${rows.length === 1 ? '' : 's'} to ${value === 'F' ? 'Female' : 'Male'}`);
+}
+
+function impRowIssues(row) {
+  const issues = [];
+  if (!row.firstName) issues.push('First name missing');
+  if (!row.surname) issues.push('Surname missing');
+  if (!row.classCode) issues.push(row.rawClass ? `Class "${row.rawClass}" not recognised — pick it` : 'Class missing');
+  const armRequired = !!(state.importClasses || []).find(c => c.code === row.classCode)?.arms?.length;
+  if (row.classCode && armRequired && !row.armName) issues.push('Class arm missing');
+  return issues;
 }
 
 function impToggleRow(i, checked) {
@@ -2503,8 +2552,12 @@ function impUpdateRow(i, field, value) {
     const armExists = (state.importClasses || []).find(c => c.code === row.classCode)?.arms?.some(a => a.toLowerCase() === value.toLowerCase());
     row.armWillCreate = !!(row.classCode && value && !armExists);
   }
-  row.ready = !!(row.firstName && row.surname && row.classCode && row.armName);
-  row.included = row.ready;
+  if (field !== 'gender') {
+    const wasReady = row.ready;
+    row.issues = impRowIssues(row);
+    row.ready = row.issues.length === 0;
+    if (row.ready !== wasReady) row.included = row.ready;
+  }
   renderImportPreview();
 }
 
