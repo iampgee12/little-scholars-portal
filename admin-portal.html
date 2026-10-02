@@ -2831,11 +2831,25 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
                 <div class="pf-field"><label class="field-label">Email</label><input type="email" class="field-input" id="pf-email" placeholder="you@example.com"></div>
                 <div class="pf-field pf-wide"><label class="field-label">Address</label><textarea class="field-input" id="pf-address" rows="2"></textarea></div>
               </div>
-              <div class="pf-section-title">Head of School Signature</div>
-              <div class="pf-hint" style="margin-bottom:8px;">Printed on every result sheet. Same signature as Settings → Signatures. PNG or JPG, ideally on a white background.</div>
-              <img id="as-sig-preview" alt="Head of School signature" class="pf-sig-preview" style="display:none;">
-              <input type="file" id="pf-signature-file" accept="image/png,image/jpeg" class="pf-file">
               <button class="bs-print-btn pf-save" onclick="saveProfile(this)">Save Changes</button>
+
+              <div id="sig-section">
+              <div class="pf-section-title">Head of School Signature</div>
+              <div class="pf-hint" style="margin-bottom:8px;">Printed on every pupil's result sheet. It is the same signature as Settings → Signatures.</div>
+              <div class="sig-box">
+                <div class="sig-current" id="sig-current"><span>Current signature:</span><img id="as-sig-preview" alt="Current signature" style="display:none;"><em id="sig-none">none yet</em></div>
+                <div class="sig-pad-wrap">
+                  <canvas id="sig-pad" class="sig-pad" width="600" height="180"></canvas>
+                  <div class="sig-pad-line"></div>
+                  <div class="sig-hint" id="sig-hint">Sign here with your finger, stylus or mouse</div>
+                </div>
+                <div class="sig-actions">
+                  <button type="button" class="btn-outline" onclick="sigClear()">Clear</button>
+                  <label class="btn-outline">Upload a photo instead<input type="file" accept="image/*" hidden onchange="sigFromFile(this)"></label>
+                  <button type="button" class="post-btn" onclick="sigSave(this, sigSaved)">Save Signature</button>
+                </div>
+              </div>
+              </div>
             </div>
           </div>
 

@@ -3076,14 +3076,16 @@ async function drawWordComments(page, pdfDoc, formTeacher, fonts, colors, teache
 
   const teacherSigPath = formTeacher.teacherSignaturePath || '';
   const teacherSig = await embedImageIfPresent(pdfDoc, teacherSigPath);
-  if (teacherSig) page.drawImage(teacherSig, { x: x + leftW + 70, y: teacherTop - (rowH * 2) + 4, width: 70, height: 18 });
+  // signatures keep their proportions inside the 70 x 18 box
+  const sigBox = (img, top) => { const fit = img.scaleToFit(70, 18); return { x: x + leftW + 70 + ((70 - fit.width) / 2), y: top - (rowH * 2) + 4 + ((18 - fit.height) / 2), width: fit.width, height: fit.height }; };
+  if (teacherSig) page.drawImage(teacherSig, sigBox(teacherSig, teacherTop));
 
   const headTop = 254;
   drawWordCell(page, { x, top: headTop, width, height: rowH, value: `Head of School Comment:  ${headComment}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
   drawWordCell(page, { x, top: headTop - rowH, width: leftW, height: rowH, value: `Head of School: ${headName}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
   drawWordCell(page, { x: x + leftW, top: headTop - rowH, width: rightW, height: rowH, value: "Head of School's Signature :", fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, align: 'center' });
   const headSig = await embedImageIfPresent(pdfDoc, valueFromMeta('head_signature_path', ''));
-  if (headSig) page.drawImage(headSig, { x: x + leftW + 70, y: headTop - (rowH * 2) + 4, width: 70, height: 18 });
+  if (headSig) page.drawImage(headSig, sigBox(headSig, headTop));
 }
 
 function drawWordScoreChart(page, rows, fonts, colors, degrees) {
@@ -3173,12 +3175,19 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
   const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
   const absent = Math.max(0, schoolDays - present);
-  // Form Teacher = the class's class teacher; otherwise a subject teacher
-  // (never the admin, who may have entered some scores).
+  // Form Teacher = the form teacher of the pupil's arm, else the class's class
+  // teacher (one who has signed first); otherwise a subject teacher (never the
+  // admin, who may have entered some scores).
   const formTeacher = one(
     `SELECT u.name AS teacherName, u.signature_path AS teacherSignaturePath
+     FROM class_arms ca JOIN users u ON u.id = ca.form_teacher_id
+     WHERE ca.id = ? AND u.role = 'teacher'`,
+    student.class_arm_id || 0
+  ) || one(
+    `SELECT u.name AS teacherName, u.signature_path AS teacherSignaturePath
      FROM teacher_assignments ta JOIN users u ON u.id = ta.teacher_id
-     WHERE ta.class_code = ? AND ta.teacher_type = 'class_teacher' AND u.role = 'teacher' ORDER BY ta.id LIMIT 1`,
+     WHERE ta.class_code = ? AND ta.teacher_type = 'class_teacher' AND u.role = 'teacher'
+     ORDER BY (COALESCE(u.signature_path, '') = ''), ta.id LIMIT 1`,
     classCode
   ) || rows.find(row => row.teacherSignaturePath && row.teacherRole === 'teacher')
     || rows.find(row => row.teacherRole === 'teacher') || {};
@@ -3847,10 +3856,18 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res);
     if (!user) return;
     const body = await readJson(req);
+    if (user.role === 'student') return sendJson(res, 403, { error: 'Only staff can add a signature' });
     const dataUrl = cleanText(body.dataUrl);
     if (!dataUrl) return sendJson(res, 400, { error: 'Signature image is required' });
-    const stored = saveDataUrl(dataUrl, `signature-${user.id}`);
+    let stored;
+    try {
+      stored = saveDataUrl(dataUrl, `signature-${user.id}`);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
     run('UPDATE users SET signature_path = ? WHERE id = ?', stored, user.id);
+    // The admin's signature is the Head of School signature on result sheets.
+    if (user.role === 'admin') setMeta('head_signature_path', stored);
     return sendJson(res, 200, { ok: true, signaturePath: stored });
   }
 

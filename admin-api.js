@@ -2168,7 +2168,7 @@ function renderTeacherSigPreview() {
 
 async function uploadHeadSignature() {
   try {
-    const dataUrl = await fileToDataUrl('head-signature-file');
+    const dataUrl = await imageToSmallDataUrl(document.getElementById('head-signature-file').files?.[0], 900, false);
     if (!dataUrl) return showToast('Choose a head signature image');
     const data = await apiFetch('/api/admin/signatures', {
       method: 'POST',
@@ -2190,7 +2190,7 @@ async function uploadHeadSignature() {
 async function uploadTeacherSignature() {
   try {
     const teacherId = document.getElementById('signature-teacher').value;
-    const dataUrl = await fileToDataUrl('teacher-signature-file');
+    const dataUrl = await imageToSmallDataUrl(document.getElementById('teacher-signature-file').files?.[0], 900, false);
     if (!teacherId) return showToast('Choose a teacher');
     if (!dataUrl) return showToast('Choose a teacher signature image');
     const data = await apiFetch('/api/admin/signatures', {
@@ -3300,10 +3300,12 @@ function profileInit() {
   document.getElementById('pf-phone').value = u.phone || '';
   document.getElementById('pf-email').value = u.email || '';
   document.getElementById('pf-address').value = u.address || '';
-  document.getElementById('pf-signature-file').value = '';
+  // signature box: current signature + a fresh pad
   const sig = document.getElementById('as-sig-preview');
   if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
   else sig.style.display = 'none';
+  document.getElementById('sig-none').style.display = u.signaturePath ? 'none' : '';
+  sigInit();
 
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
@@ -3325,6 +3327,13 @@ async function previewProfilePhoto() {
   else renderUserAvatar(el, state.user);
 }
 
+function sigSaved(path) {
+  state.user.signaturePath = path;
+  if (state.setup?.settings) state.setup.settings.headSignaturePath = path;
+  profileInit();
+  switchAsTab('edit', document.getElementById('as-tab-edit'));
+}
+
 async function saveProfile(btn) {
   const val = id => document.getElementById(id)?.value.trim() || '';
   btn.disabled = true;
@@ -3340,7 +3349,6 @@ async function saveProfile(btn) {
       email: val('pf-email'),
       address: val('pf-address'),
       photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
-      signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;
