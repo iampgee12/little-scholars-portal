@@ -3028,6 +3028,15 @@ function showAdminSection(section, trigger) {
   if (menu) menu.classList.add('active');
   // Clear any active sub-nav highlight — content only changes when sub-menu is clicked
   document.querySelectorAll('.sub-nav-item').forEach(item => item.classList.remove('active'));
+  // Coming back to a section starts fresh: every folding group closed…
+  if (menu) {
+    menu.querySelectorAll('.result-gradebook-children').forEach(group => { group.classList.remove('open'); group.style.display = 'none'; });
+    menu.querySelectorAll('.sub-chev').forEach(chev => chev.classList.remove('open'));
+    // …except the one holding the page that's open now, so you can see where you are.
+    const currentTab = document.querySelector('.tab-panel.active')?.id.replace(/^tab-/, '');
+    const currentItem = currentTab && menu.querySelector(`.sub-nav-item[data-tab="${currentTab}"]`);
+    if (currentItem) syncSidebarForTab(currentTab, currentItem);
+  }
   const search = document.querySelector('.admin-quick-search input');
   if (search) filterAdminSidebar(search.value);
 }
