@@ -18,7 +18,7 @@ const RR = {
   api: '/api/admin',
   classLabel: code => (state.setup?.classes || []).find(c => c.code === code)?.label || code || '',
   sessionLabel: () => state.setup?.academic?.sessionLabel || '',
-  openTab: tab => switchTab(tab, document.querySelector(`[data-tab="${tab}"]`)),
+  openTab: tab => switchTab(tab, visibleNavItem(tab)),
   onBroadsheetView: () => syncPublishButtons(),
   onBroadsheetLoaded: () => syncPublishButtons(),
 };
@@ -3085,8 +3085,8 @@ function filterAdminSidebar(query) {
 }
 
 function syncSidebarForTab(tab, trigger) {
-  const direct = document.querySelector(`.sub-nav-item[data-tab="${tab}"]`);
-  const item = trigger?.classList?.contains('sub-nav-item') ? trigger : direct;
+  const direct = visibleNavItem(tab);
+  const item = trigger?.classList?.contains('sub-nav-item') && !trigger.closest('.menu-hidden') ? trigger : direct;
   if (!item) {
     // A page with no menu entry (My Profile): nothing in the menu is "here".
     document.querySelectorAll('.sub-nav-item.active').forEach(nav => nav.classList.remove('active'));
@@ -3119,16 +3119,25 @@ function rememberTab(tab) {
   document.querySelector('.user-pill')?.classList.toggle('pill-active', tab === 'profile');
 }
 
+// Menu link for a page, ignoring sections that are switched off (.menu-hidden)
+function visibleNavItem(tab) {
+  return document.querySelector(`.sub-menu:not(.menu-hidden) .sub-nav-item[data-tab="${tab}"]`);
+}
+
 function restoreTabFromUrl() {
   const tab = location.hash.slice(1);
   if (!/^[A-Za-z]+$/.test(tab) || !document.getElementById(`tab-${tab}`)) return false;
   // A "View Results" link (?crcClass=…) reruns its own search instead.
   if (tab === 'classResultChecker' && new URLSearchParams(location.search).has('crcClass')) return false;
-  switchTab(tab, document.querySelector(`.sub-nav-item[data-tab="${tab}"]`));
+  // a page only reachable from a hidden section (e.g. Admissions) isn't reopened
+  if (!visibleNavItem(tab) && document.querySelector(`.menu-hidden .sub-nav-item[data-tab="${tab}"]`)) return false;
+  switchTab(tab, visibleNavItem(tab));
   return true;
 }
 
 function switchTab(tab, trigger, titleOverride, subOverride) {
+  // links inside a switched-off section (e.g. Admission) stand in for the visible one
+  if (trigger?.closest?.('.menu-hidden')) trigger = visibleNavItem(tab) || null;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const panel = document.getElementById(`tab-${tab}`);
