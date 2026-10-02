@@ -18,7 +18,7 @@ const RR = {
   api: '/api/admin',
   classLabel: code => (state.setup?.classes || []).find(c => c.code === code)?.label || code || '',
   sessionLabel: () => state.setup?.academic?.sessionLabel || '',
-  openTab: tab => switchTab(tab, document.querySelector(`[data-tab="${tab}"]`)),
+  openTab: tab => switchTab(tab, visibleNavItem(tab)),
   onBroadsheetView: () => syncPublishButtons(),
   onBroadsheetLoaded: () => syncPublishButtons(),
 };
@@ -1293,7 +1293,8 @@ function findGradebookBatch(selection) {
 }
 
 function gradebookIsPublished(selection) {
-  return (state.setup.publications || []).some(row => row.classCode === selection.classCode && row.examType === selection.examType);
+  // current term only (publications is a recent-activity list across all terms)
+  return (state.setup.publishedResults || []).some(row => row.classCode === selection.classCode && row.examType === selection.examType);
 }
 
 function updateGradebookSummary(selection, batch) {
@@ -1417,14 +1418,14 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td>${escapeHtml(subject.name)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input" type="number" min="0" max="${caMax}" value="${escapeHtml(String(ca))}" data-score="ca" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input score-field" type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ca" value="${escapeHtml(String(ca))}" data-score="ca" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${caScaled}</div>
         </td>
         <td class="gb-exam-column" style="display:${isFinal ? '' : 'none'};">
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input gb-exam-input" type="number" min="0" max="${examMax}" value="${escapeHtml(String(exam))}" data-score="exam" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input gb-exam-input score-field" type="text" inputmode="numeric" autocomplete="off" data-max="${examMax}" data-col="exam" value="${escapeHtml(String(exam))}" data-score="exam" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${examScaled}</div>
@@ -1433,8 +1434,8 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td class="gb-grade-cell" style="display:${gradeCol ? '' : 'none'};">${grade}</td>
         <td><input class="gb-comment-input" readonly></td>
         <td><input class="gb-comment-input" readonly></td>
-        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'absent', ${isAbsent ? 'false' : 'true'}, ${subject.id})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'excluded', ${isExcluded ? 'false' : 'true'}, ${subject.id})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
       </tr>`;
   })).join('');
   tbody.querySelectorAll('input[data-score]').forEach(input => {
@@ -1498,11 +1499,12 @@ async function saveGradebookScore(input) {
   }
 }
 
-async function toggleGradebookFlag(studentId, batchId, field, value) {
+async function toggleGradebookFlag(studentId, batchId, field, value, subjectId) {
+  const selection = gradebookSelection();
   try {
     const data = await apiFetch('/api/admin/gradebook/entries/flag', {
       method: 'PUT',
-      body: JSON.stringify({ batchId, studentId, field, value }),
+      body: JSON.stringify({ batchId, studentId, field, value, subjectId, classCode: selection.classCode, examType: selection.examType }),
     });
     state.gradebookBatch = data.gradebook;
     renderGradebookTable();
@@ -2166,7 +2168,7 @@ function renderTeacherSigPreview() {
 
 async function uploadHeadSignature() {
   try {
-    const dataUrl = await fileToDataUrl('head-signature-file');
+    const dataUrl = await imageToSmallDataUrl(document.getElementById('head-signature-file').files?.[0], 900, false);
     if (!dataUrl) return showToast('Choose a head signature image');
     const data = await apiFetch('/api/admin/signatures', {
       method: 'POST',
@@ -2188,7 +2190,7 @@ async function uploadHeadSignature() {
 async function uploadTeacherSignature() {
   try {
     const teacherId = document.getElementById('signature-teacher').value;
-    const dataUrl = await fileToDataUrl('teacher-signature-file');
+    const dataUrl = await imageToSmallDataUrl(document.getElementById('teacher-signature-file').files?.[0], 900, false);
     if (!teacherId) return showToast('Choose a teacher');
     if (!dataUrl) return showToast('Choose a teacher signature image');
     const data = await apiFetch('/api/admin/signatures', {
@@ -3083,8 +3085,8 @@ function filterAdminSidebar(query) {
 }
 
 function syncSidebarForTab(tab, trigger) {
-  const direct = document.querySelector(`.sub-nav-item[data-tab="${tab}"]`);
-  const item = trigger?.classList?.contains('sub-nav-item') ? trigger : direct;
+  const direct = visibleNavItem(tab);
+  const item = trigger?.classList?.contains('sub-nav-item') && !trigger.closest('.menu-hidden') ? trigger : direct;
   if (!item) {
     // A page with no menu entry (My Profile): nothing in the menu is "here".
     document.querySelectorAll('.sub-nav-item.active').forEach(nav => nav.classList.remove('active'));
@@ -3117,16 +3119,25 @@ function rememberTab(tab) {
   document.querySelector('.user-pill')?.classList.toggle('pill-active', tab === 'profile');
 }
 
+// Menu link for a page, ignoring sections that are switched off (.menu-hidden)
+function visibleNavItem(tab) {
+  return document.querySelector(`.sub-menu:not(.menu-hidden) .sub-nav-item[data-tab="${tab}"]`);
+}
+
 function restoreTabFromUrl() {
   const tab = location.hash.slice(1);
   if (!/^[A-Za-z]+$/.test(tab) || !document.getElementById(`tab-${tab}`)) return false;
   // A "View Results" link (?crcClass=…) reruns its own search instead.
   if (tab === 'classResultChecker' && new URLSearchParams(location.search).has('crcClass')) return false;
-  switchTab(tab, document.querySelector(`.sub-nav-item[data-tab="${tab}"]`));
+  // a page only reachable from a hidden section (e.g. Admissions) isn't reopened
+  if (!visibleNavItem(tab) && document.querySelector(`.menu-hidden .sub-nav-item[data-tab="${tab}"]`)) return false;
+  switchTab(tab, visibleNavItem(tab));
   return true;
 }
 
 function switchTab(tab, trigger, titleOverride, subOverride) {
+  // links inside a switched-off section (e.g. Admission) stand in for the visible one
+  if (trigger?.closest?.('.menu-hidden')) trigger = visibleNavItem(tab) || null;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const panel = document.getElementById(`tab-${tab}`);
@@ -3289,10 +3300,12 @@ function profileInit() {
   document.getElementById('pf-phone').value = u.phone || '';
   document.getElementById('pf-email').value = u.email || '';
   document.getElementById('pf-address').value = u.address || '';
-  document.getElementById('pf-signature-file').value = '';
+  // signature box: current signature + a fresh pad
   const sig = document.getElementById('as-sig-preview');
   if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
   else sig.style.display = 'none';
+  document.getElementById('sig-none').style.display = u.signaturePath ? 'none' : '';
+  sigInit();
 
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
@@ -3314,6 +3327,13 @@ async function previewProfilePhoto() {
   else renderUserAvatar(el, state.user);
 }
 
+function sigSaved(path) {
+  state.user.signaturePath = path;
+  if (state.setup?.settings) state.setup.settings.headSignaturePath = path;
+  profileInit();
+  switchAsTab('edit', document.getElementById('as-tab-edit'));
+}
+
 async function saveProfile(btn) {
   const val = id => document.getElementById(id)?.value.trim() || '';
   btn.disabled = true;
@@ -3329,7 +3349,6 @@ async function saveProfile(btn) {
       email: val('pf-email'),
       address: val('pf-address'),
       photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
-      signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;

@@ -766,8 +766,8 @@ function renderResultsGrid() {
     const statusChip = rec ? '<span class="chip-green">Saved</span>' : '<span class="chip-gray">Empty</span>';
     return `<tr id="row-${student.id}" class="${rec ? 'row-saved' : ''}">
       <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
-      <td><div class="score-wrap"><input type="number" min="0" max="${caMax}" class="score-input${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/${caMax}</span></div></td>
-      ${!isCA ? `<td><div class="score-wrap"><input type="number" min="0" max="70" class="score-input${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
+      <td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ca" class="score-input score-field${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/${caMax}</span></div></td>
+      ${!isCA ? `<td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ex" class="score-input score-field${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
       <td class="tot-cell" id="tot-${student.id}" style="color:${total != null ? color : 'var(--text-3)'};">${total != null ? total : '-'}</td>
       <td class="grade-cell"><span class="grade-pill ${scorePct != null ? gradeClass(scorePct) : ''}" id="grd-${student.id}" style="${total == null ? 'background:var(--black-3);color:var(--text-3);' : ''}">${grade}</span></td>
       <td class="stat-cell" id="sta-${student.id}">${statusChip}</td>
@@ -865,12 +865,12 @@ function renderStudentPanel() {
       <div class="ep-score-row">
         <div class="ep-score-box">
           <div class="ep-score-lbl">${caLabel} <span style="opacity:0.5;">(max ${caMax})</span></div>
-          <input type="number" min="0" max="${caMax}" id="ep-ca" class="ep-input-big${caVal !== '' ? ' has-val' : ''}" value="${caVal}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);epCalc('${student.id}','${isCA ? 'ca' : 'both'}')">
+          <input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ep" id="ep-ca" class="ep-input-big score-field${caVal !== '' ? ' has-val' : ''}" value="${caVal}" placeholder="-" oninput="epCalc('${student.id}','${isCA ? 'ca' : 'both'}')">
           <div class="ep-max-lbl">out of ${caMax}</div>
         </div>
         ${!isCA ? `<div class="ep-score-box">
           <div class="ep-score-lbl">Examination Score <span style="opacity:0.5;">(max 70)</span></div>
-          <input type="number" min="0" max="70" id="ep-ex" class="ep-input-big${exVal !== '' ? ' has-val' : ''}" value="${exVal}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);epCalc('${student.id}','both')">
+          <input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ep" id="ep-ex" class="ep-input-big score-field${exVal !== '' ? ' has-val' : ''}" value="${exVal}" placeholder="-" oninput="epCalc('${student.id}','both')">
           <div class="ep-max-lbl">out of 70</div>
         </div>` : `<div class="ep-score-box" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><div style="font-size:11px;color:var(--text-3);">CA-only exam</div><div style="font-size:11px;color:var(--text-3);">No exam score required</div></div>`}
       </div>
@@ -1835,10 +1835,14 @@ function profileInit() {
   document.getElementById('pf-phone').value = u.phone || '';
   document.getElementById('pf-email').value = u.email || '';
   document.getElementById('pf-address').value = u.address || '';
-  document.getElementById('pf-signature-file').value = '';
+  // signature box: current signature + a fresh pad
   const sig = document.getElementById('as-sig-preview');
   if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
   else sig.style.display = 'none';
+  document.getElementById('sig-none').style.display = u.signaturePath ? 'none' : '';
+  // only a class teacher's signature is printed (as Form Teacher)
+  document.getElementById('sig-section').style.display = classTeacherClasses().length ? '' : 'none';
+  sigInit();
 
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
@@ -1860,6 +1864,12 @@ async function previewProfilePhoto() {
   else renderUserAvatar(el, state.user);
 }
 
+function sigSaved(path) {
+  state.user.signaturePath = path;
+  profileInit();
+  switchAsTab('edit', document.getElementById('as-tab-edit'));
+}
+
 async function saveProfile(btn) {
   const val = id => document.getElementById(id)?.value.trim() || '';
   btn.disabled = true;
@@ -1875,7 +1885,6 @@ async function saveProfile(btn) {
       email: val('pf-email'),
       address: val('pf-address'),
       photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
-      signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;
