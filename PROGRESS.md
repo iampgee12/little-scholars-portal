@@ -190,6 +190,12 @@ Fresh sanity pass on a clean DB: deleted `school.sqlite`, `node --check` clean o
 
 No code changes needed — scope remains fully built, tested, and working. No new owner notification this firing (nothing changed since the last one); standing recommendation to disable or repoint this hourly trigger still holds.
 
+## Check-in (2026-10-02, 37th firing) — `feature/finance-payroll-expenses`
+
+Thirty-seventh consecutive firing, independently re-verified from scratch. Branch confirmed 0 commits behind `origin/launch-prep` (diff vs `origin/launch-prep` is PROGRESS.md-only) — nothing to merge, no drift. `node --check` clean on server.js/admin-api.js. Fresh sanity pass on a clean DB: deleted `school.sqlite`, server booted cleanly on a fresh port against the freshly-reseeded database, all three demo logins verified via real cookie sessions (200/200/200). Exercised the Payroll & Expenses read surface (`/api/admin/payroll/rates`, `/salaries`, `/loans`, `/api/admin/finance/expense-requests`, `/income`, `/analytics`) — all 200 with real seeded data — then a write path (logged a new income entry) which returned `{ok:true}` and correctly moved `totalIncome`/`incomeCount` (3→4) on re-fetch in `/api/admin/finance/analytics`. Zero server-side errors in the log.
+
+No code changes needed — scope remains fully built, tested, and working. No new owner notification this firing (nothing changed since the last one); standing recommendation to disable or repoint this hourly trigger still holds.
+
 ## Check-in (2026-10-02, 36th firing) — `feature/finance-payroll-expenses`
 
 Thirty-sixth consecutive firing, independently re-verified from scratch. Branch confirmed 0 commits behind `origin/launch-prep` (diff vs `origin/launch-prep` is PROGRESS.md-only) — nothing to merge, no drift.
