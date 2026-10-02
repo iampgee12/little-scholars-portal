@@ -374,7 +374,8 @@ function populateStudents() {
     tr.innerHTML = `
       <td><button type="button" class="stu-photo-btn" title="${student.photoPath ? 'Change' : 'Add'} ${escapeHtml(student.name)}'s photo" onclick="spPickOne('${escapeHtml(student.id)}')">${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="" loading="lazy">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}</button><strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
-      <td style="color:var(--text-2);">Class ${escapeHtml(student.classCode)}</td>
+      <td style="color:var(--text-2);">${escapeHtml((state.setup.classes || []).find(c => c.code === student.classCode)?.label || student.classCode)}</td>
+      <td style="color:var(--text-2);">${escapeHtml(student.classArmName || '—')}</td>
       <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
       <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
       <td><span class="grade-pill ${gradeClass(student.avg)}">${grade}</span></td>
@@ -500,42 +501,79 @@ function caInit() {
   // classes, so nobody can be promoted/transferred into a hidden class.
   const allOptions = (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}${c.archived ? ' (Archived)' : ''}</option>`).join('');
   const activeOptions = (state.setup.classes || []).filter(c => !c.archived).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
-  fromSel.innerHTML = '<option value="">Select Class</option>' + allOptions;
-  toSel.innerHTML = '<option value="">Select Class</option>' + activeOptions;
-  document.getElementById('ca-students-list').innerHTML = '<span style="font-size:12px;color:var(--text-3);">Select a class to load students.</span>';
+  fromSel.innerHTML = '<option value="">— Choose class —</option>' + allOptions;
+  toSel.innerHTML = '<option value="">— Choose new class —</option>' + activeOptions;
+  caFromClassChanged();
+  caToClassChanged();
   caLoadStatusList();
+}
+
+function caArmSelect(selectId, classCode, placeholder) {
+  const sel = document.getElementById(selectId);
+  const hasArms = !!classCode && (state.setup.classArms || []).some(a => a.classCode === classCode);
+  sel.innerHTML = hasArms ? attArmOptions(classCode, placeholder) : `<option value="">${classCode ? 'No arms' : placeholder}</option>`;
+  sel.disabled = !hasArms;
+  return hasArms;
+}
+
+function caFromClassChanged() {
+  caArmSelect('ca-from-arm', document.getElementById('ca-from-class').value, 'All arms');
+  caLoadStudents();
+}
+
+function caToClassChanged() {
+  const hasArms = caArmSelect('ca-to-arm', document.getElementById('ca-to-class').value, '— Choose arm —');
+  document.getElementById('ca-to-arm').dataset.required = hasArms ? '1' : '';
 }
 
 async function caLoadStudents() {
   const classCode = document.getElementById('ca-from-class').value;
+  const armId = document.getElementById('ca-from-arm').value;
   const wrap = document.getElementById('ca-students-list');
-  if (!classCode) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text-3);">Select a class to load students.</span>'; return; }
-  wrap.innerHTML = '<span style="font-size:12px;color:var(--text-3);">Loading…</span>';
+  if (!classCode) { wrap.innerHTML = '<span class="ca-empty">Choose the class the pupils are in now.</span>'; caUpdateCount(); return; }
+  wrap.innerHTML = '<span class="ca-empty">Loading…</span>';
   try {
     const data = await apiFetch(`/api/admin/students/by-class?classCode=${encodeURIComponent(classCode)}&status=active`);
-    const students = data.students || [];
-    wrap.innerHTML = students.length ? students.map(s => `
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input type="checkbox" class="ca-student-check" value="${escapeHtml(s.id)}"> ${escapeHtml(s.name)} <span style="color:var(--text-3);">(${escapeHtml(s.id)})</span></label>
-    `).join('') : '<span style="font-size:12px;color:var(--text-3);">No active students in this class.</span>';
-  } catch (err) { wrap.innerHTML = `<span style="font-size:12px;color:var(--red);">${escapeHtml(err.message)}</span>`; }
+    const students = (data.students || []).filter(st => !armId || String(st.classArmId) === String(armId));
+    wrap.innerHTML = students.length ? students.map(st => `
+      <label class="ca-student"><input type="checkbox" class="ca-student-check" value="${escapeHtml(st.id)}" checked onchange="caUpdateCount()">
+        ${pupilAvatar(st)}<span>${escapeHtml(st.name)}<small>${escapeHtml(st.id)}${st.classArmName ? ` · ${escapeHtml(st.classArmName)}` : ''}</small></span></label>
+    `).join('') : '<span class="ca-empty">No active pupils in this class.</span>';
+    document.getElementById('ca-select-all').checked = true;
+  } catch (err) { wrap.innerHTML = `<span class="ca-empty" style="color:var(--red);">${escapeHtml(err.message)}</span>`; }
+  caUpdateCount();
+}
+
+function caUpdateCount() {
+  const all = document.querySelectorAll('.ca-student-check').length;
+  const picked = caSelectedIds().length;
+  document.getElementById('ca-selected-count').textContent = all ? `${picked} of ${all} selected` : '';
+  const btn = document.getElementById('ca-promote-btn');
+  btn.textContent = picked ? `Move ${picked} Selected Pupil${picked === 1 ? '' : 's'}` : 'Move Selected Pupils';
 }
 
 function caToggleAll(box) {
-  document.querySelectorAll('.ca-student-check').forEach(cb => cb.checked = box.checked);
+  document.querySelectorAll('.ca-student-check').forEach(cb => { cb.checked = box.checked; });
+  caUpdateCount();
 }
 function caSelectedIds() {
   return [...document.querySelectorAll('.ca-student-check:checked')].map(cb => cb.value);
 }
 
 async function caPromote() {
+  const fromClass = document.getElementById('ca-from-class').value;
   const toClassCode = document.getElementById('ca-to-class').value;
+  const armSel = document.getElementById('ca-to-arm');
+  const toArmId = armSel.value;
   const studentIds = caSelectedIds();
-  if (!toClassCode) { showToast('Select a destination class'); return; }
-  if (!studentIds.length) { showToast('Select at least one student'); return; }
-  if (!confirm(`Move ${studentIds.length} student(s) to the selected class?`)) return;
+  if (!studentIds.length) { showToast('Tick at least one pupil'); return; }
+  if (!toClassCode) { showToast('Choose the new class'); return; }
+  if (armSel.dataset.required && !toArmId) { showToast('Choose the class arm in the new class'); return; }
+  const toLabel = RR.classLabel(toClassCode) + (toArmId ? ` (${armSel.selectedOptions[0].textContent})` : '');
+  if (!confirm(`Move ${studentIds.length} pupil${studentIds.length === 1 ? '' : 's'} from ${RR.classLabel(fromClass)} to ${toLabel}?`)) return;
   try {
-    const data = await apiFetch('/api/admin/students/promote', { method: 'POST', body: JSON.stringify({ toClassCode, studentIds }) });
-    showToast(`${data.moved} student(s) moved`);
+    const data = await apiFetch('/api/admin/students/promote', { method: 'POST', body: JSON.stringify({ toClassCode, toArmId: toArmId || null, studentIds }) });
+    showToast(`${data.moved} pupil${data.moved === 1 ? '' : 's'} moved to ${toLabel}`);
     await loadResultSetup();
     caLoadStudents();
   } catch (err) { showToast(err.message); }
@@ -635,16 +673,28 @@ function srInit() {
   if (!state.setup) return;
   const sel = document.getElementById('sr-class');
   sel.innerHTML = '<option value="">All Classes</option>' + (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
+  srClassChanged();
+}
+
+// Arm dropdown follows the chosen class (disabled for "All Classes" or a class without arms)
+function srClassChanged() {
+  const classCode = document.getElementById('sr-class').value;
+  const armSel = document.getElementById('sr-arm');
+  const hasArms = !!classCode && (state.setup.classArms || []).some(a => a.classCode === classCode);
+  armSel.innerHTML = hasArms ? attArmOptions(classCode, 'All Arms') : '<option value="">All Arms</option>';
+  armSel.disabled = !hasArms;
   srLoad();
 }
 async function srLoad() {
   const classCode = document.getElementById('sr-class').value;
+  const classArmId = document.getElementById('sr-arm')?.value || '';
   const status = document.getElementById('sr-status').value;
   const tbody = document.getElementById('sr-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr>';
   try {
     const params = new URLSearchParams({ status });
     if (classCode) params.set('classCode', classCode);
+    if (classArmId) params.set('classArmId', classArmId);
     const data = await apiFetch(`/api/admin/students/registry?${params.toString()}`);
     srCache = data.students || [];
     tbody.innerHTML = srCache.length ? srCache.map((s, i) => `
@@ -654,12 +704,13 @@ async function srLoad() {
         <td>${escapeHtml(s.name)}</td>
         <td>${genderLabel(s.gender)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode)}</td>
+        <td>${escapeHtml(s.classArmName || '—')}</td>
         <td>${escapeHtml(s.parentEmail || '—')}</td>
         <td>${s.enrolledAt ? escapeHtml(s.enrolledAt.slice(0, 10)) : '—'}</td>
       </tr>
-    `).join('') : '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">No students found</td></tr>';
+    `).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students found</td></tr>';
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 function srPrint() {
@@ -669,8 +720,8 @@ function srPrint() {
   win.print();
 }
 function srExportCsv() {
-  const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Parent Email', 'Enrolled'];
-  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
+  const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Class Arm', 'Parent Email', 'Enrolled'];
+  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.classArmName || '', s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -1360,7 +1411,7 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
     const examScaled = exam !== '' ? pctToScaled(exam, examMax) : '';
     const totalDisplay = isAbsent ? 'ABS' : isExcluded ? 'Excluded' : (total === '' ? '-' : escapeHtml(String(total)));
     return `
-      <tr class="${isExcluded ? 'gb-row-excluded' : ''}" data-student-id="${escapeHtml(student.id)}" data-batch-id="${escapeHtml(String(subject.batchId))}" data-search="${escapeHtml(`${student.name} ${student.id} ${subject.name}`.toLowerCase())}">
+      <tr class="${isExcluded ? 'gb-row-excluded' : ''}" data-student-id="${escapeHtml(student.id)}" data-batch-id="${subject.batchId || ''}" data-subject-id="${subject.id}" data-search="${escapeHtml(`${student.name} ${student.id} ${subject.name}`.toLowerCase())}">
         <td>${++rowIndex}</td>
         <td><strong>${escapeHtml(student.name)}</strong><div class="gb-student-id">${escapeHtml(student.id)}</div></td>
         <td>${escapeHtml(subject.name)}</td>
@@ -1382,8 +1433,8 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td class="gb-grade-cell" style="display:${gradeCol ? '' : 'none'};">${grade}</td>
         <td><input class="gb-comment-input" readonly></td>
         <td><input class="gb-comment-input" readonly></td>
-        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
       </tr>`;
   })).join('');
   tbody.querySelectorAll('input[data-score]').forEach(input => {
@@ -1414,7 +1465,8 @@ async function saveGradebookScore(input) {
         classCode: selection.classCode,
         examType: selection.examType,
         entries: [{
-          batchId: Number(row.dataset.batchId),
+          batchId: Number(row.dataset.batchId) || null,
+          subjectId: Number(row.dataset.subjectId),
           studentId: row.dataset.studentId,
           ca: row.querySelector('[data-score="ca"]')?.value ?? '',
           exam: selection.examType === 'Final Exam' ? (row.querySelector('[data-score="exam"]')?.value ?? '') : null,
@@ -1422,6 +1474,16 @@ async function saveGradebookScore(input) {
       }),
     });
     state.gradebookBatch = data.gradebook;
+    if (!row.dataset.batchId) {
+      // first score for this subject started its batch: re-draw so every row of
+      // the subject knows it (Absent/Exclude become available), keeping focus
+      const focus = { student: row.dataset.studentId, subject: row.dataset.subjectId, field: input.dataset.score };
+      renderGradebookTable();
+      const again = document.querySelector(`tr[data-student-id="${focus.student}"][data-subject-id="${focus.subject}"] [data-score="${focus.field}"]`);
+      if (again) { again.focus(); const v = again.value; again.value = ''; again.value = v; }
+      if (status) status.textContent = 'Score saved.';
+      return;
+    }
     const ca = row.querySelector('[data-score="ca"]')?.value ?? '';
     const exam = selection.examType === 'Final Exam' ? (row.querySelector('[data-score="exam"]')?.value ?? '') : '';
     const total = ca !== '' && (selection.examType !== 'Final Exam' || exam !== '')
@@ -2909,7 +2971,7 @@ const TAB_META = {
   cbtScores: { title: 'CBT Scores', sub: 'Computer-Based Test Results' },
   examPractice: { title: 'Exam Practice', sub: 'Self-Paced CBT Practice' },
   studentTags: { title: 'Student Tags', sub: 'Group and Filter Students by Tag' },
-  classAllocation: { title: 'Class Allocation / Transfer / Graduation', sub: 'Promote, Transfer, or Graduate Students' },
+  classAllocation: { title: 'Promote / Move Students', sub: 'Promote, transfer or graduate pupils' },
   enrollmentHistory: { title: 'Enrollment History', sub: 'Student Enrollment Timeline' },
   studentsRegistry: { title: 'Students Registry', sub: 'Printable Student Roster' },
   communicationBook: { title: 'Communication Book', sub: 'Student and Parent Communication Log' },
