@@ -327,7 +327,7 @@ function rvRenderStatus(data) {
   if (!el) return;
   el.className = `rv-status ${data.published ? 'published' : 'unpublished'}`;
   el.textContent = data.published
-    ? '✔ Published — comments are locked'
+    ? '✓ Published — comments are locked'
     : 'Not published yet — you can still edit comments';
 }
 
@@ -449,7 +449,7 @@ function ccRender() {
 
   const emptyCount = students.filter(st => !(st.savedTeacherComment || '').trim()).length;
   document.getElementById('cc-main').innerHTML = `
-    ${locked ? `<div class="result-locked-note">&#x1F512; This ${escapeHtml(examType)} result has been published, so comments can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>` : ''}
+    ${locked ? `<div class="result-locked-note">This ${escapeHtml(examType)} result has been published, so comments can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>` : ''}
     <div class="cc-toolbar">
       <span class="cc-saved">${students.length} pupil${students.length === 1 ? '' : 's'} · <span id="cc-empty-count">${emptyCount}</span> without a comment</span>
       <span class="spacer"></span>
@@ -820,7 +820,7 @@ function applyResultLock() {
     if (el.id !== 'grid-search-input') el.disabled = true;
   });
   main.querySelectorAll('.btn-save, .btn-clear, .ep-save-btn, .ep-clear-btn').forEach(btn => { btn.style.display = 'none'; });
-  main.insertAdjacentHTML('afterbegin', `<div class="result-locked-note">&#x1F512; This ${escapeHtml(state.currentExam)} result for ${escapeHtml(state.currentContext.classLabel)} has been published, so scores can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>`);
+  main.insertAdjacentHTML('afterbegin', `<div class="result-locked-note">This ${escapeHtml(state.currentExam)} result for ${escapeHtml(state.currentContext.classLabel)} has been published, so scores can no longer be changed. Ask the admin to unpublish it if a correction is needed.</div>`);
 }
 
 async function openStudentPanel(idx) {
@@ -1487,7 +1487,7 @@ function gbRenderClassOverview(classCode, examType, contexts) {
       ${cells}
       <td class="c" style="font-weight:700;">${avgPct != null ? avgPct + '%' : '-'}</td>
       <td class="c" style="white-space:nowrap;">
-        <button class="row-open-btn" onclick="previewTeacherReport('${escapeHtml(student.id)}','${escapeHtml(classCode)}','${escapeHtml(examType)}')" title="Preview the final PDF result">&#x1F50D; Preview</button>
+        <button class="row-open-btn" onclick="previewTeacherReport('${escapeHtml(student.id)}','${escapeHtml(classCode)}','${escapeHtml(examType)}')" title="Preview the final PDF result">Preview</button>
       </td>
     </tr>`;
   }).join('');
@@ -2021,7 +2021,7 @@ function cbtqRenderList() {
   if (!_cbtqQuestions.length) {
     list.innerHTML = `<div class="cbtq-empty">No questions yet for this class/subject.<br>
       <button class="post-btn" onclick="cbtqOpenModal()">&#xff0b; Add a Question</button>
-      <button class="post-btn cbtq-bulk-btn" onclick="cbtqOpenBulk()">&#x1F4CB; Add Many Questions</button></div>`;
+      <button class="post-btn cbtq-bulk-btn" onclick="cbtqOpenBulk()">Add Many Questions</button></div>`;
     return;
   }
   list.innerHTML = _cbtqQuestions.map((q, i) => {

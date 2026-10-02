@@ -973,12 +973,12 @@ function renderAdmissions(data) {
       actions = `<span style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;">→ ${escapeHtml(a.convertedStudentId)}</span>`;
     } else if (a.status === 'pending') {
       actions = `
-        <button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--green);" onclick="updateAdmissionStatus(${a.id},'approved')">Approve</button>
-        <button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--red);" onclick="updateAdmissionStatus(${a.id},'rejected')">Reject</button>`;
+        <button class="post-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'approved')">Approve</button>
+        <button class="del-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'rejected')">Reject</button>`;
     } else if (a.status === 'approved') {
       actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;" onclick="openConvertModal(${a.id},'${escapeHtml(a.applicantName)}')">Convert to Student</button>`;
     } else {
-      actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--amber);" onclick="updateAdmissionStatus(${a.id},'pending')">Reopen</button>`;
+      actions = `<button class="btn-outline btn-sm" onclick="updateAdmissionStatus(${a.id},'pending')">Reopen</button>`;
     }
     return `<tr>
       <td><strong>${escapeHtml(a.applicantName)}</strong>${a.gender ? ` <span style="color:var(--text-3);font-size:11px;">(${escapeHtml(a.gender)})</span>` : ''}</td>
@@ -1315,7 +1315,7 @@ function updateGradebookSummary(selection, batch) {
   }
   if (unpublish) {
     unpublish.style.display = published ? '' : 'none';
-    unpublish.textContent = '🔓 Unpublish this Result';
+    unpublish.textContent = 'Unpublish this Result';
   }
   const saved = document.getElementById('gb-batch-status');
   if (saved) {
@@ -1736,15 +1736,15 @@ function renderCognitiveModalBody(student, rating, editMode, selection) {
         </div>
       </div>
       <div class="cog-student-icons">
-        <span title="Email">✉</span>
-        <span title="Message">💬</span>
+        <span title="Email"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.2"/><path d="M2.5 4.5L8 9l5.5-4.5"/></svg></span>
+        <span title="Message"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.5 3h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7l-3 2.5v-2.5H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg></span>
       </div>
       <table class="cog-info-table">
         ${infoRows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}
       </table>
       <div class="cog-panel-actions">
         <button class="cog-profile-btn">Go to profile page ›</button>
-        <button class="cog-print-btn" onclick="window.print()">🖨 Print</button>
+        <button class="cog-print-btn" onclick="window.print()">Print</button>
       </div>
     </div>`;
 
@@ -2942,6 +2942,7 @@ function deleteAnnouncement(id) {
 }
 
 const TAB_META = {
+  pupilPhotos: { title: 'Upload Pupil Photos', sub: 'Add photos for many pupils at once' },
   profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: 'School Overview' },
   admissions: { title: 'Admission', sub: 'Applications Summary' },
@@ -3138,6 +3139,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   document.getElementById('topbar-title').textContent = titleOverride || trigger?.dataset?.title || meta.title || tab;
   document.getElementById('topbar-sub').textContent = subOverride || trigger?.dataset?.sub || meta.sub || '';
   if (tab === 'settings') renderAssignments();
+  if (tab === 'pupilPhotos') spInit();
   if (tab === 'profile') profileInit();
   if (tab === 'resultsGradebook') {
     const card = document.getElementById('gb-entry-card');
@@ -4010,13 +4012,13 @@ function crcCheckAvailability() {
     avail.style.background = '#16a34a22';
     avail.style.color = '#16a34a';
     avail.style.border = '1px solid #16a34a44';
-    avail.textContent = '✔ This Result is Available';
+    avail.textContent = '✓ This result is available';
     btn.style.display = '';
   } else {
     avail.style.background = '#f8717122';
     avail.style.color = '#f87171';
     avail.style.border = '1px solid #f8717144';
-    avail.textContent = '✖ No results found for this class and exam.';
+    avail.textContent = '✕ No results found for this class and exam.';
     btn.style.display = 'none';
   }
 }
@@ -4048,18 +4050,12 @@ function spMatchPupil(fileName) {
   return null;
 }
 
-function spOpen() {
+function spInit() {
+  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
   _spRows = [];
   document.getElementById('sp-files').value = '';
   document.getElementById('sp-result').innerHTML = '';
   spRender();
-  document.getElementById('sp-modal').style.display = 'flex';
-}
-
-function spClose() {
-  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
-  _spRows = [];
-  document.getElementById('sp-modal').style.display = 'none';
 }
 
 function spFilesChosen(input) {
@@ -5000,7 +4996,7 @@ async function csLoadSchedules() {
             <span style="background:var(--black-3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">Classes: ${s.classCount}</span>
             <div style="display:flex;gap:6px;">
               <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="csdOpen(${s.id})">View Schedule &rsaquo;</button>
-              <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csArchiveToggle(${s.id}, ${s.archived})">${s.archived ? 'Unarchive' : 'Archive'}</button>
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="csArchiveToggle(${s.id}, ${s.archived})">${s.archived ? 'Unarchive' : 'Archive'}</button>
             </div>
           </div>
         </div>
@@ -5123,7 +5119,7 @@ async function csdLoadSubjects() {
         <td>${r.visibleToStudents ? 'Yes' : 'No'}</td>
         <td>
           <button class="post-btn" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'live')" ${r.status === 'live' ? 'disabled' : ''} title="Start">&#9654;</button>
-          <button class="del-btn" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'closed')" ${r.status === 'closed' ? 'disabled' : ''} title="Stop">&#9632;</button>
+          <button class="btn-outline" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'closed')" ${r.status === 'closed' ? 'disabled' : ''} title="Stop">&#9632;</button>
         </td>
         <td>
           <select class="ctrl-select" style="font-size:11px;padding:4px;" onchange="csdRowOptionSelected(this, ${r.id})">
@@ -5365,7 +5361,7 @@ async function cscViewScores() {
         <td>${escapeHtml((r.recordedAt || '').slice(0, 10)) || '—'}</td>
         <td>
           <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore('${r.studentId}')">Save</button>
-          ${r.submittedAt ? `<button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
+          ${r.submittedAt ? `<button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students / match found</td></tr>';
@@ -6800,7 +6796,7 @@ async function cbLoadComments() {
       <td>${i+1}</td>
       <td style="max-width:480px;word-break:break-word">${escapeHtml(c.text)}</td>
       <td class="cb-score-range">${c.min} -to- ${c.max}</td>
-      <td style="white-space:nowrap;"><button class="bs-preview-btn" onclick="cbEditComment(${i})">&#x270E; Edit</button> <button class="bs-preview-btn" onclick="cbDeleteComment(${i})">&#x1F5D1; Delete</button></td>
+      <td style="white-space:nowrap;"><button class="bs-preview-btn" onclick="cbEditComment(${i})">&#x270E; Edit</button> <button class="bs-preview-btn" onclick="cbDeleteComment(${i})">Delete</button></td>
     </tr>`).join('');
 }
 
@@ -7139,7 +7135,7 @@ function ilRenderTable() {
       <td>${invoiceStatusBadge(inv)}</td>
       <td>
         <button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${inv.studentId}'})">View</button>
-        ${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;border-color:#2563eb;color:#2563eb;margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
+        ${inv.balance > 0 ? `<button class="post-btn btn-sm" style="margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
       </td>
     </tr>`).join('') : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No invoices match these filters.</td></tr>`;
   const totals = rows.reduce((acc, inv) => ({ invoiced: acc.invoiced + inv.amount, paid: acc.paid + inv.paid, balance: acc.balance + inv.balance }), { invoiced: 0, paid: 0, balance: 0 });
@@ -7273,8 +7269,8 @@ async function rppLoadQueue() {
         <td>${escapeHtml(p.reference || '-')}</td>
         <td>${feeFmtDate(p.recordedAt)}</td>
         <td>
-          <button class="bs-export-btn" style="position:static;border-color:var(--green);color:var(--green);" onclick="rppReview(${p.id}, 'successful')">Approve</button>
-          <button class="bs-export-btn" style="position:static;border-color:var(--red);color:var(--red);margin-left:4px;" onclick="rppReview(${p.id}, 'failed')">Reject</button>
+          <button class="post-btn btn-sm" onclick="rppReview(${p.id}, 'successful')">Approve</button>
+          <button class="del-btn btn-sm" style="margin-left:4px;" onclick="rppReview(${p.id}, 'failed')">Reject</button>
         </td>
       </tr>`).join('') : `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">Nothing awaiting review.</td></tr>`;
   } catch (e) {
@@ -7468,9 +7464,9 @@ function erRenderTable() {
     tbody.innerHTML = rows.map((r, i) => {
       let actions = '';
       if (r.status === 'pending') {
-        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="erDecide(${r.id},'approve')">Approve</button> <button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#ef4444;" onclick="erDecide(${r.id},'reject')">Reject</button>`;
+        actions = `<button class="post-btn btn-sm" onclick="erDecide(${r.id},'approve')">Approve</button> <button class="del-btn btn-sm" onclick="erDecide(${r.id},'reject')">Reject</button>`;
       } else if (r.status === 'approved') {
-        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#2563eb;" onclick="erDecide(${r.id},'dispense')">Mark Dispensed</button>`;
+        actions = `<button class="post-btn btn-sm" onclick="erDecide(${r.id},'dispense')">Mark Dispensed</button>`;
       } else {
         actions = '—';
       }
@@ -7905,7 +7901,7 @@ function spsRenderTable() {
   } else {
     tbody.innerHTML = rows.map((s, i) => {
       const roleLabel = s.role === 'admin' ? 'Admin' : (s.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher');
-      const action = s.status === 'paid' ? '—' : `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="spsMarkPaid(${s.id})">Mark Paid</button>`;
+      const action = s.status === 'paid' ? '—' : `<button class="post-btn btn-sm" onclick="spsMarkPaid(${s.id})">Mark Paid</button>`;
       return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${roleLabel}</td><td>${finMoney(s.baseSalary)}</td><td>${finMoney(s.allowances)}</td><td>${finMoney(s.deductions)}</td><td style="font-weight:700;">${finMoney(s.netSalary)}</td><td>${finStatusPill(s.status)}</td><td>${action}</td></tr>`;
     }).join('');
   }

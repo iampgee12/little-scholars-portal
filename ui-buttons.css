@@ -1,0 +1,152 @@
+/* One button system for every portal. Loaded last so it wins over older,
+   page-specific button colours.
+     Primary   — filled green: the main action on a screen (Save, Add, View…)
+     Secondary — white with a grey outline: Cancel, Close, Back, Export…
+     Danger    — red: Delete / Remove (filled for the main destructive action,
+                 outlined for row-level ones)
+   Icons are minimal, single-colour line icons (stroke = currentColor). */
+
+:root {
+  --btn-primary: #16a34a;
+  --btn-primary-hover: #15803d;
+  --btn-danger: #dc2626;
+  --btn-danger-hover: #b91c1c;
+  --btn-radius: 8px;
+}
+
+/* ── Primary ── */
+.post-btn,
+.bs-print-btn,
+.bs-view-results-btn,
+.bs-publish-btn,
+.crc-act,
+.act-btn.btn-save,
+.ep-save-btn,
+.gb-manage-btn,
+.cog-view-btn,
+.gb-offline-upload-btn,
+.cbtq-primary,
+.cbtq-bulk-btn,
+.ca-go,
+.cbt-btn,
+.cbt-btn-green {
+  background: var(--btn-primary) !important;
+  color: #fff !important;
+  border: 1px solid var(--btn-primary) !important;
+  border-radius: var(--btn-radius);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+.post-btn:hover,
+.bs-print-btn:hover,
+.bs-view-results-btn:hover,
+.bs-publish-btn:hover,
+.crc-act:hover,
+.act-btn.btn-save:hover,
+.ep-save-btn:hover,
+.gb-manage-btn:hover,
+.cog-view-btn:hover,
+.gb-offline-upload-btn:hover,
+.cbtq-primary:hover,
+.cbtq-bulk-btn:hover,
+.ca-go:hover,
+.cbt-btn:hover,
+.cbt-btn-green:hover {
+  background: var(--btn-primary-hover) !important;
+  border-color: var(--btn-primary-hover) !important;
+  filter: none;
+}
+
+/* ── Secondary ── */
+.btn-outline,
+.bs-ext-view-btn,
+.bs-export-btn,
+.bs-view-btn,
+.act-btn.btn-exp,
+.act-btn.btn-clear,
+.row-open-btn,
+.ep-clear-btn,
+.ep-back-btn,
+.gb-offline-dl-btn,
+.cog-print-btn,
+.staff-profile-btn,
+.staff-export-btn,
+.gb-offline-btn,
+.cbt-link-btn,
+.cbt-btn-secondary {
+  background: #fff !important;
+  color: var(--text-1, #0f172a) !important;
+  border: 1px solid var(--border-2, #cbd5e1) !important;
+  border-radius: var(--btn-radius);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background .15s, border-color .15s;
+}
+.btn-outline:hover,
+.bs-ext-view-btn:hover,
+.bs-export-btn:hover,
+.bs-view-btn:hover,
+.act-btn.btn-exp:hover,
+.act-btn.btn-clear:hover,
+.row-open-btn:hover,
+.ep-clear-btn:hover,
+.ep-back-btn:hover,
+.gb-offline-dl-btn:hover,
+.cog-print-btn:hover,
+.staff-profile-btn:hover,
+.staff-export-btn:hover,
+.gb-offline-btn:hover,
+.cbt-link-btn:hover,
+.cbt-btn-secondary:hover {
+  background: var(--black-3, #f1f5f9) !important;
+  border-color: var(--text-3, #94a3b8) !important;
+}
+
+/* ── Danger ── */
+.btn-danger {
+  background: var(--btn-danger) !important;
+  color: #fff !important;
+  border: 1px solid var(--btn-danger) !important;
+  border-radius: var(--btn-radius);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-danger:hover { background: var(--btn-danger-hover) !important; border-color: var(--btn-danger-hover) !important; }
+.del-btn,
+.bs-unpublish-btn,
+.gb-published-btn {
+  background: #fff !important;
+  color: var(--btn-danger) !important;
+  border: 1px solid #fca5a5 !important;
+  border-radius: var(--btn-radius);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+}
+.del-btn:hover,
+.bs-unpublish-btn:hover,
+.gb-published-btn:hover { background: #fef2f2 !important; border-color: var(--btn-danger) !important; }
+
+/* ── Shared states & sizes ── */
+.post-btn:disabled, .bs-print-btn:disabled, .crc-act:disabled, .act-btn:disabled, .ep-save-btn:disabled,
+.btn-outline:disabled, .btn-danger:disabled, .del-btn:disabled, .cbt-btn:disabled, .bs-view-results-btn:disabled, .bs-publish-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.btn-sm { padding: 5px 10px !important; font-size: 11px !important; }
+
+/* Minimal line icons inside buttons */
+.btn-icon { width: 14px; height: 14px; flex-shrink: 0; vertical-align: -2px; }
+
+/* ON/OFF switches use the same green as primary buttons */
+.staff-status-toggle button.on-active { background: var(--btn-primary) !important; color: #fff !important; }
+
+/* Selected view switch and subject tags use the same green */
+.bs-toggle-btn.active { background: var(--btn-primary) !important; border-color: var(--btn-primary) !important; color: #fff !important; }
+.bs-pill { background: var(--btn-primary) !important; color: #fff !important; }

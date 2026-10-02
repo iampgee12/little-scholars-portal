@@ -47,7 +47,7 @@ async function crcBulkView(opts = {}) {
     area.innerHTML = `
       <div class="crc-toolbar">
         <span class="crc-count">${sheets.length} pupil${sheets.length === 1 ? '' : 's'} · ${withResults} with results · ${escapeHtml(classLabel)} · ${escapeHtml(examType)}</span>
-        <button class="bs-print-btn" id="crc-print-all" onclick="crcPrintAll(this)" ${withResults ? '' : 'disabled'}>&#x1F5A8; Print all Results</button>
+        <button class="bs-print-btn" id="crc-print-all" onclick="crcPrintAll(this)" ${withResults ? '' : 'disabled'}>Print all Results</button>
       </div>
       ${sheets.map(sheet => crcRowHtml(sheet)).join('')}
       <button class="crc-top-btn" onclick="this.closest('.tab-panel').scrollIntoView({behavior:'smooth'})">&#x2191; Back to Top</button>`;
@@ -71,10 +71,10 @@ function crcRowHtml(sheet) {
     </div>
     <div class="crc-actions">
       <div class="crc-who"><strong>${escapeHtml(sheet.name)}</strong><span>${id}${sheet.hasResults && st ? ` · Position ${escapeHtml(String(st.position))}` : ''}</span></div>
-      ${isAdmin ? `<button class="crc-act" onclick="crcAnalysis('${id}')" ${off}>&#x1F4CA; Result Analysis</button>` : ''}
-      <button class="crc-act" onclick="crcPrint('${id}', this)" ${off}>&#x1F5A8; Print Result</button>
+      ${isAdmin ? `<button class="crc-act" onclick="crcAnalysis('${id}')" ${off}>Result Analysis</button>` : ''}
+      <button class="crc-act" onclick="crcPrint('${id}', this)" ${off}>Print Result</button>
       <div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x1F4C4; Get as PDF &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>Get as PDF &#x25BE;</button>
         <div class="crc-dd-menu">
           <button onclick="crcViewPdf('${id}')">View PDF</button>
           <button onclick="crcDownloadPdf('${id}')">Download PDF</button>
@@ -87,7 +87,7 @@ function crcRowHtml(sheet) {
 
 function crcAdminActionsHtml(id, parentEmail, off) {
   return `<div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x2709; Send to Email &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>Send to Email &#x25BE;</button>
         <div class="crc-dd-menu">
           ${parentEmail
             ? `<button onclick="crcEmail('${id}', '')">To Parent / Guardian<small>${parentEmail}</small></button>`
@@ -96,13 +96,13 @@ function crcAdminActionsHtml(id, parentEmail, off) {
         </div>
       </div>
       <div class="crc-dd">
-        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>&#x1F4AC; To WhatsApp &#x25BE;</button>
+        <button class="crc-act" onclick="crcToggleDd(this)" ${off}>To WhatsApp &#x25BE;</button>
         <div class="crc-dd-menu">
           <button onclick="crcWhatsApp('${id}', '')">Send from My Phone / Device</button>
           <button onclick="crcWhatsAppOther('${id}')">To Other WhatsApp Number</button>
         </div>
       </div>
-      <button class="crc-act" onclick="crcFees('${id}')">&#x1F4B3; Student's Fees</button>`;
+      <button class="crc-act" onclick="crcFees('${id}')">Student's Fees</button>`;
 }
 
 // ── On-screen report sheet ──
@@ -625,10 +625,10 @@ function renderBroadsheetTable(data) {
         ${remarkSelectHtml(st.id, st.headComment)}
         <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested remark based on this student's score" onclick="autoFillHeadRemark('${escapeHtml(st.id)}')">&#x21bb; Auto Remark</button>
       </td>`}
-      <td style="text-align:center;"><button class="bs-preview-btn" title="Open Cognitive Skills Assessment" onclick="RR.openTab('cognitiveSkills')">&#x1F393;</button></td>
+      <td style="text-align:center;"><button class="bs-preview-btn" title="Open Cognitive Skills Assessment" onclick="RR.openTab('cognitiveSkills')"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l7-3 7 3-7 3z"/><path d="M4 7.5V11c0 1 1.8 2 4 2s4-1 4-2V7.5"/></svg></button></td>
       <td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.absent ?? 0}</td>
       <td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.absent ?? 0}</td>
-      <td style="text-align:center;"><button class="bs-preview-btn" title="Preview result" onclick="previewStudentReport('${escapeHtml(st.id)}')">&#x1F50D;</button></td>
+      <td style="text-align:center;"><button class="bs-preview-btn" title="Preview result" onclick="previewStudentReport('${escapeHtml(st.id)}')"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg></button></td>
     </tr>`;
   });
 
@@ -758,7 +758,7 @@ function showSubjectRanking(subjectId, subjectName) {
     .sort((a, b) => b.score - a.score);
 
   const rows = ranked.map((r, i) => {
-    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    const medal = '';
     const color = i === 0 ? 'var(--amber)' : i < 3 ? 'var(--text-2)' : 'var(--text-3)';
     return `<tr>
       <td class="rank-num" style="color:${color};">${medal || (i + 1)}</td>
