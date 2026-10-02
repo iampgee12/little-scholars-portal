@@ -5267,6 +5267,75 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true });
   }
 
+  // "Add Many Questions": save a whole pasted/uploaded paper at once. All or
+  // nothing — any invalid question rejects the batch with its number.
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/questions/bulk') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const subjectId = Number(body.subjectId);
+    const questions = Array.isArray(body.questions) ? body.questions : [];
+    if (!classCode || !subjectId) return sendJson(res, 400, { error: 'Class and subject are required' });
+    if (!teacherOwnsCbtContext(user.id, classCode, subjectId)) {
+      return sendJson(res, 403, { error: 'You are not assigned to this class/subject' });
+    }
+    if (!questions.length) return sendJson(res, 400, { error: 'No questions to add' });
+    if (questions.length > 200) return sendJson(res, 400, { error: 'Add at most 200 questions at a time' });
+    const cleaned = [];
+    for (const [i, q] of questions.entries()) {
+      const questionText = cleanText(q.questionText);
+      const marks = Math.max(1, Math.min(100, Number(q.marks) || 1));
+      const options = Array.isArray(q.options)
+        ? q.options.map(o => ({ text: cleanText(o.text), correct: !!o.correct })).filter(o => o.text)
+        : [];
+      const problem = !questionText ? 'has no question text'
+        : options.length < 2 || options.length > 6 ? 'needs 2 to 6 answer options'
+        : options.filter(o => o.correct).length !== 1 ? 'needs exactly one correct answer'
+        : '';
+      if (problem) return sendJson(res, 400, { error: `Question ${i + 1} ${problem}` });
+      cleaned.push({ questionText, marks, options });
+    }
+    const now = new Date().toISOString();
+    db.exec('BEGIN');
+    try {
+      cleaned.forEach(q => run(
+        `INSERT INTO cbt_questions (class_code, subject_id, question_type, question_text, marks, options, vetted, created_by, created_at)
+         VALUES (?, ?, 'Multiple Choice Question', ?, ?, ?, 1, ?, ?)`,
+        classCode, subjectId, q.questionText, q.marks, JSON.stringify(q.options), user.id, now
+      ));
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, added: cleaned.length });
+  }
+
+  // Word (.docx) upload for "Add Many Questions": returns the document's text,
+  // one paragraph per line, for the teacher to review before saving.
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/extract-text') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const match = cleanText(body.fileDataUrl).match(/^data:[^;]*;base64,(.+)$/);
+    if (!match) return sendJson(res, 400, { error: 'Upload a Word (.docx) file' });
+    let xml;
+    try {
+      xml = readZipEntries(Buffer.from(match[1], 'base64'), ['word/document.xml']).get('word/document.xml')?.toString('utf8');
+    } catch (err) {
+      return sendJson(res, 400, { error: 'Could not read this file — save it as a Word (.docx) document and try again' });
+    }
+    if (!xml) return sendJson(res, 400, { error: 'This does not look like a Word (.docx) document' });
+    const decode = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    // <w:p/> is an empty paragraph (a blank line) — keep it as one.
+    const lines = (xml.match(/<w:p\b[^>]*\/>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g) || []).map(p => decode(
+      p.replace(/<w:tab\/>/g, ' ').replace(/<w:br\/>/g, '\n').replace(/<w:t(?: [^>]*)?>([\s\S]*?)<\/w:t>/g, '\u0000$1\u0000')
+        .split('\u0000').filter((_, i) => i % 2 === 1).join('')
+    ));
+    return sendJson(res, 200, { text: lines.join('\n') });
+  }
+
   const teacherCbtQuestionMatch = url.pathname.match(/^\/api\/teacher\/cbt\/questions\/(\d+)$/);
   if (req.method === 'PUT' && teacherCbtQuestionMatch) {
     const user = requireUser(req, res, 'teacher');
@@ -5384,7 +5453,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Student name and class are required' });
     }
     if (!['F', 'M'].includes(gender)) {
-      return sendJson(res, 400, { error: 'Student gender must be F or M' });
+      return sendJson(res, 400, { error: 'Choose the pupil\'s gender (Male or Female)' });
     }
     const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
     if (!cls) return sendJson(res, 400, { error: 'Class does not exist' });
@@ -5556,16 +5625,32 @@ async function handleApi(req, res, url) {
     }
     if (!headers.length) return sendJson(res, 400, { error: 'No header row found in this spreadsheet' });
 
-    const col = name => headers.indexOf(name);
-    const idxSurname = col('Surname');
-    const idxFirst = col('First Name');
-    const idxOther = col('Other Names');
-    const idxGender = col('Gender');
-    const idxParentEmail = col('Parent 1 Email');
-    const idxEnrollment = col('Enrollment Status');
-    const idxClassArmCombined = col('Class & Class Arm');
-    const idxClassOnly = col('Class');
-    const idxArmOnly = col('Class Arm');
+    // Headings are matched ignoring case, spaces and punctuation, and common
+    // alternative wordings are accepted ("Last Name", "Sex", …).
+    const headingKey = h => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const headingKeys = headers.map(headingKey);
+    const col = (...names) => {
+      for (const name of names) {
+        const i = headingKeys.indexOf(headingKey(name));
+        if (i !== -1) return i;
+      }
+      return -1;
+    };
+    const idxFirst = col('First Name', 'Firstname', 'Forename', 'Given Name');
+    const idxSurnameCol = col('Surname', 'Last Name', 'Family Name');
+    const idxMiddle = col('Middle Name', 'Middle Names');
+    const idxOtherCol = col('Other Names', 'Other Name');
+    // No Surname column but a separate Middle/Other split (e.g. "First Name,
+    // Middle Name, Other Name"): the "Other Name" column holds the surname.
+    const otherIsSurname = idxSurnameCol === -1 && idxOtherCol !== -1;
+    const idxSurname = otherIsSurname ? idxOtherCol : idxSurnameCol;
+    const idxOtherNames = otherIsSurname ? [idxMiddle] : [idxMiddle, idxOtherCol];
+    const idxGender = col('Gender', 'Sex');
+    const idxParentEmail = col('Parent 1 Email', 'Parent Email', "Parent's Email", 'Parents Email', 'Email');
+    const idxEnrollment = col('Enrollment Status', 'Enrolment Status');
+    const idxClassArmCombined = col('Class & Class Arm', 'Class and Class Arm', 'Class/Arm');
+    const idxClassOnly = col('Class', 'Class Name');
+    const idxArmOnly = col('Class Arm', 'Arm');
 
     const classes = all('SELECT code, label FROM classes ORDER BY label');
     const arms = all('SELECT id, class_code AS classCode, name FROM class_arms');
@@ -5578,8 +5663,11 @@ async function handleApi(req, res, url) {
       PRESCHOOL1: 'PS1', PRESCHOOL2: 'PS2',
       CRECHE: 'CR',
     };
+    // "Pre-School One" → "Pre-School 1", "Year Five" → "Year 5" (whole words only).
+    const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+    const numberWordsToDigits = s => s.replace(new RegExp(`\\b(${NUMBER_WORDS.join('|')})\\b`, 'gi'), w => String(NUMBER_WORDS.indexOf(w.toLowerCase())));
     const findClass = (rawClassText, armText) => {
-      let t = cleanText(rawClassText);
+      let t = numberWordsToDigits(cleanText(rawClassText));
       // A combined "Class & Class Arm" field often bakes the arm name into
       // the class text itself (e.g. "K.G DOVE" for class "K.G", arm "Dove")
       // — strip a trailing arm name before matching the class.
@@ -5604,7 +5692,7 @@ async function handleApi(req, res, url) {
     const preview = rows.map((row, i) => {
       const surname = idxSurname >= 0 ? cleanText(row[idxSurname]) : '';
       const firstName = idxFirst >= 0 ? cleanText(row[idxFirst]) : '';
-      const otherNames = idxOther >= 0 ? cleanText(row[idxOther]) : '';
+      const otherNames = idxOtherNames.filter(i => i >= 0).map(i => cleanText(row[i])).filter(Boolean).join(' ');
       const gender = idxGender >= 0 ? normalizeGender(row[idxGender]) : '';
       const parentEmail = idxParentEmail >= 0 ? cleanText(row[idxParentEmail]).toLowerCase() : '';
       const enrollmentStatus = idxEnrollment >= 0 ? cleanText(row[idxEnrollment]) : '';
@@ -5625,6 +5713,11 @@ async function handleApi(req, res, url) {
       const classArms = matchedClass ? arms.filter(a => a.classCode === matchedClass.code) : [];
       const armExists = !!classArms.find(a => a.name.toLowerCase() === rawArm.toLowerCase());
       const armRequired = classArms.length > 0;
+      const issues = [];
+      if (!firstName) issues.push('First name missing');
+      if (!surname) issues.push('Surname missing');
+      if (!matchedClass) issues.push(rawClass ? `Class "${rawClass}" not recognised — pick it` : 'Class missing');
+      if (matchedClass && armRequired && !rawArm) issues.push('Class arm missing');
 
       return {
         rowNumber: i + 1,
@@ -5634,12 +5727,19 @@ async function handleApi(req, res, url) {
         classLabel: matchedClass ? matchedClass.label : '',
         armName: rawArm,
         armWillCreate: !!(matchedClass && rawArm && !armExists),
-        ready: !!(firstName && surname && matchedClass && (rawArm || !armRequired)),
+        issues,
+        ready: issues.length === 0,
       };
     });
 
     return sendJson(res, 200, {
       totalRows: rows.length,
+      // Tells the admin how the file's columns were read.
+      columns: {
+        surname: idxSurname >= 0 ? headers[idxSurname] : '',
+        surnameFromOtherName: otherIsSurname,
+        gender: idxGender >= 0 ? headers[idxGender] : '',
+      },
       preview,
       classes: classes.map(c => ({
         code: c.code,
@@ -5669,7 +5769,8 @@ async function handleApi(req, res, url) {
         const classCode = cleanText(row.classCode).toUpperCase();
         const armName = cleanText(row.armName);
         const genderRaw = cleanText(row.gender).toUpperCase();
-        const gender = ['F', 'M'].includes(genderRaw) ? genderRaw : 'F';
+        // Never guess: no gender in the file stays blank until the admin sets it.
+        const gender = ['F', 'M'].includes(genderRaw) ? genderRaw : '';
         const parentEmail = cleanText(row.parentEmail).toLowerCase();
 
         if (!firstName || !surname || !classCode) {
