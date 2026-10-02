@@ -3723,6 +3723,11 @@ async function handleApi(req, res, url) {
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { error: 'Enter a valid email address' });
     if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) return sendJson(res, 400, { error: 'Enter a valid phone number' });
 
+    // Pupils' photos print on their result sheets, so only the school sets them
+    // (Student Directory → Upload Photos / the pupil's record).
+    if (isStudent && body.photoDataUrl) {
+      return sendJson(res, 403, { error: 'Your photo is set by the school. Ask the school office to change it.' });
+    }
     let photoPath = null;
     let signaturePath = null;
     try {
@@ -3744,7 +3749,6 @@ async function handleApi(req, res, url) {
       if (isStudent) {
         // Name stays admin-controlled for pupils (it prints on official results).
         if (gender) run('UPDATE students SET gender = ? WHERE id = ?', gender === 'Female' ? 'F' : 'M', user.id);
-        if (photoPath) run('UPDATE students SET photo_path = ? WHERE id = ?', photoPath, user.id);
         const [y, m, d] = dob ? dob.split('-') : [];
         setMeta(`student_dob_${user.id}`, dob ? `${d}/${m}/${y}` : '');
       } else {
