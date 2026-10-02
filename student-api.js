@@ -444,7 +444,7 @@ function fileToDataUrl(inputId) {
 }
 
 async function previewProfilePhoto() {
-  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const dataUrl = await photoInputToDataUrl('pf-photo-file');
   const el = document.getElementById('pf-photo-preview');
   if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
   else renderUserAvatar(el, currentUser);
@@ -464,7 +464,7 @@ async function saveProfile(btn) {
       phone: val('pf-phone'),
       email: val('pf-email'),
       address: val('pf-address'),
-      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     currentUser = data.user;

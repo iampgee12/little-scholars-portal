@@ -363,13 +363,16 @@ function populateStudents() {
   const all = [...(state.setup.students || [])].sort((a, b) => Number(b.avg) - Number(a.avg));
   tbody.innerHTML = '';
   document.getElementById('stu-count-label').textContent = `Student Directory - ${all.length} records`;
+  const academic = state.setup?.academic;
+  const sub = document.getElementById('student-page-sub');
+  if (sub && academic) sub.textContent = `Complete student directory - ${academic.termLabel}, ${academic.sessionLabel}`;
   all.forEach(student => {
     const grade = scoreToGrade(student.avg);
     const tr = document.createElement('tr');
     tr.dataset.name = student.name.toLowerCase();
     tr.dataset.id = student.id.toLowerCase();
     tr.innerHTML = `
-      <td>${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}<strong>${escapeHtml(student.name)}</strong></td>
+      <td><button type="button" class="stu-photo-btn" title="${student.photoPath ? 'Change' : 'Add'} ${escapeHtml(student.name)}'s photo" onclick="spPickOne('${escapeHtml(student.id)}')">${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="" loading="lazy">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}</button><strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
       <td style="color:var(--text-2);">Class ${escapeHtml(student.classCode)}</td>
       <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
@@ -2152,7 +2155,7 @@ async function updateStudentAssets() {
   if (!studentId) return showToast('Choose a student');
   let photoDataUrl = '';
   try {
-    photoDataUrl = await fileToDataUrl('asset-student-photo');
+    photoDataUrl = await photoInputToDataUrl('asset-student-photo');
   } catch (err) {
     showToast(err.message);
     return;
@@ -2308,7 +2311,7 @@ function editStudent(id) {
 async function saveStudent() {
   let photoDataUrl = '';
   try {
-    photoDataUrl = await fileToDataUrl('new-student-photo');
+    photoDataUrl = await photoInputToDataUrl('new-student-photo');
   } catch (err) {
     showToast(err.message);
     return;
@@ -3232,7 +3235,7 @@ function switchAsTab(tab, btn) {
 }
 
 async function previewProfilePhoto() {
-  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const dataUrl = await photoInputToDataUrl('pf-photo-file');
   const el = document.getElementById('pf-photo-preview');
   if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
   else renderUserAvatar(el, state.user);
@@ -3252,7 +3255,7 @@ async function saveProfile(btn) {
       phone: val('pf-phone'),
       email: val('pf-email'),
       address: val('pf-address'),
-      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
       signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
@@ -3944,6 +3947,162 @@ function crcCheckAvailability() {
     avail.style.border = '1px solid #f8717144';
     avail.textContent = '✖ No results found for this class and exam.';
     btn.style.display = 'none';
+  }
+}
+
+// ── PUPIL PHOTOS: click a pupil's circle, or upload many at once ──
+// Files are matched to pupils by name: the Reg No ("STU-2027-017.jpg") or the
+// pupil's name ("Chukwuebuka Onyeka.jpg", any order, middle name optional).
+let _spRows = [];
+
+const spWords = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[^a-z0-9]+/).filter(Boolean);
+const spIdKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function spMatchPupil(fileName) {
+  const students = state.setup?.students || [];
+  const key = spIdKey(fileName.replace(/\.[a-z0-9]+$/i, ''));
+  const byId = students.find(s => spIdKey(s.id) === key);
+  if (byId) return { student: byId, how: 'Reg No' };
+  const words = spWords(fileName).filter(w => !/^\d+$/.test(w));
+  if (!words.length) return null;
+  const sameWords = students.filter(s => {
+    const sw = spWords(s.name);
+    return sw.length === words.length && words.every(w => sw.includes(w));
+  });
+  if (sameWords.length === 1) return { student: sameWords[0], how: 'name' };
+  if (words.length >= 2) { // e.g. "Ebegue Rovine.jpg" for Ebegue Jaden Rovine
+    const subset = students.filter(s => words.every(w => spWords(s.name).includes(w)));
+    if (subset.length === 1) return { student: subset[0], how: 'name' };
+  }
+  return null;
+}
+
+function spOpen() {
+  _spRows = [];
+  document.getElementById('sp-files').value = '';
+  document.getElementById('sp-result').innerHTML = '';
+  spRender();
+  document.getElementById('sp-modal').style.display = 'flex';
+}
+
+function spClose() {
+  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
+  _spRows = [];
+  document.getElementById('sp-modal').style.display = 'none';
+}
+
+function spFilesChosen(input) {
+  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
+  _spRows = [...input.files].map(file => {
+    const m = spMatchPupil(file.name);
+    return { file, thumb: URL.createObjectURL(file), studentId: m?.student.id || '', how: m?.how || '' };
+  });
+  document.getElementById('sp-result').innerHTML = '';
+  spRender();
+}
+
+function spSetPupil(i, studentId) {
+  _spRows[i].studentId = studentId;
+  _spRows[i].how = studentId ? 'chosen' : '';
+  spRender();
+}
+
+function spRender() {
+  const students = (state.setup?.students || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const counts = {};
+  _spRows.forEach(r => { if (r.studentId) counts[r.studentId] = (counts[r.studentId] || 0) + 1; });
+  const ready = _spRows.filter(r => r.studentId).length;
+  const options = students.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} — ${escapeHtml(s.classCode)} (${escapeHtml(s.id)})</option>`).join('');
+  document.getElementById('sp-list').innerHTML = _spRows.map((r, i) => {
+    const st = students.find(s => s.id === r.studentId);
+    const status = !r.studentId ? '<span class="sp-tag bad">Not matched — choose the pupil</span>'
+      : counts[r.studentId] > 1 ? '<span class="sp-tag warn">Same pupil chosen twice</span>'
+      : st?.photoPath ? '<span class="sp-tag warn">Will replace their current photo</span>'
+      : `<span class="sp-tag ok">Matched${r.how === 'chosen' ? '' : ` by ${r.how}`}</span>`;
+    return `<div class="sp-row">
+      <img src="${r.thumb}" alt="">
+      <div class="sp-row-main">
+        <div class="sp-file">${escapeHtml(r.file.name)}</div>
+        <select class="ctrl-select" onchange="spSetPupil(${i}, this.value)">
+          <option value="">— Choose pupil —</option>${options.replace(`value="${escapeHtml(r.studentId)}"`, `value="${escapeHtml(r.studentId)}" selected`)}
+        </select>
+        ${status}
+      </div>
+    </div>`;
+  }).join('');
+  const notMatched = _spRows.length - ready;
+  document.getElementById('sp-summary').textContent = _spRows.length
+    ? `${_spRows.length} photo${_spRows.length === 1 ? '' : 's'} · ${ready} matched${notMatched ? ` · ${notMatched} not matched (they'll be skipped)` : ''}`
+    : '';
+  const btn = document.getElementById('sp-upload-btn');
+  btn.disabled = !ready;
+  btn.textContent = ready ? `Upload ${ready} Photo${ready === 1 ? '' : 's'}` : 'Upload Photos';
+}
+
+async function spUpload(btn) {
+  // the last file wins if one pupil was picked twice
+  const byStudent = new Map();
+  _spRows.filter(r => r.studentId).forEach(r => byStudent.set(r.studentId, r));
+  const todo = [...byStudent.values()];
+  if (!todo.length) return;
+  btn.disabled = true;
+  const progress = document.getElementById('sp-summary');
+  const saved = [];
+  const failed = [];
+  for (let i = 0; i < todo.length; i += 5) {
+    const chunk = todo.slice(i, i + 5);
+    progress.textContent = `Uploading… ${Math.min(i + chunk.length, todo.length)} of ${todo.length}`;
+    const photos = [];
+    for (const r of chunk) {
+      try { photos.push({ studentId: r.studentId, photoDataUrl: await imageToSmallDataUrl(r.file) }); }
+      catch (err) { failed.push({ name: r.file.name, error: err.message }); }
+    }
+    if (!photos.length) continue;
+    try {
+      const data = await apiFetch('/api/admin/students/photos', { method: 'POST', body: JSON.stringify({ photos }) });
+      saved.push(...data.saved);
+      data.failed.forEach(f => failed.push({ name: f.studentId, error: f.error }));
+    } catch (err) {
+      photos.forEach(p => failed.push({ name: p.studentId, error: err.message }));
+    }
+  }
+  spApplySaved(saved);
+  document.getElementById('sp-result').innerHTML = `<div class="sp-done">✓ ${saved.length} photo${saved.length === 1 ? '' : 's'} saved.</div>
+    ${failed.length ? `<div class="sp-failed">${failed.length} couldn't be saved:<ul>${failed.map(f => `<li>${escapeHtml(f.name)}: ${escapeHtml(f.error)}</li>`).join('')}</ul></div>` : ''}`;
+  _spRows = _spRows.filter(r => !saved.some(s => s.studentId === r.studentId));
+  spRender();
+  btn.disabled = !_spRows.some(r => r.studentId);
+  showToast(`${saved.length} photo${saved.length === 1 ? '' : 's'} saved`);
+}
+
+function spApplySaved(saved) {
+  saved.forEach(({ studentId, photoPath }) => {
+    const st = (state.setup?.students || []).find(s => s.id === studentId);
+    if (st) st.photoPath = photoPath;
+  });
+  if (saved.length) populateStudents();
+}
+
+// Click a pupil's circle in the Student Directory to add/change one photo.
+function spPickOne(studentId) {
+  const input = document.getElementById('sp-one-file');
+  input.dataset.studentId = studentId;
+  input.value = '';
+  input.click();
+}
+
+async function spOneChosen(input) {
+  const studentId = input.dataset.studentId;
+  const file = input.files?.[0];
+  if (!studentId || !file) return;
+  try {
+    const photoDataUrl = await imageToSmallDataUrl(file);
+    const data = await apiFetch('/api/admin/students/photos', { method: 'POST', body: JSON.stringify({ photos: [{ studentId, photoDataUrl }] }) });
+    if (data.failed.length) throw new Error(data.failed[0].error);
+    spApplySaved(data.saved);
+    showToast('Photo saved');
+  } catch (err) {
+    showToast(err.message);
   }
 }
 

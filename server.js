@@ -1804,7 +1804,7 @@ function computeSchoolDays(academicId) {
 function studentRowsForClass(classCode) {
   return all(
     `SELECT st.id, st.name, st.initials, st.gender, st.avg, st.att, st.class_code AS classCode,
-            st.class_arm_id AS classArmId, ca.name AS classArmName
+            st.class_arm_id AS classArmId, ca.name AS classArmName, st.photo_path AS photoPath
      FROM students st
      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
      WHERE st.class_code = ?
@@ -2287,7 +2287,7 @@ function adminGradebook(classCode, examType) {
 
   const students = all(
     `SELECT st.id, st.name, st.initials, st.class_code AS classCode, st.class_arm_id AS classArmId,
-            COALESCE(u.active, 1) AS active
+            st.photo_path AS photoPath, COALESCE(u.active, 1) AS active
      FROM students st
      LEFT JOIN users u ON u.id = st.id
      WHERE st.class_code = ?
@@ -2430,7 +2430,10 @@ function rankOf(standings, studentId) {
 async function embedImageIfPresent(pdfDoc, relativePath) {
   const full = absoluteAssetPath(relativePath);
   if (!full || !fs.existsSync(full)) return null;
-  const bytes = fs.readFileSync(full);
+  // Copy into a standalone array: Node keeps small files inside a shared
+  // buffer pool, and pdf-lib reads from the start of that pool rather than
+  // the file's own offset ("SOI not found in JPEG" for small photos).
+  const bytes = new Uint8Array(fs.readFileSync(full));
   if (full.toLowerCase().endsWith('.png')) return pdfDoc.embedPng(bytes);
   return pdfDoc.embedJpg(bytes);
 }
@@ -2594,7 +2597,10 @@ async function drawStudentInfo(page, pdfDoc, student, rows, totals, average, col
 
   drawCell(page, { x: photoX, top, width: photoW, height: rowH * 5, fill: colors.white, border: colors.grid });
   const photo = await embedImageIfPresent(pdfDoc, student.photo_path) || await embedImageIfPresent(pdfDoc, 'report_assets/student-placeholder.png');
-  if (photo) page.drawImage(photo, { x: photoX + 10, y: top - (rowH * 5) + 12, width: 58, height: 59 });
+  if (photo) {
+    const fit = photo.scaleToFit(58, 59);
+    page.drawImage(photo, { x: photoX + 10 + ((58 - fit.width) / 2), y: top - (rowH * 5) + 12 + ((59 - fit.height) / 2), width: fit.width, height: fit.height });
+  }
 
   return metrics;
 }
@@ -2816,11 +2822,13 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     const photoX = x + widths[0];
     const photoWidth = widths[1];
     const photoSize = 60;
+    // Fit inside the 60pt box without stretching (square photos fill it).
+    const fit = photo.scaleToFit(photoSize, photoSize);
     page.drawImage(photo, {
-      x: photoX + ((photoWidth - photoSize) / 2),
-      y: top - (rowH * (rowCount / 2)) - (photoSize / 2),
-      width: photoSize,
-      height: photoSize,
+      x: photoX + ((photoWidth - fit.width) / 2),
+      y: top - (rowH * (rowCount / 2)) - (fit.height / 2),
+      width: fit.width,
+      height: fit.height,
     });
   }
   return rowH * (rowCount - 6);
@@ -5405,6 +5413,34 @@ async function handleApi(req, res, url) {
       run('UPDATE users SET signature_path = ? WHERE id = ?', stored, teacherId);
     }
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
+  // Bulk pupil photos (Student Directory → Upload Photos, or clicking a
+  // pupil's circle). The browser shrinks each photo first; up to 10 a request.
+  if (req.method === 'POST' && url.pathname === '/api/admin/students/photos') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const photos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    if (!photos.length) return sendJson(res, 400, { error: 'No photos to upload' });
+    const saved = [];
+    const failed = [];
+    for (const p of photos) {
+      const studentId = cleanText(p.studentId).toUpperCase();
+      if (!one('SELECT id FROM students WHERE id = ?', studentId)) {
+        failed.push({ studentId, error: 'Pupil not found' });
+        continue;
+      }
+      try {
+        const photoPath = saveDataUrl(p.photoDataUrl, `student-${studentId}`);
+        if (!photoPath) throw new Error('No image');
+        run('UPDATE students SET photo_path = ? WHERE id = ?', photoPath, studentId);
+        saved.push({ studentId, photoPath });
+      } catch (err) {
+        failed.push({ studentId, error: err.message });
+      }
+    }
+    return sendJson(res, 200, { saved, failed });
   }
 
   const studentAssetsMatch = url.pathname.match(/^\/api\/admin\/students\/([^/]+)\/assets$/);

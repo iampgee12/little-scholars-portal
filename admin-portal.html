@@ -162,6 +162,22 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .data-table tr:last-child td { border-bottom:none; }
 .data-table tbody tr:hover td { background:var(--black-3); }
 .stu-av { width:26px; height:26px; border-radius:50%; background:var(--green-bg); border:1px solid rgba(34,197,94,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--green); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
+.stu-photo-btn { background:none; border:none; padding:0; margin:0; cursor:pointer; position:relative; vertical-align:middle; }
+.stu-photo-btn:hover .stu-av, .stu-photo-btn:hover .stu-av-photo { outline:2px solid var(--green); outline-offset:1px; }
+.sp-help { font-size:12.5px; color:var(--text-2); line-height:1.55; }
+.sp-help code { font-family:'DM Mono',monospace; background:var(--black-3); padding:0 4px; border-radius:4px; }
+.sp-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; }
+.sp-row { display:flex; gap:10px; align-items:center; border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; }
+.sp-row img { width:56px; height:56px; border-radius:50%; object-fit:cover; flex-shrink:0; background:var(--black-3); }
+.sp-row-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.sp-row-main select { width:100%; }
+.sp-file { font-size:11px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sp-tag { font-size:11px; font-weight:700; }
+.sp-tag.ok { color:var(--green); } .sp-tag.warn { color:#b45309; } .sp-tag.bad { color:var(--red); }
+.sp-foot { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 18px; border-top:1px solid var(--border); }
+.sp-summary { font-size:12.5px; color:var(--text-2); font-weight:600; }
+.sp-done { color:var(--green); font-weight:700; margin-bottom:8px; }
+.sp-failed { color:var(--red); font-size:12px; margin-bottom:10px; }
 .stu-av-photo { width:26px; height:26px; border-radius:50%; object-fit:cover; margin-right:8px; vertical-align:middle; flex-shrink:0; border:1px solid rgba(34,197,94,0.3); }
 .staff-av { width:26px; height:26px; border-radius:50%; background:var(--blue-bg); border:1px solid rgba(99,102,241,0.3); display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--blue); font-family:'DM Mono',monospace; margin-right:8px; vertical-align:middle; flex-shrink:0; }
 .grade-pill { font-family:'DM Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; }
@@ -2986,10 +3002,11 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
           <div>
             <h2>All Students</h2>
-            <p id="student-page-sub">Complete student directory - Term 2, 2025/2026</p>
+            <p id="student-page-sub">Complete student directory</p>
           </div>
           <div style="display:flex;gap:8px;">
             <button class="post-btn" style="background:var(--black-3);color:var(--text-1);" onclick="switchTab('importStudents', document.querySelector('[data-tab=\'importStudents\']'))">&#x2B06; Import Records</button>
+            <button class="post-btn" style="background:#0f766e;" onclick="spOpen()">&#x1F4F7; Upload Photos</button>
             <button class="post-btn" onclick="clearStudentForm();switchTab('addStudent', document.querySelector('[data-tab=\'addStudent\']'))">&#x2795; Add Student</button>
           </div>
         </div>
@@ -3026,6 +3043,23 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
       </div>
 
       <!-- ━━━ ADD / EDIT STUDENT (dedicated page, not inline on the directory) ━━━ -->
+      <input type="file" id="sp-one-file" accept="image/*" style="display:none;" onchange="spOneChosen(this)">
+      <div id="sp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:12px;" onclick="if(event.target===this)spClose()">
+        <div class="card" style="width:min(760px,100%);max-height:92vh;display:flex;flex-direction:column;padding:0;">
+          <div class="card-head"><span class="card-title">Upload Pupil Photos</span><button class="cog-modal-close" onclick="spClose()">&#x2715;</button></div>
+          <div class="card-body" style="overflow-y:auto;">
+            <div class="sp-help">Choose photos for many pupils at once. Name each photo with the pupil's <strong>Reg No</strong> (e.g. <code>STU-2027-017.jpg</code>) or their <strong>name</strong> (e.g. <code>Chukwuebuka Onyeka.jpg</code>) and it will be matched automatically — you can fix any match below before uploading. Photos are resized automatically.</div>
+            <input type="file" id="sp-files" accept="image/*" multiple class="field-input" style="margin:12px 0;" onchange="spFilesChosen(this)">
+            <div id="sp-result"></div>
+            <div id="sp-list" class="sp-list"></div>
+          </div>
+          <div class="sp-foot">
+            <span id="sp-summary" class="sp-summary"></span>
+            <button class="post-btn" id="sp-upload-btn" onclick="spUpload(this)" disabled>Upload Photos</button>
+          </div>
+        </div>
+      </div>
+
       <div class="tab-panel" id="tab-addStudent">
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
           <div>
@@ -7167,6 +7201,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 
 <div class="toast" id="toast"></div>
 
+<script src="image-utils.js"></script>
 <script src="results-review.js"></script>
 <script src="admin-api.js"></script>
 </body>

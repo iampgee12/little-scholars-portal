@@ -684,7 +684,7 @@ function populateStudents() {
     tr.dataset.id = student.id.toLowerCase();
     tr.innerHTML = `
       <td><span style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px;">${i + 1}</span></td>
-      <td><span class="stu-av">${escapeHtml(student.initials)}</span><strong>${escapeHtml(student.name)}</strong></td>
+      <td>${pupilAvatar(student)}<strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
       <td style="color:var(--text-2);">Class ${escapeHtml(student.cls)}</td>
       <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
@@ -765,7 +765,7 @@ function renderResultsGrid() {
     const color = gradeColor(grade);
     const statusChip = rec ? '<span class="chip-green">Saved</span>' : '<span class="chip-gray">Empty</span>';
     return `<tr id="row-${student.id}" class="${rec ? 'row-saved' : ''}">
-      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
+      <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       <td><div class="score-wrap"><input type="number" min="0" max="${caMax}" class="score-input${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/${caMax}</span></div></td>
       ${!isCA ? `<td><div class="score-wrap"><input type="number" min="0" max="70" class="score-input${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="if(this.value.length>2)this.value=this.value.slice(0,2);calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
       <td class="tot-cell" id="tot-${student.id}" style="color:${total != null ? color : 'var(--text-3)'};">${total != null ? total : '-'}</td>
@@ -858,7 +858,7 @@ function renderStudentPanel() {
         </div>
       </div>
       <div class="ep-who">
-        <div class="ep-who-av">${escapeHtml(student.initials)}</div>
+        ${pupilAvatar(student, 'ep-who-av')}
         <div><div class="ep-who-name">${escapeHtml(student.name)}</div><div class="ep-who-id">${escapeHtml(student.id)}</div></div>
         <div class="ep-who-pos"><div class="ep-pos-num">${escapeHtml(ctx.classLabel)} - ${escapeHtml(ctx.subjectName)}</div><div class="ep-pos-num" style="margin-top:2px;">${escapeHtml(state.currentExam)}</div></div>
       </div>
@@ -1231,7 +1231,7 @@ function renderPublished() {
           const color = gradeColor(grade);
           const remark = scorePct >= 80 ? 'Excellent' : scorePct >= 65 ? 'Very Good' : scorePct >= 50 ? 'Good' : 'Below Average';
           const remarkClass = scorePct >= 80 ? 'rm-ex' : scorePct >= 65 ? 'rm-vg' : scorePct >= 50 ? 'rm-gd' : 'rm-av';
-          return `<tr><td style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px;">${i + 1}</td><td><span class="stu-av" style="margin-right:6px;">${escapeHtml(row.student.initials)}</span><strong>${escapeHtml(row.student.name)}</strong></td>${hasExam ? `<td style="font-family:'DM Mono',monospace;">${row.entry.ca}</td><td style="font-family:'DM Mono',monospace;">${row.entry.exam ?? '-'}</td>` : `<td style="font-family:'DM Mono',monospace;">${row.entry.ca}</td>`}<td style="font-family:'DM Mono',monospace;font-weight:700;color:${color};">${row.entry.total}</td><td><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:${color};">${grade}</span></td><td><span class="remark-tag ${remarkClass}">${remark}</span></td></tr>`;
+          return `<tr><td style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px;">${i + 1}</td><td>${pupilAvatar(row.student)}<strong>${escapeHtml(row.student.name)}</strong></td>${hasExam ? `<td style="font-family:'DM Mono',monospace;">${row.entry.ca}</td><td style="font-family:'DM Mono',monospace;">${row.entry.exam ?? '-'}</td>` : `<td style="font-family:'DM Mono',monospace;">${row.entry.ca}</td>`}<td style="font-family:'DM Mono',monospace;font-weight:700;color:${color};">${row.entry.total}</td><td><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:${color};">${grade}</span></td><td><span class="remark-tag ${remarkClass}">${remark}</span></td></tr>`;
         }).join('')}</tbody>
       </table></div></div>
     </div>`;
@@ -1483,7 +1483,7 @@ function gbRenderClassOverview(classCode, examType, contexts) {
     }).join('');
     const avgPct = counted ? Math.round((total / (counted * max)) * 100) : null;
     return `<tr>
-      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
+      <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       ${cells}
       <td class="c" style="font-weight:700;">${avgPct != null ? avgPct + '%' : '-'}</td>
       <td class="c" style="white-space:nowrap;">
@@ -1528,7 +1528,7 @@ function gbRender(ctx, examType) {
     const color = (isAbsent || isExcluded) ? 'var(--text-3)' : gradeColor(grade);
     const totalDisplay = isAbsent ? 'ABS' : isExcluded ? 'Excluded' : (total != null ? total : '-');
     return `<tr>
-      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
+      <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       <td class="tot-cell" style="color:${color};">${totalDisplay}</td>
       <td class="grade-cell"><span class="grade-pill" style="${(isAbsent || isExcluded) ? 'background:var(--black-3);color:var(--text-3);' : ''}">${(isAbsent || isExcluded) ? '-' : grade}</span></td>
       <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="gbToggleFlag('${escapeHtml(student.id)}','absent',${isAbsent ? 'false' : 'true'})" ${isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
@@ -1608,7 +1608,7 @@ function cogRender(ctx, examType) {
   const rows = students.map(student => {
     const r = ratings[student.id];
     return `<tr>
-      <td><div class="stu-cell"><span class="stu-av">${escapeHtml(student.initials)}</span><div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
+      <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       <td>${r ? `<span class="chip-green">Rated - ${escapeHtml(r.updatedAt)}</span>` : '<span class="chip-gray">Not Rated</span>'}</td>
       <td class="act-cell"><button class="row-open-btn" onclick="cogOpenModal('${escapeHtml(ctx.classCode)}','${escapeHtml(examType)}','${escapeHtml(student.id)}')">Rate</button></td>
     </tr>`;
@@ -1854,7 +1854,7 @@ function switchAsTab(tab, btn) {
 }
 
 async function previewProfilePhoto() {
-  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const dataUrl = await photoInputToDataUrl('pf-photo-file');
   const el = document.getElementById('pf-photo-preview');
   if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
   else renderUserAvatar(el, state.user);
@@ -1874,7 +1874,7 @@ async function saveProfile(btn) {
       phone: val('pf-phone'),
       email: val('pf-email'),
       address: val('pf-address'),
-      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
       signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
