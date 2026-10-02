@@ -1293,7 +1293,8 @@ function findGradebookBatch(selection) {
 }
 
 function gradebookIsPublished(selection) {
-  return (state.setup.publications || []).some(row => row.classCode === selection.classCode && row.examType === selection.examType);
+  // current term only (publications is a recent-activity list across all terms)
+  return (state.setup.publishedResults || []).some(row => row.classCode === selection.classCode && row.examType === selection.examType);
 }
 
 function updateGradebookSummary(selection, batch) {
@@ -1417,14 +1418,14 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td>${escapeHtml(subject.name)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input" type="number" min="0" max="${caMax}" value="${escapeHtml(String(ca))}" data-score="ca" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input score-field" type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ca" value="${escapeHtml(String(ca))}" data-score="ca" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${caScaled}</div>
         </td>
         <td class="gb-exam-column" style="display:${isFinal ? '' : 'none'};">
           <div style="display:flex;align-items:center;gap:4px;">
-            <input class="gb-score-input gb-exam-input" type="number" min="0" max="${examMax}" value="${escapeHtml(String(exam))}" data-score="exam" oninput="if(this.value.length>2)this.value=this.value.slice(0,2)" ${locked ? 'disabled' : ''}>
+            <input class="gb-score-input gb-exam-input score-field" type="text" inputmode="numeric" autocomplete="off" data-max="${examMax}" data-col="exam" value="${escapeHtml(String(exam))}" data-score="exam" ${locked ? 'disabled' : ''}>
             <span class="gb-score-pct-label" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);">%</span>
           </div>
           <div class="gb-score-scaled" style="display:${pctMode ? '' : 'none'};font-size:11px;color:var(--text-3);padding-left:4px;">${examScaled}</div>

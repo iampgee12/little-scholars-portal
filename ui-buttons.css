@@ -150,3 +150,7 @@
 /* Selected view switch and subject tags use the same green */
 .bs-toggle-btn.active { background: var(--btn-primary) !important; border-color: var(--btn-primary) !important; color: #fff !important; }
 .bs-pill { background: var(--btn-primary) !important; color: #fff !important; }
+
+/* Score boxes: brief warning when a keystroke would go over the maximum */
+input.score-field.score-over { border-color: var(--btn-danger) !important; background: #fef2f2 !important; }
+.score-max-tip { position: absolute; left: 0; top: 100%; margin-top: 2px; z-index: 5; background: var(--btn-danger); color: #fff; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
