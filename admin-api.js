@@ -363,15 +363,19 @@ function populateStudents() {
   const all = [...(state.setup.students || [])].sort((a, b) => Number(b.avg) - Number(a.avg));
   tbody.innerHTML = '';
   document.getElementById('stu-count-label').textContent = `Student Directory - ${all.length} records`;
+  const academic = state.setup?.academic;
+  const sub = document.getElementById('student-page-sub');
+  if (sub && academic) sub.textContent = `Complete student directory - ${academic.termLabel}, ${academic.sessionLabel}`;
   all.forEach(student => {
     const grade = scoreToGrade(student.avg);
     const tr = document.createElement('tr');
     tr.dataset.name = student.name.toLowerCase();
     tr.dataset.id = student.id.toLowerCase();
     tr.innerHTML = `
-      <td>${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}<strong>${escapeHtml(student.name)}</strong></td>
+      <td><button type="button" class="stu-photo-btn" title="${student.photoPath ? 'Change' : 'Add'} ${escapeHtml(student.name)}'s photo" onclick="spPickOne('${escapeHtml(student.id)}')">${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="" loading="lazy">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}</button><strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
-      <td style="color:var(--text-2);">Class ${escapeHtml(student.classCode)}</td>
+      <td style="color:var(--text-2);">${escapeHtml((state.setup.classes || []).find(c => c.code === student.classCode)?.label || student.classCode)}</td>
+      <td style="color:var(--text-2);">${escapeHtml(student.classArmName || '—')}</td>
       <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
       <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
       <td><span class="grade-pill ${gradeClass(student.avg)}">${grade}</span></td>
@@ -497,42 +501,79 @@ function caInit() {
   // classes, so nobody can be promoted/transferred into a hidden class.
   const allOptions = (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}${c.archived ? ' (Archived)' : ''}</option>`).join('');
   const activeOptions = (state.setup.classes || []).filter(c => !c.archived).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
-  fromSel.innerHTML = '<option value="">Select Class</option>' + allOptions;
-  toSel.innerHTML = '<option value="">Select Class</option>' + activeOptions;
-  document.getElementById('ca-students-list').innerHTML = '<span style="font-size:12px;color:var(--text-3);">Select a class to load students.</span>';
+  fromSel.innerHTML = '<option value="">— Choose class —</option>' + allOptions;
+  toSel.innerHTML = '<option value="">— Choose new class —</option>' + activeOptions;
+  caFromClassChanged();
+  caToClassChanged();
   caLoadStatusList();
+}
+
+function caArmSelect(selectId, classCode, placeholder) {
+  const sel = document.getElementById(selectId);
+  const hasArms = !!classCode && (state.setup.classArms || []).some(a => a.classCode === classCode);
+  sel.innerHTML = hasArms ? attArmOptions(classCode, placeholder) : `<option value="">${classCode ? 'No arms' : placeholder}</option>`;
+  sel.disabled = !hasArms;
+  return hasArms;
+}
+
+function caFromClassChanged() {
+  caArmSelect('ca-from-arm', document.getElementById('ca-from-class').value, 'All arms');
+  caLoadStudents();
+}
+
+function caToClassChanged() {
+  const hasArms = caArmSelect('ca-to-arm', document.getElementById('ca-to-class').value, '— Choose arm —');
+  document.getElementById('ca-to-arm').dataset.required = hasArms ? '1' : '';
 }
 
 async function caLoadStudents() {
   const classCode = document.getElementById('ca-from-class').value;
+  const armId = document.getElementById('ca-from-arm').value;
   const wrap = document.getElementById('ca-students-list');
-  if (!classCode) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text-3);">Select a class to load students.</span>'; return; }
-  wrap.innerHTML = '<span style="font-size:12px;color:var(--text-3);">Loading…</span>';
+  if (!classCode) { wrap.innerHTML = '<span class="ca-empty">Choose the class the pupils are in now.</span>'; caUpdateCount(); return; }
+  wrap.innerHTML = '<span class="ca-empty">Loading…</span>';
   try {
     const data = await apiFetch(`/api/admin/students/by-class?classCode=${encodeURIComponent(classCode)}&status=active`);
-    const students = data.students || [];
-    wrap.innerHTML = students.length ? students.map(s => `
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;"><input type="checkbox" class="ca-student-check" value="${escapeHtml(s.id)}"> ${escapeHtml(s.name)} <span style="color:var(--text-3);">(${escapeHtml(s.id)})</span></label>
-    `).join('') : '<span style="font-size:12px;color:var(--text-3);">No active students in this class.</span>';
-  } catch (err) { wrap.innerHTML = `<span style="font-size:12px;color:var(--red);">${escapeHtml(err.message)}</span>`; }
+    const students = (data.students || []).filter(st => !armId || String(st.classArmId) === String(armId));
+    wrap.innerHTML = students.length ? students.map(st => `
+      <label class="ca-student"><input type="checkbox" class="ca-student-check" value="${escapeHtml(st.id)}" checked onchange="caUpdateCount()">
+        ${pupilAvatar(st)}<span>${escapeHtml(st.name)}<small>${escapeHtml(st.id)}${st.classArmName ? ` · ${escapeHtml(st.classArmName)}` : ''}</small></span></label>
+    `).join('') : '<span class="ca-empty">No active pupils in this class.</span>';
+    document.getElementById('ca-select-all').checked = true;
+  } catch (err) { wrap.innerHTML = `<span class="ca-empty" style="color:var(--red);">${escapeHtml(err.message)}</span>`; }
+  caUpdateCount();
+}
+
+function caUpdateCount() {
+  const all = document.querySelectorAll('.ca-student-check').length;
+  const picked = caSelectedIds().length;
+  document.getElementById('ca-selected-count').textContent = all ? `${picked} of ${all} selected` : '';
+  const btn = document.getElementById('ca-promote-btn');
+  btn.textContent = picked ? `Move ${picked} Selected Pupil${picked === 1 ? '' : 's'}` : 'Move Selected Pupils';
 }
 
 function caToggleAll(box) {
-  document.querySelectorAll('.ca-student-check').forEach(cb => cb.checked = box.checked);
+  document.querySelectorAll('.ca-student-check').forEach(cb => { cb.checked = box.checked; });
+  caUpdateCount();
 }
 function caSelectedIds() {
   return [...document.querySelectorAll('.ca-student-check:checked')].map(cb => cb.value);
 }
 
 async function caPromote() {
+  const fromClass = document.getElementById('ca-from-class').value;
   const toClassCode = document.getElementById('ca-to-class').value;
+  const armSel = document.getElementById('ca-to-arm');
+  const toArmId = armSel.value;
   const studentIds = caSelectedIds();
-  if (!toClassCode) { showToast('Select a destination class'); return; }
-  if (!studentIds.length) { showToast('Select at least one student'); return; }
-  if (!confirm(`Move ${studentIds.length} student(s) to the selected class?`)) return;
+  if (!studentIds.length) { showToast('Tick at least one pupil'); return; }
+  if (!toClassCode) { showToast('Choose the new class'); return; }
+  if (armSel.dataset.required && !toArmId) { showToast('Choose the class arm in the new class'); return; }
+  const toLabel = RR.classLabel(toClassCode) + (toArmId ? ` (${armSel.selectedOptions[0].textContent})` : '');
+  if (!confirm(`Move ${studentIds.length} pupil${studentIds.length === 1 ? '' : 's'} from ${RR.classLabel(fromClass)} to ${toLabel}?`)) return;
   try {
-    const data = await apiFetch('/api/admin/students/promote', { method: 'POST', body: JSON.stringify({ toClassCode, studentIds }) });
-    showToast(`${data.moved} student(s) moved`);
+    const data = await apiFetch('/api/admin/students/promote', { method: 'POST', body: JSON.stringify({ toClassCode, toArmId: toArmId || null, studentIds }) });
+    showToast(`${data.moved} pupil${data.moved === 1 ? '' : 's'} moved to ${toLabel}`);
     await loadResultSetup();
     caLoadStudents();
   } catch (err) { showToast(err.message); }
@@ -632,16 +673,28 @@ function srInit() {
   if (!state.setup) return;
   const sel = document.getElementById('sr-class');
   sel.innerHTML = '<option value="">All Classes</option>' + (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
+  srClassChanged();
+}
+
+// Arm dropdown follows the chosen class (disabled for "All Classes" or a class without arms)
+function srClassChanged() {
+  const classCode = document.getElementById('sr-class').value;
+  const armSel = document.getElementById('sr-arm');
+  const hasArms = !!classCode && (state.setup.classArms || []).some(a => a.classCode === classCode);
+  armSel.innerHTML = hasArms ? attArmOptions(classCode, 'All Arms') : '<option value="">All Arms</option>';
+  armSel.disabled = !hasArms;
   srLoad();
 }
 async function srLoad() {
   const classCode = document.getElementById('sr-class').value;
+  const classArmId = document.getElementById('sr-arm')?.value || '';
   const status = document.getElementById('sr-status').value;
   const tbody = document.getElementById('sr-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr>';
   try {
     const params = new URLSearchParams({ status });
     if (classCode) params.set('classCode', classCode);
+    if (classArmId) params.set('classArmId', classArmId);
     const data = await apiFetch(`/api/admin/students/registry?${params.toString()}`);
     srCache = data.students || [];
     tbody.innerHTML = srCache.length ? srCache.map((s, i) => `
@@ -651,12 +704,13 @@ async function srLoad() {
         <td>${escapeHtml(s.name)}</td>
         <td>${genderLabel(s.gender)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode)}</td>
+        <td>${escapeHtml(s.classArmName || '—')}</td>
         <td>${escapeHtml(s.parentEmail || '—')}</td>
         <td>${s.enrolledAt ? escapeHtml(s.enrolledAt.slice(0, 10)) : '—'}</td>
       </tr>
-    `).join('') : '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">No students found</td></tr>';
+    `).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students found</td></tr>';
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
   }
 }
 function srPrint() {
@@ -666,8 +720,8 @@ function srPrint() {
   win.print();
 }
 function srExportCsv() {
-  const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Parent Email', 'Enrolled'];
-  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
+  const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Class Arm', 'Parent Email', 'Enrolled'];
+  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.classArmName || '', s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -919,12 +973,12 @@ function renderAdmissions(data) {
       actions = `<span style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;">→ ${escapeHtml(a.convertedStudentId)}</span>`;
     } else if (a.status === 'pending') {
       actions = `
-        <button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--green);" onclick="updateAdmissionStatus(${a.id},'approved')">Approve</button>
-        <button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--red);" onclick="updateAdmissionStatus(${a.id},'rejected')">Reject</button>`;
+        <button class="post-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'approved')">Approve</button>
+        <button class="del-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'rejected')">Reject</button>`;
     } else if (a.status === 'approved') {
       actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;" onclick="openConvertModal(${a.id},'${escapeHtml(a.applicantName)}')">Convert to Student</button>`;
     } else {
-      actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;background:var(--amber);" onclick="updateAdmissionStatus(${a.id},'pending')">Reopen</button>`;
+      actions = `<button class="btn-outline btn-sm" onclick="updateAdmissionStatus(${a.id},'pending')">Reopen</button>`;
     }
     return `<tr>
       <td><strong>${escapeHtml(a.applicantName)}</strong>${a.gender ? ` <span style="color:var(--text-3);font-size:11px;">(${escapeHtml(a.gender)})</span>` : ''}</td>
@@ -1261,7 +1315,7 @@ function updateGradebookSummary(selection, batch) {
   }
   if (unpublish) {
     unpublish.style.display = published ? '' : 'none';
-    unpublish.textContent = '🔓 Unpublish this Result';
+    unpublish.textContent = 'Unpublish this Result';
   }
   const saved = document.getElementById('gb-batch-status');
   if (saved) {
@@ -1357,7 +1411,7 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
     const examScaled = exam !== '' ? pctToScaled(exam, examMax) : '';
     const totalDisplay = isAbsent ? 'ABS' : isExcluded ? 'Excluded' : (total === '' ? '-' : escapeHtml(String(total)));
     return `
-      <tr class="${isExcluded ? 'gb-row-excluded' : ''}" data-student-id="${escapeHtml(student.id)}" data-batch-id="${escapeHtml(String(subject.batchId))}" data-search="${escapeHtml(`${student.name} ${student.id} ${subject.name}`.toLowerCase())}">
+      <tr class="${isExcluded ? 'gb-row-excluded' : ''}" data-student-id="${escapeHtml(student.id)}" data-batch-id="${subject.batchId || ''}" data-subject-id="${subject.id}" data-search="${escapeHtml(`${student.name} ${student.id} ${subject.name}`.toLowerCase())}">
         <td>${++rowIndex}</td>
         <td><strong>${escapeHtml(student.name)}</strong><div class="gb-student-id">${escapeHtml(student.id)}</div></td>
         <td>${escapeHtml(subject.name)}</td>
@@ -1379,8 +1433,8 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td class="gb-grade-cell" style="display:${gradeCol ? '' : 'none'};">${grade}</td>
         <td><input class="gb-comment-input" readonly></td>
         <td><input class="gb-comment-input" readonly></td>
-        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
       </tr>`;
   })).join('');
   tbody.querySelectorAll('input[data-score]').forEach(input => {
@@ -1411,7 +1465,8 @@ async function saveGradebookScore(input) {
         classCode: selection.classCode,
         examType: selection.examType,
         entries: [{
-          batchId: Number(row.dataset.batchId),
+          batchId: Number(row.dataset.batchId) || null,
+          subjectId: Number(row.dataset.subjectId),
           studentId: row.dataset.studentId,
           ca: row.querySelector('[data-score="ca"]')?.value ?? '',
           exam: selection.examType === 'Final Exam' ? (row.querySelector('[data-score="exam"]')?.value ?? '') : null,
@@ -1419,6 +1474,16 @@ async function saveGradebookScore(input) {
       }),
     });
     state.gradebookBatch = data.gradebook;
+    if (!row.dataset.batchId) {
+      // first score for this subject started its batch: re-draw so every row of
+      // the subject knows it (Absent/Exclude become available), keeping focus
+      const focus = { student: row.dataset.studentId, subject: row.dataset.subjectId, field: input.dataset.score };
+      renderGradebookTable();
+      const again = document.querySelector(`tr[data-student-id="${focus.student}"][data-subject-id="${focus.subject}"] [data-score="${focus.field}"]`);
+      if (again) { again.focus(); const v = again.value; again.value = ''; again.value = v; }
+      if (status) status.textContent = 'Score saved.';
+      return;
+    }
     const ca = row.querySelector('[data-score="ca"]')?.value ?? '';
     const exam = selection.examType === 'Final Exam' ? (row.querySelector('[data-score="exam"]')?.value ?? '') : '';
     const total = ca !== '' && (selection.examType !== 'Final Exam' || exam !== '')
@@ -1671,15 +1736,15 @@ function renderCognitiveModalBody(student, rating, editMode, selection) {
         </div>
       </div>
       <div class="cog-student-icons">
-        <span title="Email">✉</span>
-        <span title="Message">💬</span>
+        <span title="Email"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.2"/><path d="M2.5 4.5L8 9l5.5-4.5"/></svg></span>
+        <span title="Message"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.5 3h11a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H7l-3 2.5v-2.5H2.5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg></span>
       </div>
       <table class="cog-info-table">
         ${infoRows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}
       </table>
       <div class="cog-panel-actions">
         <button class="cog-profile-btn">Go to profile page ›</button>
-        <button class="cog-print-btn" onclick="window.print()">🖨 Print</button>
+        <button class="cog-print-btn" onclick="window.print()">Print</button>
       </div>
     </div>`;
 
@@ -2152,7 +2217,7 @@ async function updateStudentAssets() {
   if (!studentId) return showToast('Choose a student');
   let photoDataUrl = '';
   try {
-    photoDataUrl = await fileToDataUrl('asset-student-photo');
+    photoDataUrl = await photoInputToDataUrl('asset-student-photo');
   } catch (err) {
     showToast(err.message);
     return;
@@ -2308,7 +2373,7 @@ function editStudent(id) {
 async function saveStudent() {
   let photoDataUrl = '';
   try {
-    photoDataUrl = await fileToDataUrl('new-student-photo');
+    photoDataUrl = await photoInputToDataUrl('new-student-photo');
   } catch (err) {
     showToast(err.message);
     return;
@@ -2877,6 +2942,7 @@ function deleteAnnouncement(id) {
 }
 
 const TAB_META = {
+  pupilPhotos: { title: 'Upload Pupil Photos', sub: 'Add photos for many pupils at once' },
   profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: 'School Overview' },
   admissions: { title: 'Admission', sub: 'Applications Summary' },
@@ -2906,7 +2972,7 @@ const TAB_META = {
   cbtScores: { title: 'CBT Scores', sub: 'Computer-Based Test Results' },
   examPractice: { title: 'Exam Practice', sub: 'Self-Paced CBT Practice' },
   studentTags: { title: 'Student Tags', sub: 'Group and Filter Students by Tag' },
-  classAllocation: { title: 'Class Allocation / Transfer / Graduation', sub: 'Promote, Transfer, or Graduate Students' },
+  classAllocation: { title: 'Promote / Move Students', sub: 'Promote, transfer or graduate pupils' },
   enrollmentHistory: { title: 'Enrollment History', sub: 'Student Enrollment Timeline' },
   studentsRegistry: { title: 'Students Registry', sub: 'Printable Student Roster' },
   communicationBook: { title: 'Communication Book', sub: 'Student and Parent Communication Log' },
@@ -2963,6 +3029,15 @@ function showAdminSection(section, trigger) {
   if (menu) menu.classList.add('active');
   // Clear any active sub-nav highlight — content only changes when sub-menu is clicked
   document.querySelectorAll('.sub-nav-item').forEach(item => item.classList.remove('active'));
+  // Coming back to a section starts fresh: every folding group closed…
+  if (menu) {
+    menu.querySelectorAll('.result-gradebook-children').forEach(group => { group.classList.remove('open'); group.style.display = 'none'; });
+    menu.querySelectorAll('.sub-chev').forEach(chev => chev.classList.remove('open'));
+    // …except the one holding the page that's open now, so you can see where you are.
+    const currentTab = document.querySelector('.tab-panel.active')?.id.replace(/^tab-/, '');
+    const currentItem = currentTab && menu.querySelector(`.sub-nav-item[data-tab="${currentTab}"]`);
+    if (currentItem) syncSidebarForTab(currentTab, currentItem);
+  }
   const search = document.querySelector('.admin-quick-search input');
   if (search) filterAdminSidebar(search.value);
 }
@@ -3064,6 +3139,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   document.getElementById('topbar-title').textContent = titleOverride || trigger?.dataset?.title || meta.title || tab;
   document.getElementById('topbar-sub').textContent = subOverride || trigger?.dataset?.sub || meta.sub || '';
   if (tab === 'settings') renderAssignments();
+  if (tab === 'pupilPhotos') spInit();
   if (tab === 'profile') profileInit();
   if (tab === 'resultsGradebook') {
     const card = document.getElementById('gb-entry-card');
@@ -3232,7 +3308,7 @@ function switchAsTab(tab, btn) {
 }
 
 async function previewProfilePhoto() {
-  const dataUrl = await fileToDataUrl('pf-photo-file');
+  const dataUrl = await photoInputToDataUrl('pf-photo-file');
   const el = document.getElementById('pf-photo-preview');
   if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
   else renderUserAvatar(el, state.user);
@@ -3252,7 +3328,7 @@ async function saveProfile(btn) {
       phone: val('pf-phone'),
       email: val('pf-email'),
       address: val('pf-address'),
-      photoDataUrl: await fileToDataUrl('pf-photo-file'),
+      photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
       signatureDataUrl: await fileToDataUrl('pf-signature-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
@@ -3936,14 +4012,164 @@ function crcCheckAvailability() {
     avail.style.background = '#16a34a22';
     avail.style.color = '#16a34a';
     avail.style.border = '1px solid #16a34a44';
-    avail.textContent = '✔ This Result is Available';
+    avail.textContent = '✓ This result is available';
     btn.style.display = '';
   } else {
     avail.style.background = '#f8717122';
     avail.style.color = '#f87171';
     avail.style.border = '1px solid #f8717144';
-    avail.textContent = '✖ No results found for this class and exam.';
+    avail.textContent = '✕ No results found for this class and exam.';
     btn.style.display = 'none';
+  }
+}
+
+// ── PUPIL PHOTOS: click a pupil's circle, or upload many at once ──
+// Files are matched to pupils by name: the Reg No ("STU-2027-017.jpg") or the
+// pupil's name ("Chukwuebuka Onyeka.jpg", any order, middle name optional).
+let _spRows = [];
+
+const spWords = s => String(s || '').toLowerCase().replace(/\.[a-z0-9]+$/, '').split(/[^a-z0-9]+/).filter(Boolean);
+const spIdKey = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function spMatchPupil(fileName) {
+  const students = state.setup?.students || [];
+  const key = spIdKey(fileName.replace(/\.[a-z0-9]+$/i, ''));
+  const byId = students.find(s => spIdKey(s.id) === key);
+  if (byId) return { student: byId, how: 'Reg No' };
+  const words = spWords(fileName).filter(w => !/^\d+$/.test(w));
+  if (!words.length) return null;
+  const sameWords = students.filter(s => {
+    const sw = spWords(s.name);
+    return sw.length === words.length && words.every(w => sw.includes(w));
+  });
+  if (sameWords.length === 1) return { student: sameWords[0], how: 'name' };
+  if (words.length >= 2) { // e.g. "Ebegue Rovine.jpg" for Ebegue Jaden Rovine
+    const subset = students.filter(s => words.every(w => spWords(s.name).includes(w)));
+    if (subset.length === 1) return { student: subset[0], how: 'name' };
+  }
+  return null;
+}
+
+function spInit() {
+  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
+  _spRows = [];
+  document.getElementById('sp-files').value = '';
+  document.getElementById('sp-result').innerHTML = '';
+  spRender();
+}
+
+function spFilesChosen(input) {
+  _spRows.forEach(r => URL.revokeObjectURL(r.thumb));
+  _spRows = [...input.files].map(file => {
+    const m = spMatchPupil(file.name);
+    return { file, thumb: URL.createObjectURL(file), studentId: m?.student.id || '', how: m?.how || '' };
+  });
+  document.getElementById('sp-result').innerHTML = '';
+  spRender();
+}
+
+function spSetPupil(i, studentId) {
+  _spRows[i].studentId = studentId;
+  _spRows[i].how = studentId ? 'chosen' : '';
+  spRender();
+}
+
+function spRender() {
+  const students = (state.setup?.students || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const counts = {};
+  _spRows.forEach(r => { if (r.studentId) counts[r.studentId] = (counts[r.studentId] || 0) + 1; });
+  const ready = _spRows.filter(r => r.studentId).length;
+  const options = students.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} — ${escapeHtml(s.classCode)} (${escapeHtml(s.id)})</option>`).join('');
+  document.getElementById('sp-list').innerHTML = _spRows.map((r, i) => {
+    const st = students.find(s => s.id === r.studentId);
+    const status = !r.studentId ? '<span class="sp-tag bad">Not matched — choose the pupil</span>'
+      : counts[r.studentId] > 1 ? '<span class="sp-tag warn">Same pupil chosen twice</span>'
+      : st?.photoPath ? '<span class="sp-tag warn">Will replace their current photo</span>'
+      : `<span class="sp-tag ok">Matched${r.how === 'chosen' ? '' : ` by ${r.how}`}</span>`;
+    return `<div class="sp-row">
+      <img src="${r.thumb}" alt="">
+      <div class="sp-row-main">
+        <div class="sp-file">${escapeHtml(r.file.name)}</div>
+        <select class="ctrl-select" onchange="spSetPupil(${i}, this.value)">
+          <option value="">— Choose pupil —</option>${options.replace(`value="${escapeHtml(r.studentId)}"`, `value="${escapeHtml(r.studentId)}" selected`)}
+        </select>
+        ${status}
+      </div>
+    </div>`;
+  }).join('');
+  const notMatched = _spRows.length - ready;
+  document.getElementById('sp-summary').textContent = _spRows.length
+    ? `${_spRows.length} photo${_spRows.length === 1 ? '' : 's'} · ${ready} matched${notMatched ? ` · ${notMatched} not matched (they'll be skipped)` : ''}`
+    : '';
+  const btn = document.getElementById('sp-upload-btn');
+  btn.disabled = !ready;
+  btn.textContent = ready ? `Upload ${ready} Photo${ready === 1 ? '' : 's'}` : 'Upload Photos';
+}
+
+async function spUpload(btn) {
+  // the last file wins if one pupil was picked twice
+  const byStudent = new Map();
+  _spRows.filter(r => r.studentId).forEach(r => byStudent.set(r.studentId, r));
+  const todo = [...byStudent.values()];
+  if (!todo.length) return;
+  btn.disabled = true;
+  const progress = document.getElementById('sp-summary');
+  const saved = [];
+  const failed = [];
+  for (let i = 0; i < todo.length; i += 5) {
+    const chunk = todo.slice(i, i + 5);
+    progress.textContent = `Uploading… ${Math.min(i + chunk.length, todo.length)} of ${todo.length}`;
+    const photos = [];
+    for (const r of chunk) {
+      try { photos.push({ studentId: r.studentId, photoDataUrl: await imageToSmallDataUrl(r.file) }); }
+      catch (err) { failed.push({ name: r.file.name, error: err.message }); }
+    }
+    if (!photos.length) continue;
+    try {
+      const data = await apiFetch('/api/admin/students/photos', { method: 'POST', body: JSON.stringify({ photos }) });
+      saved.push(...data.saved);
+      data.failed.forEach(f => failed.push({ name: f.studentId, error: f.error }));
+    } catch (err) {
+      photos.forEach(p => failed.push({ name: p.studentId, error: err.message }));
+    }
+  }
+  spApplySaved(saved);
+  document.getElementById('sp-result').innerHTML = `<div class="sp-done">✓ ${saved.length} photo${saved.length === 1 ? '' : 's'} saved.</div>
+    ${failed.length ? `<div class="sp-failed">${failed.length} couldn't be saved:<ul>${failed.map(f => `<li>${escapeHtml(f.name)}: ${escapeHtml(f.error)}</li>`).join('')}</ul></div>` : ''}`;
+  _spRows = _spRows.filter(r => !saved.some(s => s.studentId === r.studentId));
+  spRender();
+  btn.disabled = !_spRows.some(r => r.studentId);
+  showToast(`${saved.length} photo${saved.length === 1 ? '' : 's'} saved`);
+}
+
+function spApplySaved(saved) {
+  saved.forEach(({ studentId, photoPath }) => {
+    const st = (state.setup?.students || []).find(s => s.id === studentId);
+    if (st) st.photoPath = photoPath;
+  });
+  if (saved.length) populateStudents();
+}
+
+// Click a pupil's circle in the Student Directory to add/change one photo.
+function spPickOne(studentId) {
+  const input = document.getElementById('sp-one-file');
+  input.dataset.studentId = studentId;
+  input.value = '';
+  input.click();
+}
+
+async function spOneChosen(input) {
+  const studentId = input.dataset.studentId;
+  const file = input.files?.[0];
+  if (!studentId || !file) return;
+  try {
+    const photoDataUrl = await imageToSmallDataUrl(file);
+    const data = await apiFetch('/api/admin/students/photos', { method: 'POST', body: JSON.stringify({ photos: [{ studentId, photoDataUrl }] }) });
+    if (data.failed.length) throw new Error(data.failed[0].error);
+    spApplySaved(data.saved);
+    showToast('Photo saved');
+  } catch (err) {
+    showToast(err.message);
   }
 }
 
@@ -4770,7 +4996,7 @@ async function csLoadSchedules() {
             <span style="background:var(--black-3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">Classes: ${s.classCount}</span>
             <div style="display:flex;gap:6px;">
               <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="csdOpen(${s.id})">View Schedule &rsaquo;</button>
-              <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="csArchiveToggle(${s.id}, ${s.archived})">${s.archived ? 'Unarchive' : 'Archive'}</button>
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="csArchiveToggle(${s.id}, ${s.archived})">${s.archived ? 'Unarchive' : 'Archive'}</button>
             </div>
           </div>
         </div>
@@ -4893,7 +5119,7 @@ async function csdLoadSubjects() {
         <td>${r.visibleToStudents ? 'Yes' : 'No'}</td>
         <td>
           <button class="post-btn" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'live')" ${r.status === 'live' ? 'disabled' : ''} title="Start">&#9654;</button>
-          <button class="del-btn" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'closed')" ${r.status === 'closed' ? 'disabled' : ''} title="Stop">&#9632;</button>
+          <button class="btn-outline" style="padding:3px 8px;font-size:11px;" onclick="csdSetStatus(${r.id},'closed')" ${r.status === 'closed' ? 'disabled' : ''} title="Stop">&#9632;</button>
         </td>
         <td>
           <select class="ctrl-select" style="font-size:11px;padding:4px;" onchange="csdRowOptionSelected(this, ${r.id})">
@@ -5135,7 +5361,7 @@ async function cscViewScores() {
         <td>${escapeHtml((r.recordedAt || '').slice(0, 10)) || '—'}</td>
         <td>
           <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore('${r.studentId}')">Save</button>
-          ${r.submittedAt ? `<button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
+          ${r.submittedAt ? `<button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students / match found</td></tr>';
@@ -6570,7 +6796,7 @@ async function cbLoadComments() {
       <td>${i+1}</td>
       <td style="max-width:480px;word-break:break-word">${escapeHtml(c.text)}</td>
       <td class="cb-score-range">${c.min} -to- ${c.max}</td>
-      <td style="white-space:nowrap;"><button class="bs-preview-btn" onclick="cbEditComment(${i})">&#x270E; Edit</button> <button class="bs-preview-btn" onclick="cbDeleteComment(${i})">&#x1F5D1; Delete</button></td>
+      <td style="white-space:nowrap;"><button class="bs-preview-btn" onclick="cbEditComment(${i})">&#x270E; Edit</button> <button class="bs-preview-btn" onclick="cbDeleteComment(${i})">Delete</button></td>
     </tr>`).join('');
 }
 
@@ -6909,7 +7135,7 @@ function ilRenderTable() {
       <td>${invoiceStatusBadge(inv)}</td>
       <td>
         <button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${inv.studentId}'})">View</button>
-        ${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;border-color:#2563eb;color:#2563eb;margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
+        ${inv.balance > 0 ? `<button class="post-btn btn-sm" style="margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
       </td>
     </tr>`).join('') : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No invoices match these filters.</td></tr>`;
   const totals = rows.reduce((acc, inv) => ({ invoiced: acc.invoiced + inv.amount, paid: acc.paid + inv.paid, balance: acc.balance + inv.balance }), { invoiced: 0, paid: 0, balance: 0 });
@@ -7043,8 +7269,8 @@ async function rppLoadQueue() {
         <td>${escapeHtml(p.reference || '-')}</td>
         <td>${feeFmtDate(p.recordedAt)}</td>
         <td>
-          <button class="bs-export-btn" style="position:static;border-color:var(--green);color:var(--green);" onclick="rppReview(${p.id}, 'successful')">Approve</button>
-          <button class="bs-export-btn" style="position:static;border-color:var(--red);color:var(--red);margin-left:4px;" onclick="rppReview(${p.id}, 'failed')">Reject</button>
+          <button class="post-btn btn-sm" onclick="rppReview(${p.id}, 'successful')">Approve</button>
+          <button class="del-btn btn-sm" style="margin-left:4px;" onclick="rppReview(${p.id}, 'failed')">Reject</button>
         </td>
       </tr>`).join('') : `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3);">Nothing awaiting review.</td></tr>`;
   } catch (e) {
@@ -7238,9 +7464,9 @@ function erRenderTable() {
     tbody.innerHTML = rows.map((r, i) => {
       let actions = '';
       if (r.status === 'pending') {
-        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="erDecide(${r.id},'approve')">Approve</button> <button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#ef4444;" onclick="erDecide(${r.id},'reject')">Reject</button>`;
+        actions = `<button class="post-btn btn-sm" onclick="erDecide(${r.id},'approve')">Approve</button> <button class="del-btn btn-sm" onclick="erDecide(${r.id},'reject')">Reject</button>`;
       } else if (r.status === 'approved') {
-        actions = `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#2563eb;" onclick="erDecide(${r.id},'dispense')">Mark Dispensed</button>`;
+        actions = `<button class="post-btn btn-sm" onclick="erDecide(${r.id},'dispense')">Mark Dispensed</button>`;
       } else {
         actions = '—';
       }
@@ -7675,7 +7901,7 @@ function spsRenderTable() {
   } else {
     tbody.innerHTML = rows.map((s, i) => {
       const roleLabel = s.role === 'admin' ? 'Admin' : (s.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher');
-      const action = s.status === 'paid' ? '—' : `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;color:#059669;" onclick="spsMarkPaid(${s.id})">Mark Paid</button>`;
+      const action = s.status === 'paid' ? '—' : `<button class="post-btn btn-sm" onclick="spsMarkPaid(${s.id})">Mark Paid</button>`;
       return `<tr><td>${i + 1}</td><td>${escapeHtml(s.name)}</td><td>${roleLabel}</td><td>${finMoney(s.baseSalary)}</td><td>${finMoney(s.allowances)}</td><td>${finMoney(s.deductions)}</td><td style="font-weight:700;">${finMoney(s.netSalary)}</td><td>${finStatusPill(s.status)}</td><td>${action}</td></tr>`;
     }).join('');
   }

@@ -1804,7 +1804,7 @@ function computeSchoolDays(academicId) {
 function studentRowsForClass(classCode) {
   return all(
     `SELECT st.id, st.name, st.initials, st.gender, st.avg, st.att, st.class_code AS classCode,
-            st.class_arm_id AS classArmId, ca.name AS classArmName
+            st.class_arm_id AS classArmId, ca.name AS classArmName, st.photo_path AS photoPath
      FROM students st
      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
      WHERE st.class_code = ?
@@ -2210,6 +2210,7 @@ function classReportRows(classCode, examType, studentId) {
        s.name AS subjectName,
        u.name AS teacherName,
        u.signature_path AS teacherSignaturePath,
+       u.role AS teacherRole,
        re.ca_score AS ca,
        re.exam_score AS exam,
        re.total_score AS total,
@@ -2285,9 +2286,24 @@ function adminGradebook(classCode, examType) {
     });
   });
 
+  // Subjects with no scores yet are listed too (batchId null) so the admin
+  // can enter scores for any subject: the class's own subjects if set up,
+  // otherwise every subject.
+  const classSubjects = all(
+    `SELECT DISTINCT s.id, s.name, s.code FROM class_subjects cs
+     JOIN subjects s ON s.id = cs.subject_id WHERE cs.class_code = ? ORDER BY s.name`,
+    classCode
+  );
+  (classSubjects.length ? classSubjects : all('SELECT id, name, code FROM subjects ORDER BY name')).forEach(sub => {
+    if (seenSubjects.has(sub.id)) return;
+    seenSubjects.add(sub.id);
+    subjects.push({ id: sub.id, name: sub.name, code: sub.code, teacherName: '', batchId: null, vettedAt: null });
+  });
+  subjects.sort((a, b) => a.name.localeCompare(b.name));
+
   const students = all(
     `SELECT st.id, st.name, st.initials, st.class_code AS classCode, st.class_arm_id AS classArmId,
-            COALESCE(u.active, 1) AS active
+            st.photo_path AS photoPath, COALESCE(u.active, 1) AS active
      FROM students st
      LEFT JOIN users u ON u.id = st.id
      WHERE st.class_code = ?
@@ -2296,7 +2312,7 @@ function adminGradebook(classCode, examType) {
   ).map(student => ({ ...student, active: !!student.active }));
 
   const scoreMatrix = {};
-  subjects.forEach(subject => {
+  subjects.filter(subject => subject.batchId).forEach(subject => {
     all(
       `SELECT student_id AS studentId, ca_score AS ca,
               exam_score AS ex, total_score AS tot,
@@ -2322,6 +2338,39 @@ function adminGradebook(classCode, examType) {
 // A student must only ever be able to see PUBLISHED results (a row exists in
 // report_publications for their id/class/exam/term) - never a teacher's
 // in-progress result_batches / result_entries directly.
+
+// The admin can enter scores for any subject. Scores live in a batch tied to
+// a teacher assignment: the subject's assigned teacher if there is one (so the
+// teacher sees the same scores), otherwise an internal assignment owned by
+// the admin (hidden from staff lists, never used as "Form Teacher").
+function batchForAdminEntry(academic, classCode, subjectId, examType, adminId) {
+  const existing = one(
+    'SELECT id FROM result_batches WHERE academic_id = ? AND class_code = ? AND subject_id = ? AND exam_type = ? ORDER BY id LIMIT 1',
+    academic.id, classCode, subjectId, examType
+  );
+  if (existing) return existing.id;
+  let assignment = one(
+    `SELECT ta.id, ta.teacher_id AS teacherId FROM teacher_assignments ta JOIN users u ON u.id = ta.teacher_id
+     WHERE ta.class_code = ? AND ta.subject_id = ? AND u.role = 'teacher'
+     ORDER BY CASE ta.teacher_type WHEN 'subject_teacher' THEN 0 ELSE 1 END, ta.id LIMIT 1`,
+    classCode, subjectId
+  );
+  if (!assignment) {
+    assignment = one('SELECT id, teacher_id AS teacherId FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ?', adminId, classCode, subjectId);
+    if (!assignment) {
+      const inserted = run(
+        "INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'subject_teacher', ?, ?)",
+        adminId, classCode, subjectId
+      );
+      assignment = { id: Number(inserted.lastInsertRowid), teacherId: adminId };
+    }
+  }
+  const inserted = run(
+    'INSERT INTO result_batches (academic_id, assignment_id, teacher_id, class_code, subject_id, exam_type, saved_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    academic.id, assignment.id, assignment.teacherId, classCode, subjectId, examType, new Date().toISOString()
+  );
+  return Number(inserted.lastInsertRowid);
+}
 
 function maxScoreForExamType(examType) {
   return examType === 'Final Exam' ? 100 : 40;
@@ -2430,7 +2479,10 @@ function rankOf(standings, studentId) {
 async function embedImageIfPresent(pdfDoc, relativePath) {
   const full = absoluteAssetPath(relativePath);
   if (!full || !fs.existsSync(full)) return null;
-  const bytes = fs.readFileSync(full);
+  // Copy into a standalone array: Node keeps small files inside a shared
+  // buffer pool, and pdf-lib reads from the start of that pool rather than
+  // the file's own offset ("SOI not found in JPEG" for small photos).
+  const bytes = new Uint8Array(fs.readFileSync(full));
   if (full.toLowerCase().endsWith('.png')) return pdfDoc.embedPng(bytes);
   return pdfDoc.embedJpg(bytes);
 }
@@ -2594,7 +2646,10 @@ async function drawStudentInfo(page, pdfDoc, student, rows, totals, average, col
 
   drawCell(page, { x: photoX, top, width: photoW, height: rowH * 5, fill: colors.white, border: colors.grid });
   const photo = await embedImageIfPresent(pdfDoc, student.photo_path) || await embedImageIfPresent(pdfDoc, 'report_assets/student-placeholder.png');
-  if (photo) page.drawImage(photo, { x: photoX + 10, y: top - (rowH * 5) + 12, width: 58, height: 59 });
+  if (photo) {
+    const fit = photo.scaleToFit(58, 59);
+    page.drawImage(photo, { x: photoX + 10 + ((58 - fit.width) / 2), y: top - (rowH * 5) + 12 + ((59 - fit.height) / 2), width: fit.width, height: fit.height });
+  }
 
   return metrics;
 }
@@ -2816,11 +2871,13 @@ async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, aver
     const photoX = x + widths[0];
     const photoWidth = widths[1];
     const photoSize = 60;
+    // Fit inside the 60pt box without stretching (square photos fill it).
+    const fit = photo.scaleToFit(photoSize, photoSize);
     page.drawImage(photo, {
-      x: photoX + ((photoWidth - photoSize) / 2),
-      y: top - (rowH * (rowCount / 2)) - (photoSize / 2),
-      width: photoSize,
-      height: photoSize,
+      x: photoX + ((photoWidth - fit.width) / 2),
+      y: top - (rowH * (rowCount / 2)) - (fit.height / 2),
+      width: fit.width,
+      height: fit.height,
     });
   }
   return rowH * (rowCount - 6);
@@ -3115,7 +3172,15 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
   const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
   const absent = Math.max(0, schoolDays - present);
-  const formTeacher = rows.find(row => row.teacherSignaturePath) || rows[0] || {};
+  // Form Teacher = the class's class teacher; otherwise a subject teacher
+  // (never the admin, who may have entered some scores).
+  const formTeacher = one(
+    `SELECT u.name AS teacherName, u.signature_path AS teacherSignaturePath
+     FROM teacher_assignments ta JOIN users u ON u.id = ta.teacher_id
+     WHERE ta.class_code = ? AND ta.teacher_type = 'class_teacher' AND u.role = 'teacher' ORDER BY ta.id LIMIT 1`,
+    classCode
+  ) || rows.find(row => row.teacherSignaturePath && row.teacherRole === 'teacher')
+    || rows.find(row => row.teacherRole === 'teacher') || {};
   const { teacherComment, headComment } = resolveReportComments({
     academicId: academic.id, studentId: student.id, examType, average,
   });
@@ -3715,6 +3780,11 @@ async function handleApi(req, res, url) {
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { error: 'Enter a valid email address' });
     if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) return sendJson(res, 400, { error: 'Enter a valid phone number' });
 
+    // Pupils' photos print on their result sheets, so only the school sets them
+    // (Student Directory → Upload Photos / the pupil's record).
+    if (isStudent && body.photoDataUrl) {
+      return sendJson(res, 403, { error: 'Your photo is set by the school. Ask the school office to change it.' });
+    }
     let photoPath = null;
     let signaturePath = null;
     try {
@@ -3736,7 +3806,6 @@ async function handleApi(req, res, url) {
       if (isStudent) {
         // Name stays admin-controlled for pupils (it prints on official results).
         if (gender) run('UPDATE students SET gender = ? WHERE id = ?', gender === 'Female' ? 'F' : 'M', user.id);
-        if (photoPath) run('UPDATE students SET photo_path = ? WHERE id = ?', photoPath, user.id);
         const [y, m, d] = dob ? dob.split('-') : [];
         setMeta(`student_dob_${user.id}`, dob ? `${d}/${m}/${y}` : '');
       } else {
@@ -4774,6 +4843,7 @@ async function handleApi(req, res, url) {
       academic.id, classCode, examType
     );
     const batchMap = new Map(batches.map(batch => [Number(batch.id), batch]));
+    const subjectIds = new Set(all('SELECT id FROM subjects').map(row => row.id));
     const studentIds = new Set(all('SELECT id FROM students WHERE class_code = ?', classCode).map(row => row.id));
     const caMax = examType === 'Final Exam' ? 30 : 40;
     const examMax = 70;
@@ -4784,17 +4854,19 @@ async function handleApi(req, res, url) {
     const cleaned = [];
     try {
       incoming.forEach(entry => {
-        const batchId = Number(entry.batchId);
+        const batchId = Number(entry.batchId) || null;
+        const subjectId = Number(entry.subjectId) || null;
         const studentId = cleanText(entry.studentId).toUpperCase();
-        const batch = batchMap.get(batchId);
-        if (!batch) throw new Error('One or more score rows do not belong to this class and exam');
+        if (batchId ? !batchMap.get(batchId) : !subjectIds.has(subjectId)) {
+          throw new Error('One or more score rows do not belong to this class and exam');
+        }
         if (!studentIds.has(studentId)) throw new Error(`Student ${studentId} is not in this class`);
         const ca = cleanScore(entry.ca, 'CA score', caMax);
         const exam = examType === 'Final Exam' ? cleanScore(entry.exam, 'Exam score', examMax) : null;
         const total = ca === null || (examType === 'Final Exam' && exam === null)
           ? null
           : ca + (examType === 'Final Exam' ? exam : 0);
-        cleaned.push({ batchId, studentId, ca, exam, total });
+        cleaned.push({ batchId, subjectId, studentId, ca, exam, total });
       });
     } catch (err) {
       return sendJson(res, 400, { error: err.message });
@@ -4802,6 +4874,9 @@ async function handleApi(req, res, url) {
 
     db.exec('BEGIN');
     try {
+      cleaned.forEach(entry => {
+        if (!entry.batchId) entry.batchId = batchForAdminEntry(academic, classCode, entry.subjectId, examType, user.id);
+      });
       cleaned.forEach(entry => run(
         `INSERT INTO result_entries (batch_id, student_id, ca_score, exam_score, total_score)
          VALUES (?, ?, ?, ?, ?)
@@ -5407,6 +5482,34 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
+  // Bulk pupil photos (Student Directory → Upload Photos, or clicking a
+  // pupil's circle). The browser shrinks each photo first; up to 10 a request.
+  if (req.method === 'POST' && url.pathname === '/api/admin/students/photos') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const photos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    if (!photos.length) return sendJson(res, 400, { error: 'No photos to upload' });
+    const saved = [];
+    const failed = [];
+    for (const p of photos) {
+      const studentId = cleanText(p.studentId).toUpperCase();
+      if (!one('SELECT id FROM students WHERE id = ?', studentId)) {
+        failed.push({ studentId, error: 'Pupil not found' });
+        continue;
+      }
+      try {
+        const photoPath = saveDataUrl(p.photoDataUrl, `student-${studentId}`);
+        if (!photoPath) throw new Error('No image');
+        run('UPDATE students SET photo_path = ? WHERE id = ?', photoPath, studentId);
+        saved.push({ studentId, photoPath });
+      } catch (err) {
+        failed.push({ studentId, error: err.message });
+      }
+    }
+    return sendJson(res, 200, { saved, failed });
+  }
+
   const studentAssetsMatch = url.pathname.match(/^\/api\/admin\/students\/([^/]+)\/assets$/);
   if (req.method === 'POST' && studentAssetsMatch) {
     const user = requireUser(req, res, 'admin');
@@ -5913,7 +6016,10 @@ async function handleApi(req, res, url) {
     const status = cleanText(url.searchParams.get('status')) || 'active';
     if (!classCode) return sendJson(res, 400, { error: 'Class is required' });
     const rows = all(
-      'SELECT id, name, initials, class_code AS classCode, status FROM students WHERE class_code = ? AND status = ? ORDER BY name',
+      `SELECT st.id, st.name, st.initials, st.class_code AS classCode, st.status, st.photo_path AS photoPath,
+              st.class_arm_id AS classArmId, ca.name AS classArmName
+       FROM students st LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
+       WHERE st.class_code = ? AND st.status = ? ORDER BY st.name`,
       classCode, status
     );
     return sendJson(res, 200, { students: rows });
@@ -5945,8 +6051,17 @@ async function handleApi(req, res, url) {
     if (!one('SELECT code FROM classes WHERE code = ?', toClassCode)) {
       return sendJson(res, 400, { error: 'Destination class does not exist' });
     }
+    // The arm must belong to the new class (keeping the old arm would point at
+    // the previous class's arm). Required when the new class has arms.
+    const toArmId = Number(body.toArmId) || null;
+    if (toArmId && !one('SELECT id FROM class_arms WHERE id = ? AND class_code = ?', toArmId, toClassCode)) {
+      return sendJson(res, 400, { error: 'That class arm does not belong to the destination class' });
+    }
+    if (!toArmId && classHasArms(toClassCode)) {
+      return sendJson(res, 400, { error: 'Choose the class arm in the new class' });
+    }
     const placeholders = studentIds.map(() => '?').join(',');
-    run(`UPDATE students SET class_code = ? WHERE id IN (${placeholders}) AND status = 'active'`, toClassCode, ...studentIds);
+    run(`UPDATE students SET class_code = ?, class_arm_id = ? WHERE id IN (${placeholders}) AND status = 'active'`, toClassCode, toArmId, ...studentIds);
     run(`UPDATE users SET grade = ? WHERE id IN (${placeholders}) AND role = 'student'`, `Class ${toClassCode}`, ...studentIds);
     return sendJson(res, 200, { ok: true, moved: studentIds.length });
   }
@@ -5975,7 +6090,8 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Class does not exist' });
     }
     const placeholders = studentIds.map(() => '?').join(',');
-    run(`UPDATE students SET status = 'active', class_code = ? WHERE id IN (${placeholders})`, classCode, ...studentIds);
+    // arm from the old class no longer applies — set it again on the pupil's record
+    run(`UPDATE students SET status = 'active', class_code = ?, class_arm_id = NULL WHERE id IN (${placeholders})`, classCode, ...studentIds);
     run(`UPDATE users SET active = 1, grade = ? WHERE id IN (${placeholders}) AND role = 'student'`, `Class ${classCode}`, ...studentIds);
     return sendJson(res, 200, { ok: true, reinstated: studentIds.length });
   }
@@ -6007,13 +6123,17 @@ async function handleApi(req, res, url) {
     const clauses = ['st.status = ?'];
     const params = [status];
     if (classCode) { clauses.push('st.class_code = ?'); params.push(classCode); }
+    const classArmId = Number(url.searchParams.get('classArmId')) || null;
+    if (classArmId) { clauses.push('st.class_arm_id = ?'); params.push(classArmId); }
     const rows = all(`
       SELECT st.id AS regNo, st.name, st.gender, st.class_code AS classCode, c.label AS classLabel,
+             st.class_arm_id AS classArmId, ca.name AS classArmName,
              st.parent_email AS parentEmail, st.status, st.enrolled_at AS enrolledAt
       FROM students st
       LEFT JOIN classes c ON c.code = st.class_code
+      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
       WHERE ${clauses.join(' AND ')}
-      ORDER BY c.code, st.name
+      ORDER BY c.code, ca.name, st.name
     `, ...params);
     return sendJson(res, 200, { students: rows });
   }
@@ -9513,6 +9633,7 @@ function adminSetupPayload() {
      JOIN users u ON u.id = ta.teacher_id
      JOIN classes c ON c.code = ta.class_code
      JOIN subjects s ON s.id = ta.subject_id
+     WHERE u.role = 'teacher'
      ORDER BY u.name, c.code, s.name`
   );
   const resultBatches = all(

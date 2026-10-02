@@ -408,7 +408,6 @@ function profileInit() {
   ).join('');
 
   renderUserAvatar(document.getElementById('pf-photo-preview'), u);
-  document.getElementById('pf-photo-file').value = '';
   document.getElementById('pf-name').value = u.name || '';
   document.getElementById('pf-dob').value = u.dob || '';
   document.getElementById('pf-gender').value = u.gender || '';
@@ -443,13 +442,6 @@ function fileToDataUrl(inputId) {
   });
 }
 
-async function previewProfilePhoto() {
-  const dataUrl = await fileToDataUrl('pf-photo-file');
-  const el = document.getElementById('pf-photo-preview');
-  if (dataUrl) el.innerHTML = `<img src="${dataUrl}" alt="">`;
-  else renderUserAvatar(el, currentUser);
-}
-
 async function saveProfile(btn) {
   const val = id => document.getElementById(id)?.value.trim() || '';
   btn.disabled = true;
@@ -464,7 +456,6 @@ async function saveProfile(btn) {
       phone: val('pf-phone'),
       email: val('pf-email'),
       address: val('pf-address'),
-      photoDataUrl: await fileToDataUrl('pf-photo-file'),
     };
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     currentUser = data.user;

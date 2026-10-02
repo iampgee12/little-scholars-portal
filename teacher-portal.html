@@ -178,6 +178,9 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .as-pw-eye { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-3); padding:4px; display:flex; }
 .as-pw-eye:hover { color:var(--text-1); }
 
+
+/* Pupil photos */
+.pupil-photo { object-fit:cover; padding:0; }
 /* My CBT Questions */
 .post-btn { background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm); padding:9px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:background var(--transition); }
 .post-btn:hover { filter:brightness(.93); }
@@ -185,7 +188,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .del-btn { background:transparent; color:var(--red); border:1px solid var(--border-2); border-radius:var(--radius-sm); padding:9px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; }
 .del-btn:hover { border-color:var(--red); background:var(--red-bg, #fef2f2); }
 .cbtq-toolbar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
-.cbtq-bulk-btn { background:#0f766e !important; }
+.cbtq-bulk-btn {  }
 .cbtq-summary { font-size:12px; color:var(--text-3); font-weight:600; }
 .cbtq-empty { padding:28px 20px; text-align:center; color:var(--text-3); line-height:2.4; }
 .cbtq-item { padding:14px 18px; border-bottom:1px solid var(--border); }
@@ -524,6 +527,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 }
 </style>
 <link rel="stylesheet" href="results-review.css">
+<link rel="stylesheet" href="ui-buttons.css">
 </head>
 <body>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -847,7 +851,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               <select class="ctrl-select" id="cbtq-context" onchange="cbtqLoadQuestions()"></select>
             </div>
             <button class="post-btn" onclick="cbtqOpenModal()">&#xff0b; Add a Question</button>
-            <button class="post-btn cbtq-bulk-btn" onclick="cbtqOpenBulk()">&#x1F4CB; Add Many Questions</button>
+            <button class="post-btn cbtq-bulk-btn" onclick="cbtqOpenBulk()">Add Many Questions</button>
           </div>
         </div>
         <div class="card">
@@ -903,7 +907,7 @@ Answer: B
 Marks: 2</pre>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-                <label class="act-btn btn-exp" style="cursor:pointer;">&#x1F4C4; Upload Word (.docx) or .txt<input type="file" id="cbtq-bulk-file" accept=".docx,.txt" style="display:none;" onchange="cbtqBulkFile(this)"></label>
+                <label class="act-btn btn-exp" style="cursor:pointer;">Upload Word (.docx) or .txt<input type="file" id="cbtq-bulk-file" accept=".docx,.txt" style="display:none;" onchange="cbtqBulkFile(this)"></label>
                 <span class="cbtq-hint" id="cbtq-bulk-file-note"></span>
               </div>
               <textarea id="cbtq-bulk-text" class="field-input cbtq-bulk-text" placeholder="Paste or type your questions here…" oninput="cbtqBulkParse()"></textarea>
@@ -978,7 +982,7 @@ Marks: 2</pre>
 
           <!-- School header -->
           <div class="bs-school-header">
-            <div class="bs-school-logo-placeholder" id="bs-school-logo-wrap">&#127881;</div>
+            <div class="bs-school-logo-placeholder" id="bs-school-logo-wrap"><img src="/report_assets/school-logo.png" alt="" style="max-width:100%;max-height:100%;object-fit:contain;"></div>
             <div class="bs-hdr-name" id="bs-hdr-name">UNIQUE CHILDREN SCHOOL</div>
             <div class="bs-hdr-address" id="bs-hdr-address"></div>
             <div class="bs-hdr-contact" id="bs-hdr-contact"></div>
@@ -1057,7 +1061,7 @@ Marks: 2</pre>
             </div>
             <div style="text-align:center;font-size:11px;color:#888;margin-bottom:14px;">(If hard-copy is needed, result broadsheets are best printed industrially on A0, A1 or A2 paper size, scaled accordingly.)</div>
             <div class="bs-print-row" style="margin-bottom:24px;">
-              <button class="bs-print-btn" onclick="window.print()">&#x1F5A8; Print Options &#x2192;</button>
+              <button class="bs-print-btn" onclick="window.print()">Print Options &#x2192;</button>
             </div>
           </div>
 
@@ -1109,6 +1113,7 @@ Marks: 2</pre>
 
 
 
+<script src="image-utils.js"></script>
 <script src="results-review.js"></script>
 <script src="teacher-api.js"></script>
 </body>

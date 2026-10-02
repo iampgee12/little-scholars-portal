@@ -370,7 +370,7 @@ function selectAnswer(questionId, option) {
 function renderSaveState() {
   const el = document.getElementById('cbt-save-state');
   if (!el) return;
-  if (saveFailed && saveQueue.size) { el.className = 'cbt-save-state bad'; el.textContent = '⚠ Not saved — retrying…'; }
+  if (saveFailed && saveQueue.size) { el.className = 'cbt-save-state bad'; el.textContent = 'Not saved — retrying…'; }
   else if (saving || saveQueue.size) { el.className = 'cbt-save-state busy'; el.textContent = 'Saving…'; }
   else { el.className = 'cbt-save-state ok'; el.textContent = '✓ Saved'; }
 }
@@ -479,10 +479,9 @@ async function finishExam(auto, btn) {
 
 function showResultView(data, auto) {
   const pct = data.totalMarks ? Math.round((data.score / data.totalMarks) * 100) : 0;
-  const cheer = pct >= 70 ? ['🎉', 'Excellent work!'] : pct >= 50 ? ['👍', 'Good effort!'] : ['💪', 'Keep practising — you can do it!'];
+  const cheer = pct >= 70 ? ['', 'Excellent work!'] : pct >= 50 ? ['', 'Good effort!'] : ['', 'Keep practising — you can do it!'];
   document.getElementById('cbt-result-score').innerHTML = `
-    <div class="cbt-result-emoji">${cheer[0]}</div>
-    <h2>${cheer[1]}</h2>
+        <h2>${cheer[1]}</h2>
     ${auto ? '<p class="cbt-muted">Time was up, so your exam was submitted automatically.</p>' : '<p class="cbt-muted">Your exam has been submitted.</p>'}
     <div class="cbt-result-big">${data.score} / ${data.totalMarks}</div>
     <div class="cbt-result-pct">${pct}%</div>
