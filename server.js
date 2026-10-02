@@ -2839,7 +2839,8 @@ const REPORT_SCHOOL_HEADER = {
 
 function reportInfoRows(student, rows, totalScore, average, subjectMax, extraRow = null) {
   const classSize = String(one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count);
-  const maxScore = rows.length * subjectMax;
+  // Absent subjects aren't counted (same as the average), so "out of" matches it.
+  const maxScore = rows.filter(row => !row.isAbsent).length * subjectMax;
   const infoRows = [
     [`Name: ${student.name.toUpperCase()}`, `Performance Grade: ${performanceGrade(average)}`],
     [`Reg. No:${student.id}`, `Class Size: ${classSize}`],
@@ -2896,7 +2897,7 @@ function reportSubjectRows(rows, examType, priorTerms = [], priorTermData = {}) 
       ca: row.isAbsent ? 'ABS' : row.ca ?? '-',
       exam: row.isAbsent ? 'ABS' : row.exam ?? '-',
       total: row.isAbsent ? 'ABS' : row.total ?? '-',
-      remark: row.isAbsent || pct == null ? '-' : `${gradeBand(pct).letter} - ${gradeBand(pct).word}`,
+      remark: row.isAbsent ? 'Absent' : pct == null ? '-' : `${gradeBand(pct).letter} - ${gradeBand(pct).word}`,
       priorTotals,
     };
   });
@@ -4909,12 +4910,27 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
     const body = await readJson(req);
-    const batchId = Number(body.batchId);
+    let batchId = Number(body.batchId);
     const studentId = cleanText(body.studentId).toUpperCase();
     const field = cleanText(body.field);
     const value = !!body.value;
-    if (!batchId || !studentId || !['absent', 'excluded'].includes(field)) {
-      return sendJson(res, 400, { error: 'Batch, student, and a valid field are required' });
+    if (!studentId || !['absent', 'excluded'].includes(field)) {
+      return sendJson(res, 400, { error: 'Student and a valid field are required' });
+    }
+    // A subject with no scores yet: start its batch (as entering a first score does)
+    if (!batchId) {
+      const classCode = cleanText(body.classCode).toUpperCase();
+      const examType = cleanText(body.examType);
+      const subjectId = Number(body.subjectId);
+      const current = activeAcademic();
+      if (!current || !classCode || !validateExamType(examType) || !one('SELECT id FROM subjects WHERE id = ?', subjectId)) {
+        return sendJson(res, 400, { error: 'Class, exam and subject are required' });
+      }
+      if (resultIsPublished(classCode, examType)) return sendJson(res, 409, { error: 'Unpublish this result before editing student scores' });
+      if (!one('SELECT id FROM students WHERE id = ? AND class_code = ?', studentId, classCode)) {
+        return sendJson(res, 400, { error: 'Student is not in this class' });
+      }
+      batchId = batchForAdminEntry(current, classCode, subjectId, examType, user.id);
     }
     const batch = one(
       'SELECT class_code AS classCode, exam_type AS examType, academic_id AS academicId FROM result_batches WHERE id = ?',

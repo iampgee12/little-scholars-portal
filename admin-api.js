@@ -1433,8 +1433,8 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td class="gb-grade-cell" style="display:${gradeCol ? '' : 'none'};">${grade}</td>
         <td><input class="gb-comment-input" readonly></td>
         <td><input class="gb-comment-input" readonly></td>
-        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'absent', ${isAbsent ? 'false' : 'true'})" ${published || isExcluded || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId}, 'excluded', ${isExcluded ? 'false' : 'true'})" ${published || !subject.batchId ? 'disabled' : ''} ${subject.batchId ? '' : 'title="Enter a score for this subject first"'}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'absent', ${isAbsent ? 'false' : 'true'}, ${subject.id})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'excluded', ${isExcluded ? 'false' : 'true'}, ${subject.id})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
       </tr>`;
   })).join('');
   tbody.querySelectorAll('input[data-score]').forEach(input => {
@@ -1498,11 +1498,12 @@ async function saveGradebookScore(input) {
   }
 }
 
-async function toggleGradebookFlag(studentId, batchId, field, value) {
+async function toggleGradebookFlag(studentId, batchId, field, value, subjectId) {
+  const selection = gradebookSelection();
   try {
     const data = await apiFetch('/api/admin/gradebook/entries/flag', {
       method: 'PUT',
-      body: JSON.stringify({ batchId, studentId, field, value }),
+      body: JSON.stringify({ batchId, studentId, field, value, subjectId, classCode: selection.classCode, examType: selection.examType }),
     });
     state.gradebookBatch = data.gradebook;
     renderGradebookTable();
