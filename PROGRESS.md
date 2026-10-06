@@ -354,6 +354,14 @@ Fresh sanity pass on a clean DB: deleted `school.sqlite`, `node --check` clean o
 
 No code changes needed — scope remains fully built, tested, and working end-to-end. No new notification sent — nothing has changed since the owner was told at firings 31/32.
 
+## Check-in (2026-10-06, 58th firing) — `feature/finance-payroll-expenses`
+
+Fifty-eighth consecutive firing, independently re-verified from scratch. `git fetch origin` confirmed branch diff vs `origin/launch-prep` is PROGRESS.md-only — no drift, nothing to merge; the actual payroll/expenses code lives in `launch-prep` (and `master`) already.
+
+Fresh sanity pass on a clean DB: deleted `school.sqlite`, `node --check` clean on server.js and admin-api.js, server booted cleanly on a fresh port against the freshly-reseeded database. All three demo logins verified via real cookie sessions (200/200/200). Exercised the Payroll & Expenses surface live via curl — read paths: `/api/admin/payroll/salaries`, `/loans`, `/api/admin/finance/expense-requests`, `/expenses`, `/income`, `/analytics`, `/categories`, all 200 with real seeded data in mixed realistic states (pending/paid salaries, outstanding loan, pending/approved/rejected/dispensed expense requests). Write paths exercised: marked a pending salary (`id:4`) paid, approved a pending expense request (`id:1`) via `/api/admin/finance/expense-requests/:id/decision`. Cross-checked `admin-portal.html` sub-nav (Expense Requests, Monthly Salaries Processing, Salary Payment Schedule, Payroll Settings) is real wired markup, and `admin-api.js` carries real `apiFetch` calls against these live routes, not placeholders.
+
+No code changes needed — scope remains fully built, tested, and working end-to-end. No new notification sent this firing — nothing has changed since the owner was told at firings 31/32 that this hourly trigger should be disabled or repointed at a branch with actual remaining work (26 consecutive firings since task completion, 27 since that notification).
+
 ## Check-in (2026-10-06, 57th firing) — `feature/finance-payroll-expenses`
 
 Fifty-seventh consecutive firing, independently re-verified from scratch. `git fetch origin` confirmed branch diff vs `origin/launch-prep` is PROGRESS.md-only — no drift, nothing to merge; the actual payroll/expenses code lives in `launch-prep` already.
