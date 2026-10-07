@@ -6,6 +6,7 @@ const net = require('node:net');
 const tls = require('node:tls');
 const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
+const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
 
 const ROOT = __dirname;
 
@@ -2147,60 +2148,6 @@ function sessionHeadingLabel(sessionLabel) {
   return String(sessionLabel || '').trim().replace(/\s*\/\s*/g, '-').toUpperCase();
 }
 
-function reportHeading(academic, examType) {
-  const term = termHeadingLabel(academic.termLabel);
-  const session = sessionHeadingLabel(academic.sessionLabel);
-  const exam = examType === 'Mid-Term Exam' ? 'MID TERM REPORT' : 'FINAL REPORT';
-  return `${term}, ${session} (${exam})`;
-}
-
-function performanceGrade(avg) {
-  if (avg >= 80) return 'A (Excellent)';
-  if (avg >= 70) return 'B (Very Good)';
-  if (avg >= 50) return 'C (Good)';
-  if (avg >= 40) return 'D (Fair)';
-  return 'F (Needs Support)';
-}
-
-// Shared A-F band used for the per-subject "Grade Remarks" column and the
-// overall "Result Summary" line on the report card. `point` is the 0-5 scale
-// used for Grade Point Average, matching the broadsheet's GRADE_SCALE.
-function gradeBand(pct) {
-  if (pct >= 80) return { letter: 'A', word: 'Excellent', point: 5 };
-  if (pct >= 70) return { letter: 'B', word: 'Very Good', point: 4 };
-  if (pct >= 50) return { letter: 'C', word: 'Good', point: 3 };
-  if (pct >= 40) return { letter: 'D', word: 'Fair', point: 2 };
-  return { letter: 'F', word: 'Needs Support', point: 0 };
-}
-
-// For a Final Exam report, which earlier terms in the SAME session (if any)
-// should show up as cumulative columns — Term 2's report shows Term 1,
-// Term 3's report shows Term 1 and Term 2.
-function priorTermsInSession(sessionLabel, currentTermLabel) {
-  const order = ['Term 1', 'Term 2', 'Term 3'];
-  const idx = order.indexOf(currentTermLabel);
-  if (idx <= 0) return [];
-  return order.slice(0, idx)
-    .map(label => one('SELECT id, term_label AS termLabel FROM academic_terms WHERE session_label = ? AND term_label = ?', sessionLabel, label))
-    .filter(Boolean);
-}
-
-// { [subjectId]: totalScore } for one student's Final Exam results in a
-// specific earlier term — used to populate the cumulative columns.
-function priorTermSubjectTotals(classCode, studentId, academicId) {
-  const rows = all(
-    `SELECT rb.subject_id AS subjectId, re.total_score AS total
-     FROM result_batches rb
-     JOIN result_entries re ON re.batch_id = rb.id
-     WHERE rb.class_code = ? AND rb.exam_type = 'Final Exam' AND rb.academic_id = ?
-       AND re.student_id = ? AND re.is_excluded = 0 AND re.is_absent = 0`,
-    classCode, academicId, studentId
-  );
-  const map = {};
-  rows.forEach(r => { map[r.subjectId] = r.total; });
-  return map;
-}
-
 function classReportRows(classCode, examType, studentId) {
   return all(
     `SELECT
@@ -2487,646 +2434,6 @@ async function embedImageIfPresent(pdfDoc, relativePath) {
   return pdfDoc.embedJpg(bytes);
 }
 
-function text(page, value, x, y, size, font, options = {}) {
-  page.drawText(String(value ?? ''), {
-    x,
-    y,
-    size,
-    font,
-    color: options.color,
-    maxWidth: options.maxWidth,
-  });
-}
-
-function line(page, x1, y1, x2, y2, color, width = 0.6) {
-  page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: width, color });
-}
-
-function textWidth(font, value, size) {
-  return font.widthOfTextAtSize(String(value ?? ''), size);
-}
-
-function trimToFit(font, value, size, width) {
-  let out = String(value ?? '').replace(/\s+/g, ' ').trim();
-  if (!out || textWidth(font, out, size) <= width) return out;
-  while (out.length > 3 && textWidth(font, `${out}...`, size) > width) {
-    out = out.slice(0, -1).trimEnd();
-  }
-  return `${out}...`;
-}
-
-function drawFittedText(page, value, x, y, width, size, font, color, options = {}) {
-  const out = trimToFit(font, value, size, width);
-  const actualWidth = textWidth(font, out, size);
-  const align = options.align || 'left';
-  const tx = align === 'center' ? x + Math.max(0, (width - actualWidth) / 2) : align === 'right' ? x + Math.max(0, width - actualWidth) : x;
-  text(page, out, tx, y, size, font, { color });
-}
-
-function drawCenteredText(page, value, centerX, y, size, font, color) {
-  const width = textWidth(font, value, size);
-  text(page, value, centerX - (width / 2), y, size, font, { color });
-}
-
-function drawUnderlinedText(page, value, x, y, size, font, color, ruleColor = color) {
-  text(page, value, x, y, size, font, { color });
-  line(page, x, y - 2, x + textWidth(font, value, size), y - 2, ruleColor, 0.7);
-}
-
-function drawCell(page, { x, top, width, height, fill, border, borderWidth = 0.45 }) {
-  page.drawRectangle({
-    x,
-    y: top - height,
-    width,
-    height,
-    color: fill,
-    borderColor: border,
-    borderWidth,
-  });
-}
-
-function drawCellText(page, value, x, top, width, height, size, font, color, align = 'left') {
-  const pad = 5;
-  drawFittedText(page, value, x + pad, top - height + ((height - size) / 2) + 2.5, width - (pad * 2), size, font, color, { align });
-}
-
-function normaliseGender(gender) {
-  const raw = String(gender || '').trim().toLowerCase();
-  if (raw === 'f' || raw === 'female') return 'FEMALE';
-  if (raw === 'm' || raw === 'male') return 'MALE';
-  return raw ? raw.toUpperCase() : '';
-}
-
-function reportScoreColumns(examType) {
-  if (examType === 'Mid-Term Exam') return ['Mid-Term Test (40)'];
-  return ['Mid-Term Test (30)', 'Examination (70)'];
-}
-
-function drawSkillTable(page, skills, ratings, x, top, width, rowH, fonts, colors, options = {}) {
-  const firstCol = Math.round(width * 0.63);
-  const secondCol = width - firstCol;
-  const rows = options.rows ?? skills.length;
-  const start = options.start ?? 0;
-  let currentTop = top;
-
-  if (options.header !== false) {
-    drawCell(page, { x, top: currentTop, width: firstCol, height: rowH, fill: colors.blue, border: colors.grid });
-    drawCell(page, { x: x + firstCol, top: currentTop, width: secondCol, height: rowH, fill: colors.blue, border: colors.grid });
-    drawCellText(page, 'Skill', x, currentTop, firstCol, rowH, 10, fonts.bold, colors.white, 'center');
-    drawCellText(page, 'Rating', x + firstCol, currentTop, secondCol, rowH, 10, fonts.bold, colors.white, 'center');
-    currentTop -= rowH;
-  }
-
-  skills.slice(start, start + rows).forEach(([key, , label], i) => {
-    const fill = i % 2 === 0 ? colors.skillStripe : colors.white;
-    drawCell(page, { x, top: currentTop, width: firstCol, height: rowH, fill, border: colors.grid });
-    drawCell(page, { x: x + firstCol, top: currentTop, width: secondCol, height: rowH, fill, border: colors.grid });
-    drawCellText(page, label, x, currentTop, firstCol, rowH, 9.5, fonts.regular, colors.black);
-    drawCellText(page, ratings?.[key] ?? '-', x + firstCol, currentTop, secondCol, rowH, 9.5, fonts.bold, colors.blue, 'center');
-    currentTop -= rowH;
-  });
-
-  return currentTop;
-}
-
-async function drawReportHeader(page, pdfDoc, fonts, colors, reportTitle) {
-  const logo = await embedImageIfPresent(pdfDoc, 'report_assets/school-logo.png');
-  const coat = await embedImageIfPresent(pdfDoc, 'report_assets/coat-of-arms.png');
-  if (logo) page.drawImage(logo, { x: 36, y: 710, width: 82, height: 54 });
-  if (coat) page.drawImage(coat, { x: 482, y: 710, width: 54, height: 54 });
-
-  drawCenteredText(page, 'UNIQUE CHILDREN SCHOOL', 306, 742, 16, fonts.bold, colors.blue);
-  drawCenteredText(page, 'Block 12, Plot 350 Norus Close, Omole Estate Phase 1', 306, 722, 8.5, fonts.regular, colors.black);
-  drawCenteredText(page, 'Website: uniquegroupofschools.com | Phone: 08034106866', 306, 710, 8.5, fonts.regular, colors.black);
-  drawCenteredText(page, 'Email: info@uniquegroupofschools.com', 306, 698, 8.5, fonts.regular, colors.black);
-  drawCenteredText(page, 'Motto: -', 306, 686, 8.2, fonts.italic, colors.black);
-  line(page, 35, 675, 577, 675, colors.blue, 0.7);
-  drawCenteredText(page, reportTitle, 306, 646, 10.5, fonts.bold, colors.black);
-  line(page, 214, 643, 398, 643, colors.black, 0.6);
-}
-
-async function drawStudentInfo(page, pdfDoc, student, rows, totals, average, colors, fonts, metrics) {
-  const x = 36;
-  const top = 626;
-  const rowH = 17.5;
-  const labelW = 63;
-  const valueW = 148;
-  const photoW = 78;
-  const rightLabelW = 124;
-  const rightValueW = 87;
-  const classSize = String(one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count);
-  const maxScore = rows.length * 100;
-  const infoRows = [
-    ['Name:', student.name.toUpperCase(), 'Performance Grade:', performanceGrade(average)],
-    ['Reg. No:', student.id, 'Class Size:', classSize],
-    ['Gender:', normaliseGender(student.gender), 'No. of Subjects:', String(rows.length)],
-    ['Age:', valueFromMeta(`student_age_${student.id}`, ''), 'Student Total Score:', `${totals.totalScore} / ${maxScore}`],
-    ['DOB:', valueFromMeta(`student_dob_${student.id}`, ''), 'Student Average(%):', `${average}%`],
-    ['Class:', student.classLabel, '', ''],
-  ];
-  const photoX = x + labelW + valueW;
-  const rightX = photoX + photoW;
-
-  infoRows.forEach((row, i) => {
-    const rowTop = top - (i * rowH);
-    drawCell(page, { x, top: rowTop, width: labelW, height: rowH, fill: colors.infoLabel, border: colors.grid });
-    drawCell(page, { x: x + labelW, top: rowTop, width: valueW, height: rowH, fill: colors.infoValue, border: colors.grid });
-    drawCellText(page, row[0], x, rowTop, labelW, rowH, 8.8, fonts.bold, colors.black);
-    drawCellText(page, row[1], x + labelW, rowTop, valueW, rowH, 8.8, i === 0 ? fonts.bold : fonts.regular, colors.black);
-
-    if (i < 5) {
-      drawCell(page, { x: rightX, top: rowTop, width: rightLabelW, height: rowH, fill: colors.infoLabel, border: colors.grid });
-      drawCell(page, { x: rightX + rightLabelW, top: rowTop, width: rightValueW, height: rowH, fill: colors.infoValue, border: colors.grid });
-      drawCellText(page, row[2], rightX, rowTop, rightLabelW, rowH, 8.8, fonts.bold, colors.black);
-      drawCellText(page, row[3], rightX + rightLabelW, rowTop, rightValueW, rowH, 8.8, i === 0 ? fonts.bold : fonts.regular, colors.black);
-    } else {
-      drawCell(page, { x: photoX, top: rowTop, width: photoW + rightLabelW + rightValueW, height: rowH, fill: colors.white, border: colors.grid });
-    }
-  });
-
-  drawCell(page, { x: photoX, top, width: photoW, height: rowH * 5, fill: colors.white, border: colors.grid });
-  const photo = await embedImageIfPresent(pdfDoc, student.photo_path) || await embedImageIfPresent(pdfDoc, 'report_assets/student-placeholder.png');
-  if (photo) {
-    const fit = photo.scaleToFit(58, 59);
-    page.drawImage(photo, { x: photoX + 10 + ((58 - fit.width) / 2), y: top - (rowH * 5) + 12 + ((59 - fit.height) / 2), width: fit.width, height: fit.height });
-  }
-
-  return metrics;
-}
-
-function drawAcademicTable(page, rows, examType, fonts, colors) {
-  const x = 36;
-  const top = 477;
-  const rowH = 15.6;
-  const widths = [206, 98, 98, 98];
-  const headers = ['Subject', ...reportScoreColumns(examType), 'Total Score (100)'];
-  let cursorX = x;
-
-  drawUnderlinedText(page, 'Academic Performance', x, 502, 11.5, fonts.bold, colors.black);
-  headers.forEach((header, i) => {
-    drawCell(page, { x: cursorX, top, width: widths[i], height: 21, fill: colors.blue, border: colors.grid });
-    drawCellText(page, header, cursorX, top, widths[i], 21, i === 0 ? 9.4 : 8.3, fonts.bold, colors.white, 'center');
-    cursorX += widths[i];
-  });
-
-  rows.slice(0, 18).forEach((row, i) => {
-    const rowTop = top - 21 - (i * rowH);
-    const fill = i % 2 === 0 ? colors.academicStripe : colors.white;
-    const values = [
-      row.subjectName,
-      row.ca ?? '-',
-      row.exam ?? '-',
-      row.total ?? '-',
-    ];
-    let cellX = x;
-    values.forEach((value, col) => {
-      drawCell(page, { x: cellX, top: rowTop, width: widths[col], height: rowH, fill, border: colors.grid, borderWidth: 0.35 });
-      const isTotal = col === 3;
-      const scoreColor = isTotal && Number(value) >= 70 ? colors.green : colors.black;
-      drawCellText(page, value, cellX, rowTop, widths[col], rowH, 8.5, isTotal ? fonts.bold : fonts.regular, scoreColor, col === 0 ? 'left' : 'center');
-      cellX += widths[col];
-    });
-  });
-}
-
-function drawAttendance(page, student, schoolDays, present, absent, fonts, colors) {
-  const x = 36;
-  const top = 438;
-  const rowH = 16.5;
-  const widths = [316, 184];
-  const rows = [
-    ['No. of School Days:', schoolDays],
-    ['No. of Days Present:', present],
-    ['No. of Days Absent:', absent],
-    ['% Attendance:', `${student.att || 0}%`],
-  ];
-
-  drawUnderlinedText(page, 'Attendance Report', x, 457, 11.5, fonts.bold, colors.black);
-  rows.forEach((row, i) => {
-    const rowTop = top - (i * rowH);
-    const fill = i % 2 === 0 ? colors.attendanceStripe : colors.white;
-    drawCell(page, { x, top: rowTop, width: widths[0], height: rowH, fill, border: colors.grid });
-    drawCell(page, { x: x + widths[0], top: rowTop, width: widths[1], height: rowH, fill: colors.white, border: colors.grid });
-    drawCellText(page, row[0], x, rowTop, widths[0], rowH, 9.3, fonts.bold, colors.black);
-    drawCellText(page, row[1], x + widths[0], rowTop, widths[1], rowH, 9.3, i === 3 ? fonts.bold : fonts.regular, i === 3 ? colors.green : colors.black, 'center');
-  });
-}
-
-function drawGradingScale(page, fonts, colors) {
-  const x = 36;
-  const top = 322;
-  const width = 500;
-  const rowH = 26;
-  const labels = [
-    '70-100: 5 Grade\nPoints',
-    '60-69: 4 Grade\nPoints',
-    '50-59: 3 Grade\nPoints',
-    '45-49: 2 Grade\nPoints',
-    '40-44: 1 Grade\nPoint',
-    '0-39: 0 Grade\nPoints',
-  ];
-  const cellW = width / labels.length;
-
-  drawUnderlinedText(page, 'Grading Scale', x, 345, 11.5, fonts.bold, colors.black);
-  labels.forEach((label, i) => {
-    const cellX = x + (i * cellW);
-    drawCell(page, { x: cellX, top, width: cellW, height: rowH, fill: colors.gradeFill, border: colors.grid });
-    const [line1, line2] = label.split('\n');
-    drawFittedText(page, line1, cellX + 4, top - 10.5, cellW - 8, 7.8, i === 0 ? fonts.bold : fonts.regular, colors.black, { align: 'center' });
-    drawFittedText(page, line2, cellX + 4, top - 20.5, cellW - 8, 7.8, i === 0 ? fonts.bold : fonts.regular, colors.black, { align: 'center' });
-  });
-}
-
-function drawComments(page, formTeacher, fonts, colors) {
-  const x = 36;
-  const top = 267;
-  const width = 500;
-  const rowH = 34;
-  const teacherComment = valueFromMeta('teacher_comment_default', 'Well done! Your result is remarkable. Do not relent in your efforts.');
-  const headComment = valueFromMeta('head_comment_default', 'Great work! Your diligence in your academics is impressive.');
-  const headName = valueFromMeta('head_of_school_name', 'James Idoko Ajah');
-
-  drawUnderlinedText(page, 'Comments', x, 287, 11.5, fonts.bold, colors.black);
-  drawCell(page, { x, top, width, height: rowH, fill: colors.commentCream, border: colors.grid });
-  text(page, "Form Teacher's Comment:", x + 7, top - 14, 9.2, fonts.bold, { color: colors.black });
-  drawFittedText(page, teacherComment, x + 142, top - 14, width - 150, 9.2, fonts.italic, colors.black);
-  text(page, `Form Teacher: ${formTeacher.teacherName || ''}`, x + 7, top - 29, 9.2, fonts.regular, { color: colors.black });
-
-  const secondTop = top - rowH;
-  drawCell(page, { x, top: secondTop, width, height: rowH, fill: colors.commentGreen, border: colors.grid });
-  text(page, 'Head of School Comment:', x + 7, secondTop - 14, 9.2, fonts.bold, { color: colors.black });
-  drawFittedText(page, headComment, x + 140, secondTop - 14, width - 148, 9.2, fonts.italic, colors.black);
-  text(page, `Head of School: ${headName}`, x + 7, secondTop - 29, 9.2, fonts.regular, { color: colors.black });
-}
-
-// Draws a table header cell whose label runs bottom-to-top (rotated 90deg),
-// for narrow score columns where horizontal text would be too cramped.
-function drawVerticalHeaderCell(page, { x, top, width, height, value = '', fill, border, borderWidth = 0.35, font, size = 7.2, color }) {
-  drawCell(page, { x, top, width, height, fill, border, borderWidth });
-  const label = String(value ?? '').trim();
-  if (!label) return;
-  const { degrees } = loadPdfLib();
-  const maxLen = height - 6;
-  const out = trimToFit(font, label, size, maxLen);
-  const renderedLen = textWidth(font, out, size);
-  const cx = x + (width / 2) + (size * 0.32);
-  const cy = (top - (height / 2)) - (renderedLen / 2);
-  page.drawText(out, { x: cx, y: cy, size, font, color, rotate: degrees(90) });
-}
-
-function drawWordCell(page, {
-  x,
-  top,
-  width,
-  height,
-  value = '',
-  fill,
-  border,
-  borderWidth = 0.35,
-  font,
-  size = 8,
-  color,
-  align = 'left',
-  pad = 4,
-  lineHeight = size + 2,
-}) {
-  drawCell(page, { x, top, width, height, fill, border, borderWidth });
-  const rawLines = String(value ?? '').split('\n');
-  const lines = rawLines.length ? rawLines : [''];
-  const totalHeight = lines.length * lineHeight;
-  let y = top - ((height - totalHeight) / 2) - size + 1;
-  lines.forEach(lineText => {
-    drawFittedText(page, lineText, x + pad, y, width - (pad * 2), size, font, color, { align });
-    y -= lineHeight;
-  });
-}
-
-async function drawWordHeader(page, pdfDoc, fonts, colors) {
-  const x = 36;
-  const top = 756;
-  const height = 58;
-  const widths = [70, 400, 70];
-  const logo = await embedImageIfPresent(pdfDoc, 'report_assets/school-logo.png');
-  const coat = await embedImageIfPresent(pdfDoc, 'report_assets/coat-of-arms.png');
-
-  drawWordCell(page, { x, top, width: widths[0], height, fill: colors.white, border: colors.grid, font: fonts.regular, color: colors.black });
-  drawWordCell(page, { x: x + widths[0], top, width: widths[1], height, fill: colors.white, border: colors.grid, font: fonts.regular, color: colors.black });
-  drawWordCell(page, { x: x + widths[0] + widths[1], top, width: widths[2], height, fill: colors.white, border: colors.grid, font: fonts.regular, color: colors.black });
-
-  if (logo) page.drawImage(logo, { x: x + 4, y: top - 47, width: 62, height: 41 });
-  if (coat) page.drawImage(coat, { x: x + widths[0] + widths[1] + 13, y: top - 52, width: 44, height: 44 });
-
-  const centerX = x + widths[0] + (widths[1] / 2);
-  const [address, contact, email] = REPORT_SCHOOL_HEADER.lines;
-  drawCenteredText(page, REPORT_SCHOOL_HEADER.name, centerX, top - 15, 15, fonts.bold, colors.blue);
-  drawCenteredText(page, address, centerX, top - 28, 7.3, fonts.regular, colors.black);
-  drawCenteredText(page, contact, centerX, top - 39, 7.2, fonts.regular, colors.black);
-  drawCenteredText(page, email, centerX, top - 49, 7.2, fonts.regular, colors.black);
-  drawCenteredText(page, REPORT_SCHOOL_HEADER.motto, centerX, top - 57, 6.8, fonts.italic, colors.black);
-}
-
-// Shared by the PDF and the on-screen result sheet (Class Result Checker) so
-// the two always show the same wording and numbers.
-const REPORT_SCHOOL_HEADER = {
-  name: 'UNIQUE CHILDREN SCHOOL',
-  lines: [
-    'BLOCK 12, PLOT 350 NORUS CLOSE, OMOLE ESTATE PHASE 1',
-    'Website : uniquegroupofschools.com     Phone : 08034106866',
-    'Email: info@uniquegroupofschools.com',
-  ],
-  motto: 'Motto: -',
-};
-
-function reportInfoRows(student, rows, totalScore, average, subjectMax, extraRow = null) {
-  const classSize = String(one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count);
-  // Absent subjects aren't counted (same as the average), so "out of" matches it.
-  const maxScore = rows.filter(row => !row.isAbsent).length * subjectMax;
-  const infoRows = [
-    [`Name: ${student.name.toUpperCase()}`, `Performance Grade: ${performanceGrade(average)}`],
-    [`Reg. No:${student.id}`, `Class Size: ${classSize}`],
-    [`Gender: ${normaliseGender(student.gender)}`, `No. of Subjects: ${rows.length}`],
-    [`Age: ${valueFromMeta(`student_age_${student.id}`, '')}`, `Student Total Score: ${totalScore}/${maxScore}`],
-    [`DOB: ${valueFromMeta(`student_dob_${student.id}`, '')}`, `Student Average(%): ${average}%`],
-    [`Class: ${student.classLabel}`, `Result Summary: ${gradeBand(average).word}`],
-  ];
-  if (extraRow) infoRows.push(extraRow);
-  return infoRows;
-}
-
-async function drawWordStudentInfo(page, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraRow = null) {
-  const x = 36;
-  const top = 646;
-  const widths = [220, 100, 220];
-  const rowH = 17;
-  const infoRows = reportInfoRows(student, rows, totalScore, average, subjectMax, extraRow);
-  const rowCount = infoRows.length;
-  infoRows.forEach((row, i) => {
-    const rowTop = top - (i * rowH);
-    drawWordCell(page, { x, top: rowTop, width: widths[0], height: rowH, value: row[0], fill: colors.white, border: colors.grid, font: fonts.bold, size: 8.2, color: colors.black, pad: 4 });
-    drawWordCell(page, { x: x + widths[0] + widths[1], top: rowTop, width: widths[2], height: rowH, value: row[1], fill: colors.white, border: colors.grid, font: fonts.bold, size: 8.2, color: colors.black, pad: 4 });
-  });
-
-  drawCell(page, { x: x + widths[0], top, width: widths[1], height: rowH * rowCount, fill: colors.white, border: colors.grid, borderWidth: 0.35 });
-  const photo = await embedImageIfPresent(pdfDoc, student.photo_path) || await embedImageIfPresent(pdfDoc, 'report_assets/student-placeholder.png');
-  if (photo) {
-    const photoX = x + widths[0];
-    const photoWidth = widths[1];
-    const photoSize = 60;
-    // Fit inside the 60pt box without stretching (square photos fill it).
-    const fit = photo.scaleToFit(photoSize, photoSize);
-    page.drawImage(photo, {
-      x: photoX + ((photoWidth - fit.width) / 2),
-      y: top - (rowH * (rowCount / 2)) - (fit.height / 2),
-      width: fit.width,
-      height: fit.height,
-    });
-  }
-  return rowH * (rowCount - 6);
-}
-
-function reportSubjectRows(rows, examType, priorTerms = [], priorTermData = {}) {
-  const max = maxScoreForExamType(examType);
-  const out = rows.slice(0, 18).map(row => {
-    const pct = (!row.isAbsent && row.total != null && max) ? (row.total / max) * 100 : null;
-    const priorTotals = priorTerms.map(t => {
-      const val = priorTermData[t.id]?.[row.subjectId];
-      return val == null ? '-' : val;
-    });
-    return {
-      subject: row.subjectName,
-      ca: row.isAbsent ? 'ABS' : row.ca ?? '-',
-      exam: row.isAbsent ? 'ABS' : row.exam ?? '-',
-      total: row.isAbsent ? 'ABS' : row.total ?? '-',
-      remark: row.isAbsent ? 'Absent' : pct == null ? '-' : `${gradeBand(pct).letter} - ${gradeBand(pct).word}`,
-      priorTotals,
-    };
-  });
-  while (out.length < 18) out.push({ subject: '', ca: '', exam: '', total: '', remark: '', priorTotals: priorTerms.map(() => '') });
-  return out;
-}
-
-const PRIOR_TERM_COLUMN_LABELS = ['First Term', 'Second Term'];
-
-function reportTableLayout(examType, priorTerms = []) {
-  const isFinalExam = examType === 'Final Exam';
-  const priorCount = isFinalExam ? priorTerms.length : 0;
-  // Base widths (no prior-term columns) are exactly the original layout —
-  // Term 1's Final Exam report, and every Mid-Term report, is unchanged.
-  const baseWidths = isFinalExam ? [110, 34, 34, 42, 50, 185, 85] : [110, 44, 46, 54, 180, 106];
-  const priorWidthPlans = { 1: [40], 2: [40, 40] };
-  const priorShrink = { 1: { subject: 0, remark: 0, skill: 30, rating: 10 }, 2: { subject: 5, remark: 5, skill: 55, rating: 15 } };
-  let widths = baseWidths;
-  if (priorCount > 0) {
-    const shrink = priorShrink[priorCount];
-    const priorWidths = priorWidthPlans[priorCount];
-    widths = [
-      baseWidths[0] - shrink.subject, baseWidths[1], baseWidths[2], baseWidths[3],
-      ...priorWidths,
-      baseWidths[4] - shrink.remark, baseWidths[5] - shrink.skill, baseWidths[6] - shrink.rating,
-    ];
-  }
-  const scoreHeaders = reportScoreColumns(examType);
-  const priorHeaders = priorTerms.map((t, i) => PRIOR_TERM_COLUMN_LABELS[i] || t.termLabel);
-  const headers = ['Subject', ...scoreHeaders, `Total Score (${maxScoreForExamType(examType)})`, ...priorHeaders, 'Grade Remarks', 'Affective / Psychomotor Skills', 'Rating'];
-  const totalColumn = isFinalExam ? 3 : 2;
-  const remarkColumn = totalColumn + 1 + priorCount;
-  const skillColumn = remarkColumn + 1;
-  const verticalHeaderCols = [];
-  for (let i = 1; i <= remarkColumn; i += 1) verticalHeaderCols.push(i);
-  return { isFinalExam, widths, headers, totalColumn, remarkColumn, skillColumn, verticalHeaderCols };
-}
-
-function reportSkillRows(skillRating) {
-  return {
-    affective: AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' })),
-    psychomotor: PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' })),
-  };
-}
-
-function reportAttendanceRows(attendance) {
-  return [
-    ['No. of School Days :', attendance.schoolDays],
-    ['No. of Days Present :', attendance.present],
-    ['No. of Days Absent :', attendance.absent],
-    ['% Attendance :', `${attendance.percent}%`],
-  ];
-}
-
-function drawWordMainTable(page, rows, examType, skillRating, attendance, fonts, colors, priorTerms = [], priorTermData = {}, topOffset = 0) {
-  const x = 36;
-  const top = 530 - topOffset;
-  const { isFinalExam, widths, headers, totalColumn, remarkColumn, skillColumn, verticalHeaderCols } = reportTableLayout(examType, priorTerms);
-  const headerH = 70;
-  const rowH = 14.75;
-  const subjectRows = reportSubjectRows(rows, examType, priorTerms, priorTermData);
-  const { affective, psychomotor } = reportSkillRows(skillRating);
-  const attendanceRows = reportAttendanceRows(attendance);
-
-  let cursorX = x;
-  headers.forEach((header, i) => {
-    if (verticalHeaderCols.includes(i)) {
-      drawVerticalHeaderCell(page, {
-        x: cursorX, top, width: widths[i], height: headerH, value: header,
-        fill: colors.headerGrey, border: colors.grid, font: fonts.bold, size: 7.2, color: colors.black,
-      });
-    } else {
-      drawWordCell(page, {
-        x: cursorX,
-        top,
-        width: widths[i],
-        height: headerH,
-        value: header,
-        fill: colors.headerGrey,
-        border: colors.grid,
-        font: fonts.bold,
-        size: i === 0 ? 8 : 6.8,
-        color: colors.black,
-        align: 'center',
-        pad: 3,
-      });
-    }
-    cursorX += widths[i];
-  });
-
-  for (let i = 0; i < 24; i += 1) {
-    const rowTop = top - headerH - (i * rowH);
-    const subject = i < 18 ? subjectRows[i] : { subject: '', ca: '', exam: '', total: '', remark: '', priorTotals: priorTerms.map(() => '') };
-    let cellX = x;
-    const scoreValues = isFinalExam
-      ? [subject.subject, subject.ca, subject.exam, subject.total, ...subject.priorTotals, subject.remark]
-      : [subject.subject, subject.ca, subject.total, subject.remark];
-    scoreValues.forEach((value, col) => {
-      drawWordCell(page, {
-        x: cellX,
-        top: rowTop,
-        width: widths[col],
-        height: rowH,
-        value,
-        fill: colors.white,
-        border: colors.grid,
-        font: col === totalColumn ? fonts.bold : fonts.regular,
-        size: col === 0 ? 7.4 : col === remarkColumn ? 6.2 : 7.6,
-        color: colors.black,
-        align: col === 0 ? 'left' : 'center',
-        pad: 2,
-      });
-      cellX += widths[col];
-    });
-
-    const skillX = x + widths.slice(0, skillColumn).reduce((sum, width) => sum + width, 0);
-    const skillWidth = widths[skillColumn];
-    const ratingWidth = widths[skillColumn + 1];
-    if (i === 0) {
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth + ratingWidth, height: rowH, value: 'Affective Skills Rating   (Scale of 1-to-5)', fill: colors.sectionGrey, border: colors.grid, font: fonts.bold, size: 7.8, color: colors.black, align: 'left' });
-    } else if (i >= 1 && i <= 8) {
-      const row = affective[i - 1];
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth, height: rowH, value: row.label, fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'left' });
-      drawWordCell(page, { x: skillX + skillWidth, top: rowTop, width: ratingWidth, height: rowH, value: row.rating, fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'center' });
-    } else if (i === 9) {
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth + ratingWidth, height: rowH, value: 'Psychomotor Skills Rating   (Scale of  1-to-5)', fill: colors.sectionGrey, border: colors.grid, font: fonts.bold, size: 7.8, color: colors.black, align: 'left' });
-    } else if (i >= 10 && i <= 18) {
-      const row = psychomotor[i - 10];
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth, height: rowH, value: row.label, fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'left' });
-      drawWordCell(page, { x: skillX + skillWidth, top: rowTop, width: ratingWidth, height: rowH, value: row.rating, fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'center' });
-    } else if (i === 19) {
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth + ratingWidth, height: rowH, value: 'Attendance Report', fill: colors.sectionGrey, border: colors.grid, font: fonts.bold, size: 7.8, color: colors.black, align: 'left' });
-    } else {
-      const row = attendanceRows[i - 20];
-      drawWordCell(page, { x: skillX, top: rowTop, width: skillWidth, height: rowH, value: row?.[0] || '', fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'left' });
-      drawWordCell(page, { x: skillX + skillWidth, top: rowTop, width: ratingWidth, height: rowH, value: row?.[1] || '', fill: colors.white, border: colors.grid, font: fonts.regular, size: 7.8, color: colors.black, align: 'center' });
-    }
-  }
-}
-
-const REPORT_GRADE_KEY = [
-  'Key to Grades',
-  '70-100:5 Grade Points.',
-  '60-69:4 Grade Points.',
-  '50-59:3 Grade Points.',
-  '45-49:2 Grade Points.',
-  '40-44:1 Grade Point.',
-  '0-39:0 Grade Points.',
-];
-
-function drawWordGradeKey(page, fonts, colors, topOffset = 0) {
-  const x = 36;
-  const top = 81 - topOffset;
-  const height = 28;
-  const widths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
-  const values = REPORT_GRADE_KEY;
-  let cursorX = x;
-  values.forEach((value, i) => {
-    drawWordCell(page, { x: cursorX, top, width: widths[i], height, value, fill: colors.white, border: colors.grid, font: i === 0 ? fonts.bold : fonts.regular, size: i === 0 ? 6.2 : 6.8, color: colors.black, align: 'center', pad: 3 });
-    cursorX += widths[i];
-  });
-}
-
-async function drawWordComments(page, pdfDoc, formTeacher, fonts, colors, teacherComment, headComment) {
-  const x = 36;
-  const width = 540;
-  const leftW = 324;
-  const rightW = 216;
-  const rowH = 24;
-  const headName = reportHeadName();
-
-  const teacherTop = 326;
-  drawWordCell(page, { x, top: teacherTop, width, height: rowH, value: `Form Teacher's Comment :  ${teacherComment}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
-  drawWordCell(page, { x, top: teacherTop - rowH, width: leftW, height: rowH, value: `Form Teacher :${formTeacher.teacherName || ''}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
-  drawWordCell(page, { x: x + leftW, top: teacherTop - rowH, width: rightW, height: rowH, value: "Form Teacher's Signature:", fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, align: 'center' });
-
-  const teacherSigPath = formTeacher.teacherSignaturePath || '';
-  const teacherSig = await embedImageIfPresent(pdfDoc, teacherSigPath);
-  // signatures keep their proportions inside the 70 x 18 box
-  const sigBox = (img, top) => { const fit = img.scaleToFit(70, 18); return { x: x + leftW + 70 + ((70 - fit.width) / 2), y: top - (rowH * 2) + 4 + ((18 - fit.height) / 2), width: fit.width, height: fit.height }; };
-  if (teacherSig) page.drawImage(teacherSig, sigBox(teacherSig, teacherTop));
-
-  const headTop = 254;
-  drawWordCell(page, { x, top: headTop, width, height: rowH, value: `Head of School Comment:  ${headComment}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
-  drawWordCell(page, { x, top: headTop - rowH, width: leftW, height: rowH, value: `Head of School: ${headName}`, fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, pad: 5 });
-  drawWordCell(page, { x: x + leftW, top: headTop - rowH, width: rightW, height: rowH, value: "Head of School's Signature :", fill: colors.white, border: colors.grid, font: fonts.regular, size: 8, color: colors.black, align: 'center' });
-  const headSig = await embedImageIfPresent(pdfDoc, valueFromMeta('head_signature_path', ''));
-  if (headSig) page.drawImage(headSig, sigBox(headSig, headTop));
-}
-
-function drawWordScoreChart(page, rows, fonts, colors, degrees) {
-  const x = 36;
-  const top = 676;
-  const width = 540;
-  const height = 300;
-  drawCell(page, { x, top, width, height, fill: colors.white, border: colors.grid, borderWidth: 0.35 });
-  drawCenteredText(page, 'Chart Title', x + (width / 2), top - 24, 14, fonts.regular, colors.chartText);
-
-  const plotX = x + 52;
-  const plotY = top - height + 82;
-  const plotW = width - 72;
-  const plotH = height - 130;
-  [0, 20, 40, 60, 80, 100, 120].forEach(mark => {
-    const y = plotY + (plotH * mark / 120);
-    line(page, plotX, y, plotX + plotW, y, colors.chartGrid, 0.35);
-    drawFittedText(page, String(mark), x + 18, y - 3, 22, 7, fonts.regular, colors.chartText, { align: 'right' });
-  });
-
-  const chartRows = rows.slice(0, 18);
-  const colorsList = colors.chartBars || [colors.blue];
-  const slot = plotW / Math.max(chartRows.length, 1);
-  chartRows.forEach((row, i) => {
-    const barW = Math.min(12, slot * 0.32);
-    const score = Math.max(0, Math.min(120, Number(row.total || 0)));
-    const barH = plotH * score / 120;
-    const bx = plotX + (slot * i) + ((slot - barW) / 2);
-    page.drawRectangle({ x: bx, y: plotY, width: barW, height: barH, color: colorsList[i % colorsList.length] });
-    const label = trimToFit(fonts.regular, row.subjectName || '', 6.8, 82);
-    page.drawText(label, {
-      x: bx - 4,
-      y: plotY - 14,
-      size: 6.8,
-      font: fonts.regular,
-      color: colors.chartText,
-      rotate: degrees(48),
-    });
-  });
-}
-
 // Everything a report sheet shows, gathered once. `allowEmpty` lets the
 // on-screen bulk viewer show a pupil who has no scores yet (the PDF refuses).
 function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
@@ -3151,25 +2458,6 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   const totalScore = rowTotals.reduce((sum, value) => sum + value, 0);
   const subjectMax = maxScoreForExamType(examType);
   const average = countedRows.length ? Math.round((totalScore / (countedRows.length * subjectMax)) * 100) : 0;
-
-  // Cumulative columns + GPA only apply to the Final Exam report (the one
-  // representing a term's overall result) — Mid-Term stays exactly as is.
-  let priorTerms = [];
-  let priorTermData = {};
-  let cumulativeGPA = null;
-  if (examType === 'Final Exam') {
-    priorTerms = priorTermsInSession(academic.sessionLabel, academic.termLabel);
-    priorTerms.forEach(t => { priorTermData[t.id] = priorTermSubjectTotals(classCode, studentId, t.id); });
-    const gpaSamples = [gradeBand(average).point];
-    priorTerms.forEach(t => {
-      const values = Object.values(priorTermData[t.id]);
-      if (values.length) {
-        const priorAvg = Math.round((values.reduce((a, b) => a + b, 0) / (values.length * subjectMax)) * 100);
-        gpaSamples.push(gradeBand(priorAvg).point);
-      }
-    });
-    cumulativeGPA = (gpaSamples.reduce((a, b) => a + b, 0) / gpaSamples.length).toFixed(3);
-  }
 
   const computedSchoolDays = computeSchoolDays(academic.id);
   const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
@@ -3196,7 +2484,7 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   });
   return {
     academic, student, rows, skillRating, totalScore, subjectMax, average,
-    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
+    schoolDays, present, absent, formTeacher,
     teacherComment, headComment,
   };
 }
@@ -3382,110 +2670,181 @@ function reportHeadName() {
   return valueFromMeta('head_of_school_name', 'James Idoko Ajah');
 }
 
-function reportNextTermLine() {
-  return `NEXT TERM BEGINS: ${String(valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026')).toUpperCase()}`;
+// The report sheet's contents (names, scores, grades, comments…) for one
+// pupil, in the shape report-sheet.js lays out. The PDF and the on-screen
+// sheet are both drawn from that one layout.
+function sheetDate(raw) {
+  const s = String(raw || '').trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+  m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) return { y: +m[3], m: +m[2], d: +m[1] };
+  return null;
 }
 
-// The report sheet as plain data, for the on-screen (HTML) version in the
-// Class Result Checker. Uses the same helpers as generateReportPdf.
-function reportSheetData(ctx, examType) {
+function lagosNow() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true,
+  }).formatToParts(new Date()).map(p => [p.type, p.value]));
+  return parts;
+}
+
+function reportNextTerm(academic) {
+  const termNo = Number(String(academic.termLabel || '').match(/[123]/)?.[0] || 0);
+  const names = { 1: 'FIRST TERM', 2: 'SECOND TERM', 3: 'THIRD TERM' };
+  let session = sessionHeadingLabel(academic.sessionLabel);
+  let next = termNo + 1;
+  if (termNo === 3) {
+    next = 1;
+    const years = session.match(/^(\d{4})-(\d{4})$/);
+    if (years) session = `${+years[1] + 1}-${+years[2] + 1}`;
+  }
+  // "Monday 14th of September 2026", from the next term's start date in Academics
+  const nextTerm = one(
+    `SELECT start_date AS startDate FROM academic_terms
+     WHERE REPLACE(session_label, '/', '-') = ? AND term_label = ?`,
+    session, `Term ${next}`
+  );
+  const start = sheetDate(nextTerm?.startDate);
+  let begins = String(valueFromMeta('next_term_begins', '')).trim();
+  if (start) {
+    const date = new Date(Date.UTC(start.y, start.m - 1, start.d));
+    const weekday = date.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+    const month = date.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+    const suffix = (start.d % 100 >= 11 && start.d % 100 <= 13) ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[start.d % 10] || 'th');
+    begins = `${weekday} ${start.d}${suffix} of ${month} ${start.y}`;
+  }
+  return {
+    term: names[next] ? `${names[next]} of ${session} Academic Session.` : '',
+    begins: begins ? (/[.!]$/.test(begins) ? begins : `${begins}.`) : '',
+  };
+}
+
+function reportSkillRows(skillRating) {
+  return {
+    affective: AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' })),
+    psychomotor: PSYCHOMOTOR_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.psychomotor?.[key] ?? '-' })),
+  };
+}
+
+function reportSheetFields(ctx, examType) {
   const {
-    academic, student, rows, skillRating, totalScore, subjectMax, average,
-    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
+    academic, student, rows, skillRating, totalScore, subjectMax, schoolDays, present, absent, formTeacher,
     teacherComment, headComment,
   } = ctx;
-  const layout = reportTableLayout(examType, priorTerms);
+  const isFinal = examType === 'Final Exam';
+  const counted = rows.filter(row => !row.isAbsent);
+  const maxScore = counted.length * subjectMax;
+  const averageExact = maxScore ? (totalScore / maxScore) * 100 : 0;
+  const overall = gradeForPct(averageExact);
+  const school = schoolInfoFromMeta();
+  const account = one('SELECT email, dob FROM users WHERE id = ?', student.id) || {};
+  const dob = sheetDate(account.dob) || sheetDate(valueFromMeta(`student_dob_${student.id}`, ''));
+  const now = lagosNow();
+  let age = '';
+  if (dob) {
+    age = Number(now.year) - dob.y;
+    if (Number(now.month) < dob.m || (Number(now.month) === dob.m && Number(now.day) < dob.d)) age -= 1;
+  }
+  const arm = student.class_arm_id ? one('SELECT name FROM class_arms WHERE id = ?', student.class_arm_id) : null;
+  const classSize = arm
+    ? one('SELECT COUNT(*) AS count FROM students WHERE class_code = ? AND class_arm_id = ?', student.class_code, student.class_arm_id).count
+    : one('SELECT COUNT(*) AS count FROM students WHERE class_code = ?', student.class_code).count;
+  const pad = v => String(v).padStart(2, '0');
   const assetOrEmpty = p => (p && absoluteAssetPath(p) ? p : '');
+  const gender = String(student.gender || '').trim().toUpperCase();
+
+  const columns = isFinal
+    ? [{ label: 'Mid Term Test', max: '(30)' }, { label: 'Examination', max: '(70)' }, { label: 'Total Score', max: '(100)', bold: true }]
+    : [{ label: 'Mid Term Test', max: `(${subjectMax})`, bold: true }];
+  const shown = v => (v == null || v === '' ? '-' : v);
+  const subjects = rows.map(row => {
+    if (row.isAbsent) {
+      return { subject: row.subjectName, cells: columns.map(() => 'ABS'), grade: '-', remark: 'Absent' };
+    }
+    const pct = row.total != null && subjectMax ? (Number(row.total) / subjectMax) * 100 : null;
+    const band = pct == null ? null : gradeForPct(pct);
+    return {
+      subject: row.subjectName,
+      cells: isFinal ? [shown(row.ca), shown(row.exam), shown(row.total)] : [shown(row.total)],
+      grade: band ? band.grade : '-',
+      remark: band ? band.remark : '-',
+    };
+  });
+
   return {
-    studentId: student.id,
-    name: student.name,
-    parentEmail: student.parent_email || '',
-    hasResults: rows.length > 0,
-    school: REPORT_SCHOOL_HEADER,
-    heading: reportHeading(academic, examType),
-    infoRows: reportInfoRows(student, rows, totalScore, average, subjectMax,
-      cumulativeGPA != null ? ['', `Cumulative Grade Point Average: ${cumulativeGPA}`] : null),
-    photoPath: assetOrEmpty(student.photo_path) || 'report_assets/student-placeholder.png',
-    table: {
-      headers: layout.headers,
-      widths: layout.widths,
-      verticalCols: layout.verticalHeaderCols,
-      totalColumn: layout.totalColumn,
-      remarkColumn: layout.remarkColumn,
-      rows: reportSubjectRows(rows, examType, priorTerms, priorTermData).map(r => (layout.isFinalExam
-        ? [r.subject, r.ca, r.exam, r.total, ...r.priorTotals, r.remark]
-        : [r.subject, r.ca, r.total, r.remark])),
+    school: { ...school, motto: valueFromMeta('school_motto', '-') },
+    heading: `${termHeadingLabel(academic.termLabel)}, ${sessionHeadingLabel(academic.sessionLabel)} (${isFinal ? 'END OF TERM REPORT' : 'MID TERM REPORT'})`,
+    info: {
+      left: [
+        ['Name:', String(student.name || '').toUpperCase()],
+        ['Reg. No.:', student.id],
+        ['Gender:', gender === 'MALE' ? 'M' : gender === 'FEMALE' ? 'F' : gender],
+        ['Age:', age === '' ? '' : String(age)],
+        ['DOB:', dob ? `${pad(dob.d)}-${pad(dob.m)}-${dob.y}` : ''],
+        ['Class:', `${student.classLabel}${arm ? ` - ${arm.name}` : ''}`.toUpperCase()],
+        ['Email:', account.email || student.parent_email || ''],
+      ],
+      right: [
+        ['Performance Grade:', counted.length ? `${overall.grade} (${overall.remark})` : '-'],
+        ['Class Size:', String(classSize)],
+        ['No. of Subjects:', String(rows.length)],
+        ['Student Total Score:', `${totalScore} / ${maxScore}`],
+        ['Student Average (%):', `${averageExact.toFixed(2)}%`],
+        ['Result Summary:', counted.length ? overall.remark : '-', true],
+      ],
     },
+    photoPath: assetOrEmpty(student.photo_path) || 'report_assets/student-placeholder.png',
+    columns,
+    subjects,
     ...reportSkillRows(skillRating),
-    attendance: reportAttendanceRows({ schoolDays, present, absent, percent: student.att || 0 }),
-    gradeKey: REPORT_GRADE_KEY,
-    chart: rows.slice(0, 18).map(r => ({ subject: r.subjectName || '', total: Number(r.total || 0) })),
+    attendance: [
+      ['No. of School Days :', String(schoolDays)],
+      ['No. of Days Present :', String(present)],
+      ['No. of Days Absent :', String(absent)],
+      ['% Attendance :', `${(schoolDays ? (present / schoolDays) * 100 : 0).toFixed(2)}%`],
+    ],
+    gradeKey: [...gradeScale].sort((a, b) => Number(b.min) - Number(a.min))
+      .map(g => ({ range: `${g.min}-${g.max}:`, grade: g.grade, remark: g.remark })),
+    chart: rows.map(row => {
+      const pct = !row.isAbsent && row.total != null && subjectMax ? (Number(row.total) / subjectMax) * 100 : 0;
+      return { subject: row.subjectName || '', value: pct, label: row.isAbsent || row.total == null ? '' : String(Math.round(pct)) };
+    }),
     comments: {
       teacherComment,
-      formTeacherName: formTeacher.teacherName || '',
+      formTeacherName: String(formTeacher.teacherName || '').toUpperCase(),
       teacherSignaturePath: assetOrEmpty(formTeacher.teacherSignaturePath),
       headComment,
-      headName: reportHeadName(),
+      headName: String(reportHeadName()).toUpperCase(),
       headSignaturePath: assetOrEmpty(valueFromMeta('head_signature_path', '')),
     },
-    nextTermLine: reportNextTermLine(),
+    nextTerm: reportNextTerm(academic),
+    printedAt: `${now.day}-${now.month}-${now.year} ${now.hour}:${now.minute} ${String(now.dayPeriod || '').toLowerCase()}`,
+  };
+}
+
+// What the on-screen bulk viewer needs per pupil: who it is plus the drawn layout.
+function reportSheetData(ctx, examType) {
+  return {
+    studentId: ctx.student.id,
+    name: ctx.student.name,
+    parentEmail: ctx.student.parent_email || '',
+    hasResults: ctx.rows.length > 0,
+    layout: layoutReportSheet(reportSheetFields(ctx, examType)),
   };
 }
 
 async function generateReportPdf({ studentId, classCode, examType }) {
-  const { PDFDocument, StandardFonts, rgb, degrees } = loadPdfLib();
-  const {
-    academic, student, rows, skillRating, totalScore, subjectMax, average,
-    priorTerms, priorTermData, cumulativeGPA, schoolDays, present, absent, formTeacher,
-    teacherComment, headComment,
-  } = reportContext({ studentId, classCode, examType });
-
+  const { PDFDocument } = loadPdfLib();
+  const layout = layoutReportSheet(reportSheetFields(reportContext({ studentId, classCode, examType }), examType));
   const pdfDoc = await PDFDocument.create();
-  const fonts = {
-    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-    italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
-  };
-  const colors = {
-    black: rgb(0.04, 0.04, 0.04),
-    blue: rgb(0.18, 0.47, 0.70),
-    green: rgb(0.0, 0.42, 0.18),
-    white: rgb(1, 1, 1),
-    grid: rgb(0.65, 0.65, 0.65),
-    headerGrey: rgb(0.85, 0.85, 0.85),
-    sectionGrey: rgb(0.94, 0.94, 0.94),
-    chartGrid: rgb(0.80, 0.80, 0.80),
-    chartText: rgb(0.32, 0.32, 0.32),
-    chartBars: [
-      rgb(0.29, 0.46, 0.75), rgb(0.93, 0.45, 0.16), rgb(0.60, 0.60, 0.60),
-      rgb(1, 0.75, 0.14), rgb(0.36, 0.62, 0.82), rgb(0.43, 0.68, 0.29),
-      rgb(0.16, 0.27, 0.50), rgb(0.62, 0.25, 0.07), rgb(0.38, 0.38, 0.38),
-      rgb(0.63, 0.48, 0.00), rgb(0.17, 0.37, 0.56), rgb(0.29, 0.46, 0.21),
-    ],
-    infoLabel: rgb(0.86, 0.93, 0.98),
-    infoValue: rgb(0.96, 0.96, 0.96),
-    academicStripe: rgb(0.92, 0.96, 1),
-    skillStripe: rgb(0.93, 0.97, 1),
-    attendanceStripe: rgb(0.96, 0.96, 0.96),
-    gradeFill: rgb(0.90, 0.95, 0.90),
-    commentCream: rgb(1, 0.97, 0.90),
-    commentGreen: rgb(0.90, 0.96, 0.90),
-  };
-
-  const page1 = pdfDoc.addPage([612, 792]);
-  await drawWordHeader(page1, pdfDoc, fonts, colors);
-  drawCenteredText(page1, reportHeading(academic, examType), 306, 674, 10, fonts.bold, colors.black);
-  const extraInfoRow = cumulativeGPA != null ? ['', `Cumulative Grade Point Average: ${cumulativeGPA}`] : null;
-  const topOffset = await drawWordStudentInfo(page1, pdfDoc, student, rows, totalScore, average, subjectMax, fonts, colors, extraInfoRow);
-  drawWordMainTable(page1, rows, examType, skillRating, { schoolDays, present, absent, percent: student.att || 0 }, fonts, colors, priorTerms, priorTermData, topOffset);
-  drawWordGradeKey(page1, fonts, colors, topOffset);
-
-  const page2 = pdfDoc.addPage([612, 792]);
-  await drawWordHeader(page2, pdfDoc, fonts, colors);
-  drawWordScoreChart(page2, rows, fonts, colors, degrees);
-  await drawWordComments(page2, pdfDoc, formTeacher, fonts, colors, teacherComment, headComment);
-  text(page2, reportNextTermLine(), 36, 174, 9.5, fonts.bold, { color: colors.black });
-
+  await drawLayoutPdf(pdfDoc, layout, async src => {
+    try {
+      return await embedImageIfPresent(pdfDoc, src);
+    } catch {
+      return null; // an unreadable photo or signature just leaves its box empty
+    }
+  });
   return Buffer.from(await pdfDoc.save());
 }
 
@@ -9767,10 +9126,10 @@ function serveStatic(req, res, url) {
   // ROOT too, so anything not on this allowlist — or inside a dot-folder — is
   // refused outright.
   const relParts = path.relative(ROOT, filePath).split(path.sep);
-  const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp']);
+  const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.ttf']);
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
-    || relParts[relParts.length - 1] === 'server.js'
+    || ['server.js', 'report-sheet.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -9793,6 +9152,7 @@ function serveStatic(req, res, url) {
       '.jpg': 'image/jpeg',
       '.jpeg': 'image/jpeg',
       '.svg': 'image/svg+xml',
+      '.ttf': 'font/ttf',
     };
     res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
     res.end(data);

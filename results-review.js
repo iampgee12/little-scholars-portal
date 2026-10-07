@@ -106,124 +106,45 @@ function crcAdminActionsHtml(id, parentEmail, off) {
 }
 
 // ── On-screen report sheet ──
-// Positions and sizes are the PDF's own, in points (1pt = var(--pt), which
-// scales with the sheet's width), so the page looks like the printed one but
-// is real, sharp text at any zoom.
-const RS_CHART_COLORS = ['#4a75bf', '#ed7329', '#999999', '#ffbf24', '#5c9ed1', '#6ead4a', '#29457f', '#9e4012', '#616161', '#a17a00', '#2b5e8f', '#4a7536'];
+// The server sends each pupil's sheet as the very drawing list the PDF is made
+// from (report-sheet.js); here each page becomes one SVG, so the screen shows
+// exactly what prints and what parents receive.
+const RS_FONT = {
+  regular: 'font-weight="400"',
+  semibold: 'font-weight="600"',
+  bold: 'font-weight="700"',
+  italic: 'font-style="italic"',
+  boldItalic: 'font-weight="700" font-style="italic"',
+};
 
-function rsCell(value, { w, h, cls = '', style = '' }) {
-  return `<div class="rs-cell ${cls}" style="width:calc(var(--pt)*${w});height:calc(var(--pt)*${h});${style}"><span>${escapeHtml(String(value ?? ''))}</span></div>`;
-}
-
-function rsHeader() {
-  return `<div class="rs-block rs-head" style="top:calc(var(--pt)*36)">
-    <div class="rs-cell" style="width:calc(var(--pt)*70);height:calc(var(--pt)*58)"><img src="/report_assets/school-logo.png" alt="" style="width:calc(var(--pt)*62);height:calc(var(--pt)*41)"></div>
-    <div class="rs-cell rs-head-mid" style="width:calc(var(--pt)*400);height:calc(var(--pt)*58)">
-      <div class="rs-school"></div>
-    </div>
-    <div class="rs-cell" style="width:calc(var(--pt)*70);height:calc(var(--pt)*58)"><img src="/report_assets/coat-of-arms.png" alt="" style="width:calc(var(--pt)*44);height:calc(var(--pt)*44)"></div>
-  </div>`;
-}
-
-function rsSchoolLines(school) {
-  return `<div class="rs-school-name">${escapeHtml(school.name)}</div>
-    ${school.lines.map(l => `<div class="rs-school-line">${escapeHtml(l)}</div>`).join('')}
-    <div class="rs-school-line rs-italic">${escapeHtml(school.motto)}</div>`;
+function rsSvgPage(items, width, height) {
+  const n = v => Math.round(v * 100) / 100;
+  const body = items.map(it => {
+    if (it.t === 'rect') {
+      return `<rect x="${n(it.x)}" y="${n(it.y)}" width="${n(it.w)}" height="${n(it.h)}" fill="${it.fill || 'none'}"${it.stroke ? ` stroke="${it.stroke}" stroke-width="${it.sw}"` : ''}/>`;
+    }
+    if (it.t === 'line') {
+      return `<line x1="${n(it.x1)}" y1="${n(it.y1)}" x2="${n(it.x2)}" y2="${n(it.y2)}" stroke="${it.c}" stroke-width="${it.w}"/>`;
+    }
+    if (it.t === 'text') {
+      // the layout's angles turn anticlockwise (PDF); SVG turns clockwise
+      const turn = it.r ? ` transform="rotate(${-it.r} ${n(it.x)} ${n(it.y)})"` : '';
+      return `<text x="${n(it.x)}" y="${n(it.y)}" font-size="${n(it.size)}" fill="${it.c}" ${RS_FONT[it.f] || ''}${turn}>${escapeHtml(it.s)}</text>`;
+    }
+    if (it.t === 'path') {
+      return `<path d="${it.d}" fill="${it.c}" transform="translate(${n(it.x)} ${n(it.y)}) scale(${it.k})"/>`;
+    }
+    if (it.t === 'img') {
+      return `<image href="/${escapeHtml(it.src)}" x="${n(it.x)}" y="${n(it.y)}" width="${n(it.w)}" height="${n(it.h)}" preserveAspectRatio="${it.fit === 'fill' ? 'none' : 'xMidYMid meet'}"${it.opacity != null ? ` opacity="${it.opacity}"` : ''}/>`;
+    }
+    return '';
+  }).join('');
+  return `<svg class="rs-page" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 }
 
 function crcSheetHtml(s) {
-  const header = rsHeader().replace('<div class="rs-school"></div>', `<div class="rs-school">${rsSchoolLines(s.school)}</div>`);
-  const extraRows = s.infoRows.length - 6; // Cumulative GPA row pushes the table down
-  const offset = 17 * extraRows;
-
-  // Student info: left column, photo, right column
-  const info = `<div class="rs-block rs-info" style="top:calc(var(--pt)*146)">
-    <div class="rs-col">${s.infoRows.map(r => rsCell(r[0], { w: 220, h: 17, cls: 'rs-b rs-info-cell' })).join('')}</div>
-    <div class="rs-cell rs-photo" style="width:calc(var(--pt)*100);height:calc(var(--pt)*${17 * s.infoRows.length})"><img src="/${escapeHtml(s.photoPath)}" alt=""></div>
-    <div class="rs-col">${s.infoRows.map(r => rsCell(r[1], { w: 220, h: 17, cls: 'rs-b rs-info-cell' })).join('')}</div>
-  </div>`;
-
-  // Main table: subject scores on the left, skills + attendance on the right
-  const t = s.table;
-  const { widths } = t;
-  const skillCol = t.remarkColumn + 1;
-  const headRow = t.headers.map((h, i) => t.verticalCols.includes(i)
-    ? `<div class="rs-cell rs-th rs-vert" style="width:calc(var(--pt)*${widths[i]});height:calc(var(--pt)*70)"><span>${escapeHtml(h)}</span></div>`
-    : rsCell(h, { w: widths[i], h: 70, cls: 'rs-th rs-center', style: i === 0 ? 'font-size:calc(var(--pt)*8)' : '' })).join('');
-  const sideRow = i => {
-    const sw = widths[skillCol];
-    const rw = widths[skillCol + 1];
-    const section = label => rsCell(label, { w: sw + rw, h: 14.75, cls: 'rs-b rs-section' });
-    const pair = (a, b) => rsCell(a, { w: sw, h: 14.75, cls: 'rs-side' }) + rsCell(b, { w: rw, h: 14.75, cls: 'rs-side rs-center' });
-    if (i === 0) return section('Affective Skills Rating   (Scale of 1-to-5)');
-    if (i <= 8) return pair(s.affective[i - 1].label, s.affective[i - 1].rating);
-    if (i === 9) return section('Psychomotor Skills Rating   (Scale of  1-to-5)');
-    if (i <= 18) return pair(s.psychomotor[i - 10].label, s.psychomotor[i - 10].rating);
-    if (i === 19) return section('Attendance Report');
-    const a = s.attendance[i - 20] || ['', ''];
-    return pair(a[0], a[1]);
-  };
-  const bodyRows = Array.from({ length: 24 }, (_, i) => {
-    const values = i < 18 ? t.rows[i] : Array(t.remarkColumn + 1).fill('');
-    const cells = values.map((v, col) => rsCell(v, {
-      w: widths[col], h: 14.75,
-      cls: [col === 0 ? '' : 'rs-center', col === t.totalColumn ? 'rs-b' : ''].join(' '),
-      style: `font-size:calc(var(--pt)*${col === 0 ? 7.4 : col === t.remarkColumn ? 6.2 : 7.6})`,
-    })).join('');
-    return `<div class="rs-row">${cells}${sideRow(i)}</div>`;
-  }).join('');
-  const table = `<div class="rs-block" style="top:calc(var(--pt)*${262 + offset})"><div class="rs-row">${headRow}</div>${bodyRows}</div>`;
-
-  const keyWidths = [55, 80.8, 80.8, 80.8, 80.8, 80.8, 80.8];
-  const gradeKey = `<div class="rs-block rs-row" style="top:calc(var(--pt)*${711 + offset})">${s.gradeKey.map((v, i) =>
-    rsCell(v, { w: keyWidths[i], h: 28, cls: `rs-center ${i === 0 ? 'rs-b' : ''}`, style: `font-size:calc(var(--pt)*${i === 0 ? 6.2 : 6.8})` })).join('')}</div>`;
-
-  const page1 = `<div class="rs-page">${header}
-    <div class="rs-heading" style="top:calc(var(--pt)*109)">${escapeHtml(s.heading)}</div>
-    ${info}${table}${gradeKey}</div>`;
-
-  const c = s.comments;
-  const sig = path => path ? `<img class="rs-sig" src="/${escapeHtml(path)}" alt="">` : '';
-  const commentBlock = (top, comment, nameLine, sigLabel, sigPath) => `<div class="rs-block" style="top:calc(var(--pt)*${top})">
-    ${rsCell(comment, { w: 540, h: 24, cls: 'rs-comment' })}
-    <div class="rs-row">${rsCell(nameLine, { w: 324, h: 24, cls: 'rs-comment' })}
-      <div class="rs-cell rs-center rs-comment" style="width:calc(var(--pt)*216);height:calc(var(--pt)*24);position:relative"><span>${escapeHtml(sigLabel)}</span>${sig(sigPath)}</div></div>
-  </div>`;
-
-  const page2 = `<div class="rs-page">${header}
-    <div class="rs-block" style="top:calc(var(--pt)*116)">${rsChartSvg(s.chart)}</div>
-    ${commentBlock(466, `Form Teacher's Comment :  ${c.teacherComment}`, `Form Teacher :${c.formTeacherName}`, "Form Teacher's Signature:", c.teacherSignaturePath)}
-    ${commentBlock(538, `Head of School Comment:  ${c.headComment}`, `Head of School: ${c.headName}`, "Head of School's Signature :", c.headSignaturePath)}
-    <div class="rs-next" style="top:calc(var(--pt)*610)">${escapeHtml(s.nextTermLine)}</div>
-  </div>`;
-
-  return `<div class="rs-sheet">${page1}${page2}</div>`;
-}
-
-// Bar chart drawn in the PDF's own coordinates (box 540 × 300pt).
-function rsChartSvg(chart) {
-  const W = 540, H = 300;
-  const plotX = 52, plotW = W - 72, plotH = H - 130;
-  const plotBottom = H - 82; // SVG y of the x-axis
-  const grid = [0, 20, 40, 60, 80, 100, 120].map(mark => {
-    const y = plotBottom - (plotH * mark / 120);
-    return `<line x1="${plotX}" y1="${y}" x2="${plotX + plotW}" y2="${y}" stroke="#cccccc" stroke-width="0.35"/>
-      <text x="40" y="${y + 2.5}" text-anchor="end" font-size="7" fill="#525252">${mark}</text>`;
-  }).join('');
-  const slot = plotW / Math.max(chart.length, 1);
-  const barW = Math.min(12, slot * 0.32);
-  const bars = chart.map((row, i) => {
-    const score = Math.max(0, Math.min(120, Number(row.total || 0)));
-    const h = plotH * score / 120;
-    const bx = plotX + (slot * i) + ((slot - barW) / 2);
-    const lx = bx - 4, ly = plotBottom + 14;
-    return `<rect x="${bx}" y="${plotBottom - h}" width="${barW}" height="${h}" fill="${RS_CHART_COLORS[i % RS_CHART_COLORS.length]}"/>
-      <text x="${lx}" y="${ly}" font-size="6.8" fill="#525252" transform="rotate(-48 ${lx} ${ly})">${escapeHtml(row.subject.length > 22 ? row.subject.slice(0, 21) + '…' : row.subject)}</text>`;
-  }).join('');
-  return `<svg class="rs-chart" viewBox="0 0 ${W} ${H}" style="width:calc(var(--pt)*540);height:calc(var(--pt)*300)" font-family="Helvetica, Arial, sans-serif">
-    <rect x="0.2" y="0.2" width="${W - 0.4}" height="${H - 0.4}" fill="#fff" stroke="#a6a6a6" stroke-width="0.35"/>
-    <text x="${W / 2}" y="28" text-anchor="middle" font-size="14" fill="#525252">Chart Title</text>
-    ${grid}${bars}</svg>`;
+  const { width, height, pages } = s.layout;
+  return `<div class="rs-sheet">${pages.map(items => rsSvgPage(items, width, height)).join('')}</div>`;
 }
 
 function crcStudent(id) {
