@@ -1,0 +1,81 @@
+/* Phones and small tablets — shared by the admin, teacher and pupil portals.
+   Loaded after ui-buttons.css. Rule of thumb: nothing may be wider than the
+   screen; wide tables slide sideways inside their own card instead. */
+
+@media (max-width: 768px) {
+  /* Top bar: page title + session, always on one line within the screen */
+  .topbar { padding: 0 12px !important; gap: 8px !important; }
+  .topbar-sep, .topbar-sub { display: none !important; }
+  .topbar-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px !important; }
+  .topbar-right { margin-left: 0 !important; flex-shrink: 0; gap: 6px !important; }
+  .topbar-session-info { padding-right: 8px !important; margin-right: 0 !important; }
+  .tsi-label { display: none; }
+  .tsi-row { justify-content: flex-end !important; }
+
+  .content { padding: 14px !important; }
+
+  /* Summary cards two to a row; side-by-side panels stack */
+  .stats-row { grid-template-columns: 1fr 1fr !important; }
+  .grid-2, .grid-3-1 { grid-template-columns: 1fr !important; }
+  .page-header { margin-bottom: 14px !important; }
+
+  /* Phones zoom in on any text box smaller than 16px when it is tapped */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+  select,
+  textarea { font-size: 16px !important; }
+
+  /* Wide tables and forms slide sideways inside their card, never cut off */
+  .card,
+  .gb-filter-card,
+  .gb-entry-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Card headings: title on top, search box / buttons wrap below it */
+  .card-head { flex-wrap: wrap; padding: 12px 14px !important; gap: 8px !important; }
+  .card-head .search-input { width: 100% !important; flex: 1 1 100%; }
+
+  /* Table rows stay on one line (IDs, dates, amounts) — the table slides sideways */
+  .data-table th, .data-table td { white-space: nowrap; padding-left: 10px !important; padding-right: 10px !important; }
+
+  /* Score entry: the pupil's name stays in view while the score columns slide */
+  .entry-table th:first-child,
+  .entry-table td:first-child,
+  .gb-score-table th:nth-child(2),
+  .gb-score-table td:nth-child(2) {
+    position: sticky; left: 0; z-index: 3;
+    min-width: 130px !important; max-width: 150px; white-space: normal;
+    background: var(--black-2); box-shadow: 1px 0 0 var(--border-2);
+  }
+  .entry-table th:first-child, .gb-score-table th:nth-child(2) { z-index: 4; background: var(--black-3); }
+  .entry-table tbody tr.row-saved td:first-child { background: linear-gradient(var(--green-bg), var(--green-bg)), var(--black-2); }
+  .gb-table-wrap { padding: 0 14px 16px !important; }
+
+  /* Teacher Results Entry picker: one "label — box" per line */
+  .ctx-banner { display: grid !important; grid-template-columns: auto 1fr; align-items: center; gap: 10px 12px !important; padding: 14px !important; }
+  .ctx-banner .ctx-sep { display: none; }
+  .ctx-banner .ctrl-group { display: contents !important; }
+  .ctx-banner .ctrl-select { width: 100%; min-width: 0 !important; }
+
+  /* Filter boxes: two per row */
+  .bs-filter-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+
+  /* Grade Book filters: two per row */
+  .gb-filter-grid { grid-template-columns: 1fr 1fr !important; padding: 14px !important; gap: 10px !important; }
+  .gb-card-title { padding: 14px !important; font-size: 15px !important; }
+  .gb-filter-actions { padding: 10px 14px 16px !important; }
+  .gb-checkline { margin-left: 0 !important; }
+
+  /* Rows of tabs slide sideways instead of being cut off */
+  div:has(> .pr-tab), .as-tabs { overflow-x: auto !important; scrollbar-width: none; }
+  .pr-tab, .as-tab { flex-shrink: 0; white-space: nowrap; }
+
+  /* Staff page bleeds to the edges of the (smaller) phone padding */
+  .staff-employee-page { margin: -14px !important; padding: 0 14px 24px !important; }
+
+  /* Pop-up windows: tall ones scroll instead of running off the screen */
+  [id$="-modal"] { overflow-y: auto; }
+  [id$="-modal"] > div { max-width: calc(100vw - 20px) !important; }
+}
+
+@media (max-width: 480px) {
+  .gb-filter-grid, .bs-filter-grid { grid-template-columns: 1fr !important; }
+}
