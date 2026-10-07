@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Unique Children's School — Sign In</title>
+<link rel="icon" type="image/png" href="/report_assets/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -270,6 +271,8 @@ body::before { display:none; }
 ::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:99px; }
 /* Phones zoom in on text boxes smaller than 16px when tapped */
 @media (max-width:768px) { .field-input { font-size:16px; } }
+/* School logo (replaces the old letter badge) */
+.school-logo-img { background:none !important; border:none !important; border-radius:0 !important; box-shadow:none !important; padding:0 !important; width:auto !important; height:64px !important; object-fit:contain; flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -279,7 +282,7 @@ body::before { display:none; }
   <!-- ── STEP 1: ROLE PICKER ── -->
   <div class="step" id="step-select">
     <div class="card-top">
-      <div class="logo-mark">LS</div>
+      <img class="logo-mark school-logo-img" src="/report_assets/school-logo.png" alt="Unique Group of Schools">
       <div class="logo-name">Unique Children's School</div>
     </div>
     <div class="role-picker">

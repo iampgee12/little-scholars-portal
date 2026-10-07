@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Unique Children's School — Admin Portal</title>
+<link rel="icon" type="image/png" href="/report_assets/favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -2531,6 +2532,8 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
   .staff-session-box { display:none; }
 }
 /* END CODEX ADMIN SIDEBAR */
+/* School logo (replaces the old letter badge) */
+.school-logo-img { background:none !important; border:none !important; border-radius:0 !important; box-shadow:none !important; padding:0 !important; width:auto !important; height:44px !important; object-fit:contain; flex-shrink:0; }
 </style>
 <link rel="stylesheet" href="ui-buttons.css">
 <link rel="stylesheet" href="mobile.css">
@@ -2543,7 +2546,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
   <!-- ══ SIDEBAR ══ -->
   <aside class="sidebar admin-layout-sidebar" id="main-sidebar">
     <div class="sidebar-logo admin-brand">
-      <div class="logo-mark-sm">UG</div>
+      <img class="logo-mark-sm school-logo-img" src="/report_assets/school-logo.png" alt="Unique Group of Schools">
       <div><div class="logo-name-sm">Unique School</div><div class="logo-sub-sm">Admin Portal</div></div>
     </div>
     <div class="user-pill admin-user-card" onclick="switchTab('profile')" title="My profile">
@@ -4237,7 +4240,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 
           <!-- School header -->
           <div class="bs-school-header">
-            <div class="bs-school-logo-placeholder" id="bs-school-logo-wrap"><img src="/report_assets/school-logo.png" alt="" style="max-width:100%;max-height:100%;object-fit:contain;"></div>
+            <div class="bs-school-logo-placeholder" id="bs-school-logo-wrap"><img src="/report_assets/school-logo.png" alt="Unique Group of Schools" style="max-width:100%;max-height:100%;object-fit:contain;"></div>
             <div class="bs-hdr-name" id="bs-hdr-name">UNIQUE CHILDREN SCHOOL</div>
             <div class="bs-hdr-address" id="bs-hdr-address"></div>
             <div class="bs-hdr-contact" id="bs-hdr-contact"></div>

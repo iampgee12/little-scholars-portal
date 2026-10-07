@@ -108,7 +108,7 @@ function layoutReportSheet(s) {
   const headTop = 26;
   const headH = 84;
   rect(X0, headTop, X1 - X0, headH, { stroke: C.frame });
-  image('report_assets/sheet-logo.png', X0 + 9, headTop + 9, 60, 64, { fit: 'fill' });
+  image('report_assets/school-logo.png', X0 + 9, headTop + 9, 60, 64, { fit: 'fill' });
   image('report_assets/sheet-coat-of-arms.jpg', X1 - 57, headTop + 9, 48, 62, { fit: 'fill' });
   const cx = PAGE_W / 2;
   text(s.school.name.toUpperCase(), cx, headTop + 21, { size: 14.5, font: 'bold', c: C.blue, align: 'center', maxW: 390 });
@@ -178,7 +178,7 @@ function layoutReportSheet(s) {
   const tBottom = keyTop + keyH;
 
   // watermark: the school logo, faint, behind the table
-  image('report_assets/sheet-logo.png', 150, tTop + 40, 300, 201, { fit: 'fill', opacity: 0.07 });
+  image('report_assets/school-logo.png', 150, tTop + 40, 300, 201, { fit: 'fill', opacity: 0.07 });
 
   // columns: Subject · score columns · Score Grade · Grade Remark
   const scoreCols = s.columns; // [{ label, max, bold }]

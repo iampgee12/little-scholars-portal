@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CBT — Unique Children's School</title>
+<link rel="icon" type="image/png" href="/report_assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -154,12 +155,14 @@
   .cbt-result-emoji { font-size: 44px; }
   .cbt-result-big { font-family: 'DM Mono', monospace; font-size: 44px; font-weight: 700; color: var(--blue); margin: 10px 0 4px; }
   .cbt-result-pct { font-size: 18px; font-weight: 700; }
+/* School logo (replaces the old letter badge) */
+.school-logo-img { background:none !important; border:none !important; border-radius:0 !important; box-shadow:none !important; padding:0 !important; width:auto !important; height:32px !important; object-fit:contain; flex-shrink:0; }
 </style>
 <link rel="stylesheet" href="ui-buttons.css">
 </head>
 <body>
   <header class="cbt-header">
-    <div class="cbt-header-left"><span class="cbt-logo">CBT</span><span class="cbt-title-text">Computer Based Test</span></div>
+    <div class="cbt-header-left"><img class="cbt-logo school-logo-img" src="/report_assets/school-logo.png" alt="Unique Group of Schools"><span class="cbt-title-text">Computer Based Test</span></div>
     <div class="cbt-header-right">
       <span id="cbt-student-name"></span>
       <a href="student-portal.html" class="cbt-link-btn" id="cbt-back-portal">&larr; Portal</a>
