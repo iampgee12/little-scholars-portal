@@ -1251,8 +1251,6 @@ function populateGradebookControls() {
     (state.setup.examTypes || []).map(exam => `<option value="${escapeHtml(exam)}">${escapeHtml(exam)}</option>`).join('');
   classSelect.innerHTML = '<option value="">Select class...</option>' +
     (state.setup.classes || []).map(cls => `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`).join('');
-  if (subjectSelect) subjectSelect.innerHTML = '<option value="">All Subjects</option>' +
-    (state.setup.subjects || []).map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
   gbLoadArms();
 }
 
@@ -1261,6 +1259,7 @@ function gbLoadArms() {
   const armSel = document.getElementById('gb-arm');
   const label = document.getElementById('gb-arm-label');
   if (!armSel) return;
+  fillSubjectsForClass('gb-subject', classCode, 'All Subjects');
   const hasArms = (state.setup.classArms || []).some(a => a.classCode === classCode);
   armSel.innerHTML = hasArms ? attArmOptions(classCode, '— All Arms —') : '<option value="">— No Arms —</option>';
   armSel.disabled = !hasArms;
@@ -1547,8 +1546,9 @@ function toggleOfflinePanel() {
 function exportBroadsheetCsv() {
   const selection = gradebookSelection();
   const rows = [['Subject', 'Student', 'Student ID', 'CA', 'Examination', 'Total Score']];
-  (state.setup.subjects || []).forEach(subject => {
-    (state.setup.students || []).forEach(stu => {
+  if (!selection.classCode) { showToast('Select a class first'); return; }
+  subjectsForClass(selection.classCode).forEach(subject => {
+    (state.setup.students || []).filter(stu => stu.classCode === selection.classCode).forEach(stu => {
       rows.push([subject.name, stu.name, stu.id, '', '', '']);
     });
   });
@@ -1910,11 +1910,7 @@ function populateAdminControls() {
       `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`
     ).join('');
   }
-  if (subjectSelect) {
-    subjectSelect.innerHTML = '<option value="">Select subject...</option>' + state.setup.subjects.map(subject =>
-      `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
-    ).join('');
-  }
+  if (subjectSelect) fillSubjectsForClass('assign-subject', classSelect?.value || '', 'Select subject...');
 
   const studentClassSelect = document.getElementById('new-student-class');
   if (studentClassSelect) {
@@ -2799,8 +2795,7 @@ function populateTeacherSubjectForm() {
   const subjectSelect = document.getElementById('staff-new-subject-subject');
   if (classSelect) classSelect.innerHTML = '<option value="">Select class...</option>' +
     (state.setup.classes || []).map(item => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.label)}</option>`).join('');
-  if (subjectSelect) subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
-    (state.setup.subjects || []).map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+  if (subjectSelect) fillSubjectsForClass('staff-new-subject-subject', classSelect?.value || '', 'Select subject...');
 }
 
 async function changeStaffAssignmentRole(id, teacherType) {
@@ -3478,18 +3473,44 @@ function attCollectRadios(prefix, ids) {
   return records;
 }
 
-function subjectOptionsForClass(classCode, placeholder) {
+// Subject dropdowns list only the subjects assigned to the chosen class
+// (Academics → Class Subjects) — never every subject in the school.
+const CLASS_SUBJECT_PAIRS = {
+  'gb-class': ['gb-subject', 'All Subjects'],
+  'assign-class': ['assign-subject', 'Select subject...'],
+  'staff-new-subject-class': ['staff-new-subject-subject', 'Select subject...'],
+  'sched-exam-class': ['sched-exam-subject', '— Select Subject —'],
+  'qb-class': ['qb-subject', 'Select Subject'],
+};
+document.addEventListener('change', e => {
+  const pair = CLASS_SUBJECT_PAIRS[e.target?.id];
+  if (pair) fillSubjectsForClass(pair[0], e.target.value, pair[1]);
+}, true);
+
+function subjectsForClass(classCode) {
   const seen = new Map();
   (state.setup.classSubjects || []).filter(cs => cs.classCode === classCode).forEach(cs => {
     if (!seen.has(cs.subjectId)) seen.set(cs.subjectId, cs.subjectName);
   });
-  // Fall back to the full subject bank when this class has no explicit
-  // subject linkage set up yet, so attendance marking isn't blocked on it.
-  if (!seen.size) {
-    (state.setup.subjects || []).forEach(s => seen.set(s.id, s.name));
-  }
+  return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function subjectOptionsForClass(classCode, placeholder) {
+  if (!classCode) return '<option value="">Select a class first</option>';
+  const subjects = subjectsForClass(classCode);
+  if (!subjects.length) return '<option value="">No subjects assigned to this class yet</option>';
   return `<option value="">${escapeHtml(placeholder || 'Select Subject')}</option>` +
-    [...seen.entries()].map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`).join('');
+    subjects.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+
+// Refills a subject dropdown for a class, keeping the current choice if that
+// class has it.
+function fillSubjectsForClass(selectId, classCode, placeholder) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const previous = select.value;
+  select.innerHTML = subjectOptionsForClass(classCode, placeholder);
+  if (previous && [...select.options].some(o => o.value === previous)) select.value = previous;
 }
 
 function attAggregate(students, records) {
@@ -4583,8 +4604,7 @@ function populateScheduleExamSelects() {
   const subjSel  = document.getElementById('sched-exam-subject');
   if (classSel) classSel.innerHTML = '<option value="">— Select Class —</option>' +
     (state.setup.classes||[]).map(c=>`<option value="${c.code}">${c.label}</option>`).join('');
-  if (subjSel) subjSel.innerHTML = '<option value="">— Select Subject —</option>' +
-    (state.setup.subjects||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  if (subjSel) fillSubjectsForClass('sched-exam-subject', classSel?.value || '', '— Select Subject —');
 }
 
 async function submitScheduleExam() {
@@ -4654,8 +4674,7 @@ function qbInit() {
   const subjSel = document.getElementById('qb-subject');
   if (classSel) classSel.innerHTML = '<option value="">Select Class</option>' +
     (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
-  if (subjSel) subjSel.innerHTML = '<option value="">Select Subject</option>' +
-    (state.setup.subjects || []).map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  if (subjSel) fillSubjectsForClass('qb-subject', classSel?.value || '', 'Select Subject');
   document.getElementById('qb-bank-card').style.display = 'none';
 }
 

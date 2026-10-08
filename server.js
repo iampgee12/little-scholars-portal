@@ -2233,15 +2233,15 @@ function adminGradebook(classCode, examType) {
     });
   });
 
-  // Subjects with no scores yet are listed too (batchId null) so the admin
-  // can enter scores for any subject: the class's own subjects if set up,
-  // otherwise every subject.
+  // The class's own subjects (Academics → Class Subjects) with no scores yet
+  // are listed too (batchId null) so the admin can enter them. Only that
+  // class's subjects — never every subject in the school.
   const classSubjects = all(
     `SELECT DISTINCT s.id, s.name, s.code FROM class_subjects cs
      JOIN subjects s ON s.id = cs.subject_id WHERE cs.class_code = ? ORDER BY s.name`,
     classCode
   );
-  (classSubjects.length ? classSubjects : all('SELECT id, name, code FROM subjects ORDER BY name')).forEach(sub => {
+  classSubjects.forEach(sub => {
     if (seenSubjects.has(sub.id)) return;
     seenSubjects.add(sub.id);
     subjects.push({ id: sub.id, name: sub.name, code: sub.code, teacherName: '', batchId: null, vettedAt: null });
