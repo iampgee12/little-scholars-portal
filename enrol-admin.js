@@ -11,7 +11,7 @@ const EN = {
   photoDataUrl: '',
   family: { mode: 'create', id: null, slots: {} }, // family modal state
   sr: { view: 'dashboard', kind: 'student', status: 'pending', rows: [], page: 1, perPage: 25, search: '', from: '', to: '', selected: new Set() },
-  srSettings: null,
+  sregSettings: null,
 };
 
 const EN_STEPS = ['Parents / Family', 'Basic Biodata', 'Academics', 'More Information', 'Next of Kin'];
@@ -80,7 +80,7 @@ function enrolRenderShell() {
   root.innerHTML = `${tabs}<div id="en-body"></div>`;
   if (EN.tab === 'enroll') enrolRenderWizard();
   else if (EN.tab === 'bulk') bulkRender();
-  else srRenderList(document.getElementById('en-body'), 'student', true);
+  else sregRenderList(document.getElementById('en-body'), 'student', true);
 }
 
 // ── Enroll a Student: 5-step wizard ─────────────────────────────────────
@@ -655,31 +655,31 @@ function bulkResultHtml(r) {
 }
 
 // ── Self Registration (management) ──────────────────────────────────────
-async function srOpen(view = 'dashboard') {
+async function sregOpen(view = 'dashboard') {
   EN.sr.view = view;
   const root = document.getElementById('sr-root');
   if (!root) return;
   const tabs = [['dashboard', 'Dashboard'], ['student', 'Students'], ['parent', 'Parents'], ['staff', 'Staff'], ['settings', 'Settings']];
-  root.innerHTML = `<div class="en-tabs">${tabs.map(([k, l]) => `<button class="en-tab${view === k ? ' active' : ''}" onclick="srOpen('${k}')">${l}</button>`).join('')}</div><div id="sr-body"></div>`;
+  root.innerHTML = `<div class="en-tabs">${tabs.map(([k, l]) => `<button class="en-tab${view === k ? ' active' : ''}" onclick="sregOpen('${k}')">${l}</button>`).join('')}</div><div id="sr-body"></div>`;
   const body = document.getElementById('sr-body');
-  if (view === 'dashboard') return srDashboard(body);
-  if (view === 'settings') return srSettings(body);
-  return srRenderList(body, view, false);
+  if (view === 'dashboard') return sregDashboard(body);
+  if (view === 'settings') return sregSettings(body);
+  return sregRenderList(body, view, false);
 }
 
-async function srDashboard(body) {
+async function sregDashboard(body) {
   body.innerHTML = '<div class="card"><div class="card-body en-hint">Loading…</div></div>';
   try {
     const { counts } = await apiFetch('/api/admin/selfreg/summary');
     const pending = kind => counts.filter(c => c.kind === kind && c.status === 'pending').reduce((a, c) => a + c.n, 0);
     const card = (kind, title) => `<div class="card sr-dash-card"><div class="card-body">
       <div class="sr-dash-title">${title}</div><div class="sr-dash-sub">${pending(kind)} Pending Submission${pending(kind) === 1 ? '' : 's'}</div>
-      <button class="post-btn btn-sm" onclick="srOpen('${kind}')">View Submissions</button></div></div>`;
+      <button class="post-btn btn-sm" onclick="sregOpen('${kind}')">View Submissions</button></div></div>`;
     body.innerHTML = `<div class="sr-dash">${card('student', 'Student Registrations')}${card('parent', 'Parent Registrations')}${card('staff', 'Staff Registrations')}</div>`;
   } catch (err) { body.innerHTML = `<div class="card"><div class="card-body">${enrolEsc(err.message)}</div></div>`; }
 }
 
-async function srRenderList(body, kind, fromEnrol) {
+async function sregRenderList(body, kind, fromEnrol) {
   EN.sr.kind = kind;
   EN.sr.selected = new Set();
   EN.sr.page = 1;
@@ -687,31 +687,31 @@ async function srRenderList(body, kind, fromEnrol) {
   const statuses = [['pending', 'Pending'], ['accepted', 'Accepted'], ['rejected', 'Rejected'], ['bypassed', 'Bypassed']];
   const third = kind === 'parent' ? 'Children' : kind === 'staff' ? 'Staff Type' : 'Class';
   body.innerHTML = `<div class="card"><div class="card-head"><span class="card-title">Self Registration${kind === 'student' ? '' : ` — ${kind === 'parent' ? 'Parents' : 'Staff'}`}</span>
-      <button class="btn-outline btn-sm" onclick="${fromEnrol ? "switchTab('selfRegistration', document.querySelector('[data-tab=selfRegistration]')); srOpen('settings')" : "srOpen('settings')"}">Settings</button></div>
+      <button class="btn-outline btn-sm" onclick="${fromEnrol ? "switchTab('selfRegistration', document.querySelector('[data-tab=selfRegistration]')); sregOpen('settings')" : "sregOpen('settings')"}">Settings</button></div>
     <div class="card-body">
-      <div class="sr-status">${statuses.map(([k, l]) => `<button class="sr-status-btn${EN.sr.status === k ? ' active' : ''}" onclick="EN.sr.status='${k}'; srLoad()" title="${k === 'bypassed' ? 'Submissions from someone already registered with the school (same email)' : ''}">${k === 'bypassed' ? '&#9888; ' : ''}${l}</button>`).join('')}</div>
+      <div class="sr-status">${statuses.map(([k, l]) => `<button class="sr-status-btn${EN.sr.status === k ? ' active' : ''}" onclick="EN.sr.status='${k}'; sregLoad()" title="${k === 'bypassed' ? 'Submissions from someone already registered with the school (same email)' : ''}">${k === 'bypassed' ? '&#9888; ' : ''}${l}</button>`).join('')}</div>
       <div class="sr-filters">
-        <label>From <input type="date" class="field-input" id="sr-from" value="${EN.sr.from}" onchange="EN.sr.from=this.value; srPaint()"></label>
-        <label>To <input type="date" class="field-input" id="sr-to" value="${EN.sr.to}" onchange="EN.sr.to=this.value; srPaint()"></label>
-        <button class="btn-outline btn-sm" title="Clear dates" onclick="EN.sr.from=''; EN.sr.to=''; document.getElementById('sr-from').value=''; document.getElementById('sr-to').value=''; srPaint()">&times;</button>
+        <label>From <input type="date" class="field-input" id="sr-from" value="${EN.sr.from}" onchange="EN.sr.from=this.value; sregPaint()"></label>
+        <label>To <input type="date" class="field-input" id="sr-to" value="${EN.sr.to}" onchange="EN.sr.to=this.value; sregPaint()"></label>
+        <button class="btn-outline btn-sm" title="Clear dates" onclick="EN.sr.from=''; EN.sr.to=''; document.getElementById('sr-from').value=''; document.getElementById('sr-to').value=''; sregPaint()">&times;</button>
       </div>
       <div class="sr-tools">
-        <label><select class="ctrl-select" onchange="EN.sr.perPage=Number(this.value); EN.sr.page=1; srPaint()">${[10, 25, 50, 100].map(n => `<option${n === EN.sr.perPage ? ' selected' : ''}>${n}</option>`).join('')}</select> records per page</label>
-        <input class="search-input" placeholder="Search" value="${enrolEsc(EN.sr.search)}" oninput="EN.sr.search=this.value; EN.sr.page=1; srPaint()">
+        <label><select class="ctrl-select" onchange="EN.sr.perPage=Number(this.value); EN.sr.page=1; sregPaint()">${[10, 25, 50, 100].map(n => `<option${n === EN.sr.perPage ? ' selected' : ''}>${n}</option>`).join('')}</select> records per page</label>
+        <input class="search-input" placeholder="Search" value="${enrolEsc(EN.sr.search)}" oninput="EN.sr.search=this.value; EN.sr.page=1; sregPaint()">
       </div>
-      <div class="sr-table-wrap"><table class="data-table"><thead><tr><th><input type="checkbox" id="sr-all" onchange="srSelectAll(this.checked)"></th><th>Name</th><th>Email</th><th>Phone</th><th>${third}</th><th>Date Submitted</th><th>Status</th><th>Reviewed By</th><th>Actions</th></tr></thead><tbody id="sr-tbody"></tbody></table></div>
+      <div class="sr-table-wrap"><table class="data-table"><thead><tr><th><input type="checkbox" id="sr-all" onchange="sregSelectAll(this.checked)"></th><th>Name</th><th>Email</th><th>Phone</th><th>${third}</th><th>Date Submitted</th><th>Status</th><th>Reviewed By</th><th>Actions</th></tr></thead><tbody id="sr-tbody"></tbody></table></div>
       <div class="sr-foot"><span id="sr-showing"></span><div class="sr-pages" id="sr-pages"></div></div>
       <div class="sr-bulk"><button class="btn-outline btn-sm" onclick="this.nextElementSibling.classList.toggle('open')">Action on Selected &#9662;</button>
         <div class="sr-bulk-menu">
-          <button onclick="srBulk('accept')">Bulk Review (Accept)</button>
-          <button onclick="srBulk('reject')">Bulk Reject</button>
-          <button class="danger" onclick="srBulk('delete')">Bulk Delete</button>
+          <button onclick="sregBulk('accept')">Bulk Review (Accept)</button>
+          <button onclick="sregBulk('reject')">Bulk Reject</button>
+          <button class="danger" onclick="sregBulk('delete')">Bulk Delete</button>
         </div></div>
     </div></div>`;
-  await srLoad();
+  await sregLoad();
 }
 
-async function srLoad() {
+async function sregLoad() {
   const body = EN.sr.container;
   body.querySelectorAll('.sr-status-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(EN.sr.status)));
   try {
@@ -719,11 +719,11 @@ async function srLoad() {
     EN.sr.rows = rows;
     EN.sr.selected = new Set();
     EN.sr.page = 1;
-    srPaint();
+    sregPaint();
   } catch (err) { showToast(err.message); }
 }
 
-function srFiltered() {
+function sregFiltered() {
   const q = EN.sr.search.toLowerCase();
   return EN.sr.rows.filter(r => {
     const day = String(r.submittedAt).slice(0, 10);
@@ -733,8 +733,8 @@ function srFiltered() {
   });
 }
 
-function srPaint() {
-  const rows = srFiltered();
+function sregPaint() {
+  const rows = sregFiltered();
   const pages = Math.max(1, Math.ceil(rows.length / EN.sr.perPage));
   EN.sr.page = Math.min(EN.sr.page, pages);
   const start = (EN.sr.page - 1) * EN.sr.perPage;
@@ -746,29 +746,29 @@ function srPaint() {
       <td><input type="checkbox" ${EN.sr.selected.has(r.id) ? 'checked' : ''} onchange="this.checked ? EN.sr.selected.add(${r.id}) : EN.sr.selected.delete(${r.id})"></td>
       <td><strong>${enrolEsc(r.name)}</strong></td><td>${enrolEsc(r.email)}</td><td>${enrolEsc(r.phone)}</td><td>${enrolEsc(r.classLabel)}</td>
       <td>${fmt(r.submittedAt)}</td><td><span class="sr-pill ${r.status}">${enrolEsc(r.status)}</span></td><td>${enrolEsc(r.reviewedBy || '')}</td>
-      <td class="sr-actions"><button class="btn-outline btn-sm" onclick="srView(${r.id})">View</button>${r.status !== 'accepted' ? `<button class="post-btn btn-sm" onclick="srAct([${r.id}], 'accept')">Accept</button>` : ''}${r.status === 'pending' || r.status === 'bypassed' ? `<button class="del-btn btn-sm" onclick="srAct([${r.id}], 'reject')">Reject</button>` : ''}</td>
+      <td class="sr-actions"><button class="btn-outline btn-sm" onclick="sregView(${r.id})">View</button>${r.status !== 'accepted' ? `<button class="post-btn btn-sm" onclick="sregAct([${r.id}], 'accept')">Accept</button>` : ''}${r.status === 'pending' || r.status === 'bypassed' ? `<button class="del-btn btn-sm" onclick="sregAct([${r.id}], 'reject')">Reject</button>` : ''}</td>
     </tr>`).join('') : '<tr><td colspan="9" class="sr-empty">No data available in table</td></tr>';
   document.getElementById('sr-showing').textContent = `Showing ${rows.length ? start + 1 : 0} to ${start + shown.length} of ${rows.length} entries`;
-  const btn = (label, page, disabled) => `<button class="btn-outline btn-sm" ${disabled ? 'disabled' : ''} onclick="EN.sr.page=${page}; srPaint()">${label}</button>`;
+  const btn = (label, page, disabled) => `<button class="btn-outline btn-sm" ${disabled ? 'disabled' : ''} onclick="EN.sr.page=${page}; sregPaint()">${label}</button>`;
   document.getElementById('sr-pages').innerHTML = btn('&laquo;', 1, EN.sr.page === 1) + btn('&lsaquo;', EN.sr.page - 1, EN.sr.page === 1) + `<span>${EN.sr.page} / ${pages}</span>` + btn('&rsaquo;', EN.sr.page + 1, EN.sr.page === pages) + btn('&raquo;', pages, EN.sr.page === pages);
   const all = document.getElementById('sr-all');
   if (all) all.checked = shown.length > 0 && shown.every(r => EN.sr.selected.has(r.id));
 }
 
-function srSelectAll(on) {
-  const rows = srFiltered();
+function sregSelectAll(on) {
+  const rows = sregFiltered();
   const start = (EN.sr.page - 1) * EN.sr.perPage;
   rows.slice(start, start + EN.sr.perPage).forEach(r => (on ? EN.sr.selected.add(r.id) : EN.sr.selected.delete(r.id)));
-  srPaint();
+  sregPaint();
 }
 
-function srBulk(action) {
+function sregBulk(action) {
   document.querySelector('.sr-bulk-menu')?.classList.remove('open');
   if (!EN.sr.selected.size) return showToast('Tick at least one submission first');
-  srAct([...EN.sr.selected], action);
+  sregAct([...EN.sr.selected], action);
 }
 
-async function srAct(ids, action, overrides) {
+async function sregAct(ids, action, overrides) {
   if (action === 'delete' && !confirm(`Delete ${ids.length} submission${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
   let note = '';
   if (action === 'reject') {
@@ -786,11 +786,11 @@ async function srAct(ids, action, overrides) {
     else showToast(action === 'accept' ? 'Accepted' : action === 'reject' ? 'Rejected' : 'Deleted');
     document.getElementById('sr-modal')?.remove();
     if (typeof populateStudents === 'function') populateStudents();
-    await srLoad();
+    await sregLoad();
   } catch (err) { showToast(err.message); }
 }
 
-async function srView(id) {
+async function sregView(id) {
   try {
     const { submission: s, fieldSets, staffTypes } = await apiFetch(`/api/admin/selfreg/${id}`);
     const fields = fieldSets[s.kind];
@@ -827,7 +827,7 @@ async function srView(id) {
     modal.innerHTML = `<div class="en-modal-box wide"><div class="en-modal-head"><span>${enrolEsc(s.name)} <span class="sr-pill ${s.status}">${enrolEsc(s.status)}</span></span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
       <div class="en-modal-body">${s.outcome ? `<div class="en-info">${enrolEsc(s.outcome)}</div>` : ''}${s.note ? `<div class="en-info">Rejection note: ${enrolEsc(s.note)}</div>` : ''}${detail}${accept}</div>
       <div class="en-modal-foot"><button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button>
-        ${s.status !== 'accepted' ? `<button class="del-btn" onclick="srAct([${s.id}], 'reject')">Reject</button><button class="post-btn" onclick="srAcceptFromView(${s.id})">Accept</button>` : ''}</div></div>`;
+        ${s.status !== 'accepted' ? `<button class="del-btn" onclick="sregAct([${s.id}], 'reject')">Reject</button><button class="post-btn" onclick="sregAcceptFromView(${s.id})">Accept</button>` : ''}</div></div>`;
     document.body.appendChild(modal);
     if (d.class_arm && document.getElementById('srv-arm')) document.getElementById('srv-arm').value = d.class_arm;
     (d.children || []).forEach((c, i) => { const arm = document.getElementById(`srv-c${i}-arm`); if (arm && c.class_arm) arm.value = c.class_arm; });
@@ -835,7 +835,7 @@ async function srView(id) {
   } catch (err) { showToast(err.message); }
 }
 
-function srAcceptFromView(id) {
+function sregAcceptFromView(id) {
   const overrides = {};
   const cls = document.getElementById('srv-class');
   if (cls) {
@@ -850,31 +850,31 @@ function srAcceptFromView(id) {
       classCode: document.getElementById(`srv-c${i}-class`)?.value || '', classArmId: document.getElementById(`srv-c${i}-arm`)?.value || '',
     }));
   }
-  srAct([id], 'accept', overrides);
+  sregAct([id], 'accept', overrides);
 }
 
 // Settings
-async function srSettings(body) {
+async function sregSettings(body) {
   body.innerHTML = '<div class="card"><div class="card-body en-hint">Loading…</div></div>';
   try {
-    EN.srSettings = await apiFetch('/api/admin/selfreg/settings');
+    EN.sregSettings = await apiFetch('/api/admin/selfreg/settings');
   } catch (err) { body.innerHTML = enrolEsc(err.message); return; }
-  const { settings: s, staffTypes } = EN.srSettings;
+  const { settings: s, staffTypes } = EN.sregSettings;
   const origin = location.origin;
   const toggle = (id, on) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" id="${id}" onclick="this.classList.toggle('on'); this.classList.toggle('off'); this.firstElementChild.textContent = this.classList.contains('on') ? 'ON' : 'OFF'"><span>${on ? 'ON' : 'OFF'}</span></button>`;
   const codeRow = (label, sub, code, which, link) => `<div class="sr-code"><div class="field-label">${label}</div><div class="en-hint">${sub}</div>
-      <div class="sr-code-row"><input class="field-input" readonly value="${enrolEsc(code || '(Not generated yet)')}"><button class="btn-outline btn-sm" onclick="srRegenerate('${which}')">&#8635; Regenerate</button></div></div>
+      <div class="sr-code-row"><input class="field-input" readonly value="${enrolEsc(code || '(Not generated yet)')}"><button class="btn-outline btn-sm" onclick="sregRegenerate('${which}')">&#8635; Regenerate</button></div></div>
     <div class="sr-code"><div class="field-label">${link[0]}</div><div class="en-hint">${link[1]}</div>
-      <div class="sr-code-row"><input class="field-input" readonly id="sr-link-${which}" value="${enrolEsc(link[2])}"><button class="btn-outline btn-sm" onclick="srCopy('sr-link-${which}')">Copy link</button></div></div>`;
+      <div class="sr-code-row"><input class="field-input" readonly id="sr-link-${which}" value="${enrolEsc(link[2])}"><button class="btn-outline btn-sm" onclick="sregCopy('sr-link-${which}')">Copy link</button></div></div>`;
   body.innerHTML = `<div class="sr-settings">
     <div class="card"><div class="card-head"><span class="card-title">Student &amp; Parent Registration</span></div><div class="card-body">
-      <div class="sr-set-row"><span>Enable Student Self-Registration</span>${toggle('srs-student', s.student.enabled)}<button class="btn-outline btn-sm" onclick="srFieldsModal('student')">Configure Form Fields</button></div>
-      <div class="sr-set-row"><span>Enable Parent Self-Registration</span>${toggle('srs-parent', s.parent.enabled)}<button class="btn-outline btn-sm" onclick="srFieldsModal('parent')">Configure Form Fields</button></div>
+      <div class="sr-set-row"><span>Enable Student Self-Registration</span>${toggle('srs-student', s.student.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('student')">Configure Form Fields</button></div>
+      <div class="sr-set-row"><span>Enable Parent Self-Registration</span>${toggle('srs-parent', s.parent.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('parent')">Configure Form Fields</button></div>
       ${codeRow('Access Code (Student &amp; Parent)', 'Share this code — and only this code — with students and parents', s.codes.studentParent, 'studentParent',
         ['Shareable Link (Student &amp; Parent)', 'Share with students and parents — they pick their registration type on the registration page', `${origin}/register.html`])}
     </div></div>
     <div class="card"><div class="card-head"><span class="card-title">Staff Registration</span></div><div class="card-body">
-      <div class="sr-set-row"><span>Enable Staff Self-Registration</span>${toggle('srs-staff', s.staff.enabled)}<button class="btn-outline btn-sm" onclick="srFieldsModal('staff')">Configure Form Fields</button></div>
+      <div class="sr-set-row"><span>Enable Staff Self-Registration</span>${toggle('srs-staff', s.staff.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('staff')">Configure Form Fields</button></div>
       <div class="field-label" style="margin-top:12px;">Staff Types Allowed for Self-Registration</div><div class="en-hint">Select which staff types can self-register</div>
       <div class="sr-types">${staffTypes.map(([k, l]) => `<label class="en-check"><input type="checkbox" class="srs-type" value="${k}"${s.staff.types.includes(k) ? ' checked' : ''}> ${enrolEsc(l)}</label>`).join('')}</div>
       ${codeRow('Access Code (Staff Only)', 'Share this separately — only with staff. Never share with students or parents.', s.codes.staff, 'staff',
@@ -889,45 +889,45 @@ async function srSettings(body) {
         <li>This feature is <strong>disabled by default</strong> for this reason — only enable it when needed</li></ul>
       <p>All submissions go into a pending review queue. No account is created until an admin explicitly accepts the submission.</p>
     </div>
-    <div class="en-center"><button class="post-btn" onclick="srSaveSettings(this)">Save Settings</button></div>
+    <div class="en-center"><button class="post-btn" onclick="sregSaveSettings(this)">Save Settings</button></div>
   </div>`;
 }
 
-async function srPostSettings(payload) {
+async function sregPostSettings(payload) {
   const data = await apiFetch('/api/admin/selfreg/settings', { method: 'POST', body: JSON.stringify(payload) });
-  EN.srSettings.settings = data.settings;
+  EN.sregSettings.settings = data.settings;
   return data.settings;
 }
 
-async function srSaveSettings(btn) {
+async function sregSaveSettings(btn) {
   const on = id => document.getElementById(id).classList.contains('on');
   btn.disabled = true;
   try {
-    await srPostSettings({
+    await sregPostSettings({
       student: { enabled: on('srs-student') }, parent: { enabled: on('srs-parent') },
       staff: { enabled: on('srs-staff'), types: [...document.querySelectorAll('.srs-type:checked')].map(i => i.value) },
     });
     showToast('Settings saved');
-    srSettings(document.getElementById('sr-body'));
+    sregSettings(document.getElementById('sr-body'));
   } catch (err) { showToast(err.message); } finally { btn.disabled = false; }
 }
 
-async function srRegenerate(which) {
+async function sregRegenerate(which) {
   if (!confirm('Generate a new access code? The old code stops working immediately.')) return;
   try {
     await apiFetch('/api/admin/selfreg/regenerate', { method: 'POST', body: JSON.stringify({ which }) });
     showToast('New code generated');
-    srSettings(document.getElementById('sr-body'));
+    sregSettings(document.getElementById('sr-body'));
   } catch (err) { showToast(err.message); }
 }
 
-function srCopy(id) {
+function sregCopy(id) {
   const input = document.getElementById(id);
   navigator.clipboard?.writeText(input.value).then(() => showToast('Link copied'), () => { input.select(); document.execCommand('copy'); showToast('Link copied'); });
 }
 
-function srFieldsModal(kind) {
-  const { settings, fieldSets } = EN.srSettings;
+function sregFieldsModal(kind) {
+  const { settings, fieldSets } = EN.sregSettings;
   const s = settings[kind];
   const title = { student: 'Student', parent: 'Parent', staff: 'Staff' }[kind];
   let lastGroup = '';
@@ -935,10 +935,10 @@ function srFieldsModal(kind) {
     const f = s.fields[key] || {};
     const head = group !== lastGroup ? `<tr class="sr-group"><td colspan="3">${enrolEsc(group)}</td></tr>` : '';
     lastGroup = group;
-    const sw = (prop, on, disabled) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" ${disabled ? 'disabled title="This field cannot be hidden"' : ''} onclick="srFieldToggle('${kind}', '${key}', '${prop}', this)"><span>${on ? 'ON' : 'OFF'}</span></button>${disabled ? ' <span class="sr-lock" title="Locked">&#128274;</span>' : ''}`;
+    const sw = (prop, on, disabled) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" ${disabled ? 'disabled title="This field cannot be hidden"' : ''} onclick="sregFieldToggle('${kind}', '${key}', '${prop}', this)"><span>${on ? 'ON' : 'OFF'}</span></button>${disabled ? ' <span class="sr-lock" title="Locked">&#128274;</span>' : ''}`;
     return `${head}<tr><td>${enrolEsc(label)}</td><td>${sw('show', f.show, locked)}</td><td>${sw('required', f.required, locked)}</td></tr>`;
   }).join('');
-  const setting = (prop, label, sub) => `<div class="sr-set-row"><div><strong>${label}</strong><div class="en-hint">${sub}</div></div><button type="button" class="rsp-toggle ${s[prop] ? 'on' : 'off'}" onclick="srFlagToggle('${kind}', '${prop}', this)"><span>${s[prop] ? 'ON' : 'OFF'}</span></button></div>`;
+  const setting = (prop, label, sub) => `<div class="sr-set-row"><div><strong>${label}</strong><div class="en-hint">${sub}</div></div><button type="button" class="rsp-toggle ${s[prop] ? 'on' : 'off'}" onclick="sregFlagToggle('${kind}', '${prop}', this)"><span>${s[prop] ? 'ON' : 'OFF'}</span></button></div>`;
   const modal = document.createElement('div');
   modal.className = 'en-modal';
   modal.style.display = 'flex';
@@ -954,13 +954,13 @@ function srFieldsModal(kind) {
   document.body.appendChild(modal);
 }
 
-async function srFieldToggle(kind, key, prop, btn) {
-  const f = { ...EN.srSettings.settings[kind].fields[key] };
+async function sregFieldToggle(kind, key, prop, btn) {
+  const f = { ...EN.sregSettings.settings[kind].fields[key] };
   f[prop] = !f[prop];
   if (prop === 'show' && !f.show) f.required = false;
   if (prop === 'required' && f.required) f.show = true;
   try {
-    const s = await srPostSettings({ [kind]: { fields: { [key]: f } } });
+    const s = await sregPostSettings({ [kind]: { fields: { [key]: f } } });
     const row = btn.closest('tr');
     const [showBtn, reqBtn] = row.querySelectorAll('.rsp-toggle');
     const now = s[kind].fields[key];
@@ -968,9 +968,9 @@ async function srFieldToggle(kind, key, prop, btn) {
   } catch (err) { showToast(err.message); }
 }
 
-async function srFlagToggle(kind, prop, btn) {
+async function sregFlagToggle(kind, prop, btn) {
   try {
-    const s = await srPostSettings({ [kind]: { [prop]: !EN.srSettings.settings[kind][prop] } });
+    const s = await sregPostSettings({ [kind]: { [prop]: !EN.sregSettings.settings[kind][prop] } });
     const on = s[kind][prop];
     btn.className = `rsp-toggle ${on ? 'on' : 'off'}`;
     btn.firstElementChild.textContent = on ? 'ON' : 'OFF';

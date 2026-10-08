@@ -430,18 +430,6 @@ function switchAsTab(tab, btn) {
   document.getElementById(`as-panel-${tab}`).classList.add('active');
 }
 
-function fileToDataUrl(inputId) {
-  const input = document.getElementById(inputId);
-  const file = input?.files?.[0];
-  if (!file) return Promise.resolve('');
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
-    reader.readAsDataURL(file);
-  });
-}
-
 async function saveProfile(btn) {
   const val = id => document.getElementById(id)?.value.trim() || '';
   btn.disabled = true;

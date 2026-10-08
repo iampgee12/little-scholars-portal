@@ -130,18 +130,6 @@ function priorityColor(p) {
   return 'var(--green)';
 }
 
-function fileToDataUrl(inputId) {
-  const input = document.getElementById(inputId);
-  const file = input?.files?.[0];
-  if (!file) return Promise.resolve('');
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
-    reader.readAsDataURL(file);
-  });
-}
-
 let announcements = [
   { id: Date.now() + 1, title: 'Results Submission Deadline', body: 'All teachers must submit Term 2 results by Friday 30 May 2026. Contact the Registrar if you need an extension.', date: '13 MAY 2026', priority: 'urgent' },
   { id: Date.now() + 2, title: 'Inter-School Sports Day', body: 'All staff required on duty on Friday 17 May. PE teachers to report by 7:00 AM.', date: '12 MAY 2026', priority: 'important' },
@@ -168,7 +156,6 @@ async function init() {
     populateDashboard();
     populateStudents();
     populateParents();
-    clearStudentForm();
     populateStaff();
     renderAnnouncements();
     if (!restoreTabFromUrl()) bootstrapClassResultLink();
@@ -1283,14 +1270,6 @@ function gradebookSelection() {
   };
 }
 
-function findGradebookBatch(selection) {
-  return (state.setup.resultBatches || []).find(batch =>
-    batch.classCode === selection.classCode
-    && batch.examType === selection.examType
-    && batch.subjectName === selection.subjectName
-  );
-}
-
 function gradebookIsPublished(selection) {
   // current term only (publications is a recent-activity list across all terms)
   return (state.setup.publishedResults || []).some(row => row.classCode === selection.classCode && row.examType === selection.examType);
@@ -1809,22 +1788,6 @@ function renderCognitiveSkillTable(group, rating, editMode, barIcon) {
     </div>`;
 }
 
-function renderCognitiveSkillGroups(rating, editMode) {
-  return SKILL_GROUPS.map(group => `
-    <div class="cog-skill-group">
-      <div class="cog-skill-group-head">
-        <strong>${escapeHtml(group.title)}</strong>
-        <span>Scale 1-5</span>
-      </div>
-      <div class="cog-skill-grid">
-        ${group.skills.map(([key, label]) => {
-          const value = rating[group.key]?.[key] ?? '';
-          return `<div class="cog-skill-row"><span>${escapeHtml(label)}</span><strong>${value ? escapeHtml(String(value)) : '-'}</strong></div>`;
-        }).join('')}
-      </div>
-    </div>`).join('');
-}
-
 function closeCognitiveModal() {
   const modal = document.getElementById('cog-modal');
   if (modal) modal.style.display = 'none';
@@ -2090,36 +2053,6 @@ function renderEmailConfigStatus() {
     </div>`;
 }
 
-async function publishReports() {
-  const payload = {
-    classCode: document.getElementById('publish-class').value,
-    examType: document.getElementById('publish-exam').value,
-  };
-  if (!payload.classCode || !payload.examType) {
-    showToast('Choose a class and exam to publish');
-    return;
-  }
-  try {
-    const data = await apiFetch('/api/admin/reports/publish', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    state.setup = data.setup;
-    renderPublications();
-    renderEmailQueue();
-    renderEmailConfigStatus();
-    const sent = data.published.filter(row => row.emailStatus === 'sent').length;
-    const notConfigured = data.published.filter(row => row.emailStatus === 'email_not_configured').length;
-    const failed = data.published.filter(row => row.emailStatus === 'email_failed').length;
-    if (sent) showToast(`${data.published.length} report PDFs published, ${sent} emailed`);
-    else if (notConfigured) showToast(`${data.published.length} PDFs published. Email is not configured.`);
-    else if (failed) showToast(`${data.published.length} PDFs published. Email sending failed.`);
-    else showToast(`${data.published.length} report PDFs published`);
-  } catch (err) {
-    showToast(err.message);
-  }
-}
-
 function renderSignaturesPanel() {
   const setup = state.setup;
   if (!setup) return;
@@ -2253,93 +2186,6 @@ function syncStudentAssetFields() {
   email.value = student?.parentEmail || '';
 }
 
-async function updateStudentAssets() {
-  const studentId = document.getElementById('asset-student').value;
-  if (!studentId) return showToast('Choose a student');
-  let photoDataUrl = '';
-  try {
-    photoDataUrl = await photoInputToDataUrl('asset-student-photo');
-  } catch (err) {
-    showToast(err.message);
-    return;
-  }
-  try {
-    const data = await apiFetch(`/api/admin/students/${encodeURIComponent(studentId)}/assets`, {
-      method: 'POST',
-      body: JSON.stringify({
-        parentEmail: document.getElementById('asset-parent-email').value,
-        photoDataUrl,
-      }),
-    });
-    state.setup = data.setup;
-    populateStudents();
-    populateAdminControls();
-    renderPublications();
-    document.getElementById('asset-student').value = studentId;
-    syncStudentAssetFields();
-    document.getElementById('asset-student-photo').value = '';
-    showToast('Student details updated');
-  } catch (err) {
-    showToast(err.message);
-  }
-}
-
-function updateStudentFormChrome(editing, student = null) {
-  const pageTitle = document.getElementById('stu-form-page-title');
-  const pageSub = document.getElementById('stu-form-page-sub');
-  const deleteBtn = document.getElementById('student-delete-btn');
-  const cancel = document.getElementById('student-cancel-label');
-  const title = document.getElementById('student-form-title');
-  const save = document.getElementById('student-save-label');
-
-  if (pageTitle) pageTitle.textContent = editing && student ? `Edit Student - ${student.name}` : 'Add Student';
-  if (pageSub) {
-    pageSub.textContent = editing && student
-      ? `Update ${student.name}'s record, reset password, or remove the student.`
-      : 'First name, surname, class, and class arm are required — everything else is optional.';
-  }
-  if (deleteBtn) deleteBtn.style.display = editing ? 'inline-flex' : 'none';
-  if (cancel) cancel.textContent = editing ? 'Discard Changes' : 'Clear';
-  if (title) title.textContent = editing && student ? `Edit Student - ${student.name}` : 'Add Student';
-  if (save) save.textContent = editing ? 'Save Student Changes' : 'Add Student';
-}
-
-function clearStudentForm() {
-  state.editingStudentId = null;
-  ['new-student-id', 'new-student-firstname', 'new-student-surname', 'new-student-othernames', 'new-student-initials', 'new-student-password', 'new-student-avg', 'new-student-att', 'new-student-parent-email'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  const id = document.getElementById('new-student-id');
-  const cls = document.getElementById('new-student-class');
-  const gender = document.getElementById('new-student-gender');
-  if (id) id.disabled = false;
-  const password = document.getElementById('new-student-password');
-  if (password) {
-    password.value = DEFAULT_STUDENT_PASSWORD;
-    password.placeholder = `Auto password: ${DEFAULT_STUDENT_PASSWORD}`;
-    password.readOnly = true;
-  }
-  if (cls) cls.value = '';
-  if (gender) gender.value = 'F';
-  const photo = document.getElementById('new-student-photo');
-  if (photo) photo.value = '';
-  stuLoadArms();
-  updateStudentFormChrome(false);
-}
-
-function stuLoadArms() {
-  const classCode = document.getElementById('new-student-class')?.value || '';
-  const armSel = document.getElementById('new-student-arm');
-  const hasArms = (state.setup?.classArms || []).some(a => a.classCode === classCode);
-  if (armSel) {
-    armSel.innerHTML = hasArms ? attArmOptions(classCode, '— Select Arm —') : '<option value="">— This class has no arms —</option>';
-    armSel.disabled = !hasArms;
-  }
-  const label = document.getElementById('new-student-arm-label');
-  if (label) label.textContent = hasArms ? 'Class Arm *' : 'Class Arm';
-}
-
 function clearStaffForm() {
   state.editingStaffId = null;
   ['new-staff-id', 'new-staff-name', 'new-staff-initials', 'new-staff-password'].forEach(id => {
@@ -2370,109 +2216,6 @@ function syncStaffRoleFields() {
   type.disabled = role !== 'teacher';
   if (role !== 'teacher') type.value = '';
   else if (!type.value) type.value = 'class_teacher';
-}
-
-// Best-effort split of a stored full name into first/other/surname for the
-// edit form's separate fields — we only ever store the combined `name`, so
-// this is a starting point the admin can correct, not a source of truth.
-function splitNameParts(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { firstName: '', otherNames: '', surname: '' };
-  if (parts.length === 1) return { firstName: parts[0], otherNames: '', surname: '' };
-  return { firstName: parts[0], otherNames: parts.slice(1, -1).join(' '), surname: parts[parts.length - 1] };
-}
-
-function editStudent(id) {
-  const student = state.setup.students.find(item => item.id === id);
-  if (!student) return showToast('Student not found');
-  state.editingStudentId = student.id;
-  switchTab('addStudent', document.querySelector('[data-tab="addStudent"]'), 'Edit Student', `Edit ${student.name}`);
-  const { firstName, otherNames, surname } = splitNameParts(student.name);
-  document.getElementById('new-student-id').value = student.id;
-  document.getElementById('new-student-id').disabled = true;
-  document.getElementById('new-student-firstname').value = firstName;
-  document.getElementById('new-student-surname').value = surname;
-  document.getElementById('new-student-othernames').value = otherNames;
-  document.getElementById('new-student-initials').value = student.initials || '';
-  const password = document.getElementById('new-student-password');
-  password.value = '';
-  password.placeholder = 'Leave blank to keep current password';
-  password.readOnly = false;
-  // A pupil imported without a gender shows 'Select…' rather than a guessed Female.
-  document.getElementById('new-student-gender').value = student.gender || '';
-  document.getElementById('new-student-class').value = student.classCode || '';
-  stuLoadArms();
-  document.getElementById('new-student-arm').value = student.classArmId || '';
-  document.getElementById('new-student-parent-email').value = student.parentEmail || '';
-  document.getElementById('new-student-avg').value = student.avg ?? '';
-  document.getElementById('new-student-att').value = student.att ?? '';
-  document.getElementById('new-student-photo').value = '';
-  updateStudentFormChrome(true, student);
-  document.getElementById('new-student-firstname').focus();
-}
-
-async function saveStudent() {
-  let photoDataUrl = '';
-  try {
-    photoDataUrl = await photoInputToDataUrl('new-student-photo');
-  } catch (err) {
-    showToast(err.message);
-    return;
-  }
-  const firstName = document.getElementById('new-student-firstname').value.trim();
-  const surname = document.getElementById('new-student-surname').value.trim();
-  const otherNames = document.getElementById('new-student-othernames').value.trim();
-  const classCode = document.getElementById('new-student-class').value;
-  const classArmId = document.getElementById('new-student-arm').value || null;
-  if (!firstName || !surname) {
-    showToast('First name and surname are required');
-    return;
-  }
-  if (!classCode) {
-    showToast('Class is required');
-    return;
-  }
-  const classHasArms = (state.setup.classArms || []).some(a => a.classCode === classCode);
-  if (!classArmId && classHasArms) {
-    showToast('Class arm is required');
-    return;
-  }
-  const name = [firstName, otherNames, surname].filter(Boolean).join(' ');
-  const payload = {
-    id: document.getElementById('new-student-id').value,
-    name,
-    firstName,
-    initials: document.getElementById('new-student-initials').value,
-    password: state.editingStudentId ? document.getElementById('new-student-password').value : DEFAULT_STUDENT_PASSWORD,
-    gender: document.getElementById('new-student-gender').value,
-    classCode,
-    classArmId,
-    parentEmail: document.getElementById('new-student-parent-email').value,
-    avg: document.getElementById('new-student-avg').value,
-    att: document.getElementById('new-student-att').value,
-    photoDataUrl,
-  };
-  try {
-    const url = state.editingStudentId
-      ? `/api/admin/students/${encodeURIComponent(state.editingStudentId)}`
-      : '/api/admin/students';
-    const data = await apiFetch(url, {
-      method: state.editingStudentId ? 'PUT' : 'POST',
-      body: JSON.stringify(payload),
-    });
-    state.setup = data.setup;
-    populateDashboard();
-    populateStudents();
-    populateParents();
-    populateAdminControls();
-    renderPublications();
-    const action = state.editingStudentId ? 'updated' : 'added';
-    clearStudentForm();
-    switchTab('students', document.querySelector('[data-tab="students"]'), 'Students', 'Student Records');
-    showToast(`Student ${action}`);
-  } catch (err) {
-    showToast(err.message);
-  }
 }
 
 function openStudentDeleteModal() {
@@ -2513,7 +2256,6 @@ async function deleteStudent(id) {
     populateAdminControls();
     renderPublications();
     if (state.editingStudentId === id) {
-      clearStudentForm();
       switchTab('students', document.querySelector('[data-tab="students"]'), 'Students', 'Student Records');
     }
     closeStudentDeleteModal();
@@ -2521,31 +2263,6 @@ async function deleteStudent(id) {
   } catch (err) {
     showToast(err.message);
   }
-}
-
-async function addStudent() {
-  return saveStudent();
-}
-
-function editStaff(id) {
-  const staff = state.setup.staff.find(item => item.id === id);
-  if (!staff) return showToast('Staff account not found');
-  state.editingStaffId = staff.id;
-  document.getElementById('new-staff-id').value = staff.id;
-  document.getElementById('new-staff-id').disabled = true;
-  document.getElementById('new-staff-name').value = staff.name || '';
-  document.getElementById('new-staff-initials').value = staff.initials || '';
-  document.getElementById('new-staff-password').value = '';
-  document.getElementById('new-staff-password').placeholder = 'Leave blank to keep current password';
-  document.getElementById('new-staff-role').value = staff.role || 'teacher';
-  document.getElementById('new-staff-teacher-type').value = staff.teacherType || (staff.role === 'teacher' ? 'class_teacher' : '');
-  syncStaffRoleFields();
-  const title = document.getElementById('staff-form-title');
-  const save = document.getElementById('staff-save-label');
-  if (title) title.textContent = `Edit Staff - ${staff.name}`;
-  if (save) save.textContent = 'Save Staff Changes';
-  document.getElementById('staff-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  document.getElementById('new-staff-name').focus();
 }
 
 let staffProfileId = '';
@@ -2750,10 +2467,6 @@ async function saveStaff() {
   } catch (err) {
     showToast(err.message);
   }
-}
-
-async function addStaff() {
-  return saveStaff();
 }
 
 function renderAnnouncements() {
@@ -3055,7 +2768,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'resultPrefs') { switchRspTab('sheet'); renderSignaturesPanel(); }
   // Enroll Students / Self Registration are drawn by enrol-admin.js (e.g. after a refresh)
   if (tab === 'addStudent' && !document.getElementById('en-body') && typeof enrolShowTab === 'function') enrolShowTab(EN.tab || 'enroll');
-  if (tab === 'selfRegistration' && !document.getElementById('sr-body') && typeof srOpen === 'function') srOpen(EN.sr.view || 'dashboard');
+  if (tab === 'selfRegistration' && !document.getElementById('sr-body') && typeof sregOpen === 'function') sregOpen(EN.sr.view || 'dashboard');
   if (tab === 'scheduleExam') populateScheduleExamSelects();
   if (tab === 'examTimetable') loadExamTimetable();
   if (tab === 'questionBank') qbInit();
@@ -4115,13 +3828,6 @@ async function saveGradingSystem() {
   } catch (err) {
     showToast(err.message);
   }
-}
-
-function togglePublishBody() {
-  const body = document.getElementById('pub-body');
-  const chev = document.getElementById('pub-chev');
-  body.classList.toggle('open');
-  chev.innerHTML = body.classList.contains('open') ? '&#9650;' : '&#9660;';
 }
 
 function populateBroadsheetControls() {
@@ -5385,13 +5091,6 @@ async function cscPreselect(row) {
 
 // ── ACADEMIC TERMS TAB ──
 
-function atFilterTable(tbodyId, q) {
-  const lq = q.toLowerCase();
-  document.querySelectorAll(`#${tbodyId} tr`).forEach(tr => {
-    tr.style.display = tr.textContent.toLowerCase().includes(lq) ? '' : 'none';
-  });
-}
-
 // ── ACADEMIC TERMS TAB STATE ──
 let _atSessions = [];
 let _atFiltered = [];
@@ -5756,17 +5455,6 @@ async function setActiveSession(id) {
   try {
     await apiFetch(`/api/admin/academic-sessions/${id}/activate`, { method: 'PUT' });
     showToast('Active session updated');
-    loadAcademicTermsTab();
-  } catch (e) {
-    showToast(e.message, true);
-  }
-}
-
-async function deleteAcademicSession(id) {
-  if (!confirm('Delete this session? This cannot be undone.')) return;
-  try {
-    await apiFetch(`/api/admin/academic-sessions/${id}`, { method: 'DELETE' });
-    showToast('Session deleted');
     loadAcademicTermsTab();
   } catch (e) {
     showToast(e.message, true);
