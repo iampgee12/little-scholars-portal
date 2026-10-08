@@ -177,8 +177,8 @@ function layoutReportSheet(s) {
   const keyTop = bodyTop + (n * rowH);
   const tBottom = keyTop + keyH;
 
-  // watermark: the school logo, faint, behind the table
-  image('report_assets/school-logo.png', 150, tTop + 40, 300, 201, { fit: 'fill', opacity: 0.07 });
+  // watermark (the school logo unless changed in Result Sheet Preferences), faint, behind the table
+  image(s.watermarkPath, 150, tTop + 40, 300, 201, { opacity: 0.07 });
 
   // columns: Subject · score columns · Score Grade · Grade Remark
   const scoreCols = s.columns; // [{ label, max, bold }]

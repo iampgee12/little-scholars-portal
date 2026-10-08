@@ -2132,6 +2132,7 @@ function renderSignaturesPanel() {
   }
   const headName = document.getElementById('head-name');
   if (headName && !headName.value) headName.value = settings.headOfSchoolName || '';
+  renderWatermarkPanel();
 
   const teacherSel = document.getElementById('signature-teacher');
   if (teacherSel) {
@@ -2145,6 +2146,48 @@ function renderSignaturesPanel() {
       teacherSel.addEventListener('change', renderTeacherSigPreview);
     }
     renderTeacherSigPreview();
+  }
+}
+
+// Result Sheet Preferences → watermark: shows the current one and lets the
+// admin upload another, go back to the school logo, or have none.
+function renderWatermarkPanel() {
+  const settings = state.setup?.settings || {};
+  const img = document.getElementById('wm-preview-img');
+  if (!img) return;
+  const mode = settings.watermarkMode || 'default';
+  const path = settings.watermarkPath || '';
+  img.style.display = path ? '' : 'none';
+  if (path) img.src = '/' + path;
+  document.getElementById('wm-preview-none').style.display = path ? 'none' : '';
+  document.getElementById('wm-mode-chip').textContent = { default: 'School logo', custom: 'Custom picture', none: 'Off' }[mode];
+  document.getElementById('wm-default-btn').disabled = mode === 'default';
+  document.getElementById('wm-none-btn').disabled = mode === 'none';
+}
+
+async function saveWatermark(action, btn) {
+  const fileInput = document.getElementById('wm-file');
+  let dataUrl = '';
+  if (action === 'upload') {
+    const file = fileInput.files?.[0];
+    if (!file) return showToast('Choose a picture first');
+    try {
+      dataUrl = await imageToSmallDataUrl(file, 900, false);
+    } catch (err) {
+      return showToast(err.message);
+    }
+  }
+  btn.disabled = true;
+  try {
+    const data = await apiFetch('/api/admin/watermark', { method: 'POST', body: JSON.stringify({ action, dataUrl }) });
+    state.setup = data.setup;
+    fileInput.value = '';
+    showToast({ upload: 'Watermark saved', default: 'Watermark set back to the school logo', none: 'Watermark turned off' }[action]);
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+    renderWatermarkPanel();
   }
 }
 
@@ -2954,6 +2997,7 @@ const TAB_META = {
   resultsGradebook: { title: 'Results Grade Book', sub: 'Result Score Entry' },
   cognitiveSkills: { title: 'Cognitive Skills Assessment', sub: 'Skills Assessment Records' },
   publish: { title: 'Review And Publish Results', sub: 'Review and Publish Student Reports' },
+  resultPrefs: { title: 'Result Sheet Preferences', sub: 'Result Settings' },
   studentResultChecker: { title: 'Student Result Checker', sub: 'Look Up a Student Result' },
   classResultChecker: { title: 'Class Result Checker', sub: 'Bulk Students Result Checker' },
   emailQueue: { title: 'Results Email Delivery Queue', sub: 'Published Report Email Status' },

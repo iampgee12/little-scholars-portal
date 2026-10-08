@@ -2720,6 +2720,16 @@ function reportNextTerm(academic) {
   };
 }
 
+// Result sheet watermark (Result Sheet Preferences): the school logo unless
+// the admin uploads another picture or turns it off.
+const DEFAULT_WATERMARK = 'report_assets/school-logo.png';
+function reportWatermark() {
+  const stored = valueFromMeta('report_watermark_path', '');
+  if (stored === 'none') return { path: '', mode: 'none' };
+  if (stored && absoluteAssetPath(stored)) return { path: stored, mode: 'custom' };
+  return { path: DEFAULT_WATERMARK, mode: 'default' };
+}
+
 function reportSkillRows(skillRating) {
   return {
     affective: AFFECTIVE_SKILLS.map(([key, , label]) => ({ key, label, rating: skillRating?.affective?.[key] ?? '-' })),
@@ -2795,6 +2805,7 @@ function reportSheetFields(ctx, examType) {
       ],
     },
     photoPath: assetOrEmpty(student.photo_path) || 'report_assets/student-placeholder.png',
+    watermarkPath: reportWatermark().path,
     columns,
     subjects,
     ...reportSkillRows(skillRating),
@@ -4852,6 +4863,30 @@ async function handleApi(req, res, url) {
       'Content-Length': data.length,
     });
     return res.end(data);
+  }
+
+  // Result sheet watermark: upload a picture, go back to the school logo, or none.
+  if (req.method === 'POST' && url.pathname === '/api/admin/watermark') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const action = cleanText(body.action);
+    if (action === 'upload') {
+      const dataUrl = cleanText(body.dataUrl);
+      if (!dataUrl) return sendJson(res, 400, { error: 'Choose a picture for the watermark' });
+      try {
+        setMeta('report_watermark_path', saveDataUrl(dataUrl, 'watermark'));
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    } else if (action === 'default') {
+      setMeta('report_watermark_path', '');
+    } else if (action === 'none') {
+      setMeta('report_watermark_path', 'none');
+    } else {
+      return sendJson(res, 400, { error: 'Unknown watermark action' });
+    }
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/admin/signatures') {
@@ -9076,6 +9111,8 @@ function adminSetupPayload() {
   const settings = {
     headOfSchoolName: valueFromMeta('head_of_school_name', 'James Idoko Ajah'),
     headSignaturePath: valueFromMeta('head_signature_path', ''),
+    watermarkPath: reportWatermark().path,
+    watermarkMode: reportWatermark().mode,
     nextTermBegins: valueFromMeta('next_term_begins', 'MONDAY 27TH APRIL, 2026'),
   };
   const schoolInfo = schoolInfoFromMeta();
