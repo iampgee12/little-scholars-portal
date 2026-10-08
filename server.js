@@ -8,6 +8,7 @@ const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
 const createEnrolment = require('./enrol-api');
+const createStudents = require('./students-api');
 
 const ROOT = __dirname;
 
@@ -1604,6 +1605,13 @@ const enrolment = createEnrolment({
   DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator,
 });
 enrolment.createSchema();
+// View Students + Students Registry (class history, archive)
+const studentsMod = createStudents({
+  db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload,
+  zipFiles: enrolment.zipFiles,
+});
+studentsMod.createSchema();
+enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
 // created before this change should still work immediately.
@@ -3072,6 +3080,7 @@ function validateFeeAmount(value) {
 
 async function handleApi(req, res, url) {
   if (await enrolment.handle(req, res, url)) return;
+  if (await studentsMod.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/login') {
     const body = await readJson(req);
     const id = String(body.id || '').trim().toUpperCase();
@@ -5284,6 +5293,7 @@ async function handleApi(req, res, url) {
     const placeholders = studentIds.map(() => '?').join(',');
     run(`UPDATE students SET class_code = ?, class_arm_id = ? WHERE id IN (${placeholders}) AND status = 'active'`, toClassCode, toArmId, ...studentIds);
     run(`UPDATE users SET grade = ? WHERE id IN (${placeholders}) AND role = 'student'`, `Class ${toClassCode}`, ...studentIds);
+    studentIds.forEach(id => studentsMod.recordHistory(id));
     return sendJson(res, 200, { ok: true, moved: studentIds.length });
   }
 
@@ -5297,6 +5307,7 @@ async function handleApi(req, res, url) {
     const placeholders = studentIds.map(() => '?').join(',');
     run(`UPDATE students SET status = ? WHERE id IN (${placeholders})`, status, ...studentIds);
     run(`UPDATE users SET active = 0 WHERE id IN (${placeholders}) AND role = 'student'`, ...studentIds);
+    studentIds.forEach(id => studentsMod.recordHistory(id, status));
     return sendJson(res, 200, { ok: true, updated: studentIds.length });
   }
 
@@ -5314,6 +5325,7 @@ async function handleApi(req, res, url) {
     // arm from the old class no longer applies — set it again on the pupil's record
     run(`UPDATE students SET status = 'active', class_code = ?, class_arm_id = NULL WHERE id IN (${placeholders})`, classCode, ...studentIds);
     run(`UPDATE users SET active = 1, grade = ? WHERE id IN (${placeholders}) AND role = 'student'`, `Class ${classCode}`, ...studentIds);
+    studentIds.forEach(id => studentsMod.recordHistory(id));
     return sendJson(res, 200, { ok: true, reinstated: studentIds.length });
   }
 
@@ -5332,29 +5344,6 @@ async function handleApi(req, res, url) {
       LEFT JOIN classes c ON c.code = st.class_code
       ${clauses.length ? 'WHERE ' + clauses.join(' AND ') : ''}
       ORDER BY st.enrolled_at IS NULL, st.enrolled_at DESC
-    `, ...params);
-    return sendJson(res, 200, { students: rows });
-  }
-
-  if (req.method === 'GET' && url.pathname === '/api/admin/students/registry') {
-    const user = requireUser(req, res, 'admin');
-    if (!user) return;
-    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
-    const status = cleanText(url.searchParams.get('status')) || 'active';
-    const clauses = ['st.status = ?'];
-    const params = [status];
-    if (classCode) { clauses.push('st.class_code = ?'); params.push(classCode); }
-    const classArmId = Number(url.searchParams.get('classArmId')) || null;
-    if (classArmId) { clauses.push('st.class_arm_id = ?'); params.push(classArmId); }
-    const rows = all(`
-      SELECT st.id AS regNo, st.name, st.gender, st.class_code AS classCode, c.label AS classLabel,
-             st.class_arm_id AS classArmId, ca.name AS classArmName,
-             st.parent_email AS parentEmail, st.status, st.enrolled_at AS enrolledAt
-      FROM students st
-      LEFT JOIN classes c ON c.code = st.class_code
-      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
-      WHERE ${clauses.join(' AND ')}
-      ORDER BY c.code, ca.name, st.name
     `, ...params);
     return sendJson(res, 200, { students: rows });
   }
@@ -8960,7 +8949,7 @@ function serveStatic(req, res, url) {
   const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.ttf']);
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
-    || ['server.js', 'report-sheet.js', 'enrol-api.js'].includes(relParts[relParts.length - 1])
+    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

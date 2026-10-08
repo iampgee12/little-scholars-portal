@@ -2596,7 +2596,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         <div class="sub-menu" data-menu="people">
           <button type="button" class="sub-nav-item" onclick="toggleDropdown('students-children','students-chev',this)"><span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="5" r="2.5"/><path d="M1.5 14c0-2.8 2.2-5 5-5"/><line x1="11.5" y1="9.5" x2="11.5" y2="14.5"/><line x1="9" y1="12" x2="14" y2="12"/></svg></span><span>Students</span><span class="sub-chev" id="students-chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span></button>
           <div id="students-children" class="result-gradebook-children" style="display:none;">
-            <button type="button" class="sub-nav-item result-child" data-tab="students" data-title="Students" data-sub="Student Records" onclick="switchTab('students', this, 'Students', 'Student Records')">Student Directory</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="students" data-title="View Students" data-sub="Students Information System" onclick="switchTab('students', this, 'View Students', 'Students Information System')">View Students</button>
             <button type="button" class="sub-nav-item result-child" data-tab="addStudent" data-title="Enroll Students" data-sub="Enroll a Student" onclick="enrolOpen('enroll')">Enroll Students</button>
             <button type="button" class="sub-nav-item result-child" data-tab="pupilPhotos" onclick="switchTab('pupilPhotos', this)">Upload Pupil Photos</button>
             <button type="button" class="sub-nav-item result-child" data-tab="enrollmentHistory" onclick="switchTab('enrollmentHistory', this)">Enrollment History</button>
@@ -3032,31 +3032,9 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
       </div>
 
       <div class="tab-panel" id="tab-students">
-        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
-          <div>
-            <h2>All Students</h2>
-            <p id="student-page-sub">Complete student directory</p>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="post-btn" onclick="enrolOpen('enroll')">+ Enroll Student</button>
-          </div>
-        </div>
-
-        <div class="card" id="student-directory-card">
-          <div class="card-head">
-            <span class="card-title" id="stu-count-label">Student Directory</span>
-            <input class="search-input" id="stu-search" placeholder="Search by name or ID..." oninput="filterStudents()">
-          </div>
-          <div class="card-body" style="padding:0;">
-            <div style="overflow-x:auto;padding:0 18px 14px;">
-              <table class="data-table">
-                <thead><tr><th>Student</th><th>Reg. No.</th><th>Class</th><th>Class Arm</th><th>Gender</th><th>Avg Score</th><th>Grade</th><th>Attendance</th><th>Parent Email</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody id="stu-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div id="student-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+        <div id="vs-root"></div>
+      </div>
+      <div id="student-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
           <div role="dialog" aria-modal="true" aria-labelledby="student-delete-title" style="width:min(420px,100%);background:var(--black-2);border:1px solid rgba(239,68,68,0.35);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
             <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
               <div id="student-delete-title" style="font-size:15px;font-weight:700;color:var(--red);">Delete this student?</div>
@@ -3071,7 +3049,6 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             </div>
           </div>
         </div>
-      </div>
 
       <!-- ━━━ ADD / EDIT STUDENT (dedicated page, not inline on the directory) ━━━ -->
       <input type="file" id="sp-one-file" accept="image/*" style="display:none;" onchange="spOneChosen(this)">
@@ -3114,31 +3091,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
       </div>
 
       <div class="tab-panel" id="tab-studentsRegistry">
-        <div class="page-header"><h2>Students Registry</h2><p>Printable / exportable roster of all students.</p></div>
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Students Registry</span>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <select class="ctrl-select" id="sr-class" style="width:auto;" onchange="srClassChanged()"><option value="">All Classes</option></select>
-              <select class="ctrl-select" id="sr-arm" style="width:auto;" onchange="srLoad()" disabled><option value="">All Arms</option></select>
-              <select class="ctrl-select" id="sr-status" style="width:auto;" onchange="srLoad()">
-                <option value="active">Active</option>
-                <option value="graduated">Graduated</option>
-                <option value="left">Left</option>
-              </select>
-              <button class="btn-outline" onclick="srPrint()">Print Registry</button>
-              <button class="post-btn" onclick="srExportCsv()">Export CSV</button>
-            </div>
-          </div>
-          <div class="card-body" style="padding:0;">
-            <div style="overflow-x:auto;">
-              <table class="data-table" id="sr-table">
-                <thead><tr><th>#</th><th>Reg No</th><th>Name</th><th>Gender</th><th>Class</th><th>Class Arm</th><th>Parent Email</th><th>Enrolled</th></tr></thead>
-                <tbody id="sr-tbody"><tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <div id="reg-root"></div>
       </div>
 
       <div class="tab-panel" id="tab-communicationBook">
@@ -7166,5 +7119,6 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="admin-api.js"></script>
 <script src="enrol-common.js"></script>
 <script src="enrol-admin.js"></script>
+<script src="students-admin.js"></script>
 </body>
 </html>

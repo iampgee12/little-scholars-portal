@@ -345,42 +345,6 @@ async function populateDashboard() {
   } catch (e) {}
 }
 
-function populateStudents() {
-  const tbody = document.getElementById('stu-tbody');
-  const all = [...(state.setup.students || [])].sort((a, b) => Number(b.avg) - Number(a.avg));
-  tbody.innerHTML = '';
-  document.getElementById('stu-count-label').textContent = `Student Directory - ${all.length} records`;
-  const academic = state.setup?.academic;
-  const sub = document.getElementById('student-page-sub');
-  if (sub && academic) sub.textContent = `Complete student directory - ${academic.termLabel}, ${academic.sessionLabel}`;
-  all.forEach(student => {
-    const grade = scoreToGrade(student.avg);
-    const tr = document.createElement('tr');
-    tr.dataset.name = student.name.toLowerCase();
-    tr.dataset.id = `${student.id} ${student.regNo || ""}`.toLowerCase();
-    tr.innerHTML = `
-      <td><button type="button" class="stu-photo-btn" title="${student.photoPath ? 'Change' : 'Add'} ${escapeHtml(student.name)}'s photo" onclick="spPickOne('${escapeHtml(student.id)}')">${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="" loading="lazy">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}</button><strong>${escapeHtml(student.name)}</strong></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.regNo || student.id)}</td>
-      <td style="color:var(--text-2);">${escapeHtml((state.setup.classes || []).find(c => c.code === student.classCode)?.label || student.classCode)}</td>
-      <td style="color:var(--text-2);">${escapeHtml(student.classArmName || '—')}</td>
-      <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
-      <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
-      <td><span class="grade-pill ${gradeClass(student.avg)}">${grade}</span></td>
-      <td><div class="att-bar"><div class="att-track"><div class="att-fill" style="width:${student.att}%;background:${student.att >= 90 ? 'var(--green)' : student.att >= 75 ? 'var(--amber)' : 'var(--red)'};"></div></div><span style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${student.att}%</span></div></td>
-      <td style="color:var(--text-3);font-size:12px;">${escapeHtml(student.parentEmail || '-')}</td>
-      <td>${accountStatusToggle(student.id, student.active)}</td>
-      <td><button class="post-btn" style="padding:6px 10px;" onclick="editStudent('${escapeHtml(student.id)}')">Edit</button></td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-function filterStudents() {
-  const q = document.getElementById('stu-search').value.toLowerCase();
-  document.querySelectorAll('#stu-tbody tr').forEach(tr => {
-    tr.style.display = (tr.dataset.name.includes(q) || tr.dataset.id.includes(q)) ? '' : 'none';
-  });
-}
-
 // ── STUDENT TAGS ──
 
 let stTagsCache = [];
@@ -650,70 +614,6 @@ async function ehLoad() {
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
   }
-}
-
-// ── STUDENTS REGISTRY ──
-
-let srCache = [];
-
-function srInit() {
-  if (!state.setup) return;
-  const sel = document.getElementById('sr-class');
-  sel.innerHTML = '<option value="">All Classes</option>' + (state.setup.classes || []).map(c => `<option value="${c.code}">${escapeHtml(c.label)}</option>`).join('');
-  srClassChanged();
-}
-
-// Arm dropdown follows the chosen class (disabled for "All Classes" or a class without arms)
-function srClassChanged() {
-  const classCode = document.getElementById('sr-class').value;
-  const armSel = document.getElementById('sr-arm');
-  const hasArms = !!classCode && (state.setup.classArms || []).some(a => a.classCode === classCode);
-  armSel.innerHTML = hasArms ? attArmOptions(classCode, 'All Arms') : '<option value="">All Arms</option>';
-  armSel.disabled = !hasArms;
-  srLoad();
-}
-async function srLoad() {
-  const classCode = document.getElementById('sr-class').value;
-  const classArmId = document.getElementById('sr-arm')?.value || '';
-  const status = document.getElementById('sr-status').value;
-  const tbody = document.getElementById('sr-tbody');
-  tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">Loading…</td></tr>';
-  try {
-    const params = new URLSearchParams({ status });
-    if (classCode) params.set('classCode', classCode);
-    if (classArmId) params.set('classArmId', classArmId);
-    const data = await apiFetch(`/api/admin/students/registry?${params.toString()}`);
-    srCache = data.students || [];
-    tbody.innerHTML = srCache.length ? srCache.map((s, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${escapeHtml(s.regNo)}</td>
-        <td>${escapeHtml(s.name)}</td>
-        <td>${genderLabel(s.gender)}</td>
-        <td>${escapeHtml(s.classLabel || s.classCode)}</td>
-        <td>${escapeHtml(s.classArmName || '—')}</td>
-        <td>${escapeHtml(s.parentEmail || '—')}</td>
-        <td>${s.enrolledAt ? escapeHtml(s.enrolledAt.slice(0, 10)) : '—'}</td>
-      </tr>
-    `).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students found</td></tr>';
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--red)">${escapeHtml(err.message)}</td></tr>`;
-  }
-}
-function srPrint() {
-  const win = window.open('', '_blank');
-  win.document.write(`<html><head><title>Students Registry</title></head><body>${document.getElementById('sr-table').outerHTML}</body></html>`);
-  win.document.close();
-  win.print();
-}
-function srExportCsv() {
-  const headers = ['#', 'Reg No', 'Name', 'Gender', 'Class', 'Class Arm', 'Parent Email', 'Enrolled'];
-  const rows = srCache.map((s, i) => [i + 1, s.regNo, s.name, genderLabel(s.gender), s.classLabel || s.classCode, s.classArmName || '', s.parentEmail || '', s.enrolledAt ? s.enrolledAt.slice(0, 10) : '']);
-  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = 'students-registry.csv';
-  a.click();
 }
 
 // ── COMMUNICATION BOOK ──
@@ -2513,7 +2413,7 @@ const TAB_META = {
   profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', sub: 'School Overview' },
   admissions: { title: 'Admission', sub: 'Applications Summary' },
-  students: { title: 'Admission', sub: 'Student Directory' },
+  students: { title: 'View Students', sub: 'Students Information System' },
   staff: { title: 'People', sub: 'Teachers and Staff' },
   parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
@@ -2543,7 +2443,7 @@ const TAB_META = {
   studentTags: { title: 'Student Tags', sub: 'Group and Filter Students by Tag' },
   classAllocation: { title: 'Promote / Move Students', sub: 'Promote, transfer or graduate pupils' },
   enrollmentHistory: { title: 'Enrollment History', sub: 'Student Enrollment Timeline' },
-  studentsRegistry: { title: 'Students Registry', sub: 'Printable Student Roster' },
+  studentsRegistry: { title: 'Students Registry', sub: 'Historical Records of all Students' },
   communicationBook: { title: 'Communication Book', sub: 'Student and Parent Communication Log' },
   extracurricularGroups: { title: 'Extracurricular Groups', sub: 'Clubs, Teams, and Groups' },
   invoiceList: { title: 'Invoice List', sub: 'All Student Fee Invoices' },
@@ -2779,7 +2679,8 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'studentTags') stInit();
   if (tab === 'classAllocation') caInit();
   if (tab === 'enrollmentHistory') ehInit();
-  if (tab === 'studentsRegistry') srInit();
+  if (tab === 'studentsRegistry') regInit();
+  if (tab === 'students' && !document.getElementById('vs-results') && typeof vsInit === 'function') vsInit();
   if (tab === 'communicationBook') cbkInit();
   if (tab === 'extracurricularGroups') ecgInit();
   if (tab === 'gradingSystems') initGradingSystemsTab();

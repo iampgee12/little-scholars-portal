@@ -295,6 +295,7 @@ module.exports = function createEnrolment(ctx) {
       text(f.bloodGroup, 10), text(f.genotype, 10), JSON.stringify(cleanContact(f.nextOfKin)), JSON.stringify(cleanContact(f.emergency)));
     if (dob) setMeta(`student_dob_${id}`, `${dob.slice(8, 10)}/${dob.slice(5, 7)}/${dob.slice(0, 4)}`);
     setTags(id, f.tags);
+    classChanged(id);
     return { id, regNo, name };
   }
 
@@ -369,6 +370,7 @@ module.exports = function createEnrolment(ctx) {
       ...(f.photoPath ? [f.photoPath] : []), id);
     if (dob) setMeta(`student_dob_${id}`, `${dob.slice(8, 10)}/${dob.slice(5, 7)}/${dob.slice(0, 4)}`);
     setTags(id, f.tags);
+    if (st.class_code !== classCode || String(st.class_arm_id || '') !== String(classArmId || '')) classChanged(id);
   }
 
   function withTransaction(fn) {
@@ -955,5 +957,9 @@ module.exports = function createEnrolment(ctx) {
     return false;
   }
 
-  return { createSchema, handle, pupilRecord };
+  // Set by server.js so class history follows enrolments and class changes
+  let classChanged = () => {};
+  function onClassChange(fn) { classChanged = fn; }
+
+  return { createSchema, handle, pupilRecord, zipFiles: zip, onClassChange };
 };
