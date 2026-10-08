@@ -7,6 +7,7 @@ const tls = require('node:tls');
 const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
+const createEnrolment = require('./enrol-api');
 
 const ROOT = __dirname;
 
@@ -1596,6 +1597,13 @@ if (IS_PROD) {
 migratePlaintextPasswords();
 backfillMissingStudentUsers();
 loadGradeScale();
+// Enroll Students (wizard, families, bulk enrol, self registration)
+const enrolment = createEnrolment({
+  db, one, all, run, ensureColumn, valueFromMeta, setMeta, cleanText, readJson, sendJson, requireUser, hashPassword,
+  saveDataUrl, adminSetupPayload, initialsFromName, activeAcademic, classHasArms, parseXlsxFirstSheet,
+  DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator,
+});
+enrolment.createSchema();
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
 // created before this change should still work immediately.
@@ -2788,7 +2796,7 @@ function reportSheetFields(ctx, examType) {
     info: {
       left: [
         ['Name:', String(student.name || '').toUpperCase()],
-        ['Reg. No.:', student.id],
+        ['Reg. No.:', student.reg_no || student.id],
         ['Gender:', gender === 'MALE' ? 'M' : gender === 'FEMALE' ? 'F' : gender],
         ['Age:', age === '' ? '' : String(age)],
         ['DOB:', dob ? `${pad(dob.d)}-${pad(dob.m)}-${dob.y}` : ''],
@@ -3063,6 +3071,7 @@ function validateFeeAmount(value) {
 }
 
 async function handleApi(req, res, url) {
+  if (await enrolment.handle(req, res, url)) return;
   if (req.method === 'POST' && url.pathname === '/api/login') {
     const body = await readJson(req);
     const id = String(body.id || '').trim().toUpperCase();
@@ -3073,7 +3082,8 @@ async function handleApi(req, res, url) {
       return sendJson(res, 429, { error: rateLimit.message });
     }
 
-    const user = one('SELECT * FROM users WHERE id = ?', id);
+    const byRegNo = one('SELECT id FROM students WHERE reg_no = ?', String(body.id || '').trim());
+    const user = one('SELECT * FROM users WHERE id = ?', id) || (byRegNo && one('SELECT * FROM users WHERE id = ?', byRegNo.id));
     if (!user || !verifyPassword(password, user.password)) {
       recordFailedLogin(id);
       return sendJson(res, 401, { error: 'Incorrect ID or password' });
@@ -9017,7 +9027,7 @@ function adminSetupPayload() {
   const students = all(
     `SELECT st.id, st.name, st.initials, st.gender, st.avg, st.att, st.class_code AS classCode,
             st.parent_email AS parentEmail, st.photo_path AS photoPath, u.active AS active,
-            st.class_arm_id AS classArmId, ca.name AS classArmName
+            st.class_arm_id AS classArmId, ca.name AS classArmName, st.reg_no AS regNo, st.family_id AS familyId
      FROM students st
      LEFT JOIN users u ON u.id = st.id
      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
@@ -9166,7 +9176,7 @@ function serveStatic(req, res, url) {
   const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.ttf']);
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
-    || ['server.js', 'report-sheet.js'].includes(relParts[relParts.length - 1])
+    || ['server.js', 'report-sheet.js', 'enrol-api.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

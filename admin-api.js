@@ -370,10 +370,10 @@ function populateStudents() {
     const grade = scoreToGrade(student.avg);
     const tr = document.createElement('tr');
     tr.dataset.name = student.name.toLowerCase();
-    tr.dataset.id = student.id.toLowerCase();
+    tr.dataset.id = `${student.id} ${student.regNo || ""}`.toLowerCase();
     tr.innerHTML = `
       <td><button type="button" class="stu-photo-btn" title="${student.photoPath ? 'Change' : 'Add'} ${escapeHtml(student.name)}'s photo" onclick="spPickOne('${escapeHtml(student.id)}')">${student.photoPath ? `<img class="stu-av-photo" src="/${escapeHtml(student.photoPath)}" alt="" loading="lazy">` : `<span class="stu-av">${escapeHtml(student.initials)}</span>`}</button><strong>${escapeHtml(student.name)}</strong></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.regNo || student.id)}</td>
       <td style="color:var(--text-2);">${escapeHtml((state.setup.classes || []).find(c => c.code === student.classCode)?.label || student.classCode)}</td>
       <td style="color:var(--text-2);">${escapeHtml(student.classArmName || '—')}</td>
       <td style="color:var(--text-3);">${genderLabel(student.gender)}</td>
@@ -537,7 +537,7 @@ async function caLoadStudents() {
     const students = (data.students || []).filter(st => !armId || String(st.classArmId) === String(armId));
     wrap.innerHTML = students.length ? students.map(st => `
       <label class="ca-student"><input type="checkbox" class="ca-student-check" value="${escapeHtml(st.id)}" checked onchange="caUpdateCount()">
-        ${pupilAvatar(st)}<span>${escapeHtml(st.name)}<small>${escapeHtml(st.id)}${st.classArmName ? ` · ${escapeHtml(st.classArmName)}` : ''}</small></span></label>
+        ${pupilAvatar(st)}<span>${escapeHtml(st.name)}<small>${escapeHtml(st.regNo || st.id)}${st.classArmName ? ` · ${escapeHtml(st.classArmName)}` : ''}</small></span></label>
     `).join('') : '<span class="ca-empty">No active pupils in this class.</span>';
     document.getElementById('ca-select-all').checked = true;
   } catch (err) { wrap.innerHTML = `<span class="ca-empty" style="color:var(--red);">${escapeHtml(err.message)}</span>`; }
@@ -912,7 +912,7 @@ function populateParents() {
     <tr data-search="${escapeHtml(`${student.parentEmail} ${student.name} ${student.id} ${student.classCode}`.toLowerCase())}">
       <td><strong>${escapeHtml(student.parentEmail)}</strong></td>
       <td>${escapeHtml(student.name)}</td>
-      <td style="font-family:'DM Mono',monospace;color:var(--text-3);">${escapeHtml(student.id)}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text-3);">${escapeHtml(student.regNo || student.id)}</td>
       <td>${escapeHtml(student.classCode)}</td>
       <td><span style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;">Linked</span></td>
     </tr>`).join('');
@@ -1661,7 +1661,7 @@ function renderCognitiveTable() {
     <tr data-search="${escapeHtml(`${student.name} ${student.id} ${selection.classLabel}`.toLowerCase())}">
       <td>${index + 1}</td>
       <td><strong>${escapeHtml(student.name)}</strong></td>
-      <td class="cog-reg">${escapeHtml(student.id)}</td>
+      <td class="cog-reg">${escapeHtml(student.regNo || student.id)}</td>
       <td>${escapeHtml(cognitiveClassLabel(selection))}</td>
       <td><button type="button" class="cog-action-btn" title="View Student Cognitive Skills" onclick="openCognitiveSkillsModal('${escapeHtml(student.id)}', false)"><span class="cog-action-icon view"></span></button></td>
       <td><button type="button" class="cog-action-btn edit" title="Update Student Cognitive Skills Record" onclick="openCognitiveSkillsModal('${escapeHtml(student.id)}', true)"><span class="cog-action-icon edit"></span></button></td>
@@ -2990,6 +2990,7 @@ const TAB_META = {
   staff: { title: 'People', sub: 'Teachers and Staff' },
   parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
+  addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
   announcements: { title: 'Admin', sub: 'Post and Manage Notices' },
   resultChecker: { title: 'Result Checker', sub: 'Published Reports and Downloads' },
   cbtGradebook: { title: 'CBT Grade Book', sub: 'Computer-Based Test Scores' },
@@ -3239,6 +3240,9 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'scoreDivisions') sdInit();
   if (tab === 'commentsBank') cbLoadComments();
   if (tab === 'resultPrefs') { switchRspTab('sheet'); renderSignaturesPanel(); }
+  // Enroll Students / Self Registration are drawn by enrol-admin.js (e.g. after a refresh)
+  if (tab === 'addStudent' && !document.getElementById('en-body') && typeof enrolShowTab === 'function') enrolShowTab(EN.tab || 'enroll');
+  if (tab === 'selfRegistration' && !document.getElementById('sr-body') && typeof srOpen === 'function') srOpen(EN.sr.view || 'dashboard');
   if (tab === 'scheduleExam') populateScheduleExamSelects();
   if (tab === 'examTimetable') loadExamTimetable();
   if (tab === 'questionBank') qbInit();

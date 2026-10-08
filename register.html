@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unique Children's School — Registration</title>
+<link rel="icon" type="image/png" href="/report_assets/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:#ffffff; --black-2:#f8fafc; --black-3:#f1f5f9; --border:#e2e8f0; --border-2:#cbd5e1;
+  --green:#16a34a; --red:#dc2626; --blue:#2563eb; --text-1:#0f172a; --text-2:#475569; --text-3:#94a3b8;
+  --radius-sm:8px; --radius:14px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { font-family:'DM Sans', sans-serif; background:var(--black-2); color:var(--text-1); min-height:100vh; padding:28px 16px 60px; -webkit-font-smoothing:antialiased; }
+.rg-card { max-width:760px; margin:0 auto; background:var(--black); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 4px 24px rgba(15,23,42,.08); overflow:hidden; }
+.rg-top { display:flex; flex-direction:column; align-items:center; gap:6px; padding:28px 24px 20px; border-bottom:1px solid var(--border); text-align:center; }
+.rg-top img { height:64px; width:auto; }
+.rg-top h1 { font-size:17px; font-weight:700; }
+.rg-top p { font-size:12px; color:var(--text-3); }
+.rg-body { padding:24px; }
+.rg-types { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+.rg-type { background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:20px 14px; cursor:pointer; text-align:center; font-family:inherit; display:flex; flex-direction:column; gap:6px; align-items:center; }
+.rg-type:hover { border-color:var(--green); background:#f0fdf4; }
+.rg-type strong { font-size:14px; }
+.rg-type span { font-size:12px; color:var(--text-3); }
+.rg-type:disabled { opacity:.5; cursor:not-allowed; }
+.field-label { display:block; font-size:10px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.5px; font-family:'DM Mono', monospace; margin-bottom:5px; }
+.field-input, .ctrl-select { width:100%; background:var(--black-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; font-family:inherit; font-size:16px; color:var(--text-1); outline:none; }
+.field-input:focus, .ctrl-select:focus { border-color:rgba(22,163,74,.5); box-shadow:0 0 0 3px rgba(22,163,74,.1); }
+.rg-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px 16px; }
+.rg-grid .wide { grid-column:1 / -1; }
+.rg-group { font-size:13px; font-weight:700; margin:20px 0 10px; padding-bottom:6px; border-bottom:1px dashed var(--border); }
+.rg-group:first-child { margin-top:0; }
+.rg-req { color:var(--red); }
+.en-phone { display:flex; gap:6px; }
+.en-phone select { width:46%; }
+.en-field { display:flex; flex-direction:column; }
+.btn { border:none; border-radius:var(--radius-sm); padding:11px 22px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+.btn-green { background:var(--green); color:#fff; }
+.btn-green:disabled { opacity:.6; }
+.btn-line { background:#fff; color:var(--text-1); border:1px solid var(--border-2); font-weight:600; }
+.rg-actions { display:flex; justify-content:space-between; gap:10px; margin-top:22px; flex-wrap:wrap; }
+.rg-child { border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-top:12px; background:var(--black-2); }
+.rg-child-head { display:flex; justify-content:space-between; align-items:center; font-weight:700; margin-bottom:10px; }
+.rg-link { background:none; border:none; color:var(--blue); font-weight:600; cursor:pointer; font-size:13px; padding:6px 0; }
+.rg-link.danger { color:var(--red); }
+.rg-msg { padding:12px 14px; border-radius:var(--radius-sm); font-size:13px; line-height:1.6; margin-bottom:14px; }
+.rg-msg.err { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+.rg-msg.ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
+.rg-done { text-align:center; padding:20px 0; }
+.rg-done h2 { font-size:18px; margin-bottom:8px; }
+.rg-done p { color:var(--text-2); font-size:13px; line-height:1.7; }
+@media (max-width:600px) { .rg-grid { grid-template-columns:1fr; } .rg-body { padding:18px 14px; } }
+</style>
+</head>
+<body>
+<div class="rg-card">
+  <div class="rg-top">
+    <img src="/report_assets/school-logo.png" alt="Unique Group of Schools">
+    <h1 id="rg-school">Unique Children's School</h1>
+    <p id="rg-sub">Online Registration</p>
+  </div>
+  <div class="rg-body" id="rg-body"></div>
+</div>
+<script src="enrol-common.js"></script>
+<script src="register.js"></script>
+</body>
+</html>
