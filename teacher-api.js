@@ -1716,6 +1716,7 @@ const TAB_META = {
   cbtGradebook: { title: 'CBT Grade Book', sub: 'Computer-Based Test Scores' },
   dailyGradebook: { title: 'Daily Grade Book', sub: 'Day-to-Day Scoring' },
   announcements: { title: 'Announcements', sub: 'School Notices' },
+  settings: { title: 'Settings', sub: 'My Signature' },
 };
 
 // Keep the open page in the address (…#tabName) so a refresh reopens it with
@@ -1753,6 +1754,7 @@ function switchTab(tab, trigger) {
   if (tab === 'reviewResults') rvInit();
   if (tab === 'classComments') ccInit();
   if (tab === 'profile') profileInit();
+  if (tab === 'settings') settingsInit();
 }
 
 function mobStaggerItems(sidebar) {
@@ -1823,14 +1825,7 @@ function profileInit() {
   document.getElementById('pf-phone').value = u.phone || '';
   document.getElementById('pf-email').value = u.email || '';
   document.getElementById('pf-address').value = u.address || '';
-  // signature box: current signature + a fresh pad
-  const sig = document.getElementById('as-sig-preview');
-  if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
-  else sig.style.display = 'none';
-  document.getElementById('sig-none').style.display = u.signaturePath ? 'none' : '';
-  // only a class teacher's signature is printed (as Form Teacher)
-  document.getElementById('sig-section').style.display = classTeacherClasses().length ? '' : 'none';
-  sigInit();
+  document.getElementById('pf-sig-pointer').style.display = classTeacherClasses().length ? '' : 'none';
 
   document.getElementById('as-pw-current').value = '';
   document.getElementById('as-pw-new').value = '';
@@ -1854,8 +1849,24 @@ async function previewProfilePhoto() {
 
 function sigSaved(path) {
   state.user.signaturePath = path;
-  profileInit();
-  switchAsTab('edit', document.getElementById('as-tab-edit'));
+  settingsInit();
+}
+
+// Settings → My Signature (class teachers): current signature, a fresh pad,
+// and how it prints on the result sheet
+function settingsInit() {
+  const u = state.user || {};
+  const isClassTeacher = classTeacherClasses().length > 0;
+  document.getElementById('sig-section').style.display = isClassTeacher ? '' : 'none';
+  document.getElementById('sig-not-class-teacher').style.display = isClassTeacher ? 'none' : '';
+  const sig = document.getElementById('as-sig-preview');
+  if (u.signaturePath) { sig.src = '/' + u.signaturePath; sig.style.display = ''; }
+  else sig.style.display = 'none';
+  document.getElementById('sig-none').style.display = u.signaturePath ? 'none' : '';
+  const preview = document.getElementById('sig-print-preview');
+  preview.innerHTML = isClassTeacher ? `<div class="field-label">How it prints on your class's result sheets</div>
+    <div class="sig-print-line"><span><em>Form Teacher :</em> ${escapeHtml(String(u.name || '').toUpperCase())}</span><span><em>Form Teacher's Signature :</em> ${u.signaturePath ? `<img src="/${escapeHtml(u.signaturePath)}" alt="">` : '<span class="en-hint">(none yet)</span>'}</span></div>` : '';
+  sigInit();
 }
 
 async function saveProfile(btn) {

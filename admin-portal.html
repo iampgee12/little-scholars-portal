@@ -2660,6 +2660,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <button type="button" class="sub-nav-item result-child" data-tab="commentsBank" onclick="switchTab('commentsBank', this)">My Comments Bank</button>
             <button type="button" class="sub-nav-item result-child" data-tab="configCognitive" onclick="switchTab('configCognitive', this)">Configure Cognitive Skills</button>
             <button type="button" class="sub-nav-item result-child" data-tab="resultPrefs" onclick="switchTab('resultPrefs', this)">Result Sheet Preferences</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="signatures" onclick="switchTab('signatures', this)">Signatures</button>
             <button type="button" class="sub-nav-item result-child" data-tab="clearCache" onclick="switchTab('clearCache', this)">Clear Result Cache</button>
           </div>
         </div>
@@ -3792,6 +3793,10 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
       </div>
 
       <!-- RESULT SHEET PREFERENCES -->
+      <div class="tab-panel" id="tab-signatures">
+        <div id="sigs-root"></div>
+      </div>
+
       <div class="tab-panel" id="tab-resultPrefs">
         <div class="page-header"><h2>Result Sheet Preferences</h2><p>Control what appears on student report sheets.</p></div>
         <!-- 3 sub-tabs -->
@@ -3884,24 +3889,9 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 
           <div class="card" style="margin-top:18px;">
             <div class="card-head"><span class="card-title">Signatures</span></div>
-            <div class="card-body">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-                <div>
-                  <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Head of School</div>
-                  <div style="margin-bottom:10px;"><img id="head-sig-preview" style="max-height:50px;max-width:180px;display:none;border:1px solid var(--border);border-radius:6px;background:#fff;padding:4px;" alt="Current head of school signature"></div>
-                  <div style="margin-bottom:10px;"><label class="field-label">Name</label><input class="field-input" id="head-name" placeholder="e.g. Mrs. Jane Adeyemi"></div>
-                  <div style="margin-bottom:10px;"><label class="field-label">Signature Image</label><input class="field-input" type="file" accept="image/*" id="head-signature-file"></div>
-                  <button class="post-btn" onclick="uploadHeadSignature()">Save Head of School Signature</button>
-                </div>
-                <div>
-                  <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">Set a Teacher's Signature</div>
-                  <div style="margin-bottom:10px;"><label class="field-label">Teacher</label><select class="ctrl-select" id="signature-teacher"></select></div>
-                  <div id="teacher-sig-preview-wrap" style="margin-bottom:10px;display:none;"><img id="teacher-sig-preview" style="max-height:50px;max-width:180px;border:1px solid var(--border);border-radius:6px;background:#fff;padding:4px;" alt="Current teacher signature"></div>
-                  <div style="margin-bottom:10px;"><label class="field-label">Signature Image</label><input class="field-input" type="file" accept="image/*" id="teacher-signature-file"></div>
-                  <button class="post-btn" onclick="uploadTeacherSignature()">Save Teacher Signature</button>
-                  <div style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;">Teachers can also upload their own signature from their own portal, under Account Settings.</div>
-                </div>
-              </div>
+            <div class="card-body sigs-pointer">
+              <span>The Head of School's and class teachers' signatures are managed on their own page.</span>
+              <button class="post-btn" onclick="switchTab('signatures', document.querySelector('[data-tab=signatures]'))">Open Signatures</button>
             </div>
           </div>
 

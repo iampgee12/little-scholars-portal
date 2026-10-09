@@ -4913,8 +4913,18 @@ async function handleApi(req, res, url) {
     if (!user) return;
     const body = await readJson(req);
     const dataUrl = cleanText(body.dataUrl);
-    if (!dataUrl) return sendJson(res, 400, { error: 'Signature image is required' });
     const role = cleanText(body.role);
+    // Name-only change for the Head of School, or removing a signature
+    if (!dataUrl && role === 'head' && body.headName && !body.remove) {
+      setMeta('head_of_school_name', cleanText(body.headName));
+      return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+    }
+    if (body.remove) {
+      if (role === 'head') setMeta('head_signature_path', '');
+      else run("UPDATE users SET signature_path = NULL WHERE id = ? AND role = 'teacher'", cleanText(body.teacherId).toUpperCase());
+      return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+    }
+    if (!dataUrl) return sendJson(res, 400, { error: 'Signature image is required' });
     const stored = saveDataUrl(dataUrl, role === 'head' ? 'head-signature' : 'teacher-signature');
     if (role === 'head') {
       setMeta('head_signature_path', stored);

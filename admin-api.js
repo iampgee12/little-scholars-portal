@@ -1803,12 +1803,6 @@ function populateAdminControls() {
     ).join('');
     publishExamSelect.value = 'Mid-Term Exam';
   }
-  const signatureTeacherSelect = document.getElementById('signature-teacher');
-  if (signatureTeacherSelect) {
-    signatureTeacherSelect.innerHTML = '<option value="">Select teacher...</option>' + state.setup.teachers.map(teacher =>
-      `<option value="${escapeHtml(teacher.id)}">${escapeHtml(teacher.name)} (${escapeHtml(teacher.id)})</option>`
-    ).join('');
-  }
   const assetStudentSelect = document.getElementById('asset-student');
   if (assetStudentSelect) {
     assetStudentSelect.innerHTML = '<option value="">Select student...</option>' + state.setup.students.map(student =>
@@ -1954,32 +1948,8 @@ function renderEmailConfigStatus() {
 }
 
 function renderSignaturesPanel() {
-  const setup = state.setup;
-  if (!setup) return;
-  const settings = setup.settings || {};
-
-  const headPreview = document.getElementById('head-sig-preview');
-  if (headPreview) {
-    if (settings.headSignaturePath) { headPreview.src = '/' + settings.headSignaturePath; headPreview.style.display = ''; }
-    else { headPreview.style.display = 'none'; }
-  }
-  const headName = document.getElementById('head-name');
-  if (headName && !headName.value) headName.value = settings.headOfSchoolName || '';
+  if (!state.setup) return;
   renderWatermarkPanel();
-
-  const teacherSel = document.getElementById('signature-teacher');
-  if (teacherSel) {
-    const teachers = setup.teachers || [];
-    const prevValue = teacherSel.value;
-    teacherSel.innerHTML = '<option value="">— Select Teacher —</option>' +
-      teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`).join('');
-    if (prevValue && teachers.some(t => t.id === prevValue)) teacherSel.value = prevValue;
-    if (!teacherSel.dataset.wired) {
-      teacherSel.dataset.wired = '1';
-      teacherSel.addEventListener('change', renderTeacherSigPreview);
-    }
-    renderTeacherSigPreview();
-  }
 }
 
 // Result Sheet Preferences → watermark: shows the current one and lets the
@@ -2021,60 +1991,6 @@ async function saveWatermark(action, btn) {
   } finally {
     btn.disabled = false;
     renderWatermarkPanel();
-  }
-}
-
-function renderTeacherSigPreview() {
-  const teacherSel = document.getElementById('signature-teacher');
-  const wrap = document.getElementById('teacher-sig-preview-wrap');
-  const img = document.getElementById('teacher-sig-preview');
-  if (!teacherSel || !wrap || !img) return;
-  const teacher = (state.setup.teachers || []).find(t => t.id === teacherSel.value);
-  if (teacher && teacher.signaturePath) {
-    img.src = '/' + teacher.signaturePath;
-    wrap.style.display = '';
-  } else {
-    wrap.style.display = 'none';
-  }
-}
-
-async function uploadHeadSignature() {
-  try {
-    const dataUrl = await imageToSmallDataUrl(document.getElementById('head-signature-file').files?.[0], 900, false);
-    if (!dataUrl) return showToast('Choose a head signature image');
-    const data = await apiFetch('/api/admin/signatures', {
-      method: 'POST',
-      body: JSON.stringify({
-        role: 'head',
-        headName: document.getElementById('head-name').value,
-        dataUrl,
-      }),
-    });
-    state.setup = data.setup;
-    document.getElementById('head-signature-file').value = '';
-    renderSignaturesPanel();
-    showToast('Head signature uploaded');
-  } catch (err) {
-    showToast(err.message);
-  }
-}
-
-async function uploadTeacherSignature() {
-  try {
-    const teacherId = document.getElementById('signature-teacher').value;
-    const dataUrl = await imageToSmallDataUrl(document.getElementById('teacher-signature-file').files?.[0], 900, false);
-    if (!teacherId) return showToast('Choose a teacher');
-    if (!dataUrl) return showToast('Choose a teacher signature image');
-    const data = await apiFetch('/api/admin/signatures', {
-      method: 'POST',
-      body: JSON.stringify({ role: 'teacher', teacherId, dataUrl }),
-    });
-    state.setup = data.setup;
-    document.getElementById('teacher-signature-file').value = '';
-    renderSignaturesPanel();
-    showToast('Teacher signature uploaded');
-  } catch (err) {
-    showToast(err.message);
   }
 }
 
@@ -2426,6 +2342,7 @@ const TAB_META = {
   cognitiveSkills: { title: 'Cognitive Skills Assessment', sub: 'Skills Assessment Records' },
   publish: { title: 'Review And Publish Results', sub: 'Review and Publish Student Reports' },
   resultPrefs: { title: 'Result Sheet Preferences', sub: 'Result Settings' },
+  signatures: { title: 'Signatures', sub: 'Head of School and class teachers' },
   studentResultChecker: { title: 'Student Result Checker', sub: 'Look Up a Student Result' },
   classResultChecker: { title: 'Class Result Checker', sub: 'Bulk Students Result Checker' },
   emailQueue: { title: 'Results Email Delivery Queue', sub: 'Published Report Email Status' },
@@ -2666,6 +2583,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'scoreDivisions') sdInit();
   if (tab === 'commentsBank') cbLoadComments();
   if (tab === 'resultPrefs') { switchRspTab('sheet'); renderSignaturesPanel(); }
+  if (tab === 'signatures') sigsInit();
   // Enroll Students / Self Registration are drawn by enrol-admin.js (e.g. after a refresh)
   if (tab === 'addStudent' && !document.getElementById('en-body') && typeof enrolShowTab === 'function') enrolShowTab(EN.tab || 'enroll');
   if (tab === 'selfRegistration' && !document.getElementById('sr-body') && typeof sregOpen === 'function') sregOpen(EN.sr.view || 'dashboard');
@@ -8852,4 +8770,118 @@ async function finReportsInit() {
     document.getElementById('fr-liabilities').textContent = finMoney(data.totalLiabilities);
     document.getElementById('fr-equity').textContent = finMoney(data.totalEquity);
   } catch (err) { showToast(err.message); }
+}
+
+// ── SIGNATURES (Result Settings → Signatures) ──
+// The Head of School's and every class teacher's signature, as printed on the
+// result sheets. Each can be drawn on screen or taken from a photo.
+function sigsClassTeachers() {
+  const setup = state.setup || {};
+  const classes = new Map();
+  const add = (id, label) => { if (!id) return; if (!classes.has(id)) classes.set(id, new Set()); classes.get(id).add(label); };
+  (setup.assignments || []).filter(a => a.teacherType === 'class_teacher').forEach(a => add(a.teacherId, a.classLabel || a.classCode));
+  (setup.classArms || []).filter(a => a.formTeacherId).forEach(a => add(a.formTeacherId, `${a.classLabel} ${a.name}`));
+  return (setup.teachers || []).filter(t => classes.has(t.id))
+    .map(t => ({ ...t, classes: [...classes.get(t.id)].sort() }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function sigsInit() {
+  const root = document.getElementById('sigs-root');
+  if (!root || !state.setup) return;
+  const settings = state.setup.settings || {};
+  const teachers = sigsClassTeachers();
+  const signed = teachers.filter(t => t.signaturePath).length;
+  const thumb = path => path ? `<img class="sigs-thumb" src="/${escapeHtml(path)}" alt="Signature">` : '<span class="sigs-none">Not added yet</span>';
+  root.innerHTML = `
+    <div class="card"><div class="card-head"><span class="card-title">Head of School</span></div><div class="card-body">
+      <div class="sigs-head">
+        <div class="en-field"><label class="field-label">Name (as printed on result sheets)</label>
+          <div class="sigs-name"><input class="field-input" id="sigs-head-name" value="${escapeHtml(settings.headOfSchoolName || '')}"><button class="btn-outline" onclick="sigsSaveHeadName(this)">Save Name</button></div></div>
+        <div class="sigs-current">${thumb(settings.headSignaturePath)}</div>
+        <div class="sigs-actions">
+          <button class="post-btn" onclick="sigsOpen('head')">${settings.headSignaturePath ? 'Change Signature' : 'Add Signature'}</button>
+          ${settings.headSignaturePath ? '<button class="del-btn" onclick="sigsRemove(\'head\')">Remove</button>' : ''}
+        </div>
+      </div>
+    </div></div>
+    <div class="card" style="margin-top:16px;"><div class="card-head"><span class="card-title">Class Teachers (Form Teachers)</span><span class="chip-green">${signed} of ${teachers.length} signed</span></div><div class="card-body">
+      <div class="en-hint" style="margin-bottom:10px;">A class teacher's signature prints as the Form Teacher's signature on their class's result sheets. Class teachers can also add their own in the Teacher Portal under <strong>Settings → My Signature</strong>.</div>
+      ${teachers.length ? `<div class="sr-table-wrap"><table class="data-table"><thead><tr><th>Class Teacher</th><th>Class(es)</th><th>Signature</th><th></th></tr></thead><tbody>
+        ${teachers.map(t => `<tr>
+          <td><strong>${escapeHtml(t.name)}</strong><div class="en-hint">${escapeHtml(t.id)}</div></td>
+          <td>${t.classes.map(escapeHtml).join(', ')}</td>
+          <td>${thumb(t.signaturePath)}</td>
+          <td class="sigs-row-actions"><button class="post-btn btn-sm" onclick="sigsOpen('teacher', '${escapeHtml(t.id)}')">${t.signaturePath ? 'Change' : 'Add Signature'}</button>
+            ${t.signaturePath ? `<button class="del-btn btn-sm" onclick="sigsRemove('teacher', '${escapeHtml(t.id)}')">Remove</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>` : '<div class="sr-empty">No class teachers yet. Make a teacher a class teacher under Result Settings → Setup (Assign Teachers), or set a class arm\'s form teacher.</div>'}
+    </div></div>`;
+}
+
+function sigsOpen(kind, teacherId = '') {
+  const t = kind === 'teacher' ? (state.setup.teachers || []).find(x => x.id === teacherId) : null;
+  const current = kind === 'head' ? state.setup.settings?.headSignaturePath : t?.signaturePath;
+  const modal = document.createElement('div');
+  modal.className = 'en-modal';
+  modal.id = 'sigs-modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div class="en-modal-box"><div class="en-modal-head"><span>Signature — ${escapeHtml(kind === 'head' ? 'Head of School' : t?.name || teacherId)}</span><button class="en-x" onclick="sigsClose()">&times;</button></div>
+    <div class="en-modal-body">
+      <div class="sig-box">
+        <div class="sig-current"><span>Current signature:</span>${current ? `<img src="/${escapeHtml(current)}" alt="">` : '<em>none yet</em>'}</div>
+        <div class="sig-pad-wrap"><canvas id="sigm-pad" class="sig-pad" width="600" height="180"></canvas><div class="sig-pad-line"></div><div class="sig-hint" id="sigm-hint">Sign here with a finger, stylus or mouse</div></div>
+        <div class="sig-actions">
+          <button type="button" class="btn-outline" onclick="sigClear()">Clear</button>
+          <label class="btn-outline">Upload a photo instead<input type="file" accept="image/*" hidden onchange="sigFromFile(this)"></label>
+        </div>
+      </div>
+    </div>
+    <div class="en-modal-foot"><button class="btn-outline" onclick="sigsClose()">Cancel</button><button class="post-btn" onclick="sigsSave(this, '${kind}', '${escapeHtml(teacherId)}')">Save Signature</button></div></div>`;
+  document.body.appendChild(modal);
+  sigInit('sigm-pad', 'sigm-hint');
+}
+
+function sigsClose() {
+  document.getElementById('sigs-modal')?.remove();
+  sigInit(); // hand the pad back to the Profile page's own box
+}
+
+async function sigsSave(btn, kind, teacherId) {
+  if (!sigPad.dirty) return showToast('Sign in the box (or upload a photo of the signature) first');
+  const dataUrl = sigToDataUrl();
+  if (!dataUrl) return showToast('The box looks empty — sign again');
+  btn.disabled = true;
+  try {
+    const data = await apiFetch('/api/admin/signatures', { method: 'POST', body: JSON.stringify({ role: kind, teacherId, dataUrl }) });
+    state.setup = data.setup;
+    sigsClose();
+    sigsInit();
+    showToast('Signature saved');
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function sigsRemove(kind, teacherId = '') {
+  if (!confirm('Remove this signature? It will no longer print on result sheets.')) return;
+  try {
+    const data = await apiFetch('/api/admin/signatures', { method: 'POST', body: JSON.stringify({ role: kind, teacherId, remove: true }) });
+    state.setup = data.setup;
+    sigsInit();
+    showToast('Signature removed');
+  } catch (err) { showToast(err.message); }
+}
+
+async function sigsSaveHeadName(btn) {
+  const headName = document.getElementById('sigs-head-name').value.trim();
+  if (!headName) return showToast('Enter the Head of School\'s name');
+  btn.disabled = true;
+  try {
+    const data = await apiFetch('/api/admin/signatures', { method: 'POST', body: JSON.stringify({ role: 'head', headName }) });
+    state.setup = data.setup;
+    showToast('Name saved');
+  } catch (err) { showToast(err.message); } finally { btn.disabled = false; }
 }

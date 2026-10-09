@@ -54,11 +54,13 @@ function pupilAvatar(pupil, cls = 'stu-av') {
 // ── Signature pad (Profile → Profile Update, class teachers + admin) ──
 // Sign with a finger, stylus or mouse, or load a photo of a signature onto
 // the pad. Saved as a tightly-cropped transparent PNG.
-const sigPad = { canvas: null, ctx: null, drawing: false, dirty: false };
+const sigPad = { canvas: null, ctx: null, drawing: false, dirty: false, hintId: 'sig-hint' };
 
-function sigInit() {
-  const canvas = document.getElementById('sig-pad');
+// One pad is active at a time: the page's own (#sig-pad) or a pop-up's.
+function sigInit(canvasId = 'sig-pad', hintId = 'sig-hint') {
+  const canvas = document.getElementById(canvasId);
   if (!canvas) return;
+  sigPad.hintId = hintId;
   sigPad.canvas = canvas;
   sigPad.ctx = canvas.getContext('2d');
   sigClear();
@@ -92,7 +94,7 @@ function sigInit() {
 
 function sigSetDirty(dirty) {
   sigPad.dirty = dirty;
-  const hint = document.getElementById('sig-hint');
+  const hint = document.getElementById(sigPad.hintId);
   if (hint) hint.style.display = dirty ? 'none' : '';
 }
 
