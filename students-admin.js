@@ -216,7 +216,7 @@ function vsPaint() {
       <tbody>${page.length ? page.map((r, i) => `<tr>
         <td><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick('${escapeHtml(r.id)}', this.checked)"></td>
         <td>${start + i + 1}</td>
-        <td>${pupilAvatar(r)}</td>
+        <td><button class="stu-photo-link" onclick="stuProfile('${escapeHtml(r.id)}')" title="View profile">${pupilAvatar(r)}</button></td>
         <td><button class="stu-name-link" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button></td>
         <td>${escapeHtml(r.gender || '')}</td>
         <td class="stu-mono">${escapeHtml(r.regNo || r.id)}</td>
@@ -421,49 +421,215 @@ async function stuClassHistory(id, name) {
   } catch (err) { showToast(err.message); }
 }
 
-// ── Pupil profile pop-up ────────────────────────────────────────────────
+// ── Student Information card ────────────────────────────────────────────
+// Opened by clicking a pupil's name or photo (View Students, Students
+// Registry). Mirrors SchoolsFocus's Student Information pop-up.
+let STU_CARD = null; // last loaded profile data
+
+function stuAge(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const born = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const now = new Date();
+  let months = (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
+  if (now.getDate() < born.getDate()) months -= 1;
+  if (months < 0) return '';
+  return `${Math.floor(months / 12)}yrs, ${months % 12}m`;
+}
+
+function stuWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-GB', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).replace(',', '');
+}
+
+function stuModal(id, title, body, foot = '', wide = true) {
+  document.getElementById(id)?.remove();
+  const modal = document.createElement('div');
+  modal.className = 'en-modal';
+  modal.id = id;
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div class="en-modal-box${wide ? ' wide' : ''}"><div class="en-modal-head"><span>${title}</span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
+    <div class="en-modal-body">${body}</div>
+    <div class="en-modal-foot">${foot}<button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+const STU_ICON_MAIL = '<svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><polyline points="2.5 4.5 8 8.5 13.5 4.5"/></svg>';
+
 async function stuProfile(id) {
   try {
-    const [{ student: s }, { history }] = await Promise.all([
-      apiFetch(`/api/admin/enrol/student/${encodeURIComponent(id)}`),
-      apiFetch(`/api/admin/registry/history?id=${encodeURIComponent(id)}`),
-    ]);
-    if (!EN.meta) await enrolLoadMeta();
-    const fam = (EN.meta?.families || []).find(f => String(f.id) === String(s.familyId));
-    const cls = (state.setup?.classes || []).find(c => c.code === s.classCode)?.label || s.classCode;
-    const arm = (state.setup?.classArms || []).find(a => String(a.id) === String(s.classArmId))?.name || '';
-    const row = (label, value) => value ? `<div class="stu-prof-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>` : '';
-    const parent = p => p ? `<div class="en-parent"><strong>${escapeHtml([p.title, p.fullName].filter(Boolean).join(' '))}</strong>${p.relationship ? ` <span class="en-badge">${escapeHtml(p.relationship)}</span>` : ''}<div>${[p.phone, p.email].filter(Boolean).map(escapeHtml).join(' · ')}</div>${p.occupation ? `<div>${escapeHtml(p.occupation)}</div>` : ''}${p.address ? `<div class="en-hint">${escapeHtml(p.address)}</div>` : ''}</div>` : '';
-    const contact = (title, c) => c && (c.name || c.phone) ? `<div class="en-parent"><strong>${escapeHtml(title)}: ${escapeHtml(c.name || '')}</strong>${c.relationship ? ` <span class="en-badge">${escapeHtml(c.relationship)}</span>` : ''}<div>${[c.phone, c.email].filter(Boolean).map(escapeHtml).join(' · ')}</div>${c.address ? `<div class="en-hint">${escapeHtml(c.address)}</div>` : ''}</div>` : '';
-    const name = [s.surname, s.firstName, s.otherNames].filter(Boolean).join(' ');
-    const modal = document.createElement('div');
-    modal.className = 'en-modal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `<div class="en-modal-box wide"><div class="en-modal-head"><span>Student Profile</span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
-      <div class="en-modal-body">
-        <div class="stu-prof-top">
-          <div class="en-photo">${s.photoPath ? `<img src="/${escapeHtml(s.photoPath)}" alt="">` : '<span>Photo</span>'}</div>
-          <div><div class="stu-prof-name">${escapeHtml(name)}</div>
-            <div class="en-hint">Reg. No. ${escapeHtml(s.regNo || '—')} · Student ID ${escapeHtml(s.id)}</div>
-            <div class="en-hint">${escapeHtml(cls)}${arm ? ` · ${escapeHtml(arm)}` : ''} · ${s.active ? 'Account active' : 'Account deactivated'}</div></div>
-        </div>
-        <div class="en-sub-head">Biodata</div>
-        <div class="stu-prof-grid">
-          ${row('Gender', s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : '')}${row('Date of Birth', stuDate(s.dob))}${row('Email', s.studentEmail)}
-          ${row('Contact Phone', s.phone)}${row('Religion', s.religion)}${row('Nationality', s.nationality)}${row('State of Origin', s.state)}
-          ${row('LGA', s.lga)}${row('Town', s.town)}${row('Blood Group', s.bloodGroup)}${row('Genotype', s.genotype)}${row('NIN / Birth Cert. No.', s.nin)}
-          ${row('Admission Date', stuDate(s.admissionDate))}${row('Enrolled Session', s.session)}${row('Roll No', s.rollNo)}
-          ${row('Residential Address', s.residentialAddress)}${row('Permanent Address', s.permanentAddress)}${row('Bio / Remark', s.bio)}
-        </div>
-        <div class="en-sub-head">Parents / Guardian${fam ? ` — ${escapeHtml(fam.name)}` : ''}</div>
-        <div class="en-parents">${fam ? parent(fam.parent1) + parent(fam.parent2) : '<span class="en-hint">No family linked yet — use Edit to choose or create one.</span>'}</div>
-        ${contact('Next of Kin', s.nextOfKin) || contact('Emergency Contact', s.emergency) ? `<div class="en-sub-head">Next of Kin &amp; Emergency Contact</div><div class="en-parents">${contact('Next of Kin', s.nextOfKin)}${contact('Emergency Contact', s.emergency)}</div>` : ''}
-        <div class="en-sub-head">Class History</div>
-        <table class="data-table"><thead><tr><th>Session</th><th>Class Arm</th><th>Form Teacher</th></tr></thead><tbody>
-          ${history.length ? history.map(h => `<tr><td>${escapeHtml(String(h.session).replace('/', '-'))}</td><td>${escapeHtml(h.classText)}</td><td>${escapeHtml(h.formTeacher || '')}</td></tr>`).join('') : '<tr><td colspan="3" class="sr-empty">No class history recorded yet</td></tr>'}
-        </tbody></table>
-      </div>
-      <div class="en-modal-foot"><button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button><button class="post-btn" onclick="this.closest('.en-modal').remove(); enrolEdit('${escapeHtml(s.id)}')">Edit Student</button></div></div>`;
-    document.body.appendChild(modal);
+    STU_CARD = await apiFetch(`/api/admin/view-students/profile?id=${encodeURIComponent(id)}`);
+  } catch (err) { return showToast(err.message); }
+  const { student: s, groups, tags, tagIds, family, school } = STU_CARD;
+  const name = [s.surname, s.firstName, s.otherNames].filter(Boolean).join(' ').toUpperCase();
+  const row = (label, value) => `<tr><td>${escapeHtml(label)}</td><td>${value}</td></tr>`;
+  const txt = v => escapeHtml(v || '') || '<span class="en-hint">—</span>';
+  const btn = (label, onclick, icon = 'history') => `<button class="stu-mini-btn" onclick="${onclick}">${stuIcon(icon)} ${label}</button>`;
+  const tagNames = tags.filter(t => tagIds.includes(t.id)).map(t => `<span class="en-badge">${escapeHtml(t.name)}</span>`).join(' ');
+  const registered = s.enrolledAt ? `On : ${escapeHtml(stuWhen(s.enrolledAt))}${s.registeredByName ? `<br>By : ${escapeHtml(s.registeredByName.toUpperCase())} (${escapeHtml(s.registeredByRole === 'admin' ? 'Admin' : s.registeredByRole || '')})` : ''}` : '<span class="en-hint">—</span>';
+  const contact = c => c && (c.name || c.phone) ? [c.name, c.relationship && `(${c.relationship})`, c.phone, c.email].filter(Boolean).map(escapeHtml).join(' · ') : '';
+  const more = [
+    ['Contact Phone', s.phone], ['N.ID / Birth Cert. No.', s.nin], ['Blood Group', s.bloodGroup], ['Genotype', s.genotype],
+    ['Province/State (of Origin)', s.state], ['ZIP/LGA (of Origin)', s.lga], ['Town (of Origin)', s.town],
+    ['Residential / Contact Address', s.residentialAddress], ['Permanent / Home Town Address', s.permanentAddress],
+    ['Enrolled Session', s.session], ['Roll No', s.rollNo], ['Bio / Remark', s.bio],
+    ['Next of Kin', contact(s.nextOfKin)], ['Emergency Contact', contact(s.emergency)],
+  ].filter(([, v]) => v);
+  const parents = family?.parents || [];
+  const body = `
+    <div class="stu-letterhead">
+      <div class="stu-lh-name">${escapeHtml(String(school.name || '').toUpperCase())}</div>
+      <div>${escapeHtml(String(school.address || '').toUpperCase())}</div>
+      <div>Email: ${escapeHtml(school.email || '')} &nbsp; Tel: ${escapeHtml(school.phone || '')}</div>
+      <div class="stu-lh-refs"><span>Our Ref.: _____________________</span><span>Your Ref.: ____________________</span></div>
+      <div class="stu-lh-title">Student Profile</div>
+    </div>
+    <div class="stu-card">
+      <div class="stu-card-banner"></div>
+      <div class="stu-card-photo">${s.photoPath ? `<img src="/${escapeHtml(s.photoPath)}" alt="">` : `<span>${escapeHtml((s.firstName || '?')[0] + (s.surname || '')[0])}</span>`}</div>
+      <div class="stu-card-name">${escapeHtml(name)}</div>
+      <span class="stu-card-badge">Student</span>
+      <div class="stu-card-icons">${s.studentEmail ? `<a href="mailto:${escapeHtml(s.studentEmail)}" title="Email ${escapeHtml(s.studentEmail)}">${STU_ICON_MAIL}</a>` : ''}</div>
+    </div>
+    <div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button></div>
+    <div class="stu-sec">Student Biodata</div>
+    <table class="stu-info"><tbody>
+      ${row('Surname', txt(s.surname))}${row('First Name', txt(s.firstName))}${row('Other Names', txt(s.otherNames))}
+      ${row('Gender', txt(s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : ''))}${row('Date of Birth', txt(stuDate(s.dob)))}
+      ${row('Age', txt(stuAge(s.dob)))}${row('Email', txt(s.studentEmail))}${row('Nationality', txt(s.nationality))}${row('Religion', txt(String(s.religion || '').toUpperCase()))}
+    </tbody></table>
+    <div class="stu-sec">Academic Information</div>
+    <table class="stu-info"><tbody>
+      ${row('Adm. / Reg. No.', txt(s.regNo))}
+      ${row('Current Class Category', txt(String(s.category || '').toUpperCase()))}
+      ${row('Current Class', `${txt(String(s.classLabel || '').toUpperCase())}<div>${btn('Class History', `stuClassHistory('${escapeHtml(s.id)}', '${escapeHtml(name).replace(/'/g, '&#39;')}')`)}</div>`)}
+      ${row('Current Class Arm', txt(String(s.armName || '').toUpperCase()))}
+      ${row('Current Activity Groups', `${groups.length ? groups.map(g => escapeHtml(g.name)).join(', ') : '<span class="en-hint">—</span>'}<div>${btn('Activity Group History', 'stuGroupHistory()')}</div>`)}
+      ${row('Tags', `${tagNames ? `<div class="stu-tags">${tagNames}</div>` : ''}<div>${btn('Update Student Tags', 'stuTagsModal()', 'check')}</div>`)}
+      ${row('Admission Date', txt(stuDate(s.admissionDate)))}
+      ${row('Date Registered in Portal', registered)}
+      ${row('Account Status', `<button type="button" class="rsp-toggle ${s.active ? 'on' : 'off'}" id="stu-acc-toggle" onclick="stuToggleAccount('${escapeHtml(s.id)}', this)"><span>${s.active ? 'ON' : 'OFF'}</span></button>`)}
+      ${row('Fees', btn('Fees &amp; Payment History', `crcFees('${escapeHtml(s.id)}')`, 'users'))}
+      ${row('Results', btn('Academic Results History', 'stuResultsHistory()', 'check'))}
+    </tbody></table>
+    <div class="stu-sec">More Details</div>
+    ${more.length ? `<table class="stu-info"><tbody>${more.map(([l, v]) => row(l, escapeHtml(v))).join('')}</tbody></table>` : ''}
+    <div class="stu-sec">Parents / Guardian</div>
+    <div class="stu-parents-list">${parents.length ? parents.map(p => `<div class="stu-parent">
+        <button class="stu-name-link" onclick="familyCard()">${escapeHtml([p.title, p.fullName].filter(Boolean).join(' ').toUpperCase())}</button>
+        ${p.relationship ? `<span class="en-hint">(${escapeHtml(p.relationship)})</span>` : ''}
+        <div class="stu-card-icons">${p.email ? `<a href="mailto:${escapeHtml(p.email)}" title="Email ${escapeHtml(p.email)}">${STU_ICON_MAIL}</a>` : ''}${p.phone ? `<span class="en-hint">${escapeHtml(p.phone)}</span>` : ''}</div>
+      </div>`).join('') : '<span class="en-hint">No family linked yet — open the profile page to choose or create one.</span>'}</div>
+    <div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`;
+  stuModal('stu-card-modal', 'Student Information', body, '', false);
+}
+
+function stuGoToProfile(id) {
+  document.querySelectorAll('.en-modal').forEach(m => m.remove());
+  enrolEdit(id);
+}
+
+async function stuToggleAccount(id, btn) {
+  const turnOn = btn.classList.contains('off');
+  try {
+    await apiFetch('/api/admin/view-students/action', { method: 'POST', body: JSON.stringify({ ids: [id], action: turnOn ? 'activate' : 'deactivate' }) });
+    btn.className = `rsp-toggle ${turnOn ? 'on' : 'off'}`;
+    btn.firstElementChild.textContent = turnOn ? 'ON' : 'OFF';
+    const row = VS.rows.find(r => r.id === id);
+    if (row) { row.active = turnOn; if (document.getElementById('vs-list')) vsRenderResults(); }
+    showToast(turnOn ? 'Account activated' : 'Account deactivated');
   } catch (err) { showToast(err.message); }
+}
+
+function stuGroupHistory() {
+  const { student: s, groups } = STU_CARD;
+  stuModal('stu-groups-modal', `Activity Group History | ${escapeHtml(s.firstName)} ${escapeHtml(s.surname)}`,
+    `<table class="data-table"><thead><tr><th>Activity Group</th><th>Joined</th></tr></thead><tbody>
+      ${groups.length ? groups.map(g => `<tr><td>${escapeHtml(g.name)}</td><td>${escapeHtml(stuDate(String(g.joinedAt || '').slice(0, 10)))}</td></tr>`).join('') : '<tr><td colspan="2" class="sr-empty">Not in any extracurricular group yet</td></tr>'}
+    </tbody></table>`, '', false);
+}
+
+function stuTagsModal() {
+  const { student: s, tags, tagIds } = STU_CARD;
+  const modal = stuModal('stu-tags-modal', `Update Student Tags | ${escapeHtml(s.firstName)} ${escapeHtml(s.surname)}`,
+    tags.length ? `<div class="stu-tag-pick">${tags.map(t => `<label class="en-tag"><input type="checkbox" value="${t.id}"${tagIds.includes(t.id) ? ' checked' : ''}> ${escapeHtml(t.name)}</label>`).join('')}</div>`
+      : '<div class="sr-empty">No tags yet. Create tags under People → Students → Student Tags.</div>',
+    tags.length ? '<button class="post-btn" id="stu-tags-save">Save Tags</button>' : '', false);
+  modal.querySelector('#stu-tags-save')?.addEventListener('click', async e => {
+    const ids = [...modal.querySelectorAll('input:checked')].map(i => Number(i.value));
+    e.target.disabled = true;
+    try {
+      await apiFetch('/api/admin/view-students/tags', { method: 'POST', body: JSON.stringify({ id: s.id, tags: ids }) });
+      modal.remove();
+      showToast('Tags updated');
+      stuProfile(s.id);
+    } catch (err) { showToast(err.message); e.target.disabled = false; }
+  });
+}
+
+function stuResultsHistory() {
+  const { student: s, results } = STU_CARD;
+  stuModal('stu-results-modal', `Academic Results History | ${escapeHtml(s.firstName)} ${escapeHtml(s.surname)}`,
+    `<table class="data-table"><thead><tr><th>Session</th><th>Term</th><th>Exam</th><th>Class</th><th>Published</th><th></th></tr></thead><tbody>
+      ${results.length ? results.map(r => `<tr><td>${escapeHtml(String(r.session).replace('/', '-'))}</td><td>${escapeHtml(r.term)}</td><td>${escapeHtml(r.examType)}</td><td>${escapeHtml(r.classLabel || '')}</td><td>${escapeHtml(stuDate(String(r.publishedAt || '').slice(0, 10)))}</td>
+        <td><button class="btn-outline btn-sm" onclick="window.open('/api/admin/reports/${r.id}/pdf', '_blank')">View Result</button></td></tr>`).join('') : '<tr><td colspan="6" class="sr-empty">No published results yet</td></tr>'}
+    </tbody></table>`);
+}
+
+function stuPrintCard() {
+  const card = document.querySelector('#stu-card-modal .en-modal-body');
+  if (!card) return;
+  const css = [...document.querySelectorAll('link[rel=stylesheet]')].map(l => `<link rel="stylesheet" href="${l.href}">`).join('');
+  const win = window.open('', '_blank');
+  win.document.write(`<html><head><title>Student Profile</title>${css}<style>body{background:#fff;padding:24px;font-family:'DM Sans',sans-serif}.stu-letterhead{display:block!important}.stu-card-go,.stu-card-foot,.stu-mini-btn,.rsp-toggle{display:none!important}</style></head><body>${card.innerHTML}<script>setTimeout(() => window.print(), 400);<\/script></body></html>`);
+  win.document.close();
+}
+
+// ── Family card (parent name in the Student Information card) ──
+function familyCard() {
+  const fam = STU_CARD?.family;
+  if (!fam) return;
+  const activeWards = fam.wards.filter(w => w.active).length;
+  const wards = fam.wards.map(w => `<div class="fam-ward">
+      <div class="fam-ward-top"><div class="fam-ward-photo">${w.photoPath ? `<img src="/${escapeHtml(w.photoPath)}" alt="">` : `<span>${escapeHtml(w.initials || '')}</span>`}</div>
+        <div class="fam-ward-name">${escapeHtml(String(w.name).toUpperCase())} <span class="en-hint">(${escapeHtml(w.gender || '')})</span></div></div>
+      <div class="fam-ward-grid"><div><span>Class</span><strong>${escapeHtml(String(w.classLabel || '').toUpperCase())}</strong></div><div><span>Class Arm</span><strong>${escapeHtml(String(w.armName || '—').toUpperCase())}</strong></div><div><span>Reg. No</span><strong>${escapeHtml(w.regNo || '')}</strong></div></div>
+      <div class="fam-ward-actions"><button class="en-link" onclick="stuClassHistory('${escapeHtml(w.id)}', '${escapeHtml(w.name).replace(/'/g, '&#39;')}')">Class History</button><button class="en-link" onclick="document.getElementById('fam-modal').remove(); stuProfile('${escapeHtml(w.id)}')">View Profile</button></div>
+    </div>`).join('');
+  const parents = fam.parents.map(p => `<div class="fam-parent">
+      <div class="stu-card"><div class="stu-card-banner"></div><div class="stu-card-photo"><span>${escapeHtml((p.fullName || '?').split(/\s+/).map(x => x[0]).slice(0, 2).join(''))}</span></div>
+        <div class="stu-card-name">${escapeHtml(String([p.title, p.fullName].filter(Boolean).join(' ')).toUpperCase())}</div><span class="stu-card-badge">Parent</span>
+        <div class="stu-card-icons">${p.email ? `<a href="mailto:${escapeHtml(p.email)}">${STU_ICON_MAIL}</a>` : ''}</div></div>
+      <table class="stu-info"><tbody>
+        <tr><td>Name</td><td>${escapeHtml(String(p.fullName).toUpperCase())}</td></tr>
+        <tr><td>Relationship with Ward(s)</td><td>${escapeHtml(p.relationship || '—')}</td></tr>
+        <tr><td>Occupation / Profession</td><td>${escapeHtml(String(p.occupation || '').toUpperCase() || '—')}</td></tr>
+        <tr><td>Email</td><td>${escapeHtml(p.email || '—')}</td></tr>
+        <tr><td>Phone</td><td>${escapeHtml(p.phone || '—')}</td></tr>
+        <tr><td>Address</td><td>${escapeHtml(String(p.address || '').toUpperCase() || '—')}</td></tr>
+      </tbody></table></div>`).join('');
+  stuModal('fam-modal', escapeHtml(fam.name), `
+    <div class="fam-manage"><button class="btn-outline btn-sm" onclick="familyManageFromCard()">Manage Family Members</button></div>
+    <div class="fam-head">Wards <span class="en-badge">${activeWards}</span> / <span class="en-badge">${fam.wards.length}</span></div>
+    <div class="fam-wards">${wards}</div>
+    <div class="fam-head">Parents <span class="en-badge">${fam.parents.length}</span></div>
+    <div class="fam-parents">${parents}</div>`);
+}
+
+async function familyManageFromCard() {
+  const fam = STU_CARD?.family;
+  if (!fam) return;
+  try { await enrolLoadMeta(); } catch (err) { return showToast(err.message); }
+  familyModalOpen('manage', fam.id);
+}
+
+// After Manage Family saves, reload the open cards
+async function familyCardRefresh() {
+  if (!STU_CARD?.student) return;
+  const famOpen = !!document.getElementById('fam-modal');
+  await stuProfile(STU_CARD.student.id);
+  if (famOpen) familyCard();
 }

@@ -3,7 +3,7 @@
 // server.js passes in its database helpers (ctx).
 
 module.exports = function createStudents(ctx) {
-  const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload, zipFiles } = ctx;
+  const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload, zipFiles, pupilRecord, schoolInfoFromMeta } = ctx;
 
   const nowIso = () => new Date().toISOString();
 
@@ -196,6 +196,56 @@ module.exports = function createStudents(ctx) {
           ids.forEach(id => recordHistory(id));
         } else return sendJson(res, 400, { error: 'Unknown action' }), true;
         return sendJson(res, 200, { ok: true, updated: ids.length, setup: adminSetupPayload() }), true;
+      }
+      // Everything the Student Information card shows
+      if (m === 'GET' && p === '/api/admin/view-students/profile') {
+        const id = cleanText(url.searchParams.get('id')).toUpperCase();
+        const rec = pupilRecord(id);
+        if (!rec) return sendJson(res, 404, { error: 'Student not found' }), true;
+        const st = one(`SELECT s.enrolled_at AS enrolledAt, s.registered_by AS registeredBy, c.label AS classLabel, c.category,
+                              ca.name AS armName, ru.name AS registeredByName, ru.role AS registeredByRole
+                       FROM students s LEFT JOIN classes c ON c.code = s.class_code LEFT JOIN class_arms ca ON ca.id = s.class_arm_id
+                       LEFT JOIN users ru ON ru.id = s.registered_by WHERE s.id = ?`, id);
+        const groups = all(`SELECT g.name, m.joined_at AS joinedAt FROM extracurricular_members m JOIN extracurricular_groups g ON g.id = m.group_id
+                            WHERE m.student_id = ? ORDER BY g.name`, id);
+        const tags = all('SELECT id, name, color FROM student_tags ORDER BY name');
+        const tagIds = all('SELECT tag_id AS id FROM student_tag_assignments WHERE student_id = ?', id).map(r => r.id);
+        let family = null;
+        if (rec.familyId) {
+          const f = one('SELECT * FROM families WHERE id = ?', rec.familyId);
+          if (f) {
+            const parent = pid => {
+              const p = pid && one('SELECT * FROM parents WHERE id = ?', pid);
+              return p ? { id: p.id, title: p.title || '', fullName: p.full_name, relationship: p.relationship === 'Other' ? (p.relationship_other || 'Other') : (p.relationship || ''),
+                occupation: p.occupation || '', phone: p.phone || '', email: p.email || '', address: p.address || '' } : null;
+            };
+            const wards = all(`SELECT s.id, s.name, s.gender, s.reg_no AS regNo, s.photo_path AS photoPath, s.initials, c.label AS classLabel, ca.name AS armName,
+                                      s.status, COALESCE(u.active, 1) AS active
+                               FROM students s LEFT JOIN classes c ON c.code = s.class_code LEFT JOIN class_arms ca ON ca.id = s.class_arm_id
+                               LEFT JOIN users u ON u.id = s.id WHERE s.family_id = ? ORDER BY s.name`, f.id).map(w => ({ ...w, active: !!w.active }));
+            family = { id: f.id, name: f.name, parents: [parent(f.parent1_id), parent(f.parent2_id)].filter(Boolean), wards };
+          }
+        }
+        const results = all(`SELECT rp.id, rp.exam_type AS examType, rp.published_at AS publishedAt, a.session_label AS session, a.term_label AS term, c.label AS classLabel
+                             FROM report_publications rp JOIN academic_terms a ON a.id = rp.academic_id LEFT JOIN classes c ON c.code = rp.class_code
+                             WHERE rp.student_id = ? ORDER BY rp.published_at DESC`, id);
+        const active = one('SELECT COALESCE(active, 1) AS active FROM users WHERE id = ?', id);
+        return sendJson(res, 200, {
+          student: { ...rec, ...st, active: active ? !!active.active : rec.active },
+          groups, tags, tagIds, family, results, school: schoolInfoFromMeta(),
+        }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/view-students/tags') {
+        const body = await readJson(req);
+        const id = cleanText(body.id).toUpperCase();
+        if (!one('SELECT id FROM students WHERE id = ?', id)) return sendJson(res, 404, { error: 'Student not found' }), true;
+        run('DELETE FROM student_tag_assignments WHERE student_id = ?', id);
+        for (const tagId of (Array.isArray(body.tags) ? body.tags : []).map(Number).filter(Boolean)) {
+          if (one('SELECT id FROM student_tags WHERE id = ?', tagId)) {
+            run('INSERT OR IGNORE INTO student_tag_assignments (tag_id, student_id, assigned_at) VALUES (?, ?, ?)', tagId, id, nowIso());
+          }
+        }
+        return sendJson(res, 200, { ok: true }), true;
       }
       if (m === 'POST' && p === '/api/admin/view-students/xlsx') {
         const body = await readJson(req);

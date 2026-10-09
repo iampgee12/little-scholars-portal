@@ -62,6 +62,7 @@ module.exports = function createEnrolment(ctx) {
       ['admission_date', 'TEXT'], ['enrol_session', 'TEXT'], ['blood_group', 'TEXT'], ['genotype', 'TEXT'],
       ['next_of_kin', 'TEXT'], ['emergency_contact', 'TEXT'],
     ].forEach(([col, def]) => ensureColumn('students', col, def));
+    ensureColumn('students', 'registered_by', 'TEXT');
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_students_reg_no ON students(reg_no) WHERE reg_no IS NOT NULL');
     migrate();
   }
@@ -294,6 +295,7 @@ module.exports = function createEnrolment(ctx) {
       text(f.rollNo, 20) || nextRollNo(classCode, classArmId), normDate(f.admissionDate) || now.slice(0, 10), session,
       text(f.bloodGroup, 10), text(f.genotype, 10), JSON.stringify(cleanContact(f.nextOfKin)), JSON.stringify(cleanContact(f.emergency)));
     if (dob) setMeta(`student_dob_${id}`, `${dob.slice(8, 10)}/${dob.slice(5, 7)}/${dob.slice(0, 4)}`);
+    if (actingUserId) run('UPDATE students SET registered_by = ? WHERE id = ?', actingUserId, id);
     setTags(id, f.tags);
     classChanged(id);
     return { id, regNo, name };
@@ -746,7 +748,9 @@ module.exports = function createEnrolment(ctx) {
   }
 
   // ── Routes ────────────────────────────────────────────────────────────
+  let actingUserId = null; // the admin making this request (recorded as "registered by")
   async function handle(req, res, url) {
+    actingUserId = null;
     const p = url.pathname;
     const m = req.method;
 
@@ -785,6 +789,7 @@ module.exports = function createEnrolment(ctx) {
     if (!p.startsWith('/api/admin/enrol') && !p.startsWith('/api/admin/families') && !p.startsWith('/api/admin/parents/') && !p.startsWith('/api/admin/selfreg')) return false;
     const user = requireUser(req, res, 'admin');
     if (!user) return true;
+    actingUserId = user.id;
 
     try {
       if (m === 'GET' && p === '/api/admin/enrol/meta') {

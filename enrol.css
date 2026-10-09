@@ -217,3 +217,53 @@
 @media (max-width: 900px) { .vs-filters, .reg-filters { grid-template-columns:1fr 1fr; } .stu-prof-grid, .vs-cols { grid-template-columns:1fr 1fr; } }
 @media (max-width: 560px) { .vs-filters, .reg-filters, .stu-prof-grid, .vs-cols, .vs-rule { grid-template-columns:1fr; } }
 .stu-mono, #reg-tbody td:nth-child(n+5) { white-space:nowrap; }
+
+/* Student Information card (name / photo click) and Family card */
+.crc-modal { z-index:1300 !important; }
+.stu-photo-link { background:none; border:none; padding:0; cursor:pointer; }
+.stu-letterhead { display:none; text-align:center; font-size:12px; line-height:1.6; margin-bottom:10px; }
+.stu-lh-name { font-size:17px; font-weight:700; color:#1d5c9b; }
+.stu-lh-refs { display:flex; justify-content:space-between; margin-top:8px; }
+.stu-lh-title { font-size:15px; font-weight:700; margin-top:8px; text-decoration:underline; }
+.stu-card { position:relative; border:1px solid var(--border); border-radius:12px; overflow:hidden; text-align:center; padding:0 16px 14px; background:#fff; box-shadow:0 2px 10px rgba(15,23,42,.05); }
+.stu-card-banner { height:64px; margin:0 -16px; background:var(--btn-primary, #16a34a); }
+.stu-card-photo { width:86px; height:86px; border-radius:50%; margin:-43px auto 8px; border:4px solid #fff; background:var(--black-3, #f1f5f9); overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:700; color:var(--text-3); box-shadow:0 2px 8px rgba(0,0,0,.12); position:relative; }
+.stu-card-photo img { width:100%; height:100%; object-fit:cover; }
+.stu-card-name { font-weight:700; font-size:15px; }
+.stu-card-badge { display:inline-block; margin-top:4px; font-size:10.5px; font-weight:700; color:var(--btn-primary, #16a34a); border:1px solid var(--btn-primary, #16a34a); border-radius:4px; padding:1px 8px; }
+.stu-card-icons { display:flex; justify-content:center; align-items:center; gap:10px; margin-top:8px; }
+.stu-card-icons a { color:#2563eb; display:inline-flex; }
+.stu-card-icons .btn-icon { width:17px; height:17px; }
+.stu-card-go { display:flex; justify-content:flex-end; margin:12px 0 4px; }
+.stu-card-go .post-btn, .stu-card-foot .post-btn { padding:9px 16px; font-size:13px; }
+.stu-sec { background:var(--btn-primary, #16a34a); color:#fff; font-weight:700; font-size:14px; padding:6px 10px; border-radius:4px; margin-top:10px; }
+.stu-info { width:100%; border-collapse:collapse; font-size:12.5px; }
+.stu-info td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+.stu-info td:first-child { width:42%; font-style:italic; color:var(--text-2); }
+.stu-info tr:nth-child(even) td { background:var(--black-2, #f8fafc); }
+.stu-mini-btn { display:inline-flex; align-items:center; gap:4px; margin-top:4px; border:1px solid var(--border-2); background:#fff; border-radius:5px; padding:3px 8px; font-size:11px; color:var(--text-2); cursor:pointer; font-family:'DM Sans', sans-serif; }
+.stu-mini-btn:hover { background:var(--black-3); }
+.stu-mini-btn .btn-icon { width:12px; height:12px; }
+.stu-tags { display:flex; flex-wrap:wrap; gap:4px; }
+.stu-tag-pick { display:flex; flex-wrap:wrap; gap:8px; }
+.stu-parents-list { display:flex; flex-direction:column; gap:12px; padding:10px 6px; }
+.stu-parent .stu-card-icons { justify-content:flex-start; }
+.stu-card-foot { display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:12px; margin-top:6px; }
+.stu-card-foot .btn-outline { padding:7px 14px; font-size:12px; }
+.fam-manage { display:flex; justify-content:flex-end; }
+.fam-head { font-weight:700; font-size:13.5px; margin-top:6px; }
+.fam-wards { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:12px; }
+.fam-ward { border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#fff; }
+.fam-ward-top { display:flex; align-items:center; gap:10px; padding:12px; background:linear-gradient(var(--btn-primary, #16a34a) 0 38%, #fff 38%); }
+.fam-ward-photo { width:60px; height:60px; border-radius:50%; border:3px solid #fff; overflow:hidden; background:var(--black-3); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--text-3); flex-shrink:0; }
+.fam-ward-photo img { width:100%; height:100%; object-fit:cover; }
+.fam-ward-name { font-weight:700; font-size:12.5px; padding-top:18px; }
+.fam-ward-grid { display:grid; grid-template-columns:repeat(3, 1fr); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.fam-ward-grid div { padding:6px; text-align:center; border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0; }
+.fam-ward-grid div:last-child { border-right:none; }
+.fam-ward-grid span { font-size:9.5px; color:var(--text-3); text-transform:uppercase; }
+.fam-ward-grid strong { font-size:11.5px; color:#2563eb; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fam-ward-actions { display:flex; justify-content:space-around; padding:4px; }
+.fam-parents { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px; }
+.fam-parent { border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+@media print { .stu-letterhead { display:block; } }

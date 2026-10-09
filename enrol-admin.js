@@ -399,8 +399,9 @@ function enrolDelete() {
 }
 
 // ── Create / Manage Family modal ────────────────────────────────────────
-function familyModalOpen(mode) {
-  const famId = Number(document.getElementById('en-family')?.value);
+// famId: the family to manage (defaults to the one chosen in the wizard)
+function familyModalOpen(mode, famIdArg = null) {
+  const famId = Number(famIdArg || document.getElementById('en-family')?.value);
   const fam = mode === 'manage' ? (EN.meta?.families || []).find(f => f.id === famId) : null;
   if (mode === 'manage' && !fam) return showToast('Select a family first');
   EN.family = { mode, id: fam?.id || null, slots: { 1: fam?.parent1 ? { existing: fam.parent1, editing: true } : {}, 2: fam?.parent2 ? { existing: fam.parent2, editing: true } : null } };
@@ -535,8 +536,11 @@ async function familySave(btn) {
       familyId = data.familyId;
     }
     familyModalClose();
-    document.getElementById('en-family-search').value = '';
-    enrolFilterFamilies(familyId);
+    if (document.getElementById('en-family-search')) {
+      document.getElementById('en-family-search').value = '';
+      enrolFilterFamilies(familyId);
+    }
+    if (typeof familyCardRefresh === 'function') familyCardRefresh();
     showToast(EN.family.mode === 'manage' ? 'Family updated' : 'Family created');
   } catch (err) {
     showToast(err.message);

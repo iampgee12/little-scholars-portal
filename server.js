@@ -1608,7 +1608,7 @@ enrolment.createSchema();
 // View Students + Students Registry (class history, archive)
 const studentsMod = createStudents({
   db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload,
-  zipFiles: enrolment.zipFiles,
+  zipFiles: enrolment.zipFiles, pupilRecord: enrolment.pupilRecord, schoolInfoFromMeta,
 });
 studentsMod.createSchema();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
