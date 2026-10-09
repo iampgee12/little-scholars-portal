@@ -147,7 +147,7 @@ body {
 .mob-hamburger.is-open svg line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
 /* ── SIDEBAR OVERLAY (mobile) ── */
-.sidebar-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1100; opacity:0; visibility:hidden; transition: opacity 0.6s ease, visibility 0.6s ease; }
+.sidebar-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1100; opacity:0; visibility:hidden; transition: opacity 0.25s ease, visibility 0.25s ease; }
 .sidebar-overlay.open { opacity:1; visibility:visible; }
 
 /* ── TABLET & MOBILE (≤768px) ── */
@@ -157,7 +157,7 @@ body {
     position:fixed !important; top:0 !important; left:0 !important; bottom:0 !important;
     width:280px !important; height:100vh !important; z-index:1150 !important;
     transform:translateX(-100%) !important;
-    transition:transform 0.6s cubic-bezier(0.4,0,0.2,1) !important;
+    transition:transform 0.25s cubic-bezier(0.4,0,0.2,1) !important;
     overflow-y:auto !important;
   }
   #main-sidebar.mob-open { transform:translateX(0) !important; }

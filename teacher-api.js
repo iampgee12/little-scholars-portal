@@ -1757,12 +1757,9 @@ function switchTab(tab, trigger) {
   if (tab === 'settings') settingsInit();
 }
 
+// The whole menu (and its submenus) shows the moment it opens: no item-by-item flow-in
 function mobStaggerItems(sidebar) {
-  var els = Array.from(sidebar.querySelectorAll('.sidebar-logo,.user-pill,.nav-item'));
-  els.forEach(function(el) { el.style.opacity = '0'; el.style.animation = 'none'; });
-  els.forEach(function(el, i) {
-    el.style.animation = 'mobNavIn 0.38s cubic-bezier(0.4,0,0.2,1) ' + (120 + i * 48) + 'ms both';
-  });
+  mobClearStagger(sidebar);
 }
 function mobClearStagger(sidebar) {
   sidebar.querySelectorAll('.sidebar-logo,.user-pill,.nav-item').forEach(function(el) {
