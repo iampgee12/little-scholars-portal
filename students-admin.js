@@ -463,6 +463,18 @@ async function stuProfile(id) {
   try {
     STU_CARD = await apiFetch(`/api/admin/view-students/profile?id=${encodeURIComponent(id)}`);
   } catch (err) { return showToast(err.message); }
+  stuModal('stu-card-modal', 'Student Information', stuInfoBody(false), '', false);
+}
+
+// Re-reads the pupil after a change: the profile page if it is showing them,
+// otherwise the pop-up card.
+function stuReload(id) {
+  if (typeof spfShowing === 'function' && spfShowing(id)) return spfReload();
+  return stuProfile(id);
+}
+
+// The card's content; inPage = the Profile tab of the student profile page
+function stuInfoBody(inPage) {
   const { student: s, groups, tags, tagIds, family, school } = STU_CARD;
   const name = [s.surname, s.firstName, s.otherNames].filter(Boolean).join(' ').toUpperCase();
   const row = (label, value) => `<tr><td>${escapeHtml(label)}</td><td>${value}</td></tr>`;
@@ -479,7 +491,7 @@ async function stuProfile(id) {
     ['Next of Kin', contact(s.nextOfKin)], ['Emergency Contact', contact(s.emergency)],
   ].filter(([, v]) => v);
   const parents = family?.parents || [];
-  const body = `
+  return `
     <div class="stu-letterhead">
       <div class="stu-lh-name">${escapeHtml(String(school.name || '').toUpperCase())}</div>
       <div>${escapeHtml(String(school.address || '').toUpperCase())}</div>
@@ -494,7 +506,7 @@ async function stuProfile(id) {
       <span class="stu-card-badge">Student</span>
       <div class="stu-card-icons">${s.studentEmail ? `<a href="mailto:${escapeHtml(s.studentEmail)}" title="Email ${escapeHtml(s.studentEmail)}">${STU_ICON_MAIL}</a>` : ''}</div>
     </div>
-    <div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button></div>
+    ${inPage ? '' : `<div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button></div>`}
     <div class="stu-sec">Student Biodata</div>
     <table class="stu-info"><tbody>
       ${row('Surname', txt(s.surname))}${row('First Name', txt(s.firstName))}${row('Other Names', txt(s.otherNames))}
@@ -512,8 +524,8 @@ async function stuProfile(id) {
       ${row('Admission Date', txt(stuDate(s.admissionDate)))}
       ${row('Date Registered in Portal', registered)}
       ${row('Account Status', `<button type="button" class="rsp-toggle ${s.active ? 'on' : 'off'}" id="stu-acc-toggle" onclick="stuToggleAccount('${escapeHtml(s.id)}', this)"><span>${s.active ? 'ON' : 'OFF'}</span></button>`)}
-      ${row('Fees', btn('Fees &amp; Payment History', `crcFees('${escapeHtml(s.id)}')`, 'users'))}
-      ${row('Results', btn('Academic Results History', 'stuResultsHistory()', 'check'))}
+      ${row('Fees', btn('Fees &amp; Payment History', inPage ? "spfTab('fees')" : `crcFees('${escapeHtml(s.id)}')`, 'users'))}
+      ${row('Results', btn('Academic Results History', inPage ? "spfTab('results')" : 'stuResultsHistory()', 'check'))}
     </tbody></table>
     <div class="stu-sec">More Details</div>
     ${more.length ? `<table class="stu-info"><tbody>${more.map(([l, v]) => row(l, escapeHtml(v))).join('')}</tbody></table>` : ''}
@@ -523,13 +535,15 @@ async function stuProfile(id) {
         ${p.relationship ? `<span class="en-hint">(${escapeHtml(p.relationship)})</span>` : ''}
         <div class="stu-card-icons">${p.email ? `<a href="mailto:${escapeHtml(p.email)}" title="Email ${escapeHtml(p.email)}">${STU_ICON_MAIL}</a>` : ''}${p.phone ? `<span class="en-hint">${escapeHtml(p.phone)}</span>` : ''}</div>
       </div>`).join('') : '<span class="en-hint">No family linked yet — open the profile page to choose or create one.</span>'}</div>
-    <div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`;
-  stuModal('stu-card-modal', 'Student Information', body, '', false);
+    ${inPage ? `<div class="stu-card-foot spf-prof-foot"><button class="btn-outline" onclick="stuPrintCard('#spf-profile-body')">Print</button>
+        <span class="en-foot-gap"></span><button class="btn-danger" onclick="spfDelete()">Delete Account</button>
+        ${s.archived ? '<button class="btn-outline" onclick="spfArchive(false)">Restore Account (Unarchive)</button>' : '<button class="btn-outline" onclick="spfArchive(true)">Archive Account</button>'}</div>`
+      : `<div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`}`;
 }
 
 function stuGoToProfile(id) {
   document.querySelectorAll('.en-modal').forEach(m => m.remove());
-  enrolEdit(id);
+  spfOpen(id);
 }
 
 async function stuToggleAccount(id, btn) {
@@ -565,7 +579,7 @@ function stuTagsModal() {
       await apiFetch('/api/admin/view-students/tags', { method: 'POST', body: JSON.stringify({ id: s.id, tags: ids }) });
       modal.remove();
       showToast('Tags updated');
-      stuProfile(s.id);
+      stuReload(s.id);
     } catch (err) { showToast(err.message); e.target.disabled = false; }
   });
 }
@@ -579,12 +593,12 @@ function stuResultsHistory() {
     </tbody></table>`);
 }
 
-function stuPrintCard() {
-  const card = document.querySelector('#stu-card-modal .en-modal-body');
+function stuPrintCard(selector = '#stu-card-modal .en-modal-body') {
+  const card = document.querySelector(selector);
   if (!card) return;
   const css = [...document.querySelectorAll('link[rel=stylesheet]')].map(l => `<link rel="stylesheet" href="${l.href}">`).join('');
   const win = window.open('', '_blank');
-  win.document.write(`<html><head><title>Student Profile</title>${css}<style>body{background:#fff;padding:24px;font-family:'DM Sans',sans-serif}.stu-letterhead{display:block!important}.stu-card-go,.stu-card-foot,.stu-mini-btn,.rsp-toggle{display:none!important}</style></head><body>${card.innerHTML}<script>setTimeout(() => window.print(), 400);<\/script></body></html>`);
+  win.document.write(`<html><head><title>Student Profile</title>${css}<style>body{background:#fff;padding:24px;font-family:'DM Sans',sans-serif}.stu-letterhead{display:block!important}.stu-card-go,.stu-card-foot,.spf-noprint,.stu-mini-btn,.rsp-toggle{display:none!important}</style></head><body>${card.innerHTML}<script>setTimeout(() => window.print(), 400);<\/script></body></html>`);
   win.document.close();
 }
 
@@ -630,6 +644,6 @@ async function familyManageFromCard() {
 async function familyCardRefresh() {
   if (!STU_CARD?.student) return;
   const famOpen = !!document.getElementById('fam-modal');
-  await stuProfile(STU_CARD.student.id);
+  await stuReload(STU_CARD.student.id);
   if (famOpen) familyCard();
 }

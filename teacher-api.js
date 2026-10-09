@@ -1882,6 +1882,10 @@ async function saveProfile(btn) {
       address: val('pf-address'),
       photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
     };
+    if (body.email.toLowerCase() !== String(state.user?.email || '').toLowerCase()) {
+      body.currentPassword = await askCurrentPassword('Your email receives your password reset links, so changing it needs your current password.');
+      if (!body.currentPassword) return;
+    }
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;
     renderUserAvatar(document.getElementById('t-avatar'), data.user);

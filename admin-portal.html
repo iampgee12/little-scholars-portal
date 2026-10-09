@@ -2746,6 +2746,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
           <div id="admin-children" class="result-gradebook-children" style="display:none;">
             <button type="button" class="sub-nav-item result-child" data-tab="announcements" onclick="switchTab('announcements', this)">Announcements <span class="nav-badge" id="ann-badge" style="margin-left:6px;">4</span></button>
             <button type="button" class="sub-nav-item result-child" data-tab="systemSettings" onclick="switchTab('systemSettings', this)">System Settings</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="security" onclick="switchTab('security', this)">Security &amp; Activity Log</button>
           </div>
         </div>
       </div>
@@ -3034,6 +3035,12 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 
       <div class="tab-panel" id="tab-students">
         <div id="vs-root"></div>
+      </div>
+      <div class="tab-panel" id="tab-studentProfile">
+        <div id="spf-root"></div>
+      </div>
+      <div class="tab-panel" id="tab-security">
+        <div id="sec-root"></div>
       </div>
       <div id="student-delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:1000;align-items:center;justify-content:center;padding:24px;">
           <div role="dialog" aria-modal="true" aria-labelledby="student-delete-title" style="width:min(420px,100%);background:var(--black-2);border:1px solid rgba(239,68,68,0.35);border-radius:var(--radius);box-shadow:0 22px 70px rgba(0,0,0,0.65);overflow:hidden;">
@@ -7106,9 +7113,12 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="image-utils.js"></script>
 <script src="results-review.js"></script>
 <script src="score-inputs.js"></script>
+<script src="confirm-password.js"></script>
 <script src="admin-api.js"></script>
 <script src="enrol-common.js"></script>
 <script src="enrol-admin.js"></script>
 <script src="students-admin.js"></script>
+<script src="student-profile.js"></script>
+<script src="security-admin.js"></script>
 </body>
 </html>

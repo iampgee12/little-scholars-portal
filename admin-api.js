@@ -2334,6 +2334,8 @@ const TAB_META = {
   parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
+  studentProfile: { title: 'Student Profile', sub: '' },
+  security: { title: 'Security & Activity Log', sub: 'Sign-ins, activity, sessions and backups' },
   announcements: { title: 'Admin', sub: 'Post and Manage Notices' },
   resultChecker: { title: 'Result Checker', sub: 'Published Reports and Downloads' },
   cbtGradebook: { title: 'CBT Grade Book', sub: 'Computer-Based Test Scores' },
@@ -2598,6 +2600,8 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'classAllocation') caInit();
   if (tab === 'enrollmentHistory') ehInit();
   if (tab === 'studentsRegistry') regInit();
+  if (tab === 'studentProfile' && typeof spfInit === 'function') spfInit();
+  if (tab === 'security' && typeof secInit === 'function') secInit();
   if (tab === 'students' && !document.getElementById('vs-results') && typeof vsInit === 'function') vsInit();
   if (tab === 'communicationBook') cbkInit();
   if (tab === 'extracurricularGroups') ecgInit();
@@ -2738,6 +2742,10 @@ async function saveProfile(btn) {
       address: val('pf-address'),
       photoDataUrl: await photoInputToDataUrl('pf-photo-file'),
     };
+    if (body.email.toLowerCase() !== String(state.user?.email || '').toLowerCase()) {
+      body.currentPassword = await askCurrentPassword('Your email receives your sign-in codes and password reset links, so changing it needs your current password.');
+      if (!body.currentPassword) return;
+    }
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     state.user = data.user;
     // Keep Settings → Signatures in step without a reload.

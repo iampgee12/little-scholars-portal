@@ -9,6 +9,7 @@ const { DatabaseSync } = require('node:sqlite');
 const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
 const createEnrolment = require('./enrol-api');
 const createStudents = require('./students-api');
+const createSecurity = require('./security');
 
 const ROOT = __dirname;
 
@@ -1609,8 +1610,16 @@ enrolment.createSchema();
 const studentsMod = createStudents({
   db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload,
   zipFiles: enrolment.zipFiles, pupilRecord: enrolment.pupilRecord, schoolInfoFromMeta,
+  hashPassword, absoluteAssetPath, gradeScale: () => gradeScale, UPLOAD_DIR, DATA_DIR,
 });
 studentsMod.createSchema();
+// Password rules, two-step admin login, activity log, idle sign-out, backups
+const security = createSecurity({
+  db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, hashPassword, verifyPassword,
+  smtpConfigStatus, smtpSend, zipFiles: enrolment.zipFiles, IS_PROD, DATA_DIR, UPLOAD_DIR, REPORT_DIR, COOKIE_NAME, parseCookies,
+});
+security.createSchema();
+security.startBackups();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -1656,18 +1665,9 @@ function parseCookies(req) {
   }).filter(([key]) => key));
 }
 
+// Signed-in user for this request (security.js also signs out idle sessions)
 function sessionUser(req) {
-  const token = parseCookies(req)[COOKIE_NAME];
-  if (!token) return null;
-  const row = one(
-    `SELECT users.*
-     FROM sessions
-     JOIN users ON users.id = sessions.user_id
-     WHERE sessions.token = ? AND sessions.expires_at > ?`,
-    token,
-    new Date().toISOString()
-  );
-  return row || null;
+  return security.sessionUser(req);
 }
 
 function publicUser(row) {
@@ -3081,11 +3081,16 @@ function validateFeeAmount(value) {
 async function handleApi(req, res, url) {
   if (await enrolment.handle(req, res, url)) return;
   if (await studentsMod.handle(req, res, url)) return;
+  if (await security.handleAdmin(req, res, url)) return;
+  if (await security.handleLoginSteps(req, res, url, publicUser)) return;
   if (req.method === 'POST' && url.pathname === '/api/login') {
     const body = await readJson(req);
     const id = String(body.id || '').trim().toUpperCase();
     const password = String(body.password || '');
 
+    if (security.ipBlocked(req)) {
+      return sendJson(res, 429, { error: 'Too many failed sign-in attempts from this network. Please try again in 30 minutes.' });
+    }
     const rateLimit = loginRateLimitStatus(id);
     if (!rateLimit.allowed) {
       return sendJson(res, 429, { error: rateLimit.message });
@@ -3095,34 +3100,26 @@ async function handleApi(req, res, url) {
     const user = one('SELECT * FROM users WHERE id = ?', id) || (byRegNo && one('SELECT * FROM users WHERE id = ?', byRegNo.id));
     if (!user || !verifyPassword(password, user.password)) {
       recordFailedLogin(id);
+      security.ipFailed(req);
+      security.audit(req, user ? { id: user.id, name: user.name, role: user.role } : { id, name: null, role: null },
+        'Wrong password at sign-in', user ? '' : 'Unknown ID', 'failed');
       return sendJson(res, 401, { error: 'Incorrect ID or password' });
     }
     if (!user.active) {
       recordFailedLogin(id);
+      security.audit(req, user, 'Sign-in refused (account switched off)', '', 'failed');
       return sendJson(res, 403, { error: 'This account has been deactivated. Contact the school administrator.' });
     }
     resetLoginAttempts(id);
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const now = new Date();
-    const expires = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    run(
-      'INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
-      token,
-      user.id,
-      now.toISOString(),
-      expires.toISOString()
-    );
-    return sendJson(res, 200, {
-      user: publicUser(user),
-      portal: `${user.role}-portal.html`,
-    }, {
-      'Set-Cookie': `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400${IS_PROD ? "; Secure" : ""}`,
-    });
+    // may ask for an emailed code (admins) and/or a new password first
+    const step = await security.afterPassword(req, user, password, publicUser);
+    return sendJson(res, step.status, step.body, step.headers || {});
   }
 
   if (req.method === 'POST' && url.pathname === '/api/logout') {
     const token = parseCookies(req)[COOKIE_NAME];
+    const leaving = token && one('SELECT u.id, u.name, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?', token);
+    if (leaving) security.audit(req, leaving, 'Signed out');
     if (token) run('DELETE FROM sessions WHERE token = ?', token);
     return sendJson(res, 200, { ok: true }, {
       'Set-Cookie': `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${IS_PROD ? "; Secure" : ""}`,
@@ -3146,6 +3143,12 @@ async function handleApi(req, res, url) {
     const email = cleanText(body.email).toLowerCase();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return sendJson(res, 400, { error: 'Enter a valid email address' });
+    }
+    if (email !== String(user.email || '').toLowerCase()) {
+      if (!verifyPassword(String(body.currentPassword || ''), user.password)) {
+        return sendJson(res, 400, { error: 'Enter your current password to change your email address', needPassword: true });
+      }
+      security.emailChanged(req, user, user.email, email);
     }
     run('UPDATE users SET email = ? WHERE id = ?', email, user.id);
     return sendJson(res, 200, { ok: true, user: publicUser(one('SELECT * FROM users WHERE id = ?', user.id)) });
@@ -3178,6 +3181,11 @@ async function handleApi(req, res, url) {
     if (bloodGroup && !PROFILE_BLOOD_GROUPS.includes(bloodGroup)) return sendJson(res, 400, { error: 'Choose a valid blood group' });
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { error: 'Enter a valid email address' });
     if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) return sendJson(res, 400, { error: 'Enter a valid phone number' });
+    // The email receives sign-in codes and reset links, so changing it needs the password
+    const emailChanged = email !== String(user.email || '').toLowerCase();
+    if (emailChanged && !verifyPassword(String(body.currentPassword || ''), user.password)) {
+      return sendJson(res, 400, { error: body.currentPassword ? 'Current password is incorrect' : 'Enter your current password to change your email address', needPassword: true });
+    }
 
     // Pupils' photos print on their result sheets, so only the school sets them
     // (Student Directory → Upload Photos / the pupil's record).
@@ -3222,6 +3230,7 @@ async function handleApi(req, res, url) {
       db.exec('ROLLBACK');
       throw err;
     }
+    if (emailChanged) security.emailChanged(req, user, user.email, email);
     return sendJson(res, 200, { ok: true, user: publicUser(one('SELECT * FROM users WHERE id = ?', user.id)) });
   }
 
@@ -3234,10 +3243,10 @@ async function handleApi(req, res, url) {
     if (!verifyPassword(currentPassword, user.password)) {
       return sendJson(res, 401, { error: 'Current password is incorrect' });
     }
-    if (newPassword.length < 4) {
-      return sendJson(res, 400, { error: 'New password must be at least 4 characters' });
-    }
-    run('UPDATE users SET password = ? WHERE id = ?', hashPassword(newPassword), user.id);
+    const problem = security.passwordProblem(newPassword, user);
+    if (problem) return sendJson(res, 400, { error: problem });
+    // keeps this session; signs the account out everywhere else
+    security.setOwnPassword(user.id, newPassword, parseCookies(req)[COOKIE_NAME]);
     return sendJson(res, 200, { ok: true });
   }
 
@@ -3266,6 +3275,7 @@ async function handleApi(req, res, url) {
     const genericMessage = 'If that ID has an email address on file, a reset link has been sent to it.';
     if (!id) return sendJson(res, 400, { error: 'Enter your ID' });
 
+    if (security.ipBlocked(req)) return sendJson(res, 429, { error: 'Too many attempts from this network. Please try again later.' });
     const rateKey = `FORGOT-${id}`;
     const rateLimit = loginRateLimitStatus(rateKey);
     if (!rateLimit.allowed) {
@@ -3310,17 +3320,15 @@ async function handleApi(req, res, url) {
     const token = String(body.token || '').trim();
     const newPassword = String(body.newPassword || '');
     if (!token) return sendJson(res, 400, { error: 'Missing reset token' });
-    if (newPassword.length < 4) {
-      return sendJson(res, 400, { error: 'New password must be at least 4 characters' });
-    }
     const user = one('SELECT * FROM users WHERE reset_token = ?', token);
     if (!user || !user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
       return sendJson(res, 400, { error: 'This reset link is invalid or has expired. Request a new one.' });
     }
-    run(
-      'UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
-      hashPassword(newPassword), user.id
-    );
+    const problem = security.passwordProblem(newPassword, user);
+    if (problem) return sendJson(res, 400, { error: problem });
+    security.setOwnPassword(user.id, newPassword);
+    run('UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?', user.id);
+    security.audit(req, user, 'Reset password from emailed link');
     return sendJson(res, 200, { ok: true });
   }
 
@@ -4878,7 +4886,7 @@ async function handleApi(req, res, url) {
     const data = fs.readFileSync(pdfPath);
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${publication.student_id}-${publication.exam_type.replace(/[^a-z0-9]+/gi, '_')}.pdf"`,
+      'Content-Disposition': `${url.searchParams.get('inline') ? 'inline' : 'attachment'}; filename="${publication.student_id}-${publication.exam_type.replace(/[^a-z0-9]+/gi, '_')}.pdf"`,
       'Content-Length': data.length,
     });
     return res.end(data);
@@ -5074,6 +5082,7 @@ async function handleApi(req, res, url) {
       run('DELETE FROM result_entries WHERE student_id = ?', studentId);
       run('DELETE FROM report_publications WHERE student_id = ?', studentId);
       run('DELETE FROM student_skill_ratings WHERE student_id = ?', studentId);
+      run("DELETE FROM attendance_records WHERE person_type = 'student' AND person_id = ?", studentId);
       run('DELETE FROM sessions WHERE user_id = ?', studentId);
       run('DELETE FROM students WHERE id = ?', studentId);
       run("DELETE FROM users WHERE id = ? AND role = 'student'", studentId);
@@ -8931,6 +8940,13 @@ function serveStatic(req, res, url) {
   // Uploaded images live in UPLOAD_DIR, which on Fly is the /data volume
   // rather than the app folder.
   if (pathname.startsWith('/uploads/')) {
+    // Pupil photos and signatures are for signed-in users only. Student
+    // documents are only ever served through the admin API.
+    if (!sessionUser(req) || pathname.startsWith('/uploads/student-docs/')) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not found');
+      return;
+    }
     const uploadPath = path.resolve(UPLOAD_DIR, `.${pathname.slice('/uploads'.length)}`);
     const imageTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
     const type = imageTypes[path.extname(uploadPath).toLowerCase()];
@@ -8992,14 +9008,17 @@ function serveStatic(req, res, url) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
+    security.applyHeaders(req, res, url);
     if (url.pathname.startsWith('/api/')) {
+      security.trackRequest(req, res, url, sessionUser(req));
       await handleApi(req, res, url);
       return;
     }
     serveStatic(req, res, url);
   } catch (err) {
     console.error(err);
-    sendJson(res, 500, { error: 'Server error', detail: err.message });
+    // internal details stay out of public replies
+    if (!res.headersSent) sendJson(res, 500, IS_PROD ? { error: 'Server error' } : { error: 'Server error', detail: err.message });
   }
 });
 

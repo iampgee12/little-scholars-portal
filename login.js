@@ -79,6 +79,115 @@ function goBack() {
   selectedRole = null;
 }
 
+// Signed in: go to the right portal
+function finishSignIn(data) {
+  const user = data.user;
+  const meta = ROLE_META[selectedRole] || ROLE_META[user.role];
+  // Server-side role mismatch guard (belt-and-suspenders)
+  if (selectedRole && user.role !== selectedRole) {
+    fetch('/api/logout', { method: 'POST' }).catch(() => {});
+    throw new Error(`This account does not have ${meta.badge.toLowerCase()} access. Please go back and choose the correct portal.`);
+  }
+  localStorage.setItem('ls_user_id',   user.id);
+  localStorage.setItem('ls_user_role', user.role);
+  document.getElementById('redirect-role').textContent  = meta.portalLabel;
+  document.getElementById('redirect-role').style.color  = meta.color;
+  document.getElementById('redirect-overlay').classList.add('show');
+  setTimeout(() => { window.location.href = data.portal || PORTALS[user.role]; }, 500);
+}
+
+// ── Extra sign-in step: emailed code (admins) or choosing a new password ──
+let extraState = null; // { pending, step }
+
+function showStep(showId) {
+  ['step-select', 'step-login', 'step-extra'].forEach(id => document.getElementById(id).classList.toggle('hidden', id !== showId));
+  const el = document.getElementById(showId);
+  el.classList.remove('anim-in');
+  void el.offsetWidth;
+  el.classList.add('anim-in');
+}
+
+function extraAlert(text, info = false) {
+  const el = document.getElementById('extra-alert');
+  el.textContent = text || '';
+  el.classList.toggle('show', !!text);
+  el.classList.toggle('info', info);
+}
+
+function showExtraStep(data) {
+  extraState = { pending: data.pending, step: data.step };
+  const isCode = data.step === 'code';
+  document.getElementById('extra-title').textContent = isCode ? 'Check your email' : 'Choose a new password';
+  document.getElementById('extra-sub').textContent = isCode ? 'Two-step sign-in' : 'One more step to sign in';
+  document.getElementById('extra-code').style.display = isCode ? '' : 'none';
+  document.getElementById('extra-change').style.display = isCode ? 'none' : '';
+  document.getElementById('extra-btn-txt').textContent = isCode ? 'Verify code' : 'Save and sign in';
+  if (isCode) document.getElementById('extra-code-note').textContent = `We've emailed a 6-digit code to ${data.sentTo}. Enter it below to finish signing in. It expires in 10 minutes.`;
+  else document.getElementById('extra-rules').textContent = data.rules || '';
+  ['otp', 'np1', 'np2'].forEach(id => { document.getElementById(id).value = ''; });
+  extraAlert('');
+  showStep('step-extra');
+  setTimeout(() => document.getElementById(isCode ? 'otp' : 'np1').focus(), 50);
+}
+
+function extraBack() {
+  extraState = null;
+  showStep('step-login');
+}
+
+async function extraCall(path, payload) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pending: extraState.pending, ...payload }) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (data.restart) extraState = null;
+    throw new Error(data.error || 'Something went wrong. Please try again.');
+  }
+  return data;
+}
+
+async function extraSubmit() {
+  if (!extraState) return extraBack();
+  const btn = document.getElementById('extra-btn');
+  let path, payload;
+  if (extraState.step === 'code') {
+    const code = document.getElementById('otp').value.replace(/\D/g, '');
+    if (code.length !== 6) return extraAlert('Enter the 6-digit code from the email.');
+    path = '/api/login/code';
+    payload = { code, remember: document.getElementById('otp-remember').checked };
+  } else {
+    const a = document.getElementById('np1').value;
+    const b = document.getElementById('np2').value;
+    if (!a) return extraAlert('Enter a new password.');
+    if (a !== b) return extraAlert('The two passwords are not the same.');
+    path = '/api/login/change';
+    payload = { newPassword: a };
+  }
+  btn.disabled = true;
+  try {
+    const data = await extraCall(path, payload);
+    if (data.step) return showExtraStep(data);
+    finishSignIn(data);
+  } catch (err) {
+    extraAlert(err.message);
+    if (!extraState) setTimeout(extraBack, 1800);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function extraResend() {
+  if (!extraState) return extraBack();
+  try {
+    const data = await extraCall('/api/login/resend', {});
+    extraState.pending = data.pending;
+    extraAlert(`A new code has been sent to ${data.sentTo}.`, true);
+  } catch (err) { extraAlert(err.message); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && extraState && !document.getElementById('step-extra').classList.contains('hidden')) extraSubmit();
+});
+
 function togglePw() {
   const p    = document.getElementById('pw');
   const icon = document.getElementById('eye-icon');
@@ -144,24 +253,16 @@ async function handleLogin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: sid, password: pw }),
     });
-    if (!res.ok) throw new Error('Incorrect ID or password. Please try again.');
-    const data = await res.json();
-    const user = data.user;
-
-    // Server-side role mismatch guard (belt-and-suspenders)
-    if (user.role !== selectedRole) {
-      throw new Error(`This account does not have ${meta.badge.toLowerCase()} access. Please go back and choose the correct portal.`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(res.status === 401 ? 'Incorrect ID or password. Please try again.' : (data.error || 'Sign-in failed. Please try again.'));
     }
-
-    const portal = data.portal || PORTALS[user.role];
-    localStorage.setItem('ls_user_id',   user.id);
-    localStorage.setItem('ls_user_role', user.role);
-
-    document.getElementById('redirect-role').textContent  = meta.portalLabel;
-    document.getElementById('redirect-role').style.color  = meta.color;
-    document.getElementById('redirect-overlay').classList.add('show');
-
-    setTimeout(() => { window.location.href = portal; }, 500);
+    if (data.step) {
+      setLoading(false);
+      pwEl.value = '';
+      return showExtraStep(data);
+    }
+    finishSignIn(data);
   } catch (err) {
     setLoading(false);
     alertEl.textContent = err.message.includes('Failed to fetch')
@@ -235,7 +336,7 @@ async function submitForgotPassword() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && selectedRole) handleLogin();
+  if (e.key === 'Enter' && selectedRole && !document.getElementById('step-login').classList.contains('hidden')) handleLogin();
   if (e.key === 'Escape') {
     if (document.getElementById('forgot-modal').style.display === 'flex') {
       closeForgotModal();

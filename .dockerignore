@@ -13,3 +13,6 @@ school.sqlite
 school.sqlite.bak-*
 uploads/
 published_reports/
+
+# Database backups live on the volume, never in the image
+backups/

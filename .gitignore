@@ -16,3 +16,6 @@ published_reports/
 # Local Claude settings
 .claude/settings.local.json
 school.sqlite.bak-*
+
+# Database backups (contain everyone's personal data)
+backups/

@@ -2,10 +2,66 @@
 // Information System and Student Registry), plus each pupil's class history.
 // server.js passes in its database helpers (ctx).
 
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+
 module.exports = function createStudents(ctx) {
-  const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload, zipFiles, pupilRecord, schoolInfoFromMeta } = ctx;
+  const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload, zipFiles, pupilRecord, schoolInfoFromMeta,
+    hashPassword, absoluteAssetPath, gradeScale, UPLOAD_DIR, DATA_DIR } = ctx;
 
   const nowIso = () => new Date().toISOString();
+
+  // Student documents can be larger than readJson's 1 MB limit
+  function readBigJson(req, limit = 8_000_000) {
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      let size = 0;
+      req.on('data', chunk => {
+        size += chunk.length;
+        if (size > limit) { req.destroy(); reject(new Error('File is too large (8 MB max)')); return; }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); } catch { reject(new Error('Invalid JSON')); }
+      });
+      req.on('error', reject);
+    });
+  }
+
+  const DOC_TYPES = {
+    'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+    'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx', 'text/plain': 'txt',
+  };
+  const DOC_MIME = Object.fromEntries(Object.entries(DOC_TYPES).map(([mime, ext]) => [ext, mime]));
+
+  function gradeOf(pct) {
+    const scale = gradeScale();
+    const band = scale.find(g => pct >= Number(g.min)) || scale[scale.length - 1];
+    return { grade: band.grade, remark: band.remark, point: Number(band.gradePoint ?? 0) };
+  }
+
+  // Every published result for a pupil with its subjects, average and GPA;
+  // CGPA is the running average of the GPAs up to that result.
+  function resultHistory(id) {
+    const pubs = all(`SELECT rp.id, rp.academic_id AS academicId, rp.exam_type AS examType, rp.class_code AS classCode, rp.published_at AS publishedAt,
+                             a.session_label AS session, a.term_label AS term, c.label AS classLabel
+                      FROM report_publications rp JOIN academic_terms a ON a.id = rp.academic_id LEFT JOIN classes c ON c.code = rp.class_code
+                      WHERE rp.student_id = ? ORDER BY a.session_label, a.term_label, rp.published_at`, id);
+    const history = new Map(all('SELECT session_label, class_text FROM student_class_history WHERE student_id = ?', id).map(h => [h.session_label, h.class_text]));
+    let sum = 0;
+    return pubs.map((p, i) => {
+      const subjects = all(`SELECT sub.name, re.ca_score AS ca, re.exam_score AS exam, re.total_score AS total
+                            FROM result_entries re JOIN result_batches rb ON rb.id = re.batch_id JOIN subjects sub ON sub.id = rb.subject_id
+                            WHERE re.student_id = ? AND rb.academic_id = ? AND rb.exam_type = ? ORDER BY sub.name`, id, p.academicId, p.examType)
+        .map(s => ({ ...s, ...gradeOf(Number(s.total) || 0) }));
+      const average = subjects.length ? +(subjects.reduce((t, s) => t + Number(s.total || 0), 0) / subjects.length).toFixed(2) : null;
+      const gpa = subjects.length ? +(subjects.reduce((t, s) => t + s.point, 0) / subjects.length).toFixed(2) : null;
+      sum += gpa || 0;
+      return { ...p, classText: history.get(p.session) || String(p.classLabel || p.classCode).toUpperCase(), subjects, average, gpa, cgpa: +(sum / (i + 1)).toFixed(2), maxPoint: Math.max(...gradeScale().map(g => Number(g.gradePoint ?? 0))) };
+    });
+  }
 
   function createSchema() {
     db.exec(`
@@ -21,6 +77,32 @@ module.exports = function createStudents(ctx) {
         UNIQUE(student_id, session_label)
       );
     `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS student_documents (
+        id INTEGER PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        size INTEGER NOT NULL DEFAULT 0,
+        uploaded_by TEXT,
+        uploaded_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS student_hostel (
+        id INTEGER PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        session_label TEXT NOT NULL,
+        hostel TEXT NOT NULL,
+        room TEXT,
+        bed TEXT,
+        status TEXT NOT NULL DEFAULT 'allocated',
+        note TEXT,
+        recorded_by TEXT,
+        recorded_at TEXT NOT NULL
+      );
+    `);
+    ensureColumn('users', 'pin', 'TEXT');
     ensureColumn('students', 'archived', 'INTEGER NOT NULL DEFAULT 0');
     // Everyone starts with their current class as this session's history line
     const session = activeAcademic()?.sessionLabel;
@@ -202,7 +284,7 @@ module.exports = function createStudents(ctx) {
         const id = cleanText(url.searchParams.get('id')).toUpperCase();
         const rec = pupilRecord(id);
         if (!rec) return sendJson(res, 404, { error: 'Student not found' }), true;
-        const st = one(`SELECT s.enrolled_at AS enrolledAt, s.registered_by AS registeredBy, c.label AS classLabel, c.category,
+        const st = one(`SELECT s.enrolled_at AS enrolledAt, s.registered_by AS registeredBy, c.label AS classLabel, c.category, COALESCE(s.archived, 0) AS archived,
                               ca.name AS armName, ru.name AS registeredByName, ru.role AS registeredByRole
                        FROM students s LEFT JOIN classes c ON c.code = s.class_code LEFT JOIN class_arms ca ON ca.id = s.class_arm_id
                        LEFT JOIN users ru ON ru.id = s.registered_by WHERE s.id = ?`, id);
@@ -245,6 +327,142 @@ module.exports = function createStudents(ctx) {
             run('INSERT OR IGNORE INTO student_tag_assignments (tag_id, student_id, assigned_at) VALUES (?, ?, ?)', tagId, id, nowIso());
           }
         }
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      // ── Student profile page tabs ──
+      const studentId = () => {
+        const id = cleanText(url.searchParams.get('id')).toUpperCase();
+        if (!one('SELECT id FROM students WHERE id = ?', id)) throw new Error('Student not found');
+        return id;
+      };
+      // Attendance for one month: daily (morning/afternoon) and lesson marks,
+      // plus school holidays and the term dates.
+      if (m === 'GET' && p === '/api/admin/view-students/attendance') {
+        const id = studentId();
+        const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : nowIso().slice(0, 7);
+        const records = all(`SELECT ar.record_date AS date, ar.session_type AS sessionType, ar.status, sub.name AS subject
+                             FROM attendance_records ar LEFT JOIN subjects sub ON sub.id = ar.subject_id
+                             WHERE ar.person_type = 'student' AND ar.person_id = ? AND substr(ar.record_date, 1, 7) = ? ORDER BY ar.record_date`, id, month);
+        const holidays = all(`SELECT holiday_date AS date, label FROM term_holidays WHERE substr(holiday_date, 1, 7) = ?`, month);
+        const terms = all(`SELECT session_label AS session, term_label AS term, start_date AS start, end_date AS end FROM academic_terms WHERE start_date IS NOT NULL AND end_date IS NOT NULL`);
+        return sendJson(res, 200, { month, records, holidays, terms }), true;
+      }
+      if (m === 'GET' && p === '/api/admin/view-students/subjects') {
+        const id = studentId();
+        const st = one('SELECT class_code, class_arm_id FROM students WHERE id = ?', id);
+        const term = cleanText(url.searchParams.get('term'));
+        const subjects = all(`SELECT DISTINCT sub.id, sub.name, sub.code, cs.term, u.name AS teacher
+                              FROM class_subjects cs JOIN subjects sub ON sub.id = cs.subject_id LEFT JOIN users u ON u.id = cs.teacher_in_charge_id
+                              WHERE cs.class_code = ? AND (cs.class_arm_id IS NULL OR cs.class_arm_id = ?) AND (cs.term IS NULL OR cs.term = '' OR ? = '' OR cs.term = ?)
+                              ORDER BY sub.name`, st.class_code, st.class_arm_id, term, term);
+        const seen = new Set();
+        return sendJson(res, 200, { subjects: subjects.filter(s => !seen.has(s.id) && seen.add(s.id)), academic: activeAcademic() }), true;
+      }
+      if (m === 'GET' && p === '/api/admin/view-students/results') {
+        const id = studentId();
+        const rows = resultHistory(id);
+        return sendJson(res, 200, { results: rows, school: schoolInfoFromMeta(), scale: gradeScale() }), true;
+      }
+      // Documents (admission letter + uploaded files)
+      if (m === 'GET' && p === '/api/admin/view-students/documents') {
+        const id = studentId();
+        const admission = one(`SELECT id, applicant_name AS name, status, submitted_at AS submittedAt, reviewed_at AS reviewedAt, c.label AS classLabel, parent_name AS parentName
+                               FROM admission_applications LEFT JOIN classes c ON c.code = admission_applications.class_code WHERE converted_student_id = ?`, id);
+        const docs = all(`SELECT d.id, d.title, d.file_name AS fileName, d.mime, d.size, d.uploaded_at AS uploadedAt, u.name AS uploadedBy
+                          FROM student_documents d LEFT JOIN users u ON u.id = d.uploaded_by WHERE d.student_id = ? ORDER BY d.uploaded_at DESC`, id);
+        return sendJson(res, 200, { admission: admission || null, documents: docs, school: schoolInfoFromMeta() }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/view-students/documents') {
+        const body = await readBigJson(req);
+        const id = cleanText(body.id).toUpperCase();
+        if (!one('SELECT id FROM students WHERE id = ?', id)) return sendJson(res, 404, { error: 'Student not found' }), true;
+        const title = cleanText(body.title).slice(0, 150);
+        if (!title) return sendJson(res, 400, { error: 'Give the document a title' }), true;
+        const match = String(body.dataUrl || '').match(/^data:([a-z0-9/+.-]+);base64,(.+)$/i);
+        const fileName = cleanText(body.fileName).slice(0, 150) || 'document';
+        const ext = (match && DOC_TYPES[match[1].toLowerCase()]) || DOC_MIME[path.extname(fileName).slice(1).toLowerCase()];
+        if (!match || !ext) return sendJson(res, 400, { error: 'Upload a PDF, Word, Excel, text or image (PNG/JPG) file' }), true;
+        const buf = Buffer.from(match[2], 'base64');
+        const dir = path.join(UPLOAD_DIR, 'student-docs');
+        fs.mkdirSync(dir, { recursive: true });
+        const abs = path.join(dir, `${id.replace(/[^\w-]+/g, '_')}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`);
+        fs.writeFileSync(abs, buf);
+        run('INSERT INTO student_documents (student_id, title, file_path, file_name, mime, size, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          id, title, path.relative(DATA_DIR, abs).replace(/\\/g, '/'), fileName, DOC_MIME[ext], buf.length, user.id, nowIso());
+        return sendJson(res, 201, { ok: true }), true;
+      }
+      if ((m === 'GET' || m === 'DELETE') && p === '/api/admin/view-students/document') {
+        const doc = one('SELECT * FROM student_documents WHERE id = ?', Number(url.searchParams.get('docId')));
+        if (!doc) return sendJson(res, 404, { error: 'Document not found' }), true;
+        const abs = absoluteAssetPath(doc.file_path);
+        if (m === 'DELETE') {
+          run('DELETE FROM student_documents WHERE id = ?', doc.id);
+          if (abs) fs.rmSync(abs, { force: true });
+          return sendJson(res, 200, { ok: true }), true;
+        }
+        if (!abs) return sendJson(res, 404, { error: 'The file is missing' }), true;
+        const data = fs.readFileSync(abs);
+        res.writeHead(200, {
+          'Content-Type': doc.mime,
+          'Content-Disposition': `${url.searchParams.get('download') ? 'attachment' : 'inline'}; filename="${doc.file_name.replace(/["\\\r\n]/g, '')}"`,
+          'Content-Length': data.length,
+        });
+        res.end(data);
+        return true;
+      }
+      if (m === 'POST' && (p === '/api/admin/view-students/password' || p === '/api/admin/view-students/pin')) {
+        const body = await readJson(req);
+        const id = cleanText(body.id).toUpperCase();
+        if (!one("SELECT id FROM users WHERE id = ? AND role = 'student'", id)) return sendJson(res, 404, { error: 'This student has no portal account' }), true;
+        const value = String(body.value ?? '');
+        if (value !== String(body.confirm ?? '')) return sendJson(res, 400, { error: 'The two entries do not match' }), true;
+        if (p.endsWith('/password')) {
+          // a temporary password: the pupil must choose their own at next sign-in
+          if (value.length < 6) return sendJson(res, 400, { error: 'Password must be at least 6 characters' }), true;
+          run('UPDATE users SET password = ? WHERE id = ?', hashPassword(value), id);
+          run('DELETE FROM sessions WHERE user_id = ?', id);
+        } else {
+          if (!/^\d{4,6}$/.test(value)) return sendJson(res, 400, { error: 'PIN must be 4 to 6 digits' }), true;
+          run('UPDATE users SET pin = ? WHERE id = ?', hashPassword(value), id);
+        }
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      if (m === 'GET' && p === '/api/admin/view-students/pin') {
+        const id = studentId();
+        return sendJson(res, 200, { hasPin: !!one('SELECT pin FROM users WHERE id = ?', id)?.pin }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/view-students/pin/reset') {
+        const body = await readJson(req);
+        run('UPDATE users SET pin = NULL WHERE id = ?', cleanText(body.id).toUpperCase());
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      // Hostel application / allocation
+      if (m === 'GET' && p === '/api/admin/view-students/hostel') {
+        const id = studentId();
+        const rows = all(`SELECT h.id, h.session_label AS session, h.hostel, h.room, h.bed, h.status, h.note, h.recorded_at AS recordedAt, u.name AS recordedBy
+                          FROM student_hostel h LEFT JOIN users u ON u.id = h.recorded_by WHERE h.student_id = ? ORDER BY h.recorded_at DESC`, id);
+        const hostels = all('SELECT DISTINCT hostel FROM student_hostel ORDER BY hostel').map(r => r.hostel);
+        return sendJson(res, 200, { allocations: rows, hostels, session: activeAcademic()?.sessionLabel || '' }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/view-students/hostel') {
+        const body = await readJson(req);
+        const id = cleanText(body.id).toUpperCase();
+        if (!one('SELECT id FROM students WHERE id = ?', id)) return sendJson(res, 404, { error: 'Student not found' }), true;
+        const hostel = cleanText(body.hostel).slice(0, 100);
+        const session = cleanText(body.session).slice(0, 20) || activeAcademic()?.sessionLabel || '';
+        const status = ['applied', 'allocated', 'vacated'].includes(body.status) ? body.status : 'allocated';
+        if (!hostel) return sendJson(res, 400, { error: 'Enter the hostel / house name' }), true;
+        const fields = [session, hostel, cleanText(body.room).slice(0, 40), cleanText(body.bed).slice(0, 40), status, cleanText(body.note).slice(0, 400), user.id, nowIso()];
+        if (body.hid) {
+          run('UPDATE student_hostel SET session_label = ?, hostel = ?, room = ?, bed = ?, status = ?, note = ?, recorded_by = ?, recorded_at = ? WHERE id = ? AND student_id = ?', ...fields, Number(body.hid), id);
+        } else {
+          if (status === 'allocated') run("UPDATE student_hostel SET status = 'vacated' WHERE student_id = ? AND status = 'allocated'", id);
+          run('INSERT INTO student_hostel (session_label, hostel, room, bed, status, note, recorded_by, recorded_at, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', ...fields, id);
+        }
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      if (m === 'DELETE' && p === '/api/admin/view-students/hostel') {
+        run('DELETE FROM student_hostel WHERE id = ?', Number(url.searchParams.get('hid')));
         return sendJson(res, 200, { ok: true }), true;
       }
       if (m === 'POST' && p === '/api/admin/view-students/xlsx') {

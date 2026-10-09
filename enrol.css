@@ -267,3 +267,79 @@
 .fam-parents { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px; }
 .fam-parent { border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px; }
 @media print { .stu-letterhead { display:block; } }
+
+/* Student Profile page (Go to profile page) */
+.spf-head { margin-bottom:16px; }
+.spf-head-row { display:flex; align-items:center; gap:14px; }
+.spf-avatar { width:64px; height:64px; border-radius:50%; overflow:hidden; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.12); background:var(--black-3, #f1f5f9); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:20px; color:var(--text-3); flex-shrink:0; }
+.spf-avatar img { width:100%; height:100%; object-fit:cover; }
+.spf-head-name { font-size:18px; font-weight:700; }
+.spf-head-class { font-size:12.5px; color:var(--text-2); margin-top:2px; }
+.spf-head-tags { display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
+.spf-wrap { display:grid; grid-template-columns:220px minmax(0, 1fr); gap:16px; align-items:start; }
+.spf-tabs { display:flex; flex-direction:column; padding:8px; gap:2px; position:sticky; top:12px; }
+.spf-back { border:1px solid var(--border-2); background:#fff; border-radius:var(--radius-sm); padding:8px 10px; font-size:12.5px; font-weight:600; color:var(--text-2); cursor:pointer; margin-bottom:6px; text-align:left; font-family:'DM Sans', sans-serif; }
+.spf-back:hover { background:var(--black-3); }
+.spf-tab { display:flex; align-items:center; gap:9px; border:none; background:none; border-left:3px solid transparent; border-radius:0 6px 6px 0; padding:9px 10px; font-size:13px; color:var(--text-2); cursor:pointer; text-align:left; font-family:'DM Sans', sans-serif; }
+.spf-tab .btn-icon { width:15px; height:15px; flex-shrink:0; }
+.spf-tab:hover { background:var(--black-3); color:var(--text-1); }
+.spf-tab.active { border-left-color:var(--btn-primary, #16a34a); background:#f0fdf4; color:var(--btn-primary, #16a34a); font-weight:700; }
+.spf-body { min-width:0; }
+.spf-title { display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid var(--border); padding-bottom:8px; margin:4px 0 14px; }
+.spf-title h3 { font-size:15px; font-weight:700; margin:0; }
+.spf-title ~ .spf-title { margin-top:24px; }
+.spf-sub-head { font-weight:700; font-size:13.5px; margin:18px 0 8px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.spf-sub-head span { font-weight:500; font-size:12px; color:var(--text-3); }
+.spf-filters { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; align-items:end; margin-bottom:6px; }
+.spf-filters.four { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+.spf-filters .en-field.wide { grid-column:span 2; }
+.spf-actions { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+.spf-actions.end { justify-content:flex-end; border-top:1px solid var(--border); padding-top:14px; margin-top:18px; }
+.spf-note { font-size:12px; color:var(--text-2); background:var(--black-2, #f8fafc); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 12px; margin:8px 0; }
+.spf-left { text-align:left; padding:10px 0; }
+.spf-static { padding:9px 0; font-weight:600; }
+.spf-table-wrap { overflow-x:auto; }
+.spf-table-wrap tfoot th { background:var(--black-2, #f8fafc); font-size:12px; }
+.spf-row-btns { white-space:nowrap; }
+.spf-row-btns button + button { margin-left:4px; }
+.spf-narrow { max-width:420px; display:flex; flex-direction:column; gap:12px; }
+.spf-upload { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end; margin-bottom:12px; }
+.spf-profile .stu-card-foot { gap:8px; flex-wrap:wrap; }
+.spf-profile .stu-card-foot .en-foot-gap { flex:1; }
+.spf-res-sheet iframe { width:100%; height:720px; border:1px solid var(--border); border-radius:var(--radius-sm); background:#fff; }
+.spf-att-scroll { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm); }
+.spf-att-table { border-collapse:collapse; font-size:11px; min-width:100%; }
+.spf-att-table th, .spf-att-table td { border:1px solid var(--border); padding:4px 3px; text-align:center; min-width:30px; }
+.spf-att-table th { background:var(--black-2, #f8fafc); font-weight:600; color:var(--text-2); line-height:1.25; }
+.spf-att-table .spf-att-name { text-align:left; min-width:180px; font-weight:600; position:sticky; left:0; background:#fff; z-index:1; }
+.spf-att-table th.spf-att-name { background:var(--black-2, #f8fafc); }
+.spf-att-table .na { background:#e5e7eb; }
+.spf-att-table .outside { background:repeating-linear-gradient(45deg, #f1f5f9 0 4px, #e2e8f0 4px 8px); }
+.spf-att-table .holiday { background:#fef3c7; }
+.spf-att-present { color:#16a34a; font-weight:700; } .spf-att-absent { color:#dc2626; font-weight:700; }
+.spf-att-late { color:#d97706; font-weight:700; } .spf-att-permission { color:#2563eb; font-weight:700; }
+.spf-att-key { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11.5px; color:var(--text-2); margin:8px 0 4px; align-items:center; }
+.spf-att-key i { display:inline-block; width:14px; height:12px; border:1px solid var(--border-2); vertical-align:middle; margin-right:4px; }
+.spf-att-key i.na { background:#e5e7eb; } .spf-att-key i.holiday { background:#fef3c7; }
+.spf-att-key i.outside { background:repeating-linear-gradient(45deg, #f1f5f9 0 3px, #e2e8f0 3px 6px); }
+@media (max-width: 900px) {
+  .spf-wrap { grid-template-columns:1fr; }
+  .spf-tabs { position:static; flex-direction:row; overflow-x:auto; gap:4px; }
+  .spf-back { margin:0 6px 0 0; white-space:nowrap; }
+  .spf-tab { border-left:none; border-bottom:3px solid transparent; border-radius:6px 6px 0 0; white-space:nowrap; }
+  .spf-tab.active { border-bottom-color:var(--btn-primary, #16a34a); }
+  .spf-filters, .spf-filters.four { grid-template-columns:1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .spf-filters, .spf-filters.four, .spf-upload { grid-template-columns:1fr; }
+  .spf-filters .en-field.wide { grid-column:auto; }
+  .spf-res-sheet iframe { height:480px; }
+}
+
+/* Admin → Security & Activity Log */
+#sec-root .en-tabs { margin-bottom:14px; }
+.sec-card { margin-bottom:16px; }
+.sec-p { font-size:12.5px; color:var(--text-2); line-height:1.6; margin:0 0 10px; }
+.sec-failed td { background:#fef2f2; }
+.sec-page { font-size:12px; color:var(--text-3); padding:0 8px; align-self:center; }
+.sec-bad { background:#fef2f2; border-color:#fecaca; color:#7f1d1d; }

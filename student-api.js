@@ -442,6 +442,10 @@ async function saveProfile(btn) {
       email: val('pf-email'),
       address: val('pf-address'),
     };
+    if (body.email.toLowerCase() !== String(currentUser?.email || '').toLowerCase()) {
+      body.currentPassword = await askCurrentPassword('Your email receives your password reset links, so changing it needs your current password.');
+      if (!body.currentPassword) return;
+    }
     const data = await apiFetch('/api/account/profile', { method: 'PUT', body: JSON.stringify(body) });
     currentUser = data.user;
     renderUserAvatar(document.getElementById('s-avatar'), data.user);
