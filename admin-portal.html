@@ -627,7 +627,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 }
 .rail-item {
   width:100%;
-  min-height:52px;
+  min-height:58px;
   border:0;
   border-bottom:1px solid #d8e0eb;
   background:#ffffff;
@@ -636,9 +636,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:7px;
+  gap:5px;
+  padding:7px 5px 6px;
   font-family:'DM Sans',sans-serif;
-  font-size:12px;
+  font-size:10px;
+  line-height:1.12;
   font-weight:700;
   text-transform:uppercase;
   cursor:pointer;
@@ -654,15 +656,26 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   box-shadow:inset 3px 0 0 #2563eb;
 }
 .rail-icon {
+  width:24px;
   min-width:24px;
   height:24px;
-  border:1px solid currentColor;
-  border-radius:4px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  font-size:11px;
   line-height:1;
+}
+.rail-icon svg {
+  width:21px;
+  height:21px;
+  display:block;
+}
+.rail-label {
+  display:block;
+  max-width:100%;
+  text-align:center;
+  line-height:1.12;
+  letter-spacing:0;
+  overflow-wrap:break-word;
 }
 .admin-subnav {
   background:#ffffff;
@@ -682,7 +695,8 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   gap:12px;
   padding:0 12px;
   font-family:'DM Sans',sans-serif;
-  font-size:14px;
+  font-size:13px;
+  line-height:1.22;
   font-weight:500;
   text-align:left;
   cursor:pointer;
@@ -709,6 +723,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   height:16px;
   display:block;
 }
+.sub-nav-item > span:not(.sub-nav-icon):not(.sub-chev):not(.nav-badge) {
+  min-width:0;
+  overflow-wrap:break-word;
+}
 .finance-group-gap {
   margin-top:16px;
 }
@@ -728,7 +746,7 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   min-height:43px;
   padding:0 12px 0 10px;
   color:#64748b;
-  font-size:13.5px;
+  font-size:12.5px;
 }
 .result-child.active {
   color:#0b63ff;
@@ -851,7 +869,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
     border-right:0 !important;
     padding:4px !important;
   }
-  .rail-item { min-height:44px !important; font-size:9px !important; }
+  .rail-item { min-height:48px !important; font-size:9px !important; padding:6px 3px !important; gap:4px !important; }
+  .rail-icon { width:22px !important; min-width:22px !important; height:22px !important; }
+  .rail-icon svg { width:19px !important; height:19px !important; }
+  .rail-label { font-size:9px !important; line-height:1.1 !important; }
 
   /* cards stack full width */
   .card { border-radius:8px !important; }
@@ -2573,15 +2594,15 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
     </div>
     <div class="nav-group admin-sidebar-body">
       <div class="admin-rail">
-        <button type="button" class="rail-item active" data-section="dashboard" onclick="showAdminSection('dashboard', this, 'dashboard')"><span class="rail-icon">D</span><span>Dashboard</span></button>
-        <button type="button" class="rail-item menu-hidden" data-section="admission" onclick="showAdminSection('admission', this, 'admissions')"><span class="rail-icon">+</span><span>Admission</span></button>
-        <button type="button" class="rail-item" data-section="people" onclick="showAdminSection('people', this, 'students')"><span class="rail-icon">P</span><span>People</span></button>
-        <button type="button" class="rail-item" data-section="academics" onclick="showAdminSection('academics', this, 'classes')"><span class="rail-icon">A</span><span>Academics</span></button>
-        <button type="button" class="rail-item" data-section="eclass" onclick="showAdminSection('eclass', this, 'eclass')"><span class="rail-icon">EC</span><span>E-Class</span></button>
-        <button type="button" class="rail-item" data-section="results" onclick="showAdminSection('results', this, 'resultsGradebook')"><span class="rail-icon">R</span><span>Results</span></button>
-        <button type="button" class="rail-item" data-section="finance" onclick="showAdminSection('finance', this, 'finance')"><span class="rail-icon">$</span><span>Finance</span></button>
-        <button type="button" class="rail-item" data-section="attendance" onclick="showAdminSection('attendance', this, 'studentsAttendance')"><span class="rail-icon">AT</span><span>Attendance</span></button>
-        <button type="button" class="rail-item" data-section="admin" onclick="showAdminSection('admin', this, 'announcements')"><span class="rail-icon">...</span><span>Admin</span></button>
+        <button type="button" class="rail-item active" data-section="dashboard" onclick="showAdminSection('dashboard', this, 'dashboard')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="1.8" width="4.8" height="4.8" rx="1"/><rect x="9.4" y="1.8" width="4.8" height="4.8" rx="1"/><rect x="1.8" y="9.4" width="4.8" height="4.8" rx="1"/><rect x="9.4" y="9.4" width="4.8" height="4.8" rx="1"/></svg></span><span class="rail-label">Dashboard</span></button>
+        <button type="button" class="rail-item menu-hidden" data-section="admission" onclick="showAdminSection('admission', this, 'admissions')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.2h7.2l2.8 2.8v8.8H3z"/><path d="M10.2 2.2V5H13"/><path d="M6.2 9h3.6"/><path d="M8 7.2v3.6"/></svg></span><span class="rail-label">Admission</span></button>
+        <button type="button" class="rail-item" data-section="people" onclick="showAdminSection('people', this, 'students')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.3" cy="5.4" r="2.3"/><path d="M1.8 13.8c.5-2.9 2.1-4.4 4.5-4.4s4 1.5 4.5 4.4"/><circle cx="11.6" cy="6.1" r="1.7"/><path d="M10.5 10c1.7.2 2.8 1.4 3.2 3.6"/></svg></span><span class="rail-label">People</span></button>
+        <button type="button" class="rail-item" data-section="academics" onclick="showAdminSection('academics', this, 'classes')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2 1.6 5.6 8 9l6.4-3.4z"/><path d="M4.4 7.7v3.2c0 1 1.6 1.8 3.6 1.8s3.6-.8 3.6-1.8V7.7"/><path d="M14.4 5.6v3.2"/></svg></span><span class="rail-label">Academics</span></button>
+        <button type="button" class="rail-item" data-section="eclass" onclick="showAdminSection('eclass', this, 'eclass')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.6" width="12.4" height="8.2" rx="1.4"/><path d="M6.2 13.6h3.6"/><path d="M8 10.8v2.8"/><path d="M5.5 6.6h5"/></svg></span><span class="rail-label">E-Class</span></button>
+        <button type="button" class="rail-item" data-section="results" onclick="showAdminSection('results', this, 'resultsGradebook')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 13.8h12.4"/><rect x="2.7" y="9" width="2.2" height="4.8" rx=".5"/><rect x="6.9" y="6.6" width="2.2" height="7.2" rx=".5"/><rect x="11.1" y="3.7" width="2.2" height="10.1" rx=".5"/></svg></span><span class="rail-label">Results</span></button>
+        <button type="button" class="rail-item" data-section="finance" onclick="showAdminSection('finance', this, 'finance')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="4" width="12.4" height="8" rx="1.2"/><circle cx="8" cy="8" r="1.9"/><path d="M4.1 6.2h.1"/><path d="M11.8 9.8h.1"/></svg></span><span class="rail-label">Finance</span></button>
+        <button type="button" class="rail-item" data-section="attendance" onclick="showAdminSection('attendance', this, 'studentsAttendance')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2.4" width="10" height="11.8" rx="1.3"/><path d="M6.2 1.8h3.6"/><path d="m5.6 8.4 1.6 1.6 3.4-3.6"/></svg></span><span class="rail-label">Attendance</span></button>
+        <button type="button" class="rail-item" data-section="admin" onclick="showAdminSection('admin', this, 'announcements')"><span class="rail-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 2.4 4.2v4.1c0 3.1 2.1 5.3 5.6 6 3.5-.7 5.6-2.9 5.6-6V4.2z"/><path d="M6.1 8.1 7.4 9.4 10 6.6"/></svg></span><span class="rail-label">Admin</span></button>
       </div>
       <div class="admin-subnav">
         <div class="sub-menu active" data-menu="dashboard">
