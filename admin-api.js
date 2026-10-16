@@ -2025,6 +2025,26 @@ function clearStaffForm() {
   if (save) save.textContent = 'Add Staff';
 }
 
+function editStaff(id) {
+  const staff = (state.setup.staff || []).find(item => item.id === id);
+  if (!staff) return showToast('Staff account not found');
+  state.editingStaffId = staff.id;
+  document.getElementById('new-staff-id').value = staff.id;
+  document.getElementById('new-staff-id').disabled = false;
+  document.getElementById('new-staff-name').value = staff.name || '';
+  document.getElementById('new-staff-initials').value = staff.initials || '';
+  document.getElementById('new-staff-password').value = '';
+  document.getElementById('new-staff-password').placeholder = 'Leave blank to keep current password';
+  document.getElementById('new-staff-role').value = staff.role || 'teacher';
+  document.getElementById('new-staff-teacher-type').value = staff.teacherType || '';
+  syncStaffRoleFields();
+  document.getElementById('staff-form-title').textContent = `Edit Staff / Employee — ${staff.name || staff.id}`;
+  document.getElementById('staff-save-label').textContent = 'Save Changes';
+  closeStaffProfile();
+  document.getElementById('staff-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('new-staff-name')?.focus({ preventScroll: true });
+}
+
 function syncStaffRoleFields() {
   const role = document.getElementById('new-staff-role')?.value;
   const type = document.getElementById('new-staff-teacher-type');

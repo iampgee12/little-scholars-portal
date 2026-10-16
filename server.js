@@ -6553,6 +6553,7 @@ async function handleApi(req, res, url) {
     const existing = one('SELECT id, role FROM users WHERE id = ? AND role IN (?, ?)', staffId, 'teacher', 'admin');
     if (!existing) return sendJson(res, 404, { error: 'Staff account not found' });
     const body = await readJson(req);
+    const newStaffId = cleanText(body.id).toUpperCase();
     const name = cleanText(body.name);
     const password = cleanText(body.password);
     const role = cleanText(body.role);
@@ -6560,8 +6561,11 @@ async function handleApi(req, res, url) {
     const initials = cleanText(body.initials).toUpperCase() || initialsFromName(name);
     const firstName = cleanText(body.firstName) || firstNameFromName(name);
 
-    if (!name || !role) {
-      return sendJson(res, 400, { error: 'Staff name and role are required' });
+    if (!newStaffId || !name || !role) {
+      return sendJson(res, 400, { error: 'Staff ID, name, and role are required' });
+    }
+    if (newStaffId !== staffId && one('SELECT id FROM users WHERE id = ?', newStaffId)) {
+      return sendJson(res, 409, { error: 'That staff ID is already in use' });
     }
     if (!['teacher', 'admin'].includes(role)) {
       return sendJson(res, 400, { error: 'Staff role must be teacher or admin' });
@@ -6577,15 +6581,44 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: 'Remove this teacher from result assignments before changing them to an admin' });
     }
 
-    run(
-      `UPDATE users
-       SET role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?
-           ${password ? ', password = ?' : ''}
-       WHERE id = ?`,
-      ...(password
-        ? [role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, hashPassword(password), staffId]
-        : [role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, staffId])
-    );
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      if (newStaffId !== staffId) {
+        db.exec('PRAGMA defer_foreign_keys = ON');
+        const tables = all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+        for (const { name: tableName } of tables) {
+          const escapedTable = tableName.replace(/"/g, '""');
+          const refs = all(`PRAGMA foreign_key_list("${escapedTable}")`)
+            .filter(ref => ref.table === 'users' && ref.to === 'id');
+          for (const ref of refs) {
+            const escapedColumn = ref.from.replace(/"/g, '""');
+            run(`UPDATE "${escapedTable}" SET "${escapedColumn}" = ? WHERE "${escapedColumn}" = ?`, newStaffId, staffId);
+          }
+          if (tableName === 'class_subjects') {
+            const rows = all('SELECT rowid, assisting_teacher_ids FROM class_subjects WHERE assisting_teacher_ids IS NOT NULL');
+            for (const row of rows) {
+              const ids = String(row.assisting_teacher_ids).split(',').map(id => id.trim());
+              if (ids.includes(staffId)) {
+                run('UPDATE class_subjects SET assisting_teacher_ids = ? WHERE rowid = ?', ids.map(id => id === staffId ? newStaffId : id).join(','), row.rowid);
+              }
+            }
+          }
+        }
+      }
+      run(
+        `UPDATE users
+         SET id = ?, role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?
+             ${password ? ', password = ?' : ''}
+         WHERE id = ?`,
+        ...(password
+          ? [newStaffId, role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, hashPassword(password), staffId]
+          : [newStaffId, role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, staffId])
+      );
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
 
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
