@@ -1858,6 +1858,120 @@ function teacherContexts(teacherId) {
   }));
 }
 
+const CLASS_TEACHER_CORE_SUBJECT_ALIASES = [
+  ['maths', 'math', 'mathematics'],
+  ['english'],
+  ['quantitative analysis'],
+  ['verbal aptitude'],
+];
+
+function normalizedSubjectName(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function isClassTeacherCoreSubject(subjectId) {
+  const subject = one('SELECT name FROM subjects WHERE id = ?', Number(subjectId));
+  if (!subject) return false;
+  const name = normalizedSubjectName(subject.name);
+  return CLASS_TEACHER_CORE_SUBJECT_ALIASES.some(aliases => aliases.includes(name));
+}
+
+function classTeacherCoreSubjectIds(classCode) {
+  const subjects = all('SELECT id, name FROM subjects');
+  return CLASS_TEACHER_CORE_SUBJECT_ALIASES.map(aliases => subjects.find(subject =>
+    aliases.includes(normalizedSubjectName(subject.name)) && one(
+      'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
+      classCode,
+      subject.id
+    )
+  )).filter(Boolean);
+}
+
+function assignClassTeacherToClass(teacherId, classCode) {
+  const teacher = one("SELECT id, teacher_type AS teacherType FROM users WHERE id = ? AND role = 'teacher'", teacherId);
+  const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
+  if (!teacher || teacher.teacherType !== 'class_teacher') return { error: 'Choose a registered Class Teacher' };
+  if (!cls) return { error: 'Choose a valid class' };
+  const coreSubjects = classTeacherCoreSubjectIds(classCode);
+  if (coreSubjects.length !== CLASS_TEACHER_CORE_SUBJECT_ALIASES.length) {
+    return { error: 'Add Maths, English, Quantitative Analysis, and Verbal Aptitude to this class before assigning its Class Teacher' };
+  }
+  const subjectConflict = coreSubjects.find(subject => one(
+    "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1",
+    classCode,
+    subject.id
+  ));
+  if (subjectConflict) return { error: 'A core Class Teacher subject is already assigned to a Subject Teacher for this class' };
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    coreSubjects.forEach(subject => {
+      const assignment = one(
+        "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1",
+        classCode,
+        subject.id
+      );
+      if (assignment) {
+        run('UPDATE teacher_assignments SET teacher_id = ? WHERE id = ?', teacherId, assignment.id);
+      } else {
+        run(
+          "INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'class_teacher', ?, ?)",
+          teacherId,
+          classCode,
+          subject.id
+        );
+      }
+    });
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  return { classesAssigned: 1 };
+}
+
+function assignSubjectTeacherAcrossClasses(teacherId, subjectId) {
+  const teacher = one("SELECT id, teacher_type AS teacherType FROM users WHERE id = ? AND role = 'teacher'", teacherId);
+  const subject = one('SELECT id FROM subjects WHERE id = ?', Number(subjectId));
+  if (!teacher || teacher.teacherType !== 'subject_teacher') return { error: 'Choose a registered Subject Teacher' };
+  if (!subject) return { error: 'Choose a valid subject' };
+  if (isClassTeacherCoreSubject(subjectId)) return { error: 'This is a core Class Teacher subject and is assigned through the class teacher role' };
+  const classes = all('SELECT DISTINCT class_code AS classCode FROM class_subjects WHERE subject_id = ? ORDER BY class_code', Number(subjectId));
+  if (!classes.length) return { error: 'This subject is not assigned to any class yet' };
+  const conflict = classes.find(({ classCode }) => one(
+    "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1",
+    classCode,
+    Number(subjectId)
+  ));
+  if (conflict) return { error: 'This subject is a Class Teacher assignment for one or more classes' };
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    classes.forEach(({ classCode }) => {
+      const assignment = one(
+        "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1",
+        classCode,
+        Number(subjectId)
+      );
+      if (assignment) {
+        run('UPDATE teacher_assignments SET teacher_id = ? WHERE id = ?', teacherId, assignment.id);
+      } else {
+        run(
+          "INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'subject_teacher', ?, ?)",
+          teacherId,
+          classCode,
+          Number(subjectId)
+        );
+      }
+    });
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  return { classesAssigned: classes.length };
+}
+
 function assignmentForTeacher(contextId, teacherId) {
   return one(
     `SELECT ta.*, s.name AS subjectName, c.label AS classLabel
@@ -5024,6 +5138,9 @@ async function handleApi(req, res, url) {
     }
     const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
     if (!cls) return sendJson(res, 400, { error: 'Class does not exist' });
+    if (formTeacherId && !one("SELECT id FROM users WHERE id = ? AND role = 'teacher' AND teacher_type = 'class_teacher'", formTeacherId)) {
+      return sendJson(res, 400, { error: 'A class form teacher must have the Class Teacher role' });
+    }
 
     const classArmId = body.classArmId ? Number(body.classArmId) : null;
     if (classArmId) {
@@ -6550,7 +6667,7 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
     const staffId = decodeURIComponent(staffUpdateMatch[1]).trim().toUpperCase();
-    const existing = one('SELECT id, role FROM users WHERE id = ? AND role IN (?, ?)', staffId, 'teacher', 'admin');
+    const existing = one('SELECT id, role, teacher_type AS teacherType FROM users WHERE id = ? AND role IN (?, ?)', staffId, 'teacher', 'admin');
     if (!existing) return sendJson(res, 404, { error: 'Staff account not found' });
     const body = await readJson(req);
     const newStaffId = cleanText(body.id).toUpperCase();
@@ -6579,6 +6696,18 @@ async function handleApi(req, res, url) {
     const assignmentCount = one('SELECT COUNT(*) AS count FROM teacher_assignments WHERE teacher_id = ?', staffId).count;
     if (existing.role === 'teacher' && role === 'admin' && assignmentCount > 0) {
       return sendJson(res, 400, { error: 'Remove this teacher from result assignments before changing them to an admin' });
+    }
+    if (existing.role === 'teacher' && role === 'teacher' && existing.teacherType !== teacherType) {
+      const classArmCount = one('SELECT COUNT(*) AS count FROM class_arms WHERE form_teacher_id = ?', staffId).count;
+      const classSubjectCount = one(
+        `SELECT COUNT(*) AS count FROM class_subjects
+         WHERE teacher_in_charge_id = ? OR (',' || COALESCE(assisting_teacher_ids, '') || ',') LIKE ?`,
+        staffId,
+        `%,${staffId},%`
+      ).count;
+      if (assignmentCount || classArmCount || classSubjectCount) {
+        return sendJson(res, 400, { error: 'Remove this teacher’s class or subject assignments before changing their role' });
+      }
     }
 
     db.exec('BEGIN IMMEDIATE');
@@ -6671,6 +6800,41 @@ async function handleApi(req, res, url) {
     });
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/admin/class-teacher-assignments') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const teacherId = cleanText(body.teacherId).toUpperCase();
+    const classCode = cleanText(body.classCode).toUpperCase();
+    const result = assignClassTeacherToClass(teacherId, classCode);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
+  if ((req.method === 'POST' || req.method === 'DELETE') && url.pathname === '/api/admin/subject-teacher-assignments') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    if (req.method === 'POST') {
+      const body = await readJson(req);
+      const teacherId = cleanText(body.teacherId).toUpperCase();
+      const subjectId = Number(body.subjectId);
+      const result = assignSubjectTeacherAcrossClasses(teacherId, subjectId);
+      if (result.error) return sendJson(res, 400, { error: result.error });
+      return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+    }
+    const teacherId = cleanText(url.searchParams.get('teacherId')).toUpperCase();
+    const subjectId = Number(url.searchParams.get('subjectId'));
+    const hasSavedResults = one(
+      `SELECT COUNT(*) AS count FROM result_batches
+       WHERE assignment_id IN (SELECT id FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher')`,
+      teacherId,
+      subjectId
+    ).count;
+    if (hasSavedResults) return sendJson(res, 409, { error: 'This subject has saved results. Reassign it to another Subject Teacher instead of removing it.' });
+    run("DELETE FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher'", teacherId, subjectId);
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
   if ((req.method === 'POST' || req.method === 'PUT') && url.pathname === '/api/admin/teacher-assignments') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
@@ -6682,52 +6846,30 @@ async function handleApi(req, res, url) {
     if (!['class_teacher', 'subject_teacher'].includes(teacherType)) {
       return sendJson(res, 400, { error: 'Teacher type is required' });
     }
-    const teacher = one('SELECT id FROM users WHERE id = ? AND role = ?', teacherId, 'teacher');
-    const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
-    const subject = one('SELECT id FROM subjects WHERE id = ?', subjectId);
-    if (!teacher || !cls || !subject) {
-      return sendJson(res, 400, { error: 'Teacher, class, and subject must be valid' });
-    }
-
-    try {
-      if (req.method === 'POST') {
-        run(
-          'INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, ?, ?, ?)',
-          teacherId,
-          teacherType,
-          classCode,
-          subjectId
-        );
-      } else {
-        const id = Number(body.id);
-        if (!id) return sendJson(res, 400, { error: 'Assignment id is required for updates' });
-        run(
-          'UPDATE teacher_assignments SET teacher_id = ?, teacher_type = ?, class_code = ?, subject_id = ? WHERE id = ?',
-          teacherId,
-          teacherType,
-          classCode,
-          subjectId,
-          id
-        );
-      }
-    } catch (err) {
-      if (String(err.message).includes('UNIQUE')) {
-        return sendJson(res, 409, { error: 'That assignment already exists' });
-      }
-      throw err;
-    }
-
-    return sendJson(res, 200, {
-      ok: true,
-      setup: adminSetupPayload(),
-    });
+    const result = teacherType === 'class_teacher'
+      ? assignClassTeacherToClass(teacherId, classCode)
+      : assignSubjectTeacherAcrossClasses(teacherId, subjectId);
+    if (result.error) return sendJson(res, 400, { error: result.error });
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
   const deleteMatch = url.pathname.match(/^\/api\/admin\/teacher-assignments\/(\d+)$/);
   if (req.method === 'DELETE' && deleteMatch) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
-    run('DELETE FROM teacher_assignments WHERE id = ?', Number(deleteMatch[1]));
+    const assignment = one('SELECT teacher_id AS teacherId, subject_id AS subjectId, teacher_type AS teacherType FROM teacher_assignments WHERE id = ?', Number(deleteMatch[1]));
+    if (!assignment) return sendJson(res, 404, { error: 'Teacher assignment not found' });
+    if (assignment.teacherType === 'class_teacher') {
+      return sendJson(res, 400, { error: 'Class Teacher core assignments are managed through the class assignment form' });
+    }
+    const hasSavedResults = one(
+      `SELECT COUNT(*) AS count FROM result_batches
+       WHERE assignment_id IN (SELECT id FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher')`,
+      assignment.teacherId,
+      assignment.subjectId
+    ).count;
+    if (hasSavedResults) return sendJson(res, 409, { error: 'This subject has saved results. Reassign it to another Subject Teacher instead of removing it.' });
+    run("DELETE FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher'", assignment.teacherId, assignment.subjectId);
     return sendJson(res, 200, {
       ok: true,
       setup: adminSetupPayload(),
@@ -6854,6 +6996,9 @@ async function handleApi(req, res, url) {
     const name = cleanText(body.name);
     const formTeacherId = cleanText(body.formTeacherId).toUpperCase() || null;
     if (!name) return sendJson(res, 400, { error: 'Class arm name is required' });
+    if (formTeacherId && !one("SELECT id FROM users WHERE id = ? AND role = 'teacher' AND teacher_type = 'class_teacher'", formTeacherId)) {
+      return sendJson(res, 400, { error: 'A class form teacher must have the Class Teacher role' });
+    }
     run('UPDATE class_arms SET name = ?, form_teacher_id = ? WHERE id = ?', name, formTeacherId, id);
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
@@ -6951,6 +7096,8 @@ async function handleApi(req, res, url) {
       ? body.assistingTeacherIds.map(id => cleanText(id).toUpperCase()).filter(Boolean).join(',')
       : null;
     if (!subjectId || !classCode) return sendJson(res, 400, { error: 'Subject and class are required' });
+    const selectedTeacherIds = [teacherInChargeId, ...(assistingTeacherIds || '').split(',')].filter(Boolean);
+    if (selectedTeacherIds.length) return sendJson(res, 400, { error: 'Assign Subject Teachers from the Assign Teacher tab so the subject applies across all levels' });
     const subject = one('SELECT id FROM subjects WHERE id = ?', subjectId);
     const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
     if (!subject || !cls) return sendJson(res, 400, { error: 'Subject and class must be valid' });
@@ -6995,6 +7142,8 @@ async function handleApi(req, res, url) {
     const assistingTeacherIds = Array.isArray(body.assistingTeacherIds)
       ? body.assistingTeacherIds.map(tid => cleanText(tid).toUpperCase()).filter(Boolean).join(',')
       : null;
+    const selectedTeacherIds = [teacherInChargeId, ...(assistingTeacherIds || '').split(',')].filter(Boolean);
+    if (selectedTeacherIds.length) return sendJson(res, 400, { error: 'Assign Subject Teachers from the Assign Teacher tab so the subject applies across all levels' });
     run(
       `UPDATE class_subjects
        SET class_arm_id = ?, term = ?, pass_mark = ?, full_mark = ?, attributes = ?, teacher_in_charge_id = ?, assisting_teacher_ids = ?

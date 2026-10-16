@@ -4,7 +4,6 @@ const state = {
   editingStudentId: null,
   pendingDeleteStudentId: null,
   editingStaffId: null,
-  editingAssignmentId: null,
   staffFilter: 'All Staff',
   gradebookBatch: null,
   cognitiveRatings: {},
@@ -1761,11 +1760,12 @@ function renderEmailQueue() {
 function populateAdminControls() {
   const teacherSelect = document.getElementById('assign-teacher');
   const classSelect = document.getElementById('assign-class');
-  const subjectSelect = document.getElementById('assign-subject');
 
   if (teacherSelect) {
     teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + state.setup.teachers.map(teacher =>
+      teacher.teacherType === 'class_teacher' ?
       `<option value="${escapeHtml(teacher.id)}">${escapeHtml(teacher.name)} (${escapeHtml(teacher.id)})</option>`
+      : ''
     ).join('');
   }
   if (classSelect) {
@@ -1773,7 +1773,6 @@ function populateAdminControls() {
       `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`
     ).join('');
   }
-  if (subjectSelect) fillSubjectsForClass('assign-subject', classSelect?.value || '', 'Select subject...');
 
   const studentClassSelect = document.getElementById('new-student-class');
   if (studentClassSelect) {
@@ -1812,61 +1811,55 @@ function populateAdminControls() {
   syncStudentAssetFields();
 }
 
-function teacherTypeLabel(type) {
-  return type === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher';
-}
-
 function renderAssignments() {
   const tbody = document.getElementById('assignment-tbody');
   const summary = document.getElementById('setup-summary');
   if (!tbody) return;
-  summary.textContent = `${state.setup.academic.sessionLabel} - ${state.setup.academic.termLabel} - ${state.setup.assignments.length} assignments`;
-  tbody.innerHTML = state.setup.assignments.map(assignment => `
+  const grouped = new Map();
+  (state.setup.assignments || []).filter(assignment => assignment.teacherType === 'class_teacher').forEach(assignment => {
+    const key = `${assignment.teacherId}|${assignment.classCode}`;
+    if (!grouped.has(key)) grouped.set(key, { ...assignment, coreSubjects: [] });
+    const group = grouped.get(key);
+    if (!group.coreSubjects.includes(assignment.subjectName)) group.coreSubjects.push(assignment.subjectName);
+  });
+  const assignments = [...grouped.values()];
+  summary.textContent = `${state.setup.academic.sessionLabel} - ${state.setup.academic.termLabel} - ${assignments.length} class assignments`;
+  tbody.innerHTML = assignments.map(assignment => `
     <tr>
       <td><strong>${escapeHtml(assignment.teacherName)}</strong><div style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${escapeHtml(assignment.teacherId)}</div></td>
-      <td style="color:var(--text-2);">${teacherTypeLabel(assignment.teacherType)}</td>
       <td style="color:var(--text-2);">${escapeHtml(assignment.classLabel)}</td>
-      <td style="color:var(--text-2);">${escapeHtml(assignment.subjectName)}</td>
-      <td style="display:flex;gap:6px;flex-wrap:wrap;"><button class="post-btn" style="padding:6px 10px;" onclick="editAssignment(${assignment.id})">Edit</button><button class="ann-del" style="font-size:11px;" onclick="deleteAssignment(${assignment.id})">Delete</button></td>
+      <td style="color:var(--text-2);">${assignment.coreSubjects.length ? escapeHtml(assignment.coreSubjects.join(', ')) : 'Core subjects managed automatically'}</td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="editClassTeacherAssignment('${escapeHtml(assignment.classCode)}')">Change Teacher</button></td>
     </tr>`).join('');
 }
 
-function editAssignment(id) {
-  const assignment = state.setup.assignments.find(item => Number(item.id) === Number(id));
-  if (!assignment) return;
-  state.editingAssignmentId = assignment.id;
-  document.getElementById('assign-teacher').value = assignment.teacherId;
-  document.getElementById('assign-type').value = assignment.teacherType;
-  document.getElementById('assign-class').value = assignment.classCode;
-  document.getElementById('assign-subject').value = assignment.subjectId;
-  document.getElementById('assign-save-label').textContent = 'Update Assignment';
+function editClassTeacherAssignment(classCode) {
+  document.getElementById('assign-class').value = classCode;
+  document.getElementById('assign-teacher').value = '';
+  document.getElementById('assign-save-label').textContent = 'Assign / Replace Class Teacher';
+  document.getElementById('assign-teacher')?.focus();
 }
 
 function clearAssignmentForm() {
-  state.editingAssignmentId = null;
-  ['assign-teacher', 'assign-class', 'assign-subject'].forEach(id => {
+  ['assign-teacher', 'assign-class'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  document.getElementById('assign-type').value = 'class_teacher';
   document.getElementById('assign-save-label').textContent = 'Save Assignment';
 }
 
 async function saveAssignment() {
   const payload = {
-    id: state.editingAssignmentId,
     teacherId: document.getElementById('assign-teacher').value,
-    teacherType: document.getElementById('assign-type').value,
     classCode: document.getElementById('assign-class').value,
-    subjectId: Number(document.getElementById('assign-subject').value),
   };
-  if (!payload.teacherId || !payload.classCode || !payload.subjectId) {
-    showToast('Choose a teacher, class, and subject');
+  if (!payload.teacherId || !payload.classCode) {
+    showToast('Choose a class teacher and class');
     return;
   }
   try {
-    const data = await apiFetch('/api/admin/teacher-assignments', {
-      method: state.editingAssignmentId ? 'PUT' : 'POST',
+    const data = await apiFetch('/api/admin/class-teacher-assignments', {
+      method: 'POST',
       body: JSON.stringify(payload),
     });
     state.setup = data.setup;
@@ -1874,7 +1867,7 @@ async function saveAssignment() {
     populateAdminControls();
     renderAssignments();
     clearAssignmentForm();
-    showToast('Assignment saved');
+    showToast('Class teacher assigned');
   } catch (err) {
     showToast(err.message);
   }
@@ -2154,7 +2147,11 @@ function renderStaffProfileTab(tab) {
 function renderStaffProfileSubjects(staff) {
   const body = document.getElementById('staff-profile-body');
   if (!body) return;
-  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id);
+  if (staff.teacherType === 'class_teacher') {
+    body.innerHTML = '<div class="staff-profile-empty"><strong>Class Teacher</strong><span>Class Teachers are assigned to a class and automatically handle Maths, English, Quantitative Analysis, and Verbal Aptitude. They are not assigned individual subjects.</span></div>';
+    return;
+  }
+  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'subject_teacher');
   body.innerHTML = `
     <div class="staff-subjects-toolbar">
       <span>Teacher: <strong>${escapeHtml(staff.name)}</strong></span>
@@ -2167,10 +2164,11 @@ function renderStaffProfileSubjects(staff) {
 }
 
 function openTeacherSubjectsManager(id) {
+  const staff = (state.setup.staff || []).find(item => item.id === id);
+  if (staff?.teacherType !== 'subject_teacher') return showToast('Only Subject Teachers can receive subject assignments');
   staffProfileId = id;
   const manager = document.getElementById('teacher-subjects-modal');
   if (!manager) return;
-  const staff = (state.setup.staff || []).find(item => item.id === id);
   document.getElementById('teacher-subjects-title').textContent = `Teacher Subjects | ${staff?.name || id}`;
   manager.style.display = 'flex';
   populateTeacherSubjectForm();
@@ -2186,80 +2184,47 @@ function closeTeacherSubjectsManager() {
 function renderTeacherSubjectsManager() {
   const tbody = document.getElementById('teacher-subjects-tbody');
   if (!tbody) return;
-  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId);
+  const bySubject = new Map();
+  (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId && item.teacherType === 'subject_teacher').forEach(item => {
+    if (!bySubject.has(item.subjectId)) bySubject.set(item.subjectId, { ...item, classes: [] });
+    const group = bySubject.get(item.subjectId);
+    if (!group.classes.includes(item.classLabel || item.classCode)) group.classes.push(item.classLabel || item.classCode);
+  });
+  const assignments = [...bySubject.values()];
   tbody.innerHTML = assignments.length ? assignments.map((assignment, index) => `
     <tr>
       <td>${index + 1}.</td>
       <td>${escapeHtml(assignment.subjectName)}</td>
-      <td>${escapeHtml(assignment.classLabel || assignment.classCode)}</td>
-      <td><select class="ctrl-select staff-assignment-role" onchange="changeStaffAssignmentRole(${assignment.id}, this.value)">
-        <option value="subject_teacher"${assignment.teacherType === 'subject_teacher' ? ' selected' : ''}>Subject Teacher</option>
-        <option value="class_teacher"${assignment.teacherType === 'class_teacher' ? ' selected' : ''}>Class Teacher</option>
-      </select></td>
-      <td><button type="button" class="ann-del" onclick="removeStaffAssignment(${assignment.id})">Remove</button></td>
-    </tr>`).join('') : '<tr><td colspan="5" style="padding:18px;color:var(--text-3);">No subjects assigned.</td></tr>';
+      <td>${escapeHtml(assignment.classes.join(', '))}</td>
+      <td><button type="button" class="ann-del" onclick="removeSubjectAssignment(${assignment.subjectId})">Remove Subject</button></td>
+    </tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No subjects assigned.</td></tr>';
 }
 
 function populateTeacherSubjectForm() {
-  const classSelect = document.getElementById('staff-new-subject-class');
   const subjectSelect = document.getElementById('staff-new-subject-subject');
-  if (classSelect) classSelect.innerHTML = '<option value="">Select class...</option>' +
-    (state.setup.classes || []).map(item => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.label)}</option>`).join('');
-  if (subjectSelect) fillSubjectsForClass('staff-new-subject-subject', classSelect?.value || '', 'Select subject...');
+  if (subjectSelect) subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
+    (state.setup.subjects || []).filter(subject => (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
+      `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
+    ).join('');
 }
 
-async function changeStaffAssignmentRole(id, teacherType) {
-  const assignment = (state.setup.assignments || []).find(item => Number(item.id) === Number(id));
-  if (!assignment) return;
+async function removeSubjectAssignment(subjectId) {
   try {
-    const data = await apiFetch('/api/admin/teacher-assignments', {
-      method: 'PUT',
-      body: JSON.stringify({ id: assignment.id, teacherId: assignment.teacherId, teacherType, classCode: assignment.classCode, subjectId: assignment.subjectId }),
-    });
+    const data = await apiFetch(`/api/admin/subject-teacher-assignments?teacherId=${encodeURIComponent(staffProfileId)}&subjectId=${encodeURIComponent(subjectId)}`, { method: 'DELETE' });
     state.setup = data.setup;
     renderTeacherSubjectsManager();
     populateStaff();
-    showToast('Teacher assignment role updated');
-  } catch (err) { showToast(err.message, 'warn'); }
-}
-
-async function removeStaffAssignment(id) {
-  try {
-    const data = await apiFetch(`/api/admin/teacher-assignments/${id}`, { method: 'DELETE' });
-    state.setup = data.setup;
-    renderTeacherSubjectsManager();
-    populateStaff();
-    showToast('Subject assignment removed');
-  } catch (err) { showToast(err.message, 'warn'); }
-}
-
-async function bulkManageStaffRoles() {
-  const teacherType = document.getElementById('staff-bulk-role')?.value;
-  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId);
-  if (!teacherType || !assignments.length) return;
-  try {
-    for (const assignment of assignments) {
-      await apiFetch('/api/admin/teacher-assignments', {
-        method: 'PUT',
-        body: JSON.stringify({ id: assignment.id, teacherId: assignment.teacherId, teacherType, classCode: assignment.classCode, subjectId: assignment.subjectId }),
-      });
-    }
-    state.setup = await apiFetch('/api/admin/result-setup');
-    renderTeacherSubjectsManager();
-    populateStaff();
-    showToast('Assignment roles updated');
+    showToast('Subject assignment removed across levels');
   } catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function assignStaffSubject() {
-  const classCode = document.getElementById('staff-new-subject-class')?.value;
   const subjectId = Number(document.getElementById('staff-new-subject-subject')?.value || 0);
-  const teacherType = document.getElementById('staff-new-subject-role')?.value;
-  if (!classCode || !subjectId || !teacherType) return showToast('Choose a subject, class, and role', 'warn');
+  if (!subjectId) return showToast('Choose a subject', 'warn');
   try {
-    const data = await apiFetch('/api/admin/teacher-assignments', {
+    const data = await apiFetch('/api/admin/subject-teacher-assignments', {
       method: 'POST',
-      body: JSON.stringify({ teacherId: staffProfileId, teacherType, classCode, subjectId }),
+      body: JSON.stringify({ teacherId: staffProfileId, subjectId }),
     });
     state.setup = data.setup;
     renderTeacherSubjectsManager();
@@ -2898,8 +2863,6 @@ function attCollectRadios(prefix, ids) {
 // (Academics → Class Subjects) — never every subject in the school.
 const CLASS_SUBJECT_PAIRS = {
   'gb-class': ['gb-subject', 'All Subjects'],
-  'assign-class': ['assign-subject', 'Select subject...'],
-  'staff-new-subject-class': ['staff-new-subject-subject', 'Select subject...'],
   'sched-exam-class': ['sched-exam-subject', '— Select Subject —'],
   'qb-class': ['qb-subject', 'Select Subject'],
 };
@@ -5397,7 +5360,7 @@ function populateClasses() {
   const armFormTeacher = document.getElementById('class-arm-form-teacher');
   if (armFormTeacher) {
     armFormTeacher.innerHTML = '<option value="">No form teacher</option>' +
-      (state.setup.teachers || []).map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
+      (state.setup.teachers || []).filter(t => t.teacherType === 'class_teacher').map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
   }
 
   renderClassesTable();
@@ -5654,8 +5617,6 @@ function populateSubjects() {
   const classes = state.setup.classes || [];
   const subjects = state.setup.subjects || [];
   const subjectTypes = state.setup.subjectTypes || [];
-  const teachers = state.setup.teachers || [];
-
   populateSubjectAssignmentForm();
 
   const csFilterClass = document.getElementById('cs-filter-class');
@@ -5677,16 +5638,6 @@ function populateSubjects() {
     csmClass.innerHTML = '<option value="">Select Class</option>' +
       classes.map(cls => `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`).join('');
   }
-  const csmTeacher = document.getElementById('csm-teacher-in-charge');
-  if (csmTeacher) {
-    csmTeacher.innerHTML = '<option value="">No teacher assigned</option>' +
-      teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-  }
-  const csmAssisting = document.getElementById('csm-assisting-teachers');
-  if (csmAssisting) {
-    csmAssisting.innerHTML = teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-  }
-
   const subjectFormType = document.getElementById('subject-form-type');
   if (subjectFormType) {
     subjectFormType.innerHTML = '<option value="">Select Type</option>' +
@@ -5700,83 +5651,36 @@ function populateSubjects() {
 }
 
 function populateSubjectAssignmentForm() {
-  const classSelect = document.getElementById('st-assign-class');
-  const subjectSelect = document.getElementById('st-assign-class-subject');
   const teacherSelect = document.getElementById('st-assign-teacher');
-  if (!classSelect || !subjectSelect || !teacherSelect || !state.setup) return;
-  const selectedClass = classSelect.value;
-  const selectedClassSubject = subjectSelect.value;
+  const subjectSelect = document.getElementById('st-assign-subject');
+  if (!subjectSelect || !teacherSelect || !state.setup) return;
   const selectedTeacher = teacherSelect.value;
-  classSelect.innerHTML = '<option value="">Select class...</option>' +
-    (state.setup.classes || []).filter(cls => !cls.archived).map(cls =>
-      `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`
-    ).join('');
-  if ([...classSelect.options].some(option => option.value === selectedClass)) classSelect.value = selectedClass;
   teacherSelect.innerHTML = '<option value="">Select teacher...</option>' +
-    (state.setup.teachers || []).map(teacher =>
+    (state.setup.teachers || []).filter(teacher => teacher.teacherType === 'subject_teacher').map(teacher =>
       `<option value="${escapeHtml(teacher.id)}">${escapeHtml(teacher.name)} (${escapeHtml(teacher.id)})</option>`
     ).join('');
   if ([...teacherSelect.options].some(option => option.value === selectedTeacher)) teacherSelect.value = selectedTeacher;
-  populateSubjectAssignmentOptions(selectedClassSubject);
-}
-
-function populateSubjectAssignmentOptions(preferredId = '') {
-  const classCode = document.getElementById('st-assign-class')?.value || '';
-  const subjectSelect = document.getElementById('st-assign-class-subject');
-  if (!subjectSelect) return;
-  if (!classCode) {
-    subjectSelect.innerHTML = '<option value="">Select a class first</option>';
-    return;
-  }
-  const classSubjects = (state.setup.classSubjects || []).filter(row => row.classCode === classCode);
-  subjectSelect.innerHTML = classSubjects.length
-    ? '<option value="">Select subject...</option>' + classSubjects.map(row => {
-      const details = [row.classArmName || 'All arms', row.term].filter(Boolean).join(' · ');
-      return `<option value="${row.id}">${escapeHtml(row.subjectName)}${details ? ` — ${escapeHtml(details)}` : ''}</option>`;
-    }).join('')
-    : '<option value="">No subjects assigned to this class yet</option>';
-  if (preferredId && [...subjectSelect.options].some(option => option.value === String(preferredId))) {
-    subjectSelect.value = String(preferredId);
-  }
+  subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
+    (state.setup.subjects || []).filter(subject => (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
+      `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
+    ).join('');
 }
 
 async function saveSubjectTeacherAssignment() {
-  const classSubjectId = Number(document.getElementById('st-assign-class-subject')?.value || 0);
+  const subjectId = Number(document.getElementById('st-assign-subject')?.value || 0);
   const teacherId = document.getElementById('st-assign-teacher')?.value || '';
-  const role = document.getElementById('st-assign-role')?.value || 'teacherInCharge';
-  const classSubject = (state.setup.classSubjects || []).find(row => Number(row.id) === classSubjectId);
-  if (!classSubject || !teacherId) return showToast('Choose a class subject and teacher');
-
-  const assistingTeacherIds = String(classSubject.assistingTeacherIds || '').split(',').map(id => id.trim()).filter(Boolean);
-  const payload = {
-    classArmId: classSubject.classArmId || null,
-    term: classSubject.term || '',
-    passMark: classSubject.passMark,
-    fullMark: classSubject.fullMark,
-    attributes: classSubject.attributes || '',
-    teacherInChargeId: classSubject.teacherInChargeId || '',
-    assistingTeacherIds,
-  };
-  if (role === 'teacherInCharge') {
-    payload.teacherInChargeId = teacherId;
-    payload.assistingTeacherIds = assistingTeacherIds.filter(id => id !== teacherId);
-  } else {
-    if (payload.teacherInChargeId === teacherId || assistingTeacherIds.includes(teacherId)) {
-      return showToast('This teacher is already assigned to the subject');
-    }
-    payload.assistingTeacherIds.push(teacherId);
-  }
+  if (!subjectId || !teacherId) return showToast('Choose a subject and Subject Teacher');
 
   try {
-    const data = await apiFetch(`/api/admin/class-subjects/${classSubjectId}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
+    const data = await apiFetch('/api/admin/subject-teacher-assignments', {
+      method: 'POST',
+      body: JSON.stringify({ subjectId, teacherId }),
     });
     state.setup = data.setup;
     populateSubjects();
     renderClassSubjectsTable();
     renderSubjectTeachersTable();
-    showToast(`${role === 'teacherInCharge' ? 'Teacher in charge' : 'Assisting teacher'} assigned`);
+    showToast('Subject Teacher assigned across levels');
   } catch (err) {
     showToast(err.message);
   }
@@ -5810,8 +5714,8 @@ function renderClassSubjectsTable() {
       <td>${escapeHtml(row.term || '-')}</td>
       <td>${row.passMark ?? '-'} / ${row.fullMark ?? '-'}</td>
       <td>${escapeHtml(row.attributes || '-')}</td>
-      <td>${row.teacherInChargeName ? escapeHtml(row.teacherInChargeName) : '-'}</td>
-      <td>${row.assistingTeacherNames ? escapeHtml(row.assistingTeacherNames) : '-'}</td>
+      <td>${escapeHtml((state.setup.assignments || []).find(item => item.teacherType === 'subject_teacher' && item.classCode === row.classCode && Number(item.subjectId) === Number(row.subjectId))?.teacherName || '-')}</td>
+      <td>-</td>
       <td>
         <button class="post-btn" style="padding:6px 10px;" onclick="editClassSubject(${row.id})">Edit</button>
         <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="deleteClassSubject(${row.id})">Delete</button>
@@ -5823,28 +5727,20 @@ function renderSubjectTeachersTable() {
   const tbody = document.getElementById('subject-teachers-tbody');
   if (!tbody) return;
   const search = (document.getElementById('st-search')?.value || '').toLowerCase();
-  const rows = [];
-  (state.setup.classSubjects || []).forEach(row => {
-    if (row.teacherInChargeId) {
-      rows.push({ teacherName: row.teacherInChargeName, role: 'Teacher in Charge', subjectName: row.subjectName, classLabel: row.classLabel, classArmName: row.classArmName });
-    }
-    (row.assistingTeacherNames || '').split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-      rows.push({ teacherName: name, role: 'Assisting Teacher', subjectName: row.subjectName, classLabel: row.classLabel, classArmName: row.classArmName });
-    });
-  });
-  const filtered = rows.filter(row => !search || `${row.teacherName} ${row.subjectName} ${row.classLabel}`.toLowerCase().includes(search));
+  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' &&
+    (!search || `${row.teacherName} ${row.teacherId} ${row.subjectName} ${row.classLabel}`.toLowerCase().includes(search)));
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No subject teachers assigned yet. Use "Add Subject" under Class Subjects to assign one.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No Subject Teachers assigned yet. Use the Assign Teacher tab to assign a subject across levels.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map((row, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td><strong>${escapeHtml(row.teacherName)}</strong></td>
-      <td>${escapeHtml(row.role)}</td>
+      <td><strong>${escapeHtml(row.teacherName)}</strong><div style="font-size:10px;color:var(--text-3);">${escapeHtml(row.teacherId)}</div></td>
+      <td>Subject Teacher</td>
       <td>${escapeHtml(row.subjectName)}</td>
       <td>${escapeHtml(row.classLabel)}</td>
-      <td>${row.classArmName ? escapeHtml(row.classArmName) : 'All'}</td>
+      <td>All arms</td>
     </tr>`).join('');
 }
 
@@ -5985,8 +5881,6 @@ function openClassSubjectModal() {
   document.getElementById('csm-pass-mark').value = '';
   document.getElementById('csm-full-mark').value = '';
   document.getElementById('csm-attributes').value = '';
-  document.getElementById('csm-teacher-in-charge').value = '';
-  Array.from(document.getElementById('csm-assisting-teachers').options).forEach(opt => { opt.selected = false; });
   document.getElementById('class-subject-modal').style.display = 'flex';
 }
 
@@ -6003,11 +5897,6 @@ function editClassSubject(id) {
   document.getElementById('csm-pass-mark').value = row.passMark ?? '';
   document.getElementById('csm-full-mark').value = row.fullMark ?? '';
   document.getElementById('csm-attributes').value = row.attributes || '';
-  document.getElementById('csm-teacher-in-charge').value = row.teacherInChargeId || '';
-  const assistingIds = (row.assistingTeacherIds || '').split(',').filter(Boolean);
-  Array.from(document.getElementById('csm-assisting-teachers').options).forEach(opt => {
-    opt.selected = assistingIds.includes(opt.value);
-  });
   document.getElementById('class-subject-modal').style.display = 'flex';
 }
 
@@ -6027,8 +5916,6 @@ async function saveClassSubject() {
     passMark: document.getElementById('csm-pass-mark').value,
     fullMark: document.getElementById('csm-full-mark').value,
     attributes: document.getElementById('csm-attributes').value,
-    teacherInChargeId: document.getElementById('csm-teacher-in-charge').value,
-    assistingTeacherIds: Array.from(document.getElementById('csm-assisting-teachers').selectedOptions).map(opt => opt.value),
   };
   try {
     const url = state.editingClassSubjectId ? `/api/admin/class-subjects/${state.editingClassSubjectId}` : '/api/admin/class-subjects';
