@@ -4830,6 +4830,109 @@ async function handleApi(req, res, url) {
     );
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/gradebook') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
+    const subjectId = Number(url.searchParams.get('subjectId'));
+    if (!classCode || !subjectId || !teacherOwnsCbtContext(user.id, classCode, subjectId)) {
+      return sendJson(res, 403, { error: 'Choose a class and subject assigned to you' });
+    }
+    const schedules = all(
+      `SELECT ss.id AS scheduleSubjectId, ss.class_code AS classCode, ss.subject_id AS subjectId,
+              ss.exam_date AS examDate, ss.exam_time AS examTime, ss.mode, ss.status,
+              cs.id AS scheduleId, cs.title AS scheduleTitle, cs.session_label AS sessionLabel,
+              cs.term_label AS termLabel, cs.for_exam AS forExam,
+              COUNT(sc.id) AS scoreCount
+       FROM cbt_schedule_subjects ss
+       JOIN cbt_schedules cs ON cs.id = ss.schedule_id
+       LEFT JOIN cbt_scores sc ON sc.schedule_subject_id = ss.id
+       WHERE ss.class_code = ? AND ss.subject_id = ?
+       GROUP BY ss.id ORDER BY ss.exam_date DESC, ss.id DESC`,
+      classCode, subjectId
+    ).map(schedule => ({
+      ...schedule,
+      scores: all(
+        `SELECT cs.student_id AS studentId, st.name AS studentName, cs.score,
+                cs.total_marks AS totalMarks, cs.questions_presented AS questionsPresented,
+                cs.questions_attempted AS questionsAttempted
+         FROM cbt_scores cs JOIN students st ON st.id = cs.student_id
+         WHERE cs.schedule_subject_id = ? ORDER BY st.name`,
+        schedule.scheduleSubjectId
+      ),
+    }));
+    return sendJson(res, 200, { schedules });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/teacher/cbt/scores/upload-to-gradebook') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const body = await readJson(req);
+    const scheduleSubjectId = Number(body.scheduleSubjectId);
+    const examType = cleanText(body.examType);
+    if (!scheduleSubjectId || !validateExamType(examType)) {
+      return sendJson(res, 400, { error: 'Scheduled CBT subject and exam type are required' });
+    }
+    const subjectRow = one(
+      'SELECT class_code AS classCode, subject_id AS subjectId FROM cbt_schedule_subjects WHERE id = ?',
+      scheduleSubjectId
+    );
+    if (!subjectRow || !teacherOwnsCbtContext(user.id, subjectRow.classCode, subjectRow.subjectId)) {
+      return sendJson(res, 403, { error: 'You are not assigned to this CBT class and subject' });
+    }
+    if (resultIsPublished(subjectRow.classCode, examType)) {
+      return sendJson(res, 409, { error: 'These results are published. Ask the admin to unpublish them before uploading CBT scores.' });
+    }
+    const assignment = one(
+      'SELECT id FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ?',
+      user.id, subjectRow.classCode, subjectRow.subjectId
+    );
+    const division = one(
+      'SELECT max_mark AS maxMark FROM score_divisions WHERE class_code = ? AND exam_type = ? AND enabled = 1 ORDER BY sort_order LIMIT 1',
+      subjectRow.classCode, examType
+    );
+    const targetMax = division?.maxMark || 100;
+    const academic = activeAcademic();
+    if (!academic) return sendJson(res, 400, { error: 'No active academic session/term is set' });
+    const scores = all(
+      'SELECT student_id AS studentId, score, total_marks AS totalMarks FROM cbt_scores WHERE schedule_subject_id = ?',
+      scheduleSubjectId
+    );
+    if (!scores.length) return sendJson(res, 400, { error: 'No CBT scores recorded yet for this subject' });
+
+    db.exec('BEGIN');
+    try {
+      let batch = one(
+        'SELECT id FROM result_batches WHERE academic_id = ? AND assignment_id = ? AND exam_type = ?',
+        academic.id, assignment.id, examType
+      );
+      if (!batch) {
+        const inserted = run(
+          `INSERT INTO result_batches (academic_id, assignment_id, teacher_id, class_code, subject_id, exam_type, saved_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          academic.id, assignment.id, user.id, subjectRow.classCode, subjectRow.subjectId, examType, new Date().toISOString()
+        );
+        batch = { id: inserted.lastInsertRowid };
+      }
+      const upsert = db.prepare(`
+        INSERT INTO result_entries (batch_id, student_id, ca_score, exam_score, total_score)
+        VALUES (?, ?, 0, ?, ?)
+        ON CONFLICT(batch_id, student_id) DO UPDATE SET
+          exam_score = excluded.exam_score,
+          total_score = ca_score + excluded.exam_score
+      `);
+      scores.forEach(score => {
+        const rescaled = Math.round((score.score / score.totalMarks) * targetMax);
+        upsert.run(batch.id, score.studentId, rescaled, rescaled);
+      });
+      db.exec('COMMIT');
+      return sendJson(res, 200, { ok: true, uploaded: scores.length, batchId: batch.id });
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/questions') {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;

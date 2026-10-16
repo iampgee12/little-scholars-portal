@@ -950,10 +950,17 @@ Marks: 2</pre>
         </div>
       </div>
 
-      <!-- ━━━ CBT GRADE BOOK (stub) ━━━ -->
+      <!-- ━━━ CBT GRADE BOOK ━━━ -->
       <div class="tab-panel" id="tab-cbtGradebook">
-        <div class="page-header"><h2>CBT Grade Book</h2><p>Computer-based test scores</p></div>
-        <div class="card"><div class="card-body"><div class="ep-wrap"><div class="ep-icon"><svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.3"/><path d="M8 1.7V8l3 2"/></svg></div><div class="ep-title">Coming Soon</div><div class="ep-desc">CBT Grade Book will appear here once this module is built.</div></div></div></div>
+        <div class="page-header"><h2>CBT Grade Book</h2><p>Review scores for the classes and subjects assigned to you, then upload them to Results.</p></div>
+        <div class="card" style="margin-bottom:16px;"><div class="card-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end;">
+          <div><label class="field-label" for="cbtgb-context">Assigned Class and Subject</label><select class="ctrl-select" id="cbtgb-context" onchange="cbtgbLoad()"></select></div>
+          <div><label class="field-label" for="cbtgb-schedule">CBT Schedule</label><select class="ctrl-select" id="cbtgb-schedule" onchange="cbtgbRender()"><option value="">Select a schedule...</option></select></div>
+          <div><label class="field-label" for="cbtgb-exam">Upload to Exam</label><select class="ctrl-select" id="cbtgb-exam"><option>Mid-Term Exam</option><option>Final Exam</option></select></div>
+          <button class="post-btn" id="cbtgb-upload" onclick="cbtgbUpload()" disabled>Upload Scores to Results</button>
+        </div></div>
+        <div id="cbtgb-summary" style="font-size:12px;color:var(--text-2);margin:0 0 10px;"></div>
+        <div class="card"><div class="card-body" style="padding:0;overflow:auto;"><table class="data-table"><thead><tr><th>#</th><th>Student</th><th>Score</th><th>Questions Attempted</th></tr></thead><tbody id="cbtgb-tbody"><tr><td colspan="4" style="padding:20px;color:var(--text-3);">Choose an assigned class and subject.</td></tr></tbody></table></div></div>
       </div>
 
       <!-- ━━━ DAILY GRADE BOOK (stub) ━━━ -->

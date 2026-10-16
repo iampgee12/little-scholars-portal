@@ -1751,6 +1751,7 @@ function switchTab(tab, trigger) {
   if (tab === 'resultsGradebook') gbInit();
   if (tab === 'cognitiveSkills') cogInit();
   if (tab === 'cbtQuestions') cbtqInit();
+  if (tab === 'cbtGradebook') cbtgbInit();
   if (tab === 'reviewResults') rvInit();
   if (tab === 'classComments') ccInit();
   if (tab === 'profile') profileInit();
@@ -1974,6 +1975,96 @@ async function signOut() {
 let _cbtqContext = [];
 let _cbtqQuestions = [];
 let _cbtqEditingId = null;
+
+let _cbtgbSchedules = [];
+
+async function cbtgbInit() {
+  const select = document.getElementById('cbtgb-context');
+  const contexts = state.contexts || [];
+  if (!select) return;
+  if (!contexts.length) {
+    select.innerHTML = '<option value="">No assigned subjects</option>';
+    document.getElementById('cbtgb-tbody').innerHTML = '<tr><td colspan="4" style="padding:20px;color:var(--text-3);">Ask the admin to assign you to a class or subject first.</td></tr>';
+    return;
+  }
+  const previous = select.value;
+  select.innerHTML = contexts.map((ctx, i) => '<option value="' + i + '">' + escapeHtml(ctx.classLabel) + ' — ' + escapeHtml(ctx.subjectName) + '</option>').join('');
+  if (previous && contexts[previous]) select.value = previous;
+  await cbtgbLoad();
+}
+
+function cbtgbCurrentContext() {
+  const index = Number(document.getElementById('cbtgb-context')?.value);
+  return (state.contexts || [])[index] || null;
+}
+
+function cbtgbCurrentSchedule() {
+  const id = Number(document.getElementById('cbtgb-schedule')?.value);
+  return _cbtgbSchedules.find(schedule => Number(schedule.scheduleSubjectId) === id) || null;
+}
+
+async function cbtgbLoad() {
+  const context = cbtgbCurrentContext();
+  const scheduleSelect = document.getElementById('cbtgb-schedule');
+  const tbody = document.getElementById('cbtgb-tbody');
+  const upload = document.getElementById('cbtgb-upload');
+  if (!context) return;
+  scheduleSelect.innerHTML = '<option value="">Loading schedules...</option>';
+  tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;color:var(--text-3);">Loading CBT scores...</td></tr>';
+  upload.disabled = true;
+  try {
+    const data = await apiFetch('/api/teacher/cbt/gradebook?classCode=' + encodeURIComponent(context.classCode) + '&subjectId=' + encodeURIComponent(context.subjectId));
+    _cbtgbSchedules = data.schedules || [];
+    scheduleSelect.innerHTML = _cbtgbSchedules.length
+      ? '<option value="">Select a schedule...</option>' + _cbtgbSchedules.map(item =>
+        '<option value="' + item.scheduleSubjectId + '">' + escapeHtml(item.scheduleTitle) + ' · ' + escapeHtml(item.examDate || item.sessionLabel || 'No date') + '</option>'
+      ).join('')
+      : '<option value="">No CBT schedules for this subject</option>';
+    cbtgbRender();
+  } catch (err) {
+    scheduleSelect.innerHTML = '<option value="">Could not load schedules</option>';
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;color:var(--red);">' + escapeHtml(err.message) + '</td></tr>';
+  }
+}
+
+function cbtgbRender() {
+  const schedule = cbtgbCurrentSchedule();
+  const tbody = document.getElementById('cbtgb-tbody');
+  const summary = document.getElementById('cbtgb-summary');
+  const upload = document.getElementById('cbtgb-upload');
+  if (!schedule) {
+    summary.textContent = '';
+    upload.disabled = true;
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;color:var(--text-3);">' +
+      (_cbtgbSchedules.length ? 'Choose a CBT schedule to review scores.' : 'No scheduled CBTs are available for this class and subject.') + '</td></tr>';
+    return;
+  }
+  const scores = schedule.scores || [];
+  summary.textContent = schedule.scheduleTitle + ' · ' + scores.length + ' student score' + (scores.length === 1 ? '' : 's') + (schedule.examDate ? ' · ' + schedule.examDate : '');
+  upload.disabled = !scores.length;
+  tbody.innerHTML = scores.length ? scores.map((score, i) =>
+    '<tr><td>' + (i + 1) + '</td><td><strong>' + escapeHtml(score.studentName) + '</strong><div style="font-size:10px;color:var(--text-3);">' + escapeHtml(score.studentId) + '</div></td>' +
+    '<td>' + escapeHtml(String(score.score)) + ' / ' + escapeHtml(String(score.totalMarks)) + '</td>' +
+    '<td>' + (score.questionsAttempted == null ? '-' : escapeHtml(String(score.questionsAttempted)) + (score.questionsPresented == null ? '' : ' / ' + escapeHtml(String(score.questionsPresented)))) + '</td></tr>'
+  ).join('') : '<tr><td colspan="4" style="padding:20px;color:var(--text-3);">No scores have been submitted for this CBT yet.</td></tr>';
+}
+
+async function cbtgbUpload() {
+  const schedule = cbtgbCurrentSchedule();
+  if (!schedule || !(schedule.scores || []).length) return showToast('Choose a CBT with submitted scores');
+  const examType = document.getElementById('cbtgb-exam').value;
+  if (!confirm('Upload ' + schedule.scores.length + ' CBT score(s) to ' + examType + '? This updates the exam score while preserving each student’s CA score.')) return;
+  try {
+    const data = await apiFetch('/api/teacher/cbt/scores/upload-to-gradebook', {
+      method: 'POST',
+      body: JSON.stringify({ scheduleSubjectId: schedule.scheduleSubjectId, examType }),
+    });
+    showToast(data.uploaded + ' CBT score(s) uploaded to Results');
+    await refreshAllResults();
+  } catch (err) {
+    showToast(err.message, 'warn');
+  }
+}
 
 async function cbtqInit() {
   try {
