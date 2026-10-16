@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "Little Scholars",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
-      "port": 3000
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["server.js"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }
