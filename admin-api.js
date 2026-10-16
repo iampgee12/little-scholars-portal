@@ -1058,9 +1058,13 @@ function filterStaff() {
 }
 
 function staffAssignments(staff) {
-  return (state.setup.assignments || [])
-    .filter(assignment => assignment.teacherId === staff.id)
-    .map(assignment => `${assignment.classCode} ${assignment.subjectName}`)
+  const assignments = (state.setup.assignments || []).filter(assignment => assignment.teacherId === staff.id);
+  if (staff.teacherType === 'class_teacher') {
+    return [...new Set(assignments.filter(item => item.teacherType === 'class_teacher').map(item => item.classLabel || item.classCode))].join(', ') || 'Not assigned';
+  }
+  return assignments
+    .filter(assignment => assignment.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(assignment.subjectName))
+    .map(assignment => assignment.classCode + ' ' + assignment.subjectName)
     .join(', ') || (staff.role === 'admin' ? 'All' : 'Not assigned');
 }
 
@@ -2144,14 +2148,30 @@ function renderStaffProfileTab(tab) {
   body.innerHTML = `<div class="staff-profile-details">${rows.map(([label, value]) => `<div class="staff-profile-detail"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || 'Not set')}</strong></div>`).join('')}</div>`;
 }
 
+const CLASS_TEACHER_MANAGED_SUBJECTS = [
+  'eng lang', 'english lang', 'english language', 'english',
+  'maths', 'math', 'mathematics',
+  'social studies', 'social study',
+  'vocational aptitude', 'vocational apt',
+  'health education', 'health ed',
+  'verbal reasoning',
+  'bible knowledge',
+  'creative writing',
+];
+
+function isClassTeacherManagedSubject(subjectName) {
+  const normalized = String(subjectName || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+  return CLASS_TEACHER_MANAGED_SUBJECTS.includes(normalized);
+}
+
 function renderStaffProfileSubjects(staff) {
   const body = document.getElementById('staff-profile-body');
   if (!body) return;
   if (staff.teacherType === 'class_teacher') {
-    body.innerHTML = '<div class="staff-profile-empty"><strong>Class Teacher</strong><span>Class Teachers are assigned to a class and automatically handle Maths, English, Quantitative Analysis, and Verbal Aptitude. They are not assigned individual subjects.</span></div>';
+    body.innerHTML = '<div class="staff-profile-empty"><strong>Class Teacher</strong><span>Class Teachers are assigned to a class and automatically handle Eng lang, Maths, Social Studies, Verbal Reasoning, Bible Knowledge, and Creative Writing. Vocational Aptitude applies to Years 2–6; Health Education applies to Year 1. These subjects are not assigned to Subject Teachers.</span></div>';
     return;
   }
-  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'subject_teacher');
+  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(item.subjectName));
   body.innerHTML = `
     <div class="staff-subjects-toolbar">
       <span>Teacher: <strong>${escapeHtml(staff.name)}</strong></span>
@@ -2185,7 +2205,7 @@ function renderTeacherSubjectsManager() {
   const tbody = document.getElementById('teacher-subjects-tbody');
   if (!tbody) return;
   const bySubject = new Map();
-  (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId && item.teacherType === 'subject_teacher').forEach(item => {
+  (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId && item.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(item.subjectName)).forEach(item => {
     if (!bySubject.has(item.subjectId)) bySubject.set(item.subjectId, { ...item, classes: [] });
     const group = bySubject.get(item.subjectId);
     if (!group.classes.includes(item.classLabel || item.classCode)) group.classes.push(item.classLabel || item.classCode);
@@ -2203,7 +2223,7 @@ function renderTeacherSubjectsManager() {
 function populateTeacherSubjectForm() {
   const subjectSelect = document.getElementById('staff-new-subject-subject');
   if (subjectSelect) subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
-    (state.setup.subjects || []).filter(subject => (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
+    (state.setup.subjects || []).filter(subject => !isClassTeacherManagedSubject(subject.name) && (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
       `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
     ).join('');
 }
@@ -5661,7 +5681,7 @@ function populateSubjectAssignmentForm() {
     ).join('');
   if ([...teacherSelect.options].some(option => option.value === selectedTeacher)) teacherSelect.value = selectedTeacher;
   subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
-    (state.setup.subjects || []).filter(subject => (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
+    (state.setup.subjects || []).filter(subject => !isClassTeacherManagedSubject(subject.name) && (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
       `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
     ).join('');
 }
@@ -5727,7 +5747,7 @@ function renderSubjectTeachersTable() {
   const tbody = document.getElementById('subject-teachers-tbody');
   if (!tbody) return;
   const search = (document.getElementById('st-search')?.value || '').toLowerCase();
-  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' &&
+  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(row.subjectName) &&
     (!search || `${row.teacherName} ${row.teacherId} ${row.subjectName} ${row.classLabel}`.toLowerCase().includes(search)));
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No Subject Teachers assigned yet. Use the Assign Teacher tab to assign a subject across levels.</td></tr>';

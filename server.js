@@ -1832,6 +1832,7 @@ function studentRowsForClass(classCode) {
 
 function teacherContexts(teacherId) {
   const academic = activeAcademic();
+  const teacher = one('SELECT teacher_type AS teacherType FROM users WHERE id = ? AND role = ?', teacherId, 'teacher');
   const rows = all(
     `SELECT
        ta.id,
@@ -1848,7 +1849,8 @@ function teacherContexts(teacherId) {
      ORDER BY c.code, s.name`,
     teacherId
   );
-  return rows.map(row => ({
+  return rows.filter(row => teacher && row.teacherType === teacher.teacherType &&
+    (row.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(row.subjectId))).map(row => ({
     ...row,
     academicId: academic.id,
     sessionLabel: academic.sessionLabel,
@@ -1858,28 +1860,47 @@ function teacherContexts(teacherId) {
   }));
 }
 
-const CLASS_TEACHER_CORE_SUBJECT_ALIASES = [
-  ['maths', 'math', 'mathematics'],
-  ['english'],
-  ['quantitative analysis'],
-  ['verbal aptitude'],
+const CLASS_TEACHER_CORE_SUBJECT_RULES = [
+  { label: 'English Language', aliases: ['eng lang', 'english lang', 'english language', 'english'] },
+  { label: 'Maths', aliases: ['maths', 'math', 'mathematics'] },
+  { label: 'Social Studies', aliases: ['social studies', 'social study'] },
+  { label: 'Vocational Aptitude', aliases: ['vocational aptitude', 'vocational apt'], minYear: 2, maxYear: 6 },
+  { label: 'Health Education', aliases: ['health education', 'health ed'], onlyYear: 1 },
+  { label: 'Verbal Reasoning', aliases: ['verbal reasoning'] },
+  { label: 'Bible Knowledge', aliases: ['bible knowledge'] },
+  { label: 'Creative Writing', aliases: ['creative writing'] },
 ];
 
 function normalizedSubjectName(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return String(value || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function isClassTeacherCoreSubject(subjectId) {
   const subject = one('SELECT name FROM subjects WHERE id = ?', Number(subjectId));
   if (!subject) return false;
   const name = normalizedSubjectName(subject.name);
-  return CLASS_TEACHER_CORE_SUBJECT_ALIASES.some(aliases => aliases.includes(name));
+  return CLASS_TEACHER_CORE_SUBJECT_RULES.some(rule => rule.aliases.includes(name));
+}
+
+function classYearNumber(classCode) {
+  const cls = one('SELECT code, label FROM classes WHERE code = ?', classCode);
+  if (!cls) return null;
+  const match = String(cls.label).match(/\b(?:year|yr)\s*([1-6])\b/i) || String(cls.code).match(/^Y([1-6])$/i);
+  return match ? Number(match[1]) : null;
+}
+
+function classTeacherSubjectRules(classCode) {
+  const year = classYearNumber(classCode);
+  return CLASS_TEACHER_CORE_SUBJECT_RULES.filter(rule =>
+    (rule.onlyYear == null || rule.onlyYear === year) &&
+    (rule.minYear == null || (year != null && year >= rule.minYear && year <= rule.maxYear))
+  );
 }
 
 function classTeacherCoreSubjectIds(classCode) {
   const subjects = all('SELECT id, name FROM subjects');
-  return CLASS_TEACHER_CORE_SUBJECT_ALIASES.map(aliases => subjects.find(subject =>
-    aliases.includes(normalizedSubjectName(subject.name)) && one(
+  return classTeacherSubjectRules(classCode).map(rule => subjects.find(subject =>
+    rule.aliases.includes(normalizedSubjectName(subject.name)) && one(
       'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
       classCode,
       subject.id
@@ -1893,16 +1914,19 @@ function assignClassTeacherToClass(teacherId, classCode) {
   if (!teacher || teacher.teacherType !== 'class_teacher') return { error: 'Choose a registered Class Teacher' };
   if (!cls) return { error: 'Choose a valid class' };
   const coreSubjects = classTeacherCoreSubjectIds(classCode);
-  if (coreSubjects.length !== CLASS_TEACHER_CORE_SUBJECT_ALIASES.length) {
-    return { error: 'Add Maths, English, Quantitative Analysis, and Verbal Aptitude to this class before assigning its Class Teacher' };
+  const expectedRules = classTeacherSubjectRules(classCode);
+  if (coreSubjects.length !== expectedRules.length) {
+    const subjects = all('SELECT id, name FROM subjects');
+    const missing = expectedRules.filter(rule => {
+      const subject = subjects.find(item => rule.aliases.includes(normalizedSubjectName(item.name)));
+      return !subject || !one(
+        'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
+        classCode,
+        subject.id
+      );
+    }).map(rule => rule.label);
+    return { error: 'Add the Class Teacher subjects to this class before assigning its Class Teacher' + (missing.length ? ': ' + missing.join(', ') : '') };
   }
-  const subjectConflict = coreSubjects.find(subject => one(
-    "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1",
-    classCode,
-    subject.id
-  ));
-  if (subjectConflict) return { error: 'A core Class Teacher subject is already assigned to a Subject Teacher for this class' };
-
   db.exec('BEGIN IMMEDIATE');
   try {
     coreSubjects.forEach(subject => {
@@ -1973,7 +1997,7 @@ function assignSubjectTeacherAcrossClasses(teacherId, subjectId) {
 }
 
 function assignmentForTeacher(contextId, teacherId) {
-  return one(
+  const assignment = one(
     `SELECT ta.*, s.name AS subjectName, c.label AS classLabel
      FROM teacher_assignments ta
      JOIN subjects s ON s.id = ta.subject_id
@@ -1982,6 +2006,10 @@ function assignmentForTeacher(contextId, teacherId) {
     Number(contextId),
     teacherId
   );
+  const teacher = one('SELECT teacher_type AS teacherType FROM users WHERE id = ? AND role = ?', teacherId, 'teacher');
+  if (!assignment || !teacher || assignment.teacher_type !== teacher.teacherType) return null;
+  if (teacher.teacherType === 'subject_teacher' && isClassTeacherCoreSubject(assignment.subject_id)) return null;
+  return assignment;
 }
 
 function formatSavedAt(iso) {
@@ -4812,22 +4840,27 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
     const rows = all(
-      `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel, ta.subject_id AS subjectId, s.name AS subjectName
+      `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel, ta.subject_id AS subjectId, s.name AS subjectName,
+                      ta.teacher_type AS teacherType
        FROM teacher_assignments ta
        JOIN classes c ON c.code = ta.class_code
        JOIN subjects s ON s.id = ta.subject_id
        WHERE ta.teacher_id = ?
        ORDER BY c.label, s.name`,
       user.id
-    );
+    ).filter(row => row.teacherType === user.teacherType &&
+      (row.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(row.subjectId)));
     return sendJson(res, 200, { context: rows });
   }
 
   function teacherOwnsCbtContext(teacherId, classCode, subjectId) {
-    return !!one(
-      'SELECT id FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ? LIMIT 1',
+    const teacher = one('SELECT teacher_type AS teacherType FROM users WHERE id = ? AND role = ?', teacherId, 'teacher');
+    const assignment = one(
+      'SELECT id, teacher_type AS teacherType FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ? LIMIT 1',
       teacherId, classCode, subjectId
     );
+    return !!teacher && !!assignment && teacher.teacherType === assignment.teacherType &&
+      (teacher.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(subjectId));
   }
 
   if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/gradebook') {
@@ -5063,9 +5096,10 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
     const id = Number(teacherCbtQuestionMatch[1]);
-    const existing = one('SELECT created_by AS createdBy FROM cbt_questions WHERE id = ?', id);
+    const existing = one('SELECT created_by AS createdBy, class_code AS classCode, subject_id AS subjectId FROM cbt_questions WHERE id = ?', id);
     if (!existing) return sendJson(res, 404, { error: 'Question not found' });
     if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only edit questions you added yourself' });
+    if (!teacherOwnsCbtContext(user.id, existing.classCode, existing.subjectId)) return sendJson(res, 403, { error: 'You are no longer assigned to this class and subject' });
     const body = await readJson(req);
     const questionText = cleanText(body.questionText);
     const marks = Number(body.marks) || 1;
@@ -5085,9 +5119,10 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
     const id = Number(teacherCbtQuestionMatch[1]);
-    const existing = one('SELECT created_by AS createdBy FROM cbt_questions WHERE id = ?', id);
+    const existing = one('SELECT created_by AS createdBy, class_code AS classCode, subject_id AS subjectId FROM cbt_questions WHERE id = ?', id);
     if (!existing) return sendJson(res, 404, { error: 'Question not found' });
     if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only delete questions you added yourself' });
+    if (!teacherOwnsCbtContext(user.id, existing.classCode, existing.subjectId)) return sendJson(res, 403, { error: 'You are no longer assigned to this class and subject' });
     run('DELETE FROM cbt_questions WHERE id = ?', id);
     return sendJson(res, 200, { ok: true });
   }
