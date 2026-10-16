@@ -6489,6 +6489,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         <div class="card" style="margin-bottom:14px;">
           <div class="card-head" style="gap:0;padding:0;flex-wrap:wrap;">
             <button type="button" class="academics-subtab active" data-view="classSubjects" onclick="switchSubjectsView('classSubjects', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid var(--blue,#2563eb);color:var(--blue,#2563eb);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg> Class Subjects</button>
+            <button type="button" class="academics-subtab" data-view="assignSubjectTeacher" onclick="switchSubjectsView('assignSubjectTeacher', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3"/><path d="M1.5 14.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/><path d="M12 2v4M10 4h4"/></svg> Assign Teacher</button>
             <button type="button" class="academics-subtab" data-view="subjectTeachers" onclick="switchSubjectsView('subjectTeachers', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3"/><path d="M1.5 14.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/></svg> Subject Teachers</button>
             <button type="button" class="academics-subtab" data-view="subjectBank" onclick="switchSubjectsView('subjectBank', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="5" height="5" rx="0.8"/><rect x="9.5" y="1.5" width="5" height="5" rx="0.8"/><rect x="1.5" y="9.5" width="5" height="5" rx="0.8"/><rect x="9.5" y="9.5" width="5" height="5" rx="0.8"/></svg> Subject Bank</button>
             <button type="button" class="academics-subtab" data-view="subjectTypes" onclick="switchSubjectsView('subjectTypes', this)" style="flex:1;min-width:150px;padding:14px 16px;background:none;border:0;border-bottom:2px solid transparent;color:var(--text-2);font-weight:700;font-size:13px;cursor:pointer;text-align:left;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="1.5" width="5" height="5" rx="0.8"/><rect x="9.5" y="1.5" width="5" height="5" rx="0.8"/><rect x="1.5" y="9.5" width="5" height="5" rx="0.8"/><rect x="9.5" y="9.5" width="5" height="5" rx="0.8"/></svg> Subject Types</button>
@@ -6518,7 +6519,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               </div>
               <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
                 <button class="post-btn" onclick="openClassSubjectModal()">+ Add Subject</button>
-                <button class="post-btn" onclick="switchSubjectsView('subjectTeachers', document.querySelector('.academics-subtab[data-view=subjectTeachers]'))">Manage / Assign Subject Teachers</button>
+                <button class="post-btn" onclick="switchSubjectsView('assignSubjectTeacher', document.querySelector('.academics-subtab[data-view=assignSubjectTeacher]'))">Assign Teacher to Subject</button>
               </div>
               <input class="search-input" id="cs-search" placeholder="Search subjects..." oninput="renderClassSubjectsTable()" style="margin-bottom:10px;width:260px;">
               <div style="overflow-x:auto;">
@@ -6526,6 +6527,23 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
                   <thead><tr><th>#</th><th>Subject Name</th><th>Subject Code</th><th>Class</th><th>Class Arm</th><th>Term</th><th>Pass / Full Mark</th><th>Attributes</th><th>Teacher in Charge</th><th>Assisting Teacher(s)</th><th>Action</th></tr></thead>
                   <tbody id="class-subjects-tbody"></tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="subjects-view-assignSubjectTeacher" style="display:none;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Assign a Teacher to a Subject</span></div>
+            <div class="card-body">
+              <p style="margin:0 0 16px;color:var(--text-2);font-size:13px;">Choose a class subject, a teacher, and whether they are the teacher in charge or an assisting teacher.</p>
+              <div style="display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:14px;margin-bottom:16px;">
+                <div><label class="field-label" for="st-assign-class">Class</label><select class="ctrl-select" id="st-assign-class" onchange="populateSubjectAssignmentOptions()"><option value="">Select class...</option></select></div>
+                <div><label class="field-label" for="st-assign-class-subject">Subject</label><select class="ctrl-select" id="st-assign-class-subject"><option value="">Select a class first</option></select></div>
+                <div><label class="field-label" for="st-assign-teacher">Teacher</label><select class="ctrl-select" id="st-assign-teacher"><option value="">Select teacher...</option></select></div>
+                <div><label class="field-label" for="st-assign-role">Assignment</label><select class="ctrl-select" id="st-assign-role"><option value="teacherInCharge">Teacher in Charge</option><option value="assisting">Assisting Teacher</option></select></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;">
+                <button type="button" class="post-btn" onclick="saveSubjectTeacherAssignment()">Assign Teacher</button>
               </div>
             </div>
           </div>

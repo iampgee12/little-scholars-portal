@@ -5340,11 +5340,12 @@ function switchSubjectsView(view, trigger) {
     btn.style.color = active ? 'var(--blue,#2563eb)' : 'var(--text-2)';
     btn.style.borderBottomColor = active ? 'var(--blue,#2563eb)' : 'transparent';
   });
-  ['classSubjects', 'subjectTeachers', 'subjectBank', 'subjectTypes'].forEach(name => {
+  ['classSubjects', 'assignSubjectTeacher', 'subjectTeachers', 'subjectBank', 'subjectTypes'].forEach(name => {
     const el = document.getElementById(`subjects-view-${name}`);
     if (el) el.style.display = name === view ? '' : 'none';
   });
   if (view === 'subjectTeachers') renderSubjectTeachersTable();
+  if (view === 'assignSubjectTeacher') populateSubjectAssignmentForm();
   if (view === 'subjectBank') renderSubjectBankTable();
   if (view === 'subjectTypes') renderSubjectTypesTable();
   if (view === 'classSubjects') renderClassSubjectsTable();
@@ -5655,6 +5656,8 @@ function populateSubjects() {
   const subjectTypes = state.setup.subjectTypes || [];
   const teachers = state.setup.teachers || [];
 
+  populateSubjectAssignmentForm();
+
   const csFilterClass = document.getElementById('cs-filter-class');
   if (csFilterClass) {
     const previous = csFilterClass.value;
@@ -5694,6 +5697,89 @@ function populateSubjects() {
   renderSubjectTeachersTable();
   renderSubjectBankTable();
   renderSubjectTypesTable();
+}
+
+function populateSubjectAssignmentForm() {
+  const classSelect = document.getElementById('st-assign-class');
+  const subjectSelect = document.getElementById('st-assign-class-subject');
+  const teacherSelect = document.getElementById('st-assign-teacher');
+  if (!classSelect || !subjectSelect || !teacherSelect || !state.setup) return;
+  const selectedClass = classSelect.value;
+  const selectedClassSubject = subjectSelect.value;
+  const selectedTeacher = teacherSelect.value;
+  classSelect.innerHTML = '<option value="">Select class...</option>' +
+    (state.setup.classes || []).filter(cls => !cls.archived).map(cls =>
+      `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`
+    ).join('');
+  if ([...classSelect.options].some(option => option.value === selectedClass)) classSelect.value = selectedClass;
+  teacherSelect.innerHTML = '<option value="">Select teacher...</option>' +
+    (state.setup.teachers || []).map(teacher =>
+      `<option value="${escapeHtml(teacher.id)}">${escapeHtml(teacher.name)} (${escapeHtml(teacher.id)})</option>`
+    ).join('');
+  if ([...teacherSelect.options].some(option => option.value === selectedTeacher)) teacherSelect.value = selectedTeacher;
+  populateSubjectAssignmentOptions(selectedClassSubject);
+}
+
+function populateSubjectAssignmentOptions(preferredId = '') {
+  const classCode = document.getElementById('st-assign-class')?.value || '';
+  const subjectSelect = document.getElementById('st-assign-class-subject');
+  if (!subjectSelect) return;
+  if (!classCode) {
+    subjectSelect.innerHTML = '<option value="">Select a class first</option>';
+    return;
+  }
+  const classSubjects = (state.setup.classSubjects || []).filter(row => row.classCode === classCode);
+  subjectSelect.innerHTML = classSubjects.length
+    ? '<option value="">Select subject...</option>' + classSubjects.map(row => {
+      const details = [row.classArmName || 'All arms', row.term].filter(Boolean).join(' · ');
+      return `<option value="${row.id}">${escapeHtml(row.subjectName)}${details ? ` — ${escapeHtml(details)}` : ''}</option>`;
+    }).join('')
+    : '<option value="">No subjects assigned to this class yet</option>';
+  if (preferredId && [...subjectSelect.options].some(option => option.value === String(preferredId))) {
+    subjectSelect.value = String(preferredId);
+  }
+}
+
+async function saveSubjectTeacherAssignment() {
+  const classSubjectId = Number(document.getElementById('st-assign-class-subject')?.value || 0);
+  const teacherId = document.getElementById('st-assign-teacher')?.value || '';
+  const role = document.getElementById('st-assign-role')?.value || 'teacherInCharge';
+  const classSubject = (state.setup.classSubjects || []).find(row => Number(row.id) === classSubjectId);
+  if (!classSubject || !teacherId) return showToast('Choose a class subject and teacher');
+
+  const assistingTeacherIds = String(classSubject.assistingTeacherIds || '').split(',').map(id => id.trim()).filter(Boolean);
+  const payload = {
+    classArmId: classSubject.classArmId || null,
+    term: classSubject.term || '',
+    passMark: classSubject.passMark,
+    fullMark: classSubject.fullMark,
+    attributes: classSubject.attributes || '',
+    teacherInChargeId: classSubject.teacherInChargeId || '',
+    assistingTeacherIds,
+  };
+  if (role === 'teacherInCharge') {
+    payload.teacherInChargeId = teacherId;
+    payload.assistingTeacherIds = assistingTeacherIds.filter(id => id !== teacherId);
+  } else {
+    if (payload.teacherInChargeId === teacherId || assistingTeacherIds.includes(teacherId)) {
+      return showToast('This teacher is already assigned to the subject');
+    }
+    payload.assistingTeacherIds.push(teacherId);
+  }
+
+  try {
+    const data = await apiFetch(`/api/admin/class-subjects/${classSubjectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    state.setup = data.setup;
+    populateSubjects();
+    renderClassSubjectsTable();
+    renderSubjectTeachersTable();
+    showToast(`${role === 'teacherInCharge' ? 'Teacher in charge' : 'Assisting teacher'} assigned`);
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function renderClassSubjectsTable() {
