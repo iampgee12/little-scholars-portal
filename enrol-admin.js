@@ -888,14 +888,14 @@ async function sregSettings(body) {
       <div class="sr-set-row"><span>Enable Student Self-Registration</span>${toggle('srs-student', s.student.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('student')">Configure Form Fields</button></div>
       <div class="sr-set-row"><span>Enable Parent Self-Registration</span>${toggle('srs-parent', s.parent.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('parent')">Configure Form Fields</button></div>
       ${codeRow('Access Code (Student &amp; Parent)', 'Share this code — and only this code — with students and parents', s.codes.studentParent, 'studentParent',
-        ['Shareable Link (Student &amp; Parent)', 'Share with students and parents — they pick their registration type on the registration page', `${origin}/register.html`])}
+        ['Shareable Link (Student &amp; Parent)', 'Share with students and parents — they pick their registration type on the registration page', `${origin}/register`])}
     </div></div>
     <div class="card"><div class="card-head"><span class="card-title">Staff Registration</span></div><div class="card-body">
       <div class="sr-set-row"><span>Enable Staff Self-Registration</span>${toggle('srs-staff', s.staff.enabled)}<button class="btn-outline btn-sm" onclick="sregFieldsModal('staff')">Configure Form Fields</button></div>
       <div class="field-label" style="margin-top:12px;">Staff Types Allowed for Self-Registration</div><div class="en-hint">Select which staff types can self-register</div>
       <div class="sr-types">${staffTypes.map(([k, l]) => `<label class="en-check"><input type="checkbox" class="srs-type" value="${k}"${s.staff.types.includes(k) ? ' checked' : ''}> ${enrolEsc(l)}</label>`).join('')}</div>
       ${codeRow('Access Code (Staff Only)', 'Share this separately — only with staff. Never share with students or parents.', s.codes.staff, 'staff',
-        ['Shareable Link (Staff Only)', 'Share exclusively with staff — this link leads to the staff registration form only', `${origin}/register.html?for=staff`])}
+        ['Shareable Link (Staff Only)', 'Share exclusively with staff — this link leads to the staff registration form only', `${origin}/register?for=staff`])}
     </div></div>
     <div class="sr-notice"><strong>Important Security Notice</strong>
       <p>Enabling self-registration carries <strong>verification risks</strong>. Anyone with the link can submit a registration, including people who are not part of your school.</p>

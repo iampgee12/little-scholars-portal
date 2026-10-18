@@ -1,7 +1,7 @@
 const PORTALS = {
-  student: 'student-portal.html',
-  teacher: 'teacher-portal.html',
-  admin:   'admin-portal.html',
+  student: '/student',
+  teacher: '/teacher',
+  admin:   '/admin',
 };
 
 const ROLE_META = {

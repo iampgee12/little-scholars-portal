@@ -71,7 +71,7 @@ async function apiFetch(url, options = {}) {
     ...options,
   });
   if (res.status === 401) {
-    window.location.replace('index.html');
+    window.location.replace('/signin');
     throw new Error('Authentication required');
   }
   const data = await res.json().catch(() => ({}));
@@ -372,7 +372,7 @@ function previewBroadsheetResults() {
   const examType = document.getElementById('bs-exam-sel')?.value;
   if (!classCode || !examType) return showToast('Select a class and exam first');
   const params = new URLSearchParams({ rsClass: classCode, rsExam: examType });
-  window.open(`teacher-portal.html?${params}#classSheets`, '_blank', 'noopener');
+  window.open(`/teacher?${params}#classSheets`, '_blank', 'noopener');
 }
 
 function bootstrapClassSheetsLink() {
@@ -560,7 +560,7 @@ async function init() {
   try {
     const session = await apiFetch('/api/session');
     if (session.user.role !== 'teacher') {
-      window.location.replace('index.html');
+      window.location.replace('/signin');
       return;
     }
     state.user = session.user;
@@ -1976,7 +1976,7 @@ async function signOut() {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
-  window.location.href = 'index.html';
+  window.location.href = '/signin';
 }
 
 // ── MY CBT QUESTIONS ──

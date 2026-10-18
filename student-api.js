@@ -5,7 +5,7 @@ async function apiFetch(url, options = {}) {
     ...options,
   });
   if (res.status === 401) {
-    window.location.replace('index.html');
+    window.location.replace('/signin');
     throw new Error('Authentication required');
   }
   const data = await res.json().catch(() => ({}));
@@ -247,7 +247,7 @@ async function loadAllResults() {
 async function init() {
   const session = await apiFetch('/api/session');
   if (session.user.role !== 'student') {
-    window.location.replace('index.html');
+    window.location.replace('/signin');
     return;
   }
   const acct = session.user;
@@ -327,7 +327,7 @@ async function signOut() {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
-  window.location.href = 'index.html';
+  window.location.href = '/signin';
 }
 
 // ── SIDEBAR TOGGLE (desktop collapse + mobile drawer) ──

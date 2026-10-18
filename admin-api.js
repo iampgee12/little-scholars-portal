@@ -76,7 +76,7 @@ async function apiFetch(url, options = {}) {
     ...options,
   });
   if (res.status === 401) {
-    window.location.replace('index.html');
+    window.location.replace('/signin');
     throw new Error('Authentication required');
   }
   const data = await res.json().catch(() => ({}));
@@ -148,7 +148,7 @@ async function init() {
   try {
     const session = await apiFetch('/api/session');
     if (session.user.role !== 'admin') {
-      window.location.replace('index.html');
+      window.location.replace('/signin');
       return;
     }
     state.user = session.user;
@@ -3830,7 +3830,7 @@ function previewBroadsheetResults() {
     return;
   }
   const params = new URLSearchParams({ crcClass: classCode, crcExam: examType });
-  window.open(`admin-portal.html?${params.toString()}`, '_blank', 'noopener');
+  window.open(`/admin?${params.toString()}`, '_blank', 'noopener');
 }
 
 async function saveHeadComment(studentId, textareaEl) {
@@ -5334,7 +5334,7 @@ async function signOut() {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
-  window.location.href = 'index.html';
+  window.location.href = '/signin';
 }
 
 /* ── CLASSES & SUBJECTS ── */

@@ -3439,7 +3439,7 @@ async function handleApi(req, res, url) {
     const config = smtpConfigStatus();
     if (config.configured) {
       const proto = req.headers['x-forwarded-proto'] || 'https';
-      const link = `${proto}://${req.headers.host}/reset-password.html?token=${token}`;
+      const link = `${proto}://${req.headers.host}/reset-password?token=${token}`;
       const message = [
         `From: ${config.from}`,
         `To: ${user.email}`,
@@ -9296,15 +9296,40 @@ function adminSetupPayload() {
   return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
+// Clean page addresses (/signin, /admin …) and the files behind them.
+const PAGE_ROUTES = {
+  '/signin': '/index.html',
+  '/admin': '/admin-portal.html',
+  '/teacher': '/teacher-portal.html',
+  '/student': '/student-portal.html',
+  '/cbt': '/student-cbt.html',
+  '/register': '/register.html',
+  '/reset-password': '/reset-password.html',
+};
+// Old addresses (bookmarks, emailed links) → their clean address
+const PAGE_REDIRECTS = Object.fromEntries(Object.entries(PAGE_ROUTES).map(([route, file]) => [file, route]));
+
+function redirectTo(res, location) {
+  res.writeHead(302, { Location: location });
+  res.end();
+}
+
 function serveStatic(req, res, url) {
   let pathname;
   try {
-    pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+    pathname = decodeURIComponent(url.pathname);
   } catch {
     res.writeHead(400);
     res.end('Bad request');
     return;
   }
+  // The browser keeps any #fragment across these redirects by itself.
+  if (pathname === '/') return redirectTo(res, '/signin' + url.search);
+  const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  if (PAGE_REDIRECTS[trimmed]) return redirectTo(res, PAGE_REDIRECTS[trimmed] + url.search);
+  // "/admin/" would make the page's relative script links point inside /admin/
+  if (trimmed !== pathname && PAGE_ROUTES[trimmed]) return redirectTo(res, trimmed + url.search);
+  if (PAGE_ROUTES[pathname]) pathname = PAGE_ROUTES[pathname];
   // Uploaded images live in UPLOAD_DIR, which on Fly is the /data volume
   // rather than the app folder.
   if (pathname.startsWith('/uploads/')) {

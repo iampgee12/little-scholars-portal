@@ -12,7 +12,7 @@ async function apiFetch(url, options = {}) {
     throw err;
   }
   if (res.status === 401) {
-    window.location.replace('index.html');
+    window.location.replace('/signin');
     throw new Error('Authentication required');
   }
   const data = await res.json().catch(() => ({}));
@@ -65,7 +65,7 @@ async function init() {
   try {
     const session = await apiFetch('/api/session');
     if (session.user.role !== 'student') {
-      window.location.replace('index.html');
+      window.location.replace('/signin');
       return;
     }
     document.getElementById('cbt-student-name').textContent = session.user.name;
@@ -500,7 +500,7 @@ function showListView() {
 async function signOut() {
   if (currentExam && !await uiConfirm('You are in the middle of an exam. Your answers are saved, but the timer keeps running. Sign out anyway?')) return;
   try { await apiFetch('/api/logout', { method: 'POST' }); } catch { /* ignore */ }
-  window.location.replace('index.html');
+  window.location.replace('/signin');
 }
 
 // ── Keyboard: A–E / 1–5 answer, ← → move, F flag ──

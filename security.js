@@ -323,7 +323,7 @@ module.exports = function createSecurity(ctx) {
   function finishLogin(req, user, publicUser, extraCookies = []) {
     const s = createSession(req, user);
     audit(req, user, 'Signed in');
-    return { status: 200, body: { user: publicUser(user), portal: `${user.role}-portal.html` }, headers: { 'Set-Cookie': [s.cookie, ...extraCookies] } };
+    return { status: 200, body: { user: publicUser(user), portal: `/${user.role}` }, headers: { 'Set-Cookie': [s.cookie, ...extraCookies] } };
   }
 
   function pendingEntry(body) {
