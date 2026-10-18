@@ -2031,9 +2031,16 @@ function clearStaffForm() {
     type.value = 'class_teacher';
     type.disabled = false;
   }
-  if (title) title.textContent = 'Add Staff';
+  if (title) title.textContent = 'Add Staff / Employee';
   if (save) save.textContent = 'Add Staff';
   syncStaffRoleFields();
+}
+
+// People → Add Staff: a fresh, empty form on its own page
+function openAddStaff() {
+  clearStaffForm();
+  switchTab('addStaff', visibleNavItem('addStaff'));
+  document.getElementById('new-staff-id')?.focus({ preventScroll: true });
 }
 
 function editStaff(id) {
@@ -2052,7 +2059,7 @@ function editStaff(id) {
   document.getElementById('staff-form-title').textContent = `Edit Staff / Employee — ${staff.name || staff.id}`;
   document.getElementById('staff-save-label').textContent = 'Save Changes';
   closeStaffProfile();
-  document.getElementById('staff-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  switchTab('addStaff', visibleNavItem('addStaff'), 'Edit Staff', staff.name || staff.id);
   document.getElementById('new-staff-name')?.focus({ preventScroll: true });
 }
 
@@ -2320,9 +2327,11 @@ async function saveStaff() {
     populateStaff();
     populateAdminControls();
     renderAssignments();
-    const action = state.editingStaffId ? 'updated' : 'added';
+    const wasEditing = !!state.editingStaffId;
     clearStaffForm();
-    showToast(`Staff account ${action}`);
+    // after an edit, go back to the staff list; after adding, stay ready for the next one
+    if (wasEditing) switchTab('staff', visibleNavItem('staff'));
+    showToast(`Staff account ${wasEditing ? 'updated' : 'added'}`);
   } catch (err) {
     showToast(err.message);
   }
@@ -2374,6 +2383,7 @@ const TAB_META = {
   admissions: { title: 'Admission', sub: 'Applications Summary' },
   students: { title: 'View Students', sub: 'Students Information System' },
   staff: { title: 'People', sub: 'Teachers and Staff' },
+  addStaff: { title: 'Add Staff', sub: 'Add a Staff / Employee' },
   parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
