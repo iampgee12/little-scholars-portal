@@ -242,8 +242,16 @@
     }
 
     // Browsers may autofill a saved login ID (e.g. "TCH-097") into the box.
-    // A person can only type into it while it has focus, so anything that
-    // arrives without focus is autofill and is wiped.
+    // They never fill a read-only field, so the box stays read-only (it is
+    // marked so in the HTML) until a person clicks, taps or tabs into it.
+    const unlock = () => input.removeAttribute('readonly');
+    input.addEventListener('pointerdown', unlock);
+    input.addEventListener('touchstart', unlock, { passive: true });
+    input.addEventListener('focus', unlock);
+    input.addEventListener('blur', () => input.setAttribute('readonly', ''));
+
+    // Backstop: a person can only type into it while it has focus, so
+    // anything that arrives without focus is autofill and is wiped.
     function clearAutofill() {
       if (document.activeElement !== input && input.value) { input.value = ''; close(); }
     }
