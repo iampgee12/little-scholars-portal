@@ -104,9 +104,17 @@ function gradeClass(avg) {
   return 'gp-d';
 }
 
-function showToast(msg) {
+function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
+  const text = String(msg || '');
+  const inferredError = /\b(error|failed|failure|invalid|required|choose|select|enter|please|must|cannot|can't|not found|already exists|already assigned|before assigning|missing|unavailable|unable|denied|blocked|expired|nothing to|no .* found|not enough|only .* can)\b/i.test(text);
+  const inferredSuccess = /\b(saved|added|assigned|deleted|removed|created|updated|published|sent|verified|moved|reinstated|accepted|deactivated|reactivated|posted|uploaded|restored|completed|successful|marked|cleared|enabled|disabled|recorded|generated|copied|approved|rejected|received|changed)\b/i.test(text);
+  const status = type === 'warn' ? 'error' : type || (inferredError && !(inferredSuccess && /already verified/i.test(text)) ? 'error' : inferredSuccess ? 'success' : 'error');
+  t.classList.toggle('toast-error', status === 'error');
+  t.classList.toggle('toast-success', status === 'success');
+  t.classList.toggle('toast-info', status === 'info');
+  t.setAttribute('role', status === 'error' ? 'alert' : 'status');
   t.style.display = 'block';
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => t.style.display = 'none', 3000);
@@ -1762,6 +1770,12 @@ function renderEmailQueue() {
 }
 
 function populateAdminControls() {
+  const staffClassSelect = document.getElementById('new-staff-class');
+  if (staffClassSelect) {
+    const selected = staffClassSelect.value;
+    staffClassSelect.innerHTML = '<option value="">Select class</option>' + (state.setup.classes || []).filter(cls => !cls.archived).map(cls => `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`).join('');
+    if ((state.setup.classes || []).some(cls => cls.code === selected)) staffClassSelect.value = selected;
+  }
   const teacherSelect = document.getElementById('assign-teacher');
   const classSelect = document.getElementById('assign-class');
 
@@ -1822,9 +1836,7 @@ function renderAssignments() {
   const grouped = new Map();
   (state.setup.assignments || []).filter(assignment => assignment.teacherType === 'class_teacher').forEach(assignment => {
     const key = `${assignment.teacherId}|${assignment.classCode}`;
-    if (!grouped.has(key)) grouped.set(key, { ...assignment, coreSubjects: [] });
-    const group = grouped.get(key);
-    if (!group.coreSubjects.includes(assignment.subjectName)) group.coreSubjects.push(assignment.subjectName);
+    if (!grouped.has(key)) grouped.set(key, { ...assignment });
   });
   const assignments = [...grouped.values()];
   summary.textContent = `${state.setup.academic.sessionLabel} - ${state.setup.academic.termLabel} - ${assignments.length} class assignments`;
@@ -1832,7 +1844,6 @@ function renderAssignments() {
     <tr>
       <td><strong>${escapeHtml(assignment.teacherName)}</strong><div style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${escapeHtml(assignment.teacherId)}</div></td>
       <td style="color:var(--text-2);">${escapeHtml(assignment.classLabel)}</td>
-      <td style="color:var(--text-2);">${assignment.coreSubjects.length ? escapeHtml(assignment.coreSubjects.join(', ')) : 'Core subjects managed automatically'}</td>
       <td><button class="post-btn" style="padding:6px 10px;" onclick="editClassTeacherAssignment('${escapeHtml(assignment.classCode)}')">Change Teacher</button></td>
     </tr>`).join('');
 }
@@ -2008,18 +2019,21 @@ function clearStaffForm() {
   const id = document.getElementById('new-staff-id');
   const role = document.getElementById('new-staff-role');
   const type = document.getElementById('new-staff-teacher-type');
+  const classSelect = document.getElementById('new-staff-class');
   const title = document.getElementById('staff-form-title');
   const save = document.getElementById('staff-save-label');
   if (id) id.disabled = false;
   const password = document.getElementById('new-staff-password');
   if (password) password.placeholder = 'Temporary password';
   if (role) role.value = 'teacher';
+  if (classSelect) classSelect.value = '';
   if (type) {
     type.value = 'class_teacher';
     type.disabled = false;
   }
   if (title) title.textContent = 'Add Staff';
   if (save) save.textContent = 'Add Staff';
+  syncStaffRoleFields();
 }
 
 function editStaff(id) {
@@ -2049,6 +2063,8 @@ function syncStaffRoleFields() {
   type.disabled = role !== 'teacher';
   if (role !== 'teacher') type.value = '';
   else if (!type.value) type.value = 'class_teacher';
+  const classWrap = document.getElementById('new-staff-class-wrap');
+  if (classWrap) classWrap.style.display = role === 'teacher' && type?.value === 'class_teacher' ? '' : 'none';
 }
 
 function openStudentDeleteModal() {
@@ -2108,8 +2124,25 @@ function openStaffProfile(id) {
   if (!modal) return;
   document.getElementById('staff-profile-name').textContent = staff.name || staff.id;
   document.getElementById('staff-profile-role').textContent = staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff');
+  const deleteTeacherButton = document.getElementById('staff-delete-teacher');
+  if (deleteTeacherButton) deleteTeacherButton.style.display = staff.role === 'teacher' ? '' : 'none';
   modal.style.display = 'flex';
   renderStaffProfileTab('profile');
+}
+
+async function deleteTeacherAccount(id) {
+  const staff = (state.setup.staff || []).find(item => item.id === id);
+  if (!staff || staff.role !== 'teacher') return showToast('Only teacher accounts can be deleted');
+  if (!confirm(`Delete teacher account “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
+  try {
+    const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}`, { method: 'DELETE' });
+    state.setup = data.setup;
+    closeStaffProfile();
+    populateStaff();
+    populateAdminControls();
+    populateClasses();
+    showToast('Teacher account deleted');
+  } catch (err) { showToast(err.message); }
 }
 
 function closeStaffProfile() {
@@ -2261,6 +2294,7 @@ async function saveStaff() {
     password: document.getElementById('new-staff-password').value,
     role: document.getElementById('new-staff-role').value,
     teacherType: document.getElementById('new-staff-teacher-type').value,
+    classCode: document.getElementById('new-staff-class')?.value || '',
   };
   if (!payload.id || !payload.name || !payload.role || (!state.editingStaffId && !payload.password)) {
     showToast('Staff ID, name, role, and password are required');
@@ -2268,6 +2302,10 @@ async function saveStaff() {
   }
   if (payload.role === 'teacher' && !payload.teacherType) {
     showToast('Choose a teacher type');
+    return;
+  }
+  if (!state.editingStaffId && payload.role === 'teacher' && payload.teacherType === 'class_teacher' && !payload.classCode) {
+    showToast('Choose a class for this Class Teacher');
     return;
   }
   try {
@@ -2431,8 +2469,6 @@ function showAdminSection(section, trigger) {
     const currentItem = currentTab && menu.querySelector(`.sub-nav-item[data-tab="${currentTab}"]`);
     if (currentItem) syncSidebarForTab(currentTab, currentItem);
   }
-  const search = document.querySelector('.admin-quick-search input');
-  if (search) filterAdminSidebar(search.value);
 }
 
 function toggleDropdown(childId, chevId, btn) {
@@ -2466,13 +2502,6 @@ function toggleDropdown(childId, chevId, btn) {
     if (chev) chev.classList.add('open');
   }
   btn.classList.toggle('active', !open);
-}
-
-function filterAdminSidebar(query) {
-  const q = String(query || '').trim().toLowerCase();
-  document.querySelectorAll('.sub-nav-item').forEach(item => {
-    item.style.display = !q || item.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
 }
 
 function syncSidebarForTab(tab, trigger) {
@@ -5311,9 +5340,13 @@ function switchClassesView(view, trigger) {
     btn.style.color = active ? 'var(--blue,#2563eb)' : 'var(--text-2)';
     btn.style.borderBottomColor = active ? 'var(--blue,#2563eb)' : 'transparent';
   });
-  document.getElementById('classes-view-classes').style.display = view === 'classes' ? '' : 'none';
-  document.getElementById('classes-view-categories').style.display = view === 'categories' ? '' : 'none';
+  ['classes', 'assignClassTeacher', 'assignedClassTeachers', 'categories'].forEach(name => {
+    const panel = document.getElementById('classes-view-' + name);
+    if (panel) panel.style.display = name === view ? '' : 'none';
+  });
   if (view === 'categories') renderClassCategoriesTable();
+  if (view === 'assignClassTeacher') populateClassTeacherAssignmentForm();
+  if (view === 'assignedClassTeachers') renderClassSectionAssignments();
 }
 
 function switchSubjectsView(view, trigger) {
@@ -5383,11 +5416,63 @@ function populateClasses() {
       (state.setup.teachers || []).filter(t => t.teacherType === 'class_teacher').map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
   }
 
+  populateClassTeacherAssignmentForm();
+  renderClassSectionAssignments();
   renderClassesTable();
   renderClassArmsTable();
   renderClassCategoriesTable();
 }
 
+function populateClassTeacherAssignmentForm() {
+  const teacherSelect = document.getElementById('class-assign-teacher');
+  const classSelect = document.getElementById('class-assign-class');
+  if (teacherSelect) {
+    const selected = teacherSelect.value;
+    const assigned = new Set((state.setup.assignments || []).filter(a => a.teacherType === 'class_teacher').map(a => a.teacherId));
+    const teachers = (state.setup.teachers || []).filter(t => t.teacherType === 'class_teacher');
+    teachers.sort((a, b) => Number(assigned.has(a.id)) - Number(assigned.has(b.id)) || a.name.localeCompare(b.name));
+    teacherSelect.innerHTML = '<option value="">Select teacher...</option>' + teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}${assigned.has(t.id) ? ' (already assigned)' : ''}</option>`).join('');
+    if (teachers.some(t => t.id === selected)) teacherSelect.value = selected;
+  }
+  if (classSelect) {
+    const selected = classSelect.value;
+    classSelect.innerHTML = '<option value="">Select class...</option>' + (state.setup.classes || []).filter(c => !c.archived).map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
+    if ((state.setup.classes || []).some(c => c.code === selected)) classSelect.value = selected;
+  }
+}
+function renderClassSectionAssignments() {
+  const tbody = document.getElementById('class-assigned-teachers-tbody');
+  if (!tbody) return;
+  const grouped = new Map();
+  (state.setup.assignments || []).filter(a => a.teacherType === 'class_teacher').forEach(a => {
+    if (!grouped.has(a.classCode)) grouped.set(a.classCode, { ...a });
+  });
+  const rows = [...grouped.values()].sort((a, b) => (a.classLabel || a.classCode).localeCompare(b.classLabel || b.classCode));
+  const summary = document.getElementById('class-assignment-summary');
+  if (summary) summary.textContent = `${rows.length} class${rows.length === 1 ? '' : 'es'} assigned`;
+  tbody.innerHTML = rows.length ? rows.map((a, i) => `<tr><td>${i + 1}</td><td><strong>${escapeHtml(a.classLabel || a.classCode)}</strong></td><td>${escapeHtml(a.teacherName)}<div style="font-size:10px;color:var(--text-3);">${escapeHtml(a.teacherId)}</div></td><td><button class="post-btn" style="padding:6px 10px;" onclick="editClassSectionAssignment('${escapeHtml(a.classCode)}')">Change Teacher</button></td></tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No class teachers assigned yet.</td></tr>';
+}
+function editClassSectionAssignment(classCode) {
+  switchClassesView('assignClassTeacher', document.querySelector('#tab-classes .academics-subtab[data-view="assignClassTeacher"]'));
+  const classSelect = document.getElementById('class-assign-class');
+  if (classSelect) classSelect.value = classCode;
+  document.getElementById('class-assign-teacher')?.focus();
+}
+async function saveClassSectionAssignment() {
+  const teacherId = document.getElementById('class-assign-teacher')?.value || '';
+  const classCode = document.getElementById('class-assign-class')?.value || '';
+  if (!teacherId || !classCode) return showToast('Choose a class teacher and class');
+  try {
+    const data = await apiFetch('/api/admin/class-teacher-assignments', { method: 'POST', body: JSON.stringify({ teacherId, classCode }) });
+    state.setup = data.setup;
+    populateStaff();
+    populateAdminControls();
+    populateClasses();
+    document.getElementById('class-assign-teacher').value = '';
+    document.getElementById('class-assign-class').value = '';
+    showToast('Class teacher assigned');
+  } catch (err) { showToast(err.message); }
+}
 function renderClassesTable() {
   const tbody = document.getElementById('classes-tbody');
   if (!tbody) return;

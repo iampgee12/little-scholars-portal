@@ -108,9 +108,17 @@ function gradeClass(avg) {
   return 'gp-d';
 }
 
-function showToast(msg) {
+function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
+  const text = String(msg || '');
+  const inferredError = /\b(error|failed|failure|invalid|required|choose|select|enter|please|must|cannot|can't|not found|already exists|already assigned|before assigning|missing|unavailable|unable|denied|blocked|expired|nothing to|no .* found|not enough|only .* can)\b/i.test(text);
+  const inferredSuccess = /\b(saved|added|assigned|deleted|removed|created|updated|published|sent|verified|moved|reinstated|accepted|deactivated|reactivated|posted|uploaded|restored|completed|successful|marked|cleared|enabled|disabled|recorded|generated|copied|approved|rejected|received|changed)\b/i.test(text);
+  const status = type === 'warn' ? 'error' : type || (inferredError && !(inferredSuccess && /already verified/i.test(text)) ? 'error' : inferredSuccess ? 'success' : 'error');
+  t.classList.toggle('toast-error', status === 'error');
+  t.classList.toggle('toast-success', status === 'success');
+  t.classList.toggle('toast-info', status === 'info');
+  t.setAttribute('role', status === 'error' ? 'alert' : 'status');
   t.style.display = 'block';
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => { t.style.display = 'none'; }, 3000);
@@ -2073,15 +2081,21 @@ async function cbtqInit() {
     const sel = document.getElementById('cbtq-context');
     if (!_cbtqContext.length) {
       sel.innerHTML = '<option value="">No classes/subjects assigned to you yet</option>';
+      document.getElementById('cbtq-assignment-summary').textContent = 'No class and subject assignments are available for your teacher account.';
       document.getElementById('cbtq-list').innerHTML = '<div style="padding:20px;color:var(--text-3);">You have no class/subject assignments yet — ask the admin to assign you first.</div>';
       return;
     }
     const previous = sel.value;
-    sel.innerHTML = _cbtqContext.map((c, i) =>
-      `<option value="${i}">${escapeHtml(c.classLabel)} — ${escapeHtml(c.subjectName)}</option>`
+    const groups = new Map();
+    _cbtqContext.forEach((context, index) => {
+      if (!groups.has(context.classCode)) groups.set(context.classCode, { label: context.classLabel, options: [] });
+      groups.get(context.classCode).options.push(`<option value="${index}">${escapeHtml(context.subjectName)}</option>`);
+    });
+    sel.innerHTML = [...groups.values()].map(group =>
+      `<optgroup label="${escapeHtml(group.label)}">${group.options.join('')}</optgroup>`
     ).join('');
     if (previous && _cbtqContext[previous]) sel.value = previous;
-    cbtqLoadQuestions();
+    cbtqContextChanged();
   } catch (err) {
     showToast(err.message);
   }
@@ -2090,6 +2104,13 @@ async function cbtqInit() {
 function cbtqCurrentContext() {
   const idx = Number(document.getElementById('cbtq-context').value);
   return _cbtqContext[idx];
+}
+
+function cbtqContextChanged() {
+  const ctx = cbtqCurrentContext();
+  const summary = document.getElementById('cbtq-assignment-summary');
+  if (summary) summary.textContent = ctx ? `Class: ${ctx.classLabel} · Subject: ${ctx.subjectName}` : 'Choose one of your assigned classes and subjects.';
+  cbtqLoadQuestions();
 }
 
 function cbtqContextLabel(ctx = cbtqCurrentContext()) {
@@ -2125,10 +2146,10 @@ function cbtqRenderList() {
     return;
   }
   list.innerHTML = _cbtqQuestions.map((q, i) => {
-    const actions = q.isMine
-      ? `<button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqOpenModal(${q.id})">Edit</button>
-         <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqDeleteQuestion(${q.id})">Delete</button>`
-      : `<span style="font-size:11px;color:var(--text-3);">Added by ${escapeHtml(q.createdByName || 'someone else')}</span>`;
+    // Any question in an assigned class/subject is editable, whoever added it
+    const credit = q.isMine ? '' : `<span style="font-size:11px;color:var(--text-3);margin-left:8px;">Added by ${escapeHtml(q.createdByName || 'someone else')}</span>`;
+    const actions = `<button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqOpenModal(${q.id})">Edit</button>
+         <button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="cbtqDeleteQuestion(${q.id})">Delete</button>${credit}`;
     return `<div class="cbtq-item">
       <div class="cbtq-item-head"><span class="cbtq-num">${i + 1}</span><span class="cbtq-q">${escapeHtml(q.questionText)}</span><span class="cbtq-marks">${q.marks} mark${Number(q.marks) === 1 ? '' : 's'}</span></div>
       <div class="cbtq-opts">${(q.options || []).map((o, j) =>

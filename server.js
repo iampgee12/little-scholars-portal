@@ -1603,7 +1603,7 @@ loadGradeScale();
 const enrolment = createEnrolment({
   db, one, all, run, ensureColumn, valueFromMeta, setMeta, cleanText, readJson, sendJson, requireUser, hashPassword,
   saveDataUrl, adminSetupPayload, initialsFromName, activeAcademic, classHasArms, parseXlsxFirstSheet,
-  DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator,
+  DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator, assignClassTeacherToClass,
 });
 enrolment.createSchema();
 // View Students + Students Registry (class history, archive)
@@ -1908,27 +1908,28 @@ function classTeacherCoreSubjectIds(classCode) {
   )).filter(Boolean);
 }
 
-function assignClassTeacherToClass(teacherId, classCode) {
+function assignClassTeacherToClass(teacherId, classCode, transactionManaged = false) {
   const teacher = one("SELECT id, teacher_type AS teacherType FROM users WHERE id = ? AND role = 'teacher'", teacherId);
   const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
   if (!teacher || teacher.teacherType !== 'class_teacher') return { error: 'Choose a registered Class Teacher' };
   if (!cls) return { error: 'Choose a valid class' };
-  const coreSubjects = classTeacherCoreSubjectIds(classCode);
   const expectedRules = classTeacherSubjectRules(classCode);
-  if (coreSubjects.length !== expectedRules.length) {
-    const subjects = all('SELECT id, name FROM subjects');
-    const missing = expectedRules.filter(rule => {
-      const subject = subjects.find(item => rule.aliases.includes(normalizedSubjectName(item.name)));
-      return !subject || !one(
+  if (!transactionManaged) db.exec('BEGIN IMMEDIATE');
+  try {
+    expectedRules.forEach(rule => {
+      let subject = all('SELECT id, name FROM subjects').find(item => rule.aliases.includes(normalizedSubjectName(item.name)));
+      if (!subject) {
+        run('INSERT OR IGNORE INTO subjects (name) VALUES (?)', rule.label);
+        subject = one('SELECT id, name FROM subjects WHERE name = ?', rule.label);
+      }
+      const offering = one(
         'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
         classCode,
         subject.id
       );
-    }).map(rule => rule.label);
-    return { error: 'Add the Class Teacher subjects to this class before assigning its Class Teacher' + (missing.length ? ': ' + missing.join(', ') : '') };
-  }
-  db.exec('BEGIN IMMEDIATE');
-  try {
+      if (!offering) run('INSERT INTO class_subjects (subject_id, class_code) VALUES (?, ?)', subject.id, classCode);
+    });
+    const coreSubjects = classTeacherCoreSubjectIds(classCode);
     coreSubjects.forEach(subject => {
       const assignment = one(
         "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1",
@@ -1946,9 +1947,9 @@ function assignClassTeacherToClass(teacherId, classCode) {
         );
       }
     });
-    db.exec('COMMIT');
+    if (!transactionManaged) db.exec('COMMIT');
   } catch (err) {
-    db.exec('ROLLBACK');
+    if (!transactionManaged) db.exec('ROLLBACK');
     throw err;
   }
   return { classesAssigned: 1 };
@@ -4833,23 +4834,38 @@ async function handleApi(req, res, url) {
   }
 
   // ── TEACHER: CBT QUESTION AUTHORING ─────────────────────────────────
-  // A teacher may add/edit/delete multiple-choice CBT questions for any
-  // class+subject they're assigned to (class_teacher or subject_teacher —
+  // A teacher may add/edit/delete any multiple-choice CBT question (whoever
+  // added it) for a class+subject they're assigned to (class_teacher or subject_teacher —
   // either grants access). Questions go live immediately (no vetting step).
   if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/context') {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
-    const rows = all(
-      `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel, ta.subject_id AS subjectId, s.name AS subjectName,
-                      ta.teacher_type AS teacherType
-       FROM teacher_assignments ta
-       JOIN classes c ON c.code = ta.class_code
-       JOIN subjects s ON s.id = ta.subject_id
-       WHERE ta.teacher_id = ?
-       ORDER BY c.label, s.name`,
-      user.id
-    ).filter(row => row.teacherType === user.teacherType &&
-      (row.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(row.subjectId)));
+    // requireUser returns the database row from sessionUser, which uses the
+    // snake_case users.teacher_type column rather than publicUser's camelCase.
+    const rows = user.teacher_type === 'class_teacher'
+      ? all(
+        `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel,
+                ta.subject_id AS subjectId, s.name AS subjectName,
+                ta.teacher_type AS teacherType
+         FROM teacher_assignments ta
+         JOIN classes c ON c.code = ta.class_code
+         JOIN class_subjects cs ON cs.class_code = ta.class_code AND cs.subject_id = ta.subject_id
+         JOIN subjects s ON s.id = cs.subject_id
+         WHERE ta.teacher_id = ? AND ta.teacher_type = 'class_teacher'
+         ORDER BY c.label, s.name`,
+        user.id
+      )
+      : all(
+        `SELECT DISTINCT ta.class_code AS classCode, c.label AS classLabel,
+                ta.subject_id AS subjectId, s.name AS subjectName,
+                ta.teacher_type AS teacherType
+         FROM teacher_assignments ta
+         JOIN classes c ON c.code = ta.class_code
+         JOIN subjects s ON s.id = ta.subject_id
+         WHERE ta.teacher_id = ? AND ta.teacher_type = 'subject_teacher'
+         ORDER BY c.label, s.name`,
+        user.id
+      ).filter(row => !isClassTeacherCoreSubject(row.subjectId));
     return sendJson(res, 200, { context: rows });
   }
 
@@ -5098,7 +5114,6 @@ async function handleApi(req, res, url) {
     const id = Number(teacherCbtQuestionMatch[1]);
     const existing = one('SELECT created_by AS createdBy, class_code AS classCode, subject_id AS subjectId FROM cbt_questions WHERE id = ?', id);
     if (!existing) return sendJson(res, 404, { error: 'Question not found' });
-    if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only edit questions you added yourself' });
     if (!teacherOwnsCbtContext(user.id, existing.classCode, existing.subjectId)) return sendJson(res, 403, { error: 'You are no longer assigned to this class and subject' });
     const body = await readJson(req);
     const questionText = cleanText(body.questionText);
@@ -5121,7 +5136,6 @@ async function handleApi(req, res, url) {
     const id = Number(teacherCbtQuestionMatch[1]);
     const existing = one('SELECT created_by AS createdBy, class_code AS classCode, subject_id AS subjectId FROM cbt_questions WHERE id = ?', id);
     if (!existing) return sendJson(res, 404, { error: 'Question not found' });
-    if (existing.createdBy !== user.id) return sendJson(res, 403, { error: 'You can only delete questions you added yourself' });
     if (!teacherOwnsCbtContext(user.id, existing.classCode, existing.subjectId)) return sendJson(res, 403, { error: 'You are no longer assigned to this class and subject' });
     run('DELETE FROM cbt_questions WHERE id = ?', id);
     return sendJson(res, 200, { ok: true });
@@ -6890,6 +6904,28 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
+  const staffDeleteMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)$/);
+  if (req.method === 'DELETE' && staffDeleteMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const staffId = decodeURIComponent(staffDeleteMatch[1]).trim().toUpperCase();
+    if (staffId === user.id) return sendJson(res, 400, { error: 'You cannot delete your own account' });
+    const teacher = one("SELECT id FROM users WHERE id = ? AND role = 'teacher'", staffId);
+    if (!teacher) return sendJson(res, 404, { error: 'Teacher account not found' });
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      run("DELETE FROM users WHERE id = ? AND role = 'teacher'", staffId);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      if (String(err.message).includes('FOREIGN KEY constraint failed')) {
+        return sendJson(res, 409, { error: 'This teacher is linked to school records. Reassign or remove those references before deleting the account.' });
+      }
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/admin/staff') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
@@ -6911,6 +6947,10 @@ async function handleApi(req, res, url) {
     if (role === 'teacher' && !['class_teacher', 'subject_teacher'].includes(teacherType)) {
       return sendJson(res, 400, { error: 'Teacher type is required for teacher staff' });
     }
+    const classCode = cleanText(body.classCode).toUpperCase();
+    if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) {
+      return sendJson(res, 400, { error: 'Choose a class for this Class Teacher' });
+    }
 
     try {
       run(
@@ -6930,6 +6970,14 @@ async function handleApi(req, res, url) {
         return sendJson(res, 409, { error: 'A staff user with that ID already exists' });
       }
       throw err;
+    }
+
+    if (role === 'teacher' && teacherType === 'class_teacher') {
+      const assignment = assignClassTeacherToClass(id, classCode);
+      if (assignment.error) {
+        run('DELETE FROM users WHERE id = ?', id);
+        return sendJson(res, 400, { error: assignment.error });
+      }
     }
 
     return sendJson(res, 201, {

@@ -823,7 +823,7 @@ async function sregView(id) {
     const accept = s.status === 'accepted' ? '' : s.kind === 'parent' ? childPickers : s.kind === 'student' ? `<div class="en-grid">
         ${enField('Enrol into Class', `<select class="ctrl-select" id="srv-class" onchange="document.getElementById('srv-arm').innerHTML = attArmOptions(this.value, 'Select')">${enrolOptions(classes.map(c => [c.code, c.label]), d.class, 'Select')}</select>`)}
         ${enField('Class Arm', `<select class="ctrl-select" id="srv-arm">${attArmOptions(d.class, 'Select')}</select>`)}
-      </div>` : s.kind === 'staff' && d.staff_type === 'teacher' ? `<div class="en-grid">${enField('Teacher Type', `<select class="ctrl-select" id="srv-ttype"><option value="subject_teacher">Subject Teacher</option><option value="class_teacher">Class Teacher</option></select>`)}</div>` : '';
+      </div>` : s.kind === 'staff' && d.staff_type === 'teacher' ? `<div class="en-grid">${enField('Teacher Type', `<select class="ctrl-select" id="srv-ttype" onchange="sregToggleTeacherClass()"><option value="subject_teacher">Subject Teacher</option><option value="class_teacher">Class Teacher</option></select>`)}<div id="srv-class-wrap" style="display:none;">${enField('Class *', `<select class="ctrl-select" id="srv-teacher-class">${enrolOptions(classes.map(c => [c.code, c.label]), '', 'Select class')}</select>`)}</div></div>` : '';
     const modal = document.createElement('div');
     modal.id = 'sr-modal';
     modal.className = 'en-modal';
@@ -839,6 +839,12 @@ async function sregView(id) {
   } catch (err) { showToast(err.message); }
 }
 
+function sregToggleTeacherClass() {
+  const isClassTeacher = document.getElementById('srv-ttype')?.value === 'class_teacher';
+  const wrap = document.getElementById('srv-class-wrap');
+  if (wrap) wrap.style.display = isClassTeacher ? '' : 'none';
+}
+
 function sregAcceptFromView(id) {
   const overrides = {};
   const cls = document.getElementById('srv-class');
@@ -847,7 +853,13 @@ function sregAcceptFromView(id) {
     overrides.classArmId = document.getElementById('srv-arm').value;
   }
   const tt = document.getElementById('srv-ttype');
-  if (tt) overrides.teacherType = tt.value;
+  if (tt) {
+    overrides.teacherType = tt.value;
+    if (tt.value === 'class_teacher') {
+      overrides.classCode = document.getElementById('srv-teacher-class')?.value || '';
+      if (!overrides.classCode) return showToast('Choose a class for this Class Teacher');
+    }
+  }
   const kids = Number(document.getElementById('sr-modal')?.dataset.children || 0);
   if (kids) {
     overrides.children = Array.from({ length: kids }, (_, i) => ({

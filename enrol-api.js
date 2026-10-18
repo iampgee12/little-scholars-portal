@@ -735,13 +735,20 @@ module.exports = function createEnrolment(ctx) {
     const name = [d.first_name, d.other_names, d.surname].filter(Boolean).join(' ');
     if (type === 'teacher' || type === 'admin') {
       const role = type;
+      const teacherType = role === 'teacher' ? (overrides.teacherType || 'subject_teacher') : null;
+      const classCode = role === 'teacher' && teacherType === 'class_teacher' ? text(overrides.classCode, 40).toUpperCase() : '';
+      if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) throw new Error('Choose a class for this Class Teacher');
       const id = nextStaffId(role);
       const password = randomPassword();
       run(`INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip, email, dob, phone, address)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id, role, hashPassword(password), name, d.first_name || name, initialsFromName(name),
-        role === 'teacher' ? (overrides.teacherType || 'subject_teacher') : null, role === 'teacher' ? name.toUpperCase() : null,
+        teacherType, role === 'teacher' ? name.toUpperCase() : null,
         text(d.email, 150).toLowerCase() || null, normDate(d.dob) || null, text(d.phone, 40) || null, text(d.address, 400) || null);
+      if (role === 'teacher' && teacherType === 'class_teacher') {
+        const result = assignClassTeacherToClass(id, classCode, true);
+        if (result.error) throw new Error(result.error);
+      }
       return `Created ${role === 'admin' ? 'admin' : 'teacher'} account ${id} for ${name} — password ${password}`;
     }
     return `Accepted ${name} (${STAFF_TYPES.find(([k]) => k === type)?.[1] || type}) — this staff type has no portal account, so the record is kept here`;

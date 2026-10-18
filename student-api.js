@@ -15,9 +15,17 @@ async function apiFetch(url, options = {}) {
 
 let currentUser = null;
 
-function showToast(msg) {
+function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
+  const text = String(msg || '');
+  const inferredError = /\b(error|failed|failure|invalid|required|choose|select|enter|please|must|cannot|can't|not found|already exists|already assigned|before assigning|missing|unavailable|unable|denied|blocked|expired|nothing to|no .* found|not enough|only .* can)\b/i.test(text);
+  const inferredSuccess = /\b(saved|added|assigned|deleted|removed|created|updated|published|sent|verified|moved|reinstated|accepted|deactivated|reactivated|posted|uploaded|restored|completed|successful|marked|cleared|enabled|disabled|recorded|generated|copied|approved|rejected|received|changed)\b/i.test(text);
+  const status = type === 'warn' ? 'error' : type || (inferredError && !(inferredSuccess && /already verified/i.test(text)) ? 'error' : inferredSuccess ? 'success' : 'error');
+  t.classList.toggle('toast-error', status === 'error');
+  t.classList.toggle('toast-success', status === 'success');
+  t.classList.toggle('toast-info', status === 'info');
+  t.setAttribute('role', status === 'error' ? 'alert' : 'status');
   t.style.display = 'block';
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => t.style.display = 'none', 3000);
