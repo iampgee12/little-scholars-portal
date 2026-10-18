@@ -1,0 +1,177 @@
+// In-portal dialogs shared by every portal page, used instead of the
+// browser's own confirm() / prompt() / alert() boxes so questions appear
+// inside the portal, in its own style.
+//
+//   if (!await uiConfirm('Delete this question?')) return;
+//   const name = await uiPrompt('New tag name:');      // null when cancelled
+//   await uiNotice('Order 1042', 'Customer: …');       // read-only, Close button
+(function () {
+  // Words that make a question destructive: its button turns red
+  const DANGER = ['delete', 'remove', 'clear', 'unpublish', 'archive', 'deactivate', 'reject', 'discard'];
+  // Words worth using as the button label as they are ("Delete", "Move" …)
+  const VERBS = DANGER.concat(['move', 'accept', 'generate', 'upload', 'restore', 'reactivate', 'publish', 'sign']);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .ui-dialog-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(15,23,42,0.55); }
+    .ui-dialog { width:min(440px,100%); background:var(--black-2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:var(--radius,10px); box-shadow:0 22px 70px rgba(15,23,42,0.35); overflow:hidden; font-family:'DM Sans',sans-serif; }
+    .ui-dialog.danger { border-color:rgba(220,38,38,0.35); }
+    .ui-dialog-head { padding:16px 18px; border-bottom:1px solid var(--border,#e2e8f0); }
+    .ui-dialog-title { font-size:15px; font-weight:700; color:var(--text-1,#0f172a); line-height:1.35; }
+    .ui-dialog.danger .ui-dialog-title { color:var(--red,#dc2626); }
+    .ui-dialog-sub { font-size:11px; color:var(--text-3,#94a3b8); margin-top:3px; font-family:'DM Mono',monospace; }
+    .ui-dialog-body { padding:16px 18px; }
+    .ui-dialog-text { font-size:13px; color:var(--text-2,#475569); line-height:1.55; white-space:pre-line; max-height:55vh; overflow-y:auto; margin:0; }
+    .ui-dialog-input { width:100%; margin-top:10px; box-sizing:border-box; background:var(--black-3,#f1f5f9); border:1px solid var(--border,#e2e8f0); border-radius:var(--radius-sm,6px); padding:9px 12px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1,#0f172a); outline:none; }
+    .ui-dialog-input:focus { border-color:rgba(34,197,94,0.45); }
+    .ui-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; flex-wrap:wrap; }
+    .ui-dialog-actions button { display:inline-flex; align-items:center; justify-content:center; min-width:84px; padding:9px 18px; font-size:12px; line-height:1.2; }
+    .ui-dialog.title-only .ui-dialog-head { border-bottom:0; padding-bottom:0; }
+    .ui-dialog.title-only .ui-dialog-actions { margin-top:6px; }
+  `;
+  document.head.appendChild(style);
+
+  let queue = Promise.resolve();
+
+  function capitalise(word) {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }
+
+  // "Delete this tag? Students will be unassigned." → title + detail
+  function splitMessage(message) {
+    const text = String(message ?? '').trim();
+    const q = text.indexOf('?');
+    if (q > 0 && q < 160) return { title: text.slice(0, q + 1), text: text.slice(q + 1).trim() };
+    return { title: '', text };
+  }
+
+  function open({ kind, title, text, sub, confirmLabel, cancelLabel, danger, placeholder, defaultValue }) {
+    return new Promise(resolve => {
+      const previousFocus = document.activeElement;
+      const overlay = document.createElement('div');
+      overlay.className = 'ui-dialog-overlay';
+      const box = document.createElement('div');
+      box.className = 'ui-dialog' + (danger ? ' danger' : '') + (!text && kind !== 'prompt' ? ' title-only' : '');
+      box.setAttribute('role', kind === 'notice' ? 'dialog' : 'alertdialog');
+      box.setAttribute('aria-modal', 'true');
+
+      const head = document.createElement('div');
+      head.className = 'ui-dialog-head';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'ui-dialog-title';
+      titleEl.id = 'ui-dialog-title-' + Date.now();
+      titleEl.textContent = title;
+      box.setAttribute('aria-labelledby', titleEl.id);
+      head.appendChild(titleEl);
+      if (sub) {
+        const subEl = document.createElement('div');
+        subEl.className = 'ui-dialog-sub';
+        subEl.textContent = sub;
+        head.appendChild(subEl);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'ui-dialog-body';
+      if (text) {
+        const p = document.createElement('p');
+        p.className = 'ui-dialog-text';
+        p.textContent = text;
+        body.appendChild(p);
+      }
+      let input = null;
+      if (kind === 'prompt') {
+        input = document.createElement('input');
+        input.className = 'ui-dialog-input';
+        input.type = 'text';
+        input.placeholder = placeholder || '';
+        input.value = defaultValue || '';
+        input.setAttribute('aria-labelledby', titleEl.id);
+        body.appendChild(input);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'ui-dialog-actions';
+      const ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = danger ? 'btn-danger' : 'post-btn';
+      ok.textContent = confirmLabel;
+      if (kind !== 'notice') {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn-outline';
+        cancel.textContent = cancelLabel || 'Cancel';
+        cancel.addEventListener('click', () => finish(false));
+        actions.appendChild(cancel);
+      }
+      actions.appendChild(ok);
+      body.appendChild(actions);
+
+      box.append(head, body);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      function finish(confirmed) {
+        document.removeEventListener('keydown', onKey, true);
+        overlay.remove();
+        if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus({ preventScroll: true });
+        if (kind === 'prompt') resolve(confirmed ? input.value : null);
+        else resolve(kind === 'notice' ? undefined : confirmed);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+        else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement && e.target !== ok)) {
+          e.preventDefault(); e.stopPropagation(); finish(true);
+        } else if (e.key === 'Tab') {
+          // keep keyboard focus inside the dialog
+          const items = [...box.querySelectorAll('button, input')];
+          const i = items.indexOf(document.activeElement);
+          const next = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1);
+          e.preventDefault();
+          items[next].focus();
+        }
+      }
+      ok.addEventListener('click', () => finish(true));
+      overlay.addEventListener('mousedown', e => { if (e.target === overlay) finish(false); });
+      document.addEventListener('keydown', onKey, true);
+      (input || ok).focus();
+    });
+  }
+
+  // One dialog at a time: a second request waits for the first to close.
+  function enqueue(options) {
+    const result = queue.then(() => open(options));
+    queue = result.catch(() => {});
+    return result;
+  }
+
+  window.uiConfirm = function (message, opts = {}) {
+    const parts = splitMessage(message);
+    const first = (parts.title || parts.text).split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
+    const danger = opts.danger ?? DANGER.includes(first);
+    return enqueue({
+      kind: 'confirm',
+      title: opts.title || parts.title || 'Please confirm',
+      text: opts.title ? String(message ?? '') : parts.text,
+      sub: opts.sub,
+      confirmLabel: opts.confirmLabel || (VERBS.includes(first) ? capitalise(first) : 'Continue'),
+      cancelLabel: opts.cancelLabel,
+      danger,
+    });
+  };
+
+  window.uiPrompt = function (message, opts = {}) {
+    return enqueue({
+      kind: 'prompt',
+      title: opts.title || String(message ?? ''),
+      text: opts.title ? String(message ?? '') : '',
+      confirmLabel: opts.confirmLabel || 'OK',
+      placeholder: opts.placeholder,
+      defaultValue: opts.defaultValue,
+      danger: !!opts.danger,
+    });
+  };
+
+  window.uiNotice = function (title, text, opts = {}) {
+    return enqueue({ kind: 'notice', title, text, confirmLabel: opts.closeLabel || 'Close' });
+  };
+})();

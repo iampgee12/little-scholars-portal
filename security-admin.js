@@ -64,7 +64,7 @@ async function secOverview() {
 }
 
 async function secForce(role) {
-  if (!confirm(`Everyone in this group will have to choose a new password the next time they sign in. Continue?`)) return;
+  if (!await uiConfirm(`Everyone in this group will have to choose a new password the next time they sign in. Continue?`)) return;
   try { const r = await apiFetch('/api/admin/security/force-change', { method: 'POST', body: JSON.stringify({ role }) }); showToast(`${r.updated} account(s) will choose a new password at next sign-in`); secOverview(); } catch (err) { showToast(err.message); }
 }
 
@@ -124,7 +124,7 @@ async function secSessions() {
 }
 
 async function secEnd(payload, question) {
-  if (!confirm(question)) return;
+  if (!await uiConfirm(question)) return;
   try { const r = await apiFetch('/api/admin/security/sessions/end', { method: 'POST', body: JSON.stringify(payload) }); showToast(`${r.ended} sign-in(s) ended`); secSessions(); } catch (err) { showToast(err.message); }
 }
 

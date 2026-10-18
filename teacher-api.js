@@ -404,7 +404,7 @@ async function ccLoad() {
     main.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">You are not class teacher of any class.</div></div>';
     return;
   }
-  if (cc.dirty.size && !confirm('You have unsaved comments. Discard them?')) return;
+  if (cc.dirty.size && !await uiConfirm('Discard unsaved comments? The comments you typed have not been saved yet.')) return;
   main.innerHTML = '<div class="card"><div class="card-body" style="padding:24px;color:var(--text-3);text-align:center">Loading pupils…</div></div>';
   try {
     const qs = new URLSearchParams({ classCode, examType });
@@ -2061,7 +2061,7 @@ async function cbtgbUpload() {
   const schedule = cbtgbCurrentSchedule();
   if (!schedule || !(schedule.scores || []).length) return showToast('Choose a CBT with submitted scores');
   const examType = document.getElementById('cbtgb-exam').value;
-  if (!confirm('Upload ' + schedule.scores.length + ' CBT score(s) to ' + examType + '? This updates the exam score while preserving each student’s CA score.')) return;
+  if (!await uiConfirm('Upload ' + schedule.scores.length + ' CBT score(s) to ' + examType + '? This updates the exam score while preserving each student’s CA score.')) return;
   try {
     const data = await apiFetch('/api/teacher/cbt/scores/upload-to-gradebook', {
       method: 'POST',
@@ -2291,7 +2291,7 @@ document.addEventListener('keydown', e => {
 });
 
 async function cbtqDeleteQuestion(id) {
-  if (!confirm('Delete this question?')) return;
+  if (!await uiConfirm('Delete this question?')) return;
   try {
     await apiFetch(`/api/teacher/cbt/questions/${id}`, { method: 'DELETE' });
     showToast('Question deleted');

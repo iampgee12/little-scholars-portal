@@ -498,7 +498,7 @@ function showListView() {
 }
 
 async function signOut() {
-  if (currentExam && !confirm('You are in the middle of an exam. Your answers are saved, but the timer keeps running. Sign out anyway?')) return;
+  if (currentExam && !await uiConfirm('You are in the middle of an exam. Your answers are saved, but the timer keeps running. Sign out anyway?')) return;
   try { await apiFetch('/api/logout', { method: 'POST' }); } catch { /* ignore */ }
   window.location.replace('index.html');
 }

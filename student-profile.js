@@ -125,7 +125,7 @@ async function spfDelete() {
 
 async function spfArchive(archive) {
   const s = STU_CARD.student;
-  if (archive && !confirm(`Archive ${spfName()}? The account is hidden from class lists until it is restored.`)) return;
+  if (archive && !await uiConfirm(`Archive ${spfName()}? The account is hidden from class lists until it is restored.`)) return;
   try {
     await apiFetch('/api/admin/view-students/action', { method: 'POST', body: JSON.stringify({ ids: [s.id], action: archive ? 'archive' : 'unarchive' }) });
     showToast(archive ? 'Account archived' : 'Account restored');
@@ -480,7 +480,7 @@ async function spfDocUpload(btn) {
 }
 
 async function spfDocDelete(id) {
-  if (!confirm('Delete this document?')) return;
+  if (!await uiConfirm('Delete this document?')) return;
   try { await apiFetch(`/api/admin/view-students/document?docId=${id}`, { method: 'DELETE' }); showToast('Document deleted'); spfTab('documents'); } catch (err) { showToast(err.message); }
 }
 
@@ -658,7 +658,7 @@ async function spfSecretSave(kind, btn) {
 }
 
 async function spfPinReset() {
-  if (!confirm("Remove this pupil's PIN?")) return;
+  if (!await uiConfirm("Remove this pupil's PIN?")) return;
   try { await apiFetch('/api/admin/view-students/pin/reset', { method: 'POST', body: JSON.stringify({ id: SPF.id }) }); showToast('PIN removed'); spfTab('pin'); } catch (err) { showToast(err.message); }
 }
 
@@ -723,6 +723,6 @@ async function spfHostelSave(btn) {
 }
 
 async function spfHostelDelete(hid) {
-  if (!confirm('Delete this hostel record?')) return;
+  if (!await uiConfirm('Delete this hostel record?')) return;
   try { await apiFetch(`/api/admin/view-students/hostel?hid=${hid}`, { method: 'DELETE' }); showToast('Hostel record deleted'); spfTab('hostel'); } catch (err) { showToast(err.message); }
 }

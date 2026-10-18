@@ -398,7 +398,7 @@ async function stSubmitNewTag() {
   } catch (err) { showToast(err.message); }
 }
 async function stDeleteTag(id) {
-  if (!confirm('Delete this tag? Students will be unassigned from it.')) return;
+  if (!await uiConfirm('Delete this tag? Students will be unassigned from it.')) return;
   try {
     await apiFetch(`/api/admin/student-tags/${id}`, { method: 'DELETE' });
     showToast('Tag deleted');
@@ -528,7 +528,7 @@ async function caPromote() {
   if (!toClassCode) { showToast('Choose the new class'); return; }
   if (armSel.dataset.required && !toArmId) { showToast('Choose the class arm in the new class'); return; }
   const toLabel = RR.classLabel(toClassCode) + (toArmId ? ` (${armSel.selectedOptions[0].textContent})` : '');
-  if (!confirm(`Move ${studentIds.length} pupil${studentIds.length === 1 ? '' : 's'} from ${RR.classLabel(fromClass)} to ${toLabel}?`)) return;
+  if (!await uiConfirm(`Move ${studentIds.length} pupil${studentIds.length === 1 ? '' : 's'} from ${RR.classLabel(fromClass)} to ${toLabel}?`)) return;
   try {
     const data = await apiFetch('/api/admin/students/promote', { method: 'POST', body: JSON.stringify({ toClassCode, toArmId: toArmId || null, studentIds }) });
     showToast(`${data.moved} pupil${data.moved === 1 ? '' : 's'} moved to ${toLabel}`);
@@ -541,7 +541,7 @@ async function caGraduate(status) {
   const studentIds = caSelectedIds();
   if (!studentIds.length) { showToast('Select at least one student'); return; }
   const label = status === 'left' ? 'mark as left' : 'graduate';
-  if (!confirm(`Are you sure you want to ${label} ${studentIds.length} student(s)? Their portal login will be deactivated.`)) return;
+  if (!await uiConfirm(`Are you sure you want to ${label} ${studentIds.length} student(s)? Their portal login will be deactivated.`)) return;
   try {
     await apiFetch('/api/admin/students/graduate', { method: 'POST', body: JSON.stringify({ studentIds, status }) });
     showToast(`${studentIds.length} student(s) updated`);
@@ -686,7 +686,7 @@ async function cbkSubmitNew() {
   } catch (err) { showToast(err.message); }
 }
 async function cbkDelete(id) {
-  if (!confirm('Delete this entry?')) return;
+  if (!await uiConfirm('Delete this entry?')) return;
   try {
     await apiFetch(`/api/admin/communication-book/${id}`, { method: 'DELETE' });
     showToast('Deleted');
@@ -741,7 +741,7 @@ async function ecgSubmitNew() {
   } catch (err) { showToast(err.message); }
 }
 async function ecgDelete(id) {
-  if (!confirm('Delete this group?')) return;
+  if (!await uiConfirm('Delete this group?')) return;
   try {
     await apiFetch(`/api/admin/extracurricular-groups/${id}`, { method: 'DELETE' });
     showToast('Group deleted');
@@ -2140,7 +2140,7 @@ function openStaffProfile(id) {
 async function deleteTeacherAccount(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
   if (!staff || staff.role !== 'teacher') return showToast('Only teacher accounts can be deleted');
-  if (!confirm(`Delete teacher account “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
+  if (!await uiConfirm(`Delete teacher account “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -3804,7 +3804,7 @@ async function unpublishBroadsheet() {
     showToast('Select a class and exam first');
     return;
   }
-  if (!confirm(`Unpublish ${examType} results for this class? Parents will no longer be able to view or have been sent these reports.`)) return;
+  if (!await uiConfirm(`Unpublish ${examType} results for this class? Parents will no longer be able to view or have been sent these reports.`)) return;
   const btn = document.getElementById('bs-unpublish-btn');
   if (btn) btn.disabled = true;
   try {
@@ -4090,7 +4090,7 @@ async function loadExamTimetable() {
 }
 
 async function deleteExamScheduleEntry(id) {
-  if (!confirm('Remove this exam from the timetable?')) return;
+  if (!await uiConfirm('Remove this exam from the timetable?')) return;
   try {
     await apiFetch(`/api/admin/exam-schedule/${id}`, { method: 'DELETE' });
     showToast('Removed from timetable');
@@ -4213,7 +4213,7 @@ async function qbApplyBulk() {
   if (!ids.length) { showToast('Select at least one question'); return; }
   if (!action) { showToast('Choose an action'); return; }
   if (action === 'print') { qbPrintSelected(ids); return; }
-  if (action === 'delete' && !confirm(`Delete ${ids.length} question(s)? This cannot be undone.`)) return;
+  if (action === 'delete' && !await uiConfirm(`Delete ${ids.length} question(s)? This cannot be undone.`)) return;
   try {
     await apiFetch('/api/admin/cbt/questions/bulk', { method: 'POST', body: JSON.stringify({ ids, action }) });
     showToast('Done');
@@ -4336,7 +4336,7 @@ async function qbToggleVet(id) {
   } catch (err) { showToast(err.message); }
 }
 async function qbDeleteQuestion(id) {
-  if (!confirm('Delete this question?')) return;
+  if (!await uiConfirm('Delete this question?')) return;
   try {
     await apiFetch(`/api/admin/cbt/questions/${id}`, { method: 'DELETE' });
     showToast('Question deleted');
@@ -4371,7 +4371,7 @@ async function isLoad() {
 function isPreview(id) {
   const row = isCache.find(r => r.id === id);
   if (!row) return;
-  alert(`${row.title}\n\n${row.instructions}`);
+  uiNotice(row.title, row.instructions);
 }
 function isOpenNew() {
   document.getElementById('isn-title').value = '';
@@ -4394,7 +4394,7 @@ async function isSubmitNew() {
   } catch (err) { showToast(err.message); }
 }
 async function isDelete(id) {
-  if (!confirm('Delete this instruction set?')) return;
+  if (!await uiConfirm('Delete this instruction set?')) return;
   try {
     await apiFetch(`/api/admin/cbt/instruction-sets/${id}`, { method: 'DELETE' });
     showToast('Deleted');
@@ -4619,7 +4619,7 @@ async function csdApplyBulk() {
   const ids = [...document.querySelectorAll('.csd-row-check:checked')].map(cb => Number(cb.value));
   if (!ids.length) { showToast('Select at least one row'); return; }
   if (action === 'delete') {
-    if (!confirm(`Delete ${ids.length} scheduled subject(s)?`)) return;
+    if (!await uiConfirm(`Delete ${ids.length} scheduled subject(s)?`)) return;
     try {
       await Promise.all(ids.map(id => apiFetch(`/api/admin/cbt/schedule-subjects/${id}`, { method: 'DELETE' })));
       showToast('Deleted');
@@ -4644,7 +4644,7 @@ async function csdSetStatus(id, status) {
 }
 
 async function csdDeleteRow(id) {
-  if (!confirm('Delete this scheduled subject?')) return;
+  if (!await uiConfirm('Delete this scheduled subject?')) return;
   try {
     await apiFetch(`/api/admin/cbt/schedule-subjects/${id}`, { method: 'DELETE' });
     showToast('Deleted');
@@ -4923,7 +4923,7 @@ async function cbtgbLoad() {
 
 async function cscAllowRetake(studentId) {
   const scheduleSubjectId = document.getElementById('csc-subject').value;
-  if (!confirm('Clear this student\'s submitted attempt so they can sit the exam again? Their previous answers will be gone.')) return;
+  if (!await uiConfirm('Clear this student\'s submitted attempt so they can sit the exam again? Their previous answers will be gone.')) return;
   try {
     await apiFetch(`/api/admin/cbt/schedule-subjects/${scheduleSubjectId}/students/${encodeURIComponent(studentId)}/retake`, { method: 'POST' });
     showToast('Retake allowed — the student can start this exam again');
@@ -5612,7 +5612,7 @@ async function saveClass() {
 async function deleteClass(code) {
   const cls = (state.setup.classes || []).find(item => item.code === code);
   if (!cls) return;
-  if (!confirm(`Delete class "${cls.label}"? This cannot be undone.`)) return;
+  if (!await uiConfirm(`Delete class "${cls.label}"? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`/api/admin/classes/${encodeURIComponent(code)}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -5631,7 +5631,7 @@ async function archiveClass(code, currentlyArchived) {
   const warning = currentlyArchived
     ? `Unarchive "${cls.label}"? It will reappear in class pickers for new enrollment, promotion, and scheduling.`
     : `Archive "${cls.label}"? It will be hidden from pickers used for new enrollment, promotion, and scheduling, but existing students, results, and records linked to it stay fully intact and visible everywhere else.`;
-  if (!confirm(warning)) return;
+  if (!await uiConfirm(warning)) return;
   try {
     const data = await apiFetch(`/api/admin/classes/${encodeURIComponent(code)}/archive`, { method: 'PUT' });
     state.setup = data.setup;
@@ -5687,7 +5687,7 @@ async function saveClassArm() {
 }
 
 async function deleteClassArm(id) {
-  if (!confirm('Delete this class arm?')) return;
+  if (!await uiConfirm('Delete this class arm?')) return;
   try {
     const data = await apiFetch(`/api/admin/class-arms/${id}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -5714,7 +5714,7 @@ async function saveClassCategory() {
 }
 
 async function deleteClassCategory(name) {
-  if (!confirm(`Delete category "${name}"?`)) return;
+  if (!await uiConfirm(`Delete category "${name}"?`)) return;
   try {
     const data = await apiFetch(`/api/admin/class-categories/${encodeURIComponent(name)}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -5946,7 +5946,7 @@ async function saveSubject() {
 }
 
 async function deleteSubject(id) {
-  if (!confirm('Delete this subject from the subject bank?')) return;
+  if (!await uiConfirm('Delete this subject from the subject bank?')) return;
   try {
     const data = await apiFetch(`/api/admin/subjects/${id}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -5973,7 +5973,7 @@ async function saveSubjectType() {
 }
 
 async function deleteSubjectType(name) {
-  if (!confirm(`Delete subject type "${name}"?`)) return;
+  if (!await uiConfirm(`Delete subject type "${name}"?`)) return;
   try {
     const data = await apiFetch(`/api/admin/subject-types/${encodeURIComponent(name)}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -6045,7 +6045,7 @@ async function saveClassSubject() {
 }
 
 async function deleteClassSubject(id) {
-  if (!confirm('Remove this subject from the class?')) return;
+  if (!await uiConfirm('Remove this subject from the class?')) return;
   try {
     const data = await apiFetch(`/api/admin/class-subjects/${id}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -6324,7 +6324,7 @@ async function cbLoadComments() {
 
 async function cbDeleteComment(i) {
   const c = _cbComments[i];
-  if (!c || !confirm('Delete this comment?')) return;
+  if (!c || !await uiConfirm('Delete this comment?')) return;
   try {
     await apiFetch(`/api/admin/comment-bank/${c.id}`, { method: 'DELETE' });
     await cbLoadComments();
@@ -7159,7 +7159,7 @@ async function financeCategoryAdd(type) {
 }
 
 async function financeCategoryDelete(id, type) {
-  if (!confirm('Remove this category?')) return;
+  if (!await uiConfirm('Remove this category?')) return;
   try {
     await apiFetch(`/api/admin/finance/categories/${id}`, { method: 'DELETE' });
     financeCategoryLoad(type);
@@ -7757,7 +7757,7 @@ async function finSaveCategory() {
 }
 
 async function finDeleteCategory(id) {
-  if (!confirm('Delete this category?')) return;
+  if (!await uiConfirm('Delete this category?')) return;
   try {
     await apiFetch(`/api/admin/store/categories/${id}`, { method: 'DELETE' });
     await finLoadCategories();
@@ -7847,7 +7847,7 @@ function finOpenProductModal(id) {
 }
 
 async function finDeleteProduct(id) {
-  if (!confirm('Delete this product?')) return;
+  if (!await uiConfirm('Delete this product?')) return;
   try {
     await apiFetch(`/api/admin/store/products/${id}`, { method: 'DELETE' });
     await finLoadProducts();
@@ -7957,7 +7957,7 @@ async function finViewOrder(id) {
   try {
     const data = await apiFetch(`/api/admin/store/orders/${id}`);
     const lines = data.items.map(it => `${it.qty} x ${it.productName} @ ${finMoney(it.unitPrice)} = ${finMoney(it.lineTotal)}`).join('\n');
-    alert(`Order ${data.order.orderNo}\nCustomer: ${data.order.customerName || '-'}\nDate: ${new Date(data.order.createdAt).toLocaleString()}\n\n${lines}\n\nSubtotal: ${finMoney(data.order.subtotal)}\nDiscount: ${finMoney(data.order.discount)}\nTotal: ${finMoney(data.order.total)}`);
+    uiNotice(`Order ${data.order.orderNo}`, `Customer: ${data.order.customerName || '-'}\nDate: ${new Date(data.order.createdAt).toLocaleString()}\n\n${lines}\n\nSubtotal: ${finMoney(data.order.subtotal)}\nDiscount: ${finMoney(data.order.discount)}\nTotal: ${finMoney(data.order.total)}`);
   } catch (err) { showToast(err.message); }
 }
 
@@ -8197,7 +8197,7 @@ function finOpenBannerModal(id) {
 }
 
 async function finDeleteBanner(id) {
-  if (!confirm('Delete this banner?')) return;
+  if (!await uiConfirm('Delete this banner?')) return;
   try {
     await apiFetch(`/api/admin/store/banners/${id}`, { method: 'DELETE' });
     await finLoadBanners();
@@ -8257,7 +8257,7 @@ function finOpenSectionModal(id) {
 }
 
 async function finDeleteSection(id) {
-  if (!confirm('Delete this section?')) return;
+  if (!await uiConfirm('Delete this section?')) return;
   try {
     await apiFetch(`/api/admin/store/homepage-sections/${id}`, { method: 'DELETE' });
     await finLoadSections();
@@ -8386,7 +8386,7 @@ function finOpenAccountModal(id) {
 }
 
 async function finDeleteAccount(id) {
-  if (!confirm('Delete this account?')) return;
+  if (!await uiConfirm('Delete this account?')) return;
   try {
     await apiFetch(`/api/admin/acct/accounts/${id}`, { method: 'DELETE' });
     await finLoadAccounts();
@@ -8490,7 +8490,7 @@ function finJournalEntriesRender() {
 }
 
 async function finDeleteJournalEntry(id) {
-  if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+  if (!await uiConfirm('Delete this journal entry? This cannot be undone.')) return;
   try {
     await apiFetch(`/api/admin/acct/journal-entries/${id}`, { method: 'DELETE' });
     await finLoadJournalEntries();
@@ -8615,7 +8615,7 @@ function finOpenContactModal(id) {
 }
 
 async function finDeleteContact(id) {
-  if (!confirm('Delete this contact?')) return;
+  if (!await uiConfirm('Delete this contact?')) return;
   try {
     await apiFetch(`/api/admin/acct/contacts/${id}`, { method: 'DELETE' });
     await finLoadContacts();
@@ -8681,7 +8681,7 @@ async function finMarkBillPaid(id) {
 }
 
 async function finDeleteBill(id) {
-  if (!confirm('Delete this bill / invoice?')) return;
+  if (!await uiConfirm('Delete this bill / invoice?')) return;
   try {
     await apiFetch(`/api/admin/acct/bills/${id}`, { method: 'DELETE' });
     await finLoadBills();
@@ -8737,7 +8737,7 @@ function finOpenBudgetModal() {
 }
 
 async function finDeleteBudget(id) {
-  if (!confirm('Delete this budget?')) return;
+  if (!await uiConfirm('Delete this budget?')) return;
   try {
     await apiFetch(`/api/admin/acct/budgets/${id}`, { method: 'DELETE' });
     await finLoadBudgets();
@@ -8801,7 +8801,7 @@ async function finToggleReconciled(id, reconciled) {
 }
 
 async function finDeleteBankTxn(id) {
-  if (!confirm('Delete this transaction?')) return;
+  if (!await uiConfirm('Delete this transaction?')) return;
   try {
     await apiFetch(`/api/admin/acct/bank-transactions/${id}`, { method: 'DELETE' });
     await finLoadBankTxns();
@@ -8859,7 +8859,7 @@ function finOpenTaxModal() {
 }
 
 async function finDeleteTaxRecord(id) {
-  if (!confirm('Delete this tax record?')) return;
+  if (!await uiConfirm('Delete this tax record?')) return;
   try {
     await apiFetch(`/api/admin/acct/tax-records/${id}`, { method: 'DELETE' });
     await finLoadTaxRecords();
@@ -8979,7 +8979,7 @@ async function sigsSave(btn, kind, teacherId) {
 }
 
 async function sigsRemove(kind, teacherId = '') {
-  if (!confirm('Remove this signature? It will no longer print on result sheets.')) return;
+  if (!await uiConfirm('Remove this signature? It will no longer print on result sheets.')) return;
   try {
     const data = await apiFetch('/api/admin/signatures', { method: 'POST', body: JSON.stringify({ role: kind, teacherId, remove: true }) });
     state.setup = data.setup;

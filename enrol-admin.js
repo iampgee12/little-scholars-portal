@@ -257,7 +257,7 @@ function enrolRenderTags(selected = []) {
 }
 
 async function enrolNewTag() {
-  const name = (prompt('New tag name (e.g. Returning, Scholarship):') || '').trim();
+  const name = (await uiPrompt('New tag name (e.g. Returning, Scholarship):') || '').trim();
   if (!name) return;
   try {
     await apiFetch('/api/admin/student-tags', { method: 'POST', body: JSON.stringify({ name }) });
@@ -773,21 +773,22 @@ function sregBulk(action) {
 }
 
 async function sregAct(ids, action, overrides) {
-  if (action === 'delete' && !confirm(`Delete ${ids.length} submission${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+  if (action === 'delete' && !await uiConfirm(`Delete ${ids.length} submission${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
   let note = '';
   if (action === 'reject') {
-    note = prompt('Reason for rejecting (optional):') ?? null;
+    note = await uiPrompt('Reason for rejecting (optional):') ?? null;
     if (note === null) return;
   }
-  if (action === 'accept' && !overrides && !confirm(`Accept ${ids.length} submission${ids.length === 1 ? '' : 's'}? Accepting creates the pupil, family or staff record.`)) return;
+  if (action === 'accept' && !overrides && !await uiConfirm(`Accept ${ids.length} submission${ids.length === 1 ? '' : 's'}? Accepting creates the pupil, family or staff record.`)) return;
   try {
     const data = await apiFetch('/api/admin/selfreg/action', { method: 'POST', body: JSON.stringify({ ids, action, note, overrides }) });
     if (data.setup) state.setup = data.setup;
     const ok = data.results.filter(r => r.ok);
     const bad = data.results.filter(r => !r.ok);
-    if (action === 'accept' && ok.length) alert(ok.map(r => r.message).join('\n'));
-    if (bad.length) alert(`Not done:\n${bad.map(r => r.message).join('\n')}`);
+    if (bad.length) showToast(`Not done: ${bad.map(r => r.message).join('; ')}`, 'error');
     else showToast(action === 'accept' ? 'Accepted' : action === 'reject' ? 'Rejected' : 'Deleted');
+    // Accepting reports new Reg. Nos and passwords: keep them on screen until closed
+    if (action === 'accept' && ok.length) await uiNotice(`Accepted ${ok.length} submission${ok.length === 1 ? '' : 's'}`, ok.map(r => r.message).join('\n'));
     document.getElementById('sr-modal')?.remove();
     if (typeof populateStudents === 'function') populateStudents();
     await sregLoad();
@@ -929,7 +930,7 @@ async function sregSaveSettings(btn) {
 }
 
 async function sregRegenerate(which) {
-  if (!confirm('Generate a new access code? The old code stops working immediately.')) return;
+  if (!await uiConfirm('Generate a new access code? The old code stops working immediately.')) return;
   try {
     await apiFetch('/api/admin/selfreg/regenerate', { method: 'POST', body: JSON.stringify({ which }) });
     showToast('New code generated');

@@ -258,7 +258,7 @@ async function vsAction(action) {
   document.querySelectorAll('.stu-dd-menu.open').forEach(m => m.classList.remove('open'));
   if (!VS.selected.size) return showToast('Tick at least one student first');
   const label = { activate: 'activate', deactivate: 'de-activate', archive: 'archive', unarchive: 'restore', 'set-session': 'set the active academic session for' }[action];
-  if (!confirm(`${label[0].toUpperCase()}${label.slice(1)} ${VS.selected.size} selected student${VS.selected.size === 1 ? '' : 's'}?`)) return;
+  if (!await uiConfirm(`${label[0].toUpperCase()}${label.slice(1)} ${VS.selected.size} selected student${VS.selected.size === 1 ? '' : 's'}?`)) return;
   try {
     const data = await apiFetch('/api/admin/view-students/action', { method: 'POST', body: JSON.stringify({ ids: [...VS.selected], action }) });
     if (data.setup) state.setup = data.setup;
