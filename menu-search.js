@@ -241,7 +241,18 @@
       entry.el.click();
     }
 
-    input.addEventListener('input', render);
+    // Browsers may autofill a saved login ID (e.g. "TCH-097") into the box.
+    // A person can only type into it while it has focus, so anything that
+    // arrives without focus is autofill and is wiped.
+    function clearAutofill() {
+      if (document.activeElement !== input && input.value) { input.value = ''; close(); }
+    }
+    [0, 300, 1000, 2500].forEach(ms => setTimeout(clearAutofill, ms));
+
+    input.addEventListener('input', () => {
+      if (document.activeElement !== input) return clearAutofill();
+      render();
+    });
     input.addEventListener('focus', () => { if (input.value.trim()) render(); });
     input.addEventListener('keydown', e => {
       if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) render(); else highlight(active + 1); }
