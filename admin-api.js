@@ -1048,9 +1048,9 @@ function populateStaff() {
       </td>
       <td><span class="staff-type-pill">${escapeHtml(typeLabel)}</span></td>
       <td><div class="staff-designation">${escapeHtml(designation)}</div></td>
-      <td class="staff-phone">-</td>
+      <td class="staff-phone">${escapeHtml(staff.phone || '-')}</td>
       <td><button class="staff-profile-btn" title="Open staff profile" onclick="openStaffProfile('${escapeHtml(staff.id)}')">...</button></td>
-      <td>${staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : accountStatusToggle(staff.id, staff.active)}</td>`;
+      <td>${staff.canSignIn === false ? '<span class="staff-table-sub">No login</span>' : staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : accountStatusToggle(staff.id, staff.active)}</td>`;
     tbody.appendChild(tr);
   });
   filterStaff();
@@ -1077,6 +1077,9 @@ function staffAssignments(staff) {
 }
 
 function staffCategory(staff) {
+  // the staff type chosen in Add Staff decides; admins count as General Staff
+  if (staff.staffType && staff.staffType !== 'admin' && staff.staffTypeLabel) return staff.staffTypeLabel;
+  if (staff.staffType === 'admin') return 'General Staff / Others';
   const raw = `${staff.roleLabel || ''} ${staff.name || ''} ${staff.role || ''}`.toLowerCase();
   if (staff.role === 'teacher' || raw.includes('teacher')) return 'Teacher';
   if (raw.includes('account') || raw.includes('bursar') || raw.includes('bursary')) return 'Accountant/Bursary Officer';
@@ -1770,12 +1773,6 @@ function renderEmailQueue() {
 }
 
 function populateAdminControls() {
-  const staffClassSelect = document.getElementById('new-staff-class');
-  if (staffClassSelect) {
-    const selected = staffClassSelect.value;
-    staffClassSelect.innerHTML = '<option value="">Select class</option>' + (state.setup.classes || []).filter(cls => !cls.archived).map(cls => `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`).join('');
-    if ((state.setup.classes || []).some(cls => cls.code === selected)) staffClassSelect.value = selected;
-  }
   const teacherSelect = document.getElementById('assign-teacher');
   const classSelect = document.getElementById('assign-class');
 
@@ -2010,68 +2007,291 @@ function syncStudentAssetFields() {
   email.value = student?.parentEmail || '';
 }
 
-function clearStaffForm() {
-  state.editingStaffId = null;
-  ['new-staff-id', 'new-staff-name', 'new-staff-initials', 'new-staff-password'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  const id = document.getElementById('new-staff-id');
-  const role = document.getElementById('new-staff-role');
-  const type = document.getElementById('new-staff-teacher-type');
-  const classSelect = document.getElementById('new-staff-class');
-  const title = document.getElementById('staff-form-title');
-  const save = document.getElementById('staff-save-label');
-  if (id) id.disabled = false;
-  const password = document.getElementById('new-staff-password');
-  if (password) password.placeholder = 'Temporary password';
-  if (role) role.value = 'teacher';
-  if (classSelect) classSelect.value = '';
-  if (type) {
-    type.value = 'class_teacher';
-    type.disabled = false;
-  }
-  if (title) title.textContent = 'Add Staff / Employee';
-  if (save) save.textContent = 'Add Staff';
-  syncStaffRoleFields();
+// ── ADD / EDIT STAFF (4-step pop-up over the staff list) ──
+// "+ Add Staff ▾" picks the staff type, then Bio Data → More Info → Work
+// Details → Next of Kin. Teachers and admins get a portal login; the other
+// types are saved as staff records only.
+const SF_DEFAULT_TYPES = [
+  ['teacher', 'Teacher'], ['accountant', 'Accountant/Bursary Officer'], ['librarian', 'Librarian'],
+  ['registrar', 'Registrar'], ['transport_manager', 'Transport Manager'], ['hostel_manager', 'Hostel Manager'],
+  ['store_manager', 'Store Manager'], ['general_staff', 'General Staff / Others'], ['admin', 'Administrator'],
+].map(([value, label]) => ({ value, label }));
+let sfStep = 1;
+let sfType = 'teacher';
+let sfPhotoDataUrl = '';
+
+function sfStaffTypes() {
+  return state.setup?.staffTypes?.length ? state.setup.staffTypes : SF_DEFAULT_TYPES;
+}
+function sfTypeLabel(type) {
+  return sfStaffTypes().find(item => item.value === type)?.label || 'Staff';
+}
+function sfSignsIn(type) {
+  return type === 'teacher' || type === 'admin';
 }
 
-// People → Add Staff: a fresh, empty form on its own page
-function openAddStaff() {
-  clearStaffForm();
-  switchTab('addStaff', visibleNavItem('addStaff'));
-  document.getElementById('new-staff-id')?.focus({ preventScroll: true });
+function toggleAddStaffMenu(event) {
+  event?.stopPropagation();
+  const menu = document.getElementById('sf-add-menu');
+  const button = document.getElementById('sf-add-btn');
+  if (!menu) return;
+  const open = menu.hidden;
+  if (open) {
+    const types = sfStaffTypes();
+    // Administrator sits below a divider, apart from the staff types
+    menu.innerHTML = types.filter(t => t.value !== 'admin').map(t =>
+      `<button type="button" role="menuitem" onclick="openStaffForm('${escapeHtml(t.value)}')">${escapeHtml(t.label)}</button>`).join('')
+      + '<div class="sf-menu-sep"></div>'
+      + `<button type="button" role="menuitem" onclick="openStaffForm('admin')">Administrator</button>`;
+  }
+  menu.hidden = !open;
+  button?.setAttribute('aria-expanded', String(open));
+  if (open) menu.querySelector('button')?.focus();
 }
+document.addEventListener('click', event => {
+  const menu = document.getElementById('sf-add-menu');
+  if (menu && !menu.hidden && !event.target.closest('.sf-add-wrap')) {
+    menu.hidden = true;
+    document.getElementById('sf-add-btn')?.setAttribute('aria-expanded', 'false');
+  }
+});
+
+function sfFillDesignations(selected = '') {
+  const select = document.getElementById('sf-designation');
+  if (!select) return;
+  const list = [...(state.setup?.staffDesignations || [])];
+  if (selected && !list.some(name => name.toLowerCase() === selected.toLowerCase())) list.push(selected);
+  select.innerHTML = '<option value="">Select</option>' + list.map(name => `<option>${escapeHtml(name)}</option>`).join('');
+  select.value = selected;
+}
+
+function sfFillClasses(selected = '') {
+  const select = document.getElementById('sf-class');
+  if (!select) return;
+  select.innerHTML = '<option value="">Select class</option>' + (state.setup?.classes || []).filter(cls => !cls.archived)
+    .map(cls => `<option value="${escapeHtml(cls.code)}">${escapeHtml(cls.label)}</option>`).join('');
+  select.value = selected;
+}
+
+function sfSetPhoto(src) {
+  const frame = document.getElementById('sf-photo-preview');
+  if (!frame) return;
+  frame.querySelector('img')?.remove();
+  frame.querySelector('svg').style.display = src ? 'none' : '';
+  if (src) frame.insertAdjacentHTML('beforeend', `<img src="${escapeHtml(src)}" alt="">`);
+}
+
+async function sfPhotoChosen(input) {
+  try {
+    sfPhotoDataUrl = await imageToSmallDataUrl(input.files?.[0], 480);
+    sfSetPhoto(sfPhotoDataUrl);
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    input.value = '';
+  }
+}
+
+function sfSyncPassword() {
+  const auto = document.getElementById('sf-auto-password')?.checked;
+  const password = document.getElementById('sf-password');
+  if (!password) return;
+  password.disabled = !!auto;
+  if (auto) password.value = '';
+  password.placeholder = auto ? 'A password will be generated' : state.editingStaffId ? 'Leave blank to keep current password' : '';
+}
+
+function sfSyncTeacher() {
+  const classWrap = document.getElementById('sf-class-wrap');
+  if (classWrap) classWrap.style.display = document.getElementById('sf-teacher-type')?.value === 'class_teacher' && !state.editingStaffId ? '' : 'none';
+}
+
+// Shows the parts of step 1 that apply to this staff type
+function sfSyncType() {
+  const modal = document.getElementById('sf-modal');
+  const signsIn = sfSignsIn(sfType);
+  modal.querySelectorAll('.sf-login-only').forEach(el => { el.style.display = signsIn ? '' : 'none'; });
+  modal.querySelectorAll('.sf-records-only').forEach(el => { el.style.display = signsIn ? 'none' : ''; });
+  modal.querySelectorAll('.sf-teacher-only').forEach(el => { el.style.display = sfType === 'teacher' ? '' : 'none'; });
+  const editingRecordOnly = state.editingStaffId && (state.setup.staff || []).find(s => s.id === state.editingStaffId)?.canSignIn === false;
+  document.getElementById('sf-password-label').textContent = state.editingStaffId && !editingRecordOnly ? 'Password' : 'Password *';
+  const note = modal.querySelector('.sf-records-only');
+  if (note) note.textContent = `${sfTypeLabel(sfType)} staff don’t sign in to the portal. Saving creates their staff record.`;
+  sfSyncPassword();
+  sfSyncTeacher();
+}
+
+function sfGoTo(step) {
+  if (step < 1 || step > 4) return;
+  // moving forward checks every step on the way
+  for (let s = sfStep; s < step; s++) if (!sfValidateStep(s)) return;
+  sfStep = step;
+  const modal = document.getElementById('sf-modal');
+  modal.querySelectorAll('.sf-step').forEach(el => el.classList.toggle('active', Number(el.dataset.step) === step));
+  modal.querySelectorAll('.sf-steps li').forEach(li => {
+    const n = Number(li.dataset.step);
+    li.classList.toggle('active', n === step);
+    li.classList.toggle('done', n < step);
+  });
+  document.getElementById('sf-back').style.visibility = step === 1 ? 'hidden' : '';
+  document.getElementById('sf-next').style.display = step === 4 ? 'none' : '';
+  document.getElementById('sf-save').style.display = step === 4 || state.editingStaffId ? '' : 'none';
+  modal.querySelector('.sf-body').scrollTop = 0;
+  modal.querySelector(`.sf-step[data-step="${step}"] input:not([type=checkbox]):not([type=file]), .sf-step[data-step="${step}"] select`)?.focus({ preventScroll: true });
+}
+
+function sfNext() {
+  sfGoTo(sfStep + 1);
+}
+
+function sfInvalid(el, message) {
+  el.classList.add('sf-invalid');
+  el.addEventListener('input', () => el.classList.remove('sf-invalid'), { once: true });
+  el.addEventListener('change', () => el.classList.remove('sf-invalid'), { once: true });
+  el.focus();
+  showToast(message);
+  return false;
+}
+
+function sfValidateStep(step) {
+  const section = document.querySelector(`#sf-modal .sf-step[data-step="${step}"]`);
+  section.querySelectorAll('.sf-invalid').forEach(el => el.classList.remove('sf-invalid'));
+  for (const el of section.querySelectorAll('[data-required]')) {
+    if (!el.value.trim()) return sfInvalid(el, `${el.dataset.required} is required`);
+  }
+  for (const el of section.querySelectorAll('input[type=email]')) {
+    if (el.value.trim() && !el.checkValidity()) return sfInvalid(el, 'Enter a valid email address');
+  }
+  if (step === 1) {
+    const password = document.getElementById('sf-password');
+    const auto = document.getElementById('sf-auto-password').checked;
+    const editing = (state.setup.staff || []).find(s => s.id === state.editingStaffId);
+    const needsPassword = sfSignsIn(sfType) && !auto && (!editing || editing.canSignIn === false);
+    if (needsPassword && !password.value.trim()) return sfInvalid(password, 'Enter a password or tick Auto Generate Password');
+    if (sfType === 'teacher' && !state.editingStaffId && document.getElementById('sf-teacher-type').value === 'class_teacher' && !document.getElementById('sf-class').value) {
+      return sfInvalid(document.getElementById('sf-class'), 'Choose a class for this Class Teacher');
+    }
+  }
+  return true;
+}
+
+function sfResetFields() {
+  document.querySelectorAll('#sf-modal [data-field]').forEach(el => { el.value = ''; });
+  document.querySelectorAll('#sf-modal .sf-invalid').forEach(el => el.classList.remove('sf-invalid'));
+  document.getElementById('sf-password').value = '';
+  document.getElementById('sf-auto-password').checked = false;
+  document.getElementById('sf-teacher-type').value = 'class_teacher';
+  document.getElementById('sf-teacher-type').disabled = false;
+  sfPhotoDataUrl = '';
+  sfSetPhoto('');
+}
+
+// type: a staff type key; staff: an existing staff member to edit
+function openStaffForm(type, staff = null) {
+  document.getElementById('sf-add-menu')?.setAttribute('hidden', '');
+  const modal = document.getElementById('sf-modal');
+  if (!modal) return;
+  state.editingStaffId = staff?.id || null;
+  sfType = type || staff?.staffType || 'teacher';
+  sfResetFields();
+  sfFillDesignations(staff?.designation || '');
+  sfFillClasses('');
+  if (staff) {
+    // older records only have a full name: split it into the name boxes
+    const parts = String(staff.name || '').split(/\s+/).filter(Boolean);
+    const values = {
+      ...staff,
+      firstName: staff.surname ? staff.firstName : parts[0] || '',
+      surname: staff.surname || (parts.length > 1 ? parts[parts.length - 1] : ''),
+      otherNames: staff.surname ? staff.otherNames : parts.slice(1, -1).join(' '),
+    };
+    modal.querySelectorAll('[data-field]').forEach(el => {
+      const value = values[el.dataset.field];
+      if (el.dataset.field !== 'designation' && value != null) el.value = value;
+    });
+    if (staff.teacherType) document.getElementById('sf-teacher-type').value = staff.teacherType;
+    if (staff.photoPath) sfSetPhoto(`/${staff.photoPath}`);
+  }
+  document.getElementById('sf-title').textContent = staff
+    ? `Edit ${sfTypeLabel(sfType)} — ${staff.name || staff.id}`
+    : `Add ${sfTypeLabel(sfType)}`;
+  document.getElementById('sf-save').textContent = staff ? 'Save Changes' : 'Register Staff';
+  // editing lets you jump straight to any step
+  modal.querySelectorAll('.sf-steps button').forEach(btn => { btn.disabled = !staff; });
+  sfSyncType();
+  modal.style.display = 'flex';
+  sfStep = 1;
+  sfGoTo(1);
+}
+
+function closeStaffForm() {
+  const modal = document.getElementById('sf-modal');
+  if (modal) modal.style.display = 'none';
+  state.editingStaffId = null;
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || document.querySelector('.ui-dialog-overlay')) return;
+  const modal = document.getElementById('sf-modal');
+  if (modal && modal.style.display !== 'none') closeStaffForm();
+});
 
 function editStaff(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
-  if (!staff) return showToast('Staff account not found');
-  state.editingStaffId = staff.id;
-  document.getElementById('new-staff-id').value = staff.id;
-  document.getElementById('new-staff-id').disabled = false;
-  document.getElementById('new-staff-name').value = staff.name || '';
-  document.getElementById('new-staff-initials').value = staff.initials || '';
-  document.getElementById('new-staff-password').value = '';
-  document.getElementById('new-staff-password').placeholder = 'Leave blank to keep current password';
-  document.getElementById('new-staff-role').value = staff.role || 'teacher';
-  document.getElementById('new-staff-teacher-type').value = staff.teacherType || '';
-  syncStaffRoleFields();
-  document.getElementById('staff-form-title').textContent = `Edit Staff / Employee — ${staff.name || staff.id}`;
-  document.getElementById('staff-save-label').textContent = 'Save Changes';
+  if (!staff) return showToast('Staff member not found');
   closeStaffProfile();
-  switchTab('addStaff', visibleNavItem('addStaff'), 'Edit Staff', staff.name || staff.id);
-  document.getElementById('new-staff-name')?.focus({ preventScroll: true });
+  openStaffForm(staff.staffType, staff);
 }
 
-function syncStaffRoleFields() {
-  const role = document.getElementById('new-staff-role')?.value;
-  const type = document.getElementById('new-staff-teacher-type');
-  if (!type) return;
-  type.disabled = role !== 'teacher';
-  if (role !== 'teacher') type.value = '';
-  else if (!type.value) type.value = 'class_teacher';
-  const classWrap = document.getElementById('new-staff-class-wrap');
-  if (classWrap) classWrap.style.display = role === 'teacher' && type?.value === 'class_teacher' ? '' : 'none';
+async function sfAddDesignation() {
+  const name = (await uiPrompt('New designation', { placeholder: 'e.g. Bursar', confirmLabel: 'Add' }) || '').trim();
+  if (!name) return;
+  try {
+    const data = await apiFetch('/api/admin/staff-designations', { method: 'POST', body: JSON.stringify({ name }) });
+    state.setup.staffDesignations = data.designations;
+    sfFillDesignations(data.name);
+    showToast('Designation added');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function saveStaffForm() {
+  for (let step = 1; step <= 4; step++) {
+    if (!sfValidateStep(step)) { if (sfStep !== step) sfGoTo(step); return; }
+  }
+  const payload = { staffType: sfType };
+  document.querySelectorAll('#sf-modal [data-field]').forEach(el => { payload[el.dataset.field] = el.value.trim(); });
+  payload.password = document.getElementById('sf-password').value.trim();
+  payload.autoPassword = document.getElementById('sf-auto-password').checked;
+  payload.teacherType = document.getElementById('sf-teacher-type').value;
+  payload.classCode = document.getElementById('sf-class').value;
+  if (sfPhotoDataUrl) payload.photoDataUrl = sfPhotoDataUrl;
+  const editingId = state.editingStaffId;
+  const save = document.getElementById('sf-save');
+  save.disabled = true;
+  try {
+    const data = await apiFetch(editingId ? `/api/admin/staff/${encodeURIComponent(editingId)}` : '/api/admin/staff', {
+      method: editingId ? 'PUT' : 'POST',
+      body: JSON.stringify(payload),
+    });
+    state.setup = data.setup;
+    populateStaff();
+    populateAdminControls();
+    renderAssignments();
+    closeStaffForm();
+    showToast(editingId ? 'Staff details updated' : `${sfTypeLabel(sfType)} added`);
+    // a generated password is shown once, so the admin can pass it on
+    if (data.generatedPassword) {
+      await uiNotice('Sign-in details', `Staff ID: ${data.id}\nPassword: ${data.generatedPassword}\n\nGive these to the staff member. The password is not shown again.`);
+    } else if (!editingId && sfSignsIn(sfType)) {
+      showToast(`Staff ID: ${data.id}`, 'success');
+    }
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    save.disabled = false;
+  }
 }
 
 function openStudentDeleteModal() {
@@ -2132,15 +2352,19 @@ function openStaffProfile(id) {
   document.getElementById('staff-profile-name').textContent = staff.name || staff.id;
   document.getElementById('staff-profile-role').textContent = staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff');
   const deleteTeacherButton = document.getElementById('staff-delete-teacher');
-  if (deleteTeacherButton) deleteTeacherButton.style.display = staff.role === 'teacher' ? '' : 'none';
+  if (deleteTeacherButton) {
+    deleteTeacherButton.style.display = staff.role === 'teacher' || staff.role === 'staff' ? '' : 'none';
+    deleteTeacherButton.textContent = staff.role === 'teacher' ? 'Delete Teacher' : 'Delete Staff';
+  }
   modal.style.display = 'flex';
   renderStaffProfileTab('profile');
 }
 
 async function deleteTeacherAccount(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
-  if (!staff || staff.role !== 'teacher') return showToast('Only teacher accounts can be deleted');
-  if (!await uiConfirm(`Delete teacher account “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
+  if (!staff || (staff.role !== 'teacher' && staff.role !== 'staff')) return showToast('Admin accounts cannot be deleted here');
+  const what = staff.role === 'teacher' ? 'teacher account' : 'staff record';
+  if (!await uiConfirm(`Delete ${what} “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}`, { method: 'DELETE' });
     state.setup = data.setup;
@@ -2148,7 +2372,7 @@ async function deleteTeacherAccount(id) {
     populateStaff();
     populateAdminControls();
     populateClasses();
-    showToast('Teacher account deleted');
+    showToast(staff.role === 'teacher' ? 'Teacher account deleted' : 'Staff record deleted');
   } catch (err) { showToast(err.message); }
 }
 
@@ -2176,15 +2400,26 @@ function renderStaffProfileTab(tab) {
     return;
   }
   const assignments = staffAssignments(staff);
+  const join = (...parts) => parts.filter(Boolean).join(', ');
   const rows = [
-    ['Name', staff.name || ''],
+    ['Name', [staff.title, staff.name].filter(Boolean).join(' ')],
     ['Staff ID / Number', staff.id || ''],
-    ['Account Status', staff.active === false ? 'Deactivated' : 'Active'],
-    ['Profile Type', staff.role === 'admin' ? 'Administrator' : 'Teacher'],
-    ['Designation', staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff')],
+    ['Staff Type', staff.staffTypeLabel || (staff.role === 'admin' ? 'Administrator' : 'Teacher')],
+    ['Portal Login', staff.canSignIn === false ? 'None (staff record only)' : staff.active === false ? 'Deactivated' : 'Active'],
+    ['Designation', staff.roleLabel || ''],
     ['Teacher Type', staff.teacherType === 'subject_teacher' ? 'Subject Teacher' : staff.teacherType === 'class_teacher' ? 'Class Teacher' : ''],
     ['Assignments', assignments],
-  ];
+    ['Gender', staff.gender], ['Phone', staff.phone], ['Email', staff.email],
+    ['Date of Birth', staff.dob], ['Religion', staff.religion],
+    ['Blood Group / Genotype', [staff.bloodGroup, staff.genotype].filter(Boolean).join(' / ')],
+    ['Origin', join(staff.town, staff.lga, staff.stateOfOrigin, staff.nationality)],
+    ['Residential Address', staff.address], ['Permanent Address', staff.permanentAddress],
+    ['Qualifications', staff.qualifications], ['Department', staff.department], ['Area of Work', staff.areaOfWork],
+    ['Date of Appointment', staff.dateOfAppointment], ['Date of Starting', staff.dateStarted],
+    ['Next of Kin', join(staff.nokName, staff.nokRelationship, staff.nokPhone, staff.nokEmail, staff.nokAddress)],
+    ['Emergency Contact', join(staff.emergencyName, staff.emergencyRelationship, staff.emergencyPhone, staff.emergencyEmail, staff.emergencyAddress)],
+  // the first rows always show; optional details only when filled in
+  ].filter(([, value], i) => i < 4 || value);
   body.innerHTML = `<div class="staff-profile-details">${rows.map(([label, value]) => `<div class="staff-profile-detail"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || 'Not set')}</strong></div>`).join('')}</div>`;
 }
 
@@ -2293,50 +2528,6 @@ async function assignStaffSubject() {
   } catch (err) { showToast(err.message, 'warn'); }
 }
 
-async function saveStaff() {
-  const payload = {
-    id: document.getElementById('new-staff-id').value,
-    name: document.getElementById('new-staff-name').value,
-    initials: document.getElementById('new-staff-initials').value,
-    password: document.getElementById('new-staff-password').value,
-    role: document.getElementById('new-staff-role').value,
-    teacherType: document.getElementById('new-staff-teacher-type').value,
-    classCode: document.getElementById('new-staff-class')?.value || '',
-  };
-  if (!payload.id || !payload.name || !payload.role || (!state.editingStaffId && !payload.password)) {
-    showToast('Staff ID, name, role, and password are required');
-    return;
-  }
-  if (payload.role === 'teacher' && !payload.teacherType) {
-    showToast('Choose a teacher type');
-    return;
-  }
-  if (!state.editingStaffId && payload.role === 'teacher' && payload.teacherType === 'class_teacher' && !payload.classCode) {
-    showToast('Choose a class for this Class Teacher');
-    return;
-  }
-  try {
-    const url = state.editingStaffId
-      ? `/api/admin/staff/${encodeURIComponent(state.editingStaffId)}`
-      : '/api/admin/staff';
-    const data = await apiFetch(url, {
-      method: state.editingStaffId ? 'PUT' : 'POST',
-      body: JSON.stringify(payload),
-    });
-    state.setup = data.setup;
-    populateStaff();
-    populateAdminControls();
-    renderAssignments();
-    const wasEditing = !!state.editingStaffId;
-    clearStaffForm();
-    // after an edit, go back to the staff list; after adding, stay ready for the next one
-    if (wasEditing) switchTab('staff', visibleNavItem('staff'));
-    showToast(`Staff account ${wasEditing ? 'updated' : 'added'}`);
-  } catch (err) {
-    showToast(err.message);
-  }
-}
-
 function renderAnnouncements() {
   const list = document.getElementById('ann-list');
   const countLabel = document.getElementById('ann-count-label');
@@ -2383,7 +2574,6 @@ const TAB_META = {
   admissions: { title: 'Admission', sub: 'Applications Summary' },
   students: { title: 'View Students', sub: 'Students Information System' },
   staff: { title: 'People', sub: 'Teachers and Staff' },
-  addStaff: { title: 'Add Staff', sub: 'Add a Staff / Employee' },
   parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },

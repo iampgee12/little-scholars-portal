@@ -1236,6 +1236,57 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .staff-profile-detail strong { color:#172033; font-size:13px; font-weight:500; }
 .staff-profile-empty { display:flex; flex-direction:column; gap:8px; padding:35px; text-align:center; color:#64748b; }
 .staff-profile-empty strong { color:#172033; }
+/* ── Add / Edit Staff: type dropdown + 4-step pop-up ── */
+.sf-add-wrap { position:relative; display:inline-block; }
+.sf-add-btn { padding:8px 14px; font-size:12px; }
+.sf-add-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:40; min-width:230px; padding:6px; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 14px 34px rgba(15,23,42,.14); }
+.sf-add-menu button { display:block; width:100%; text-align:left; border:0; background:transparent; padding:9px 12px; border-radius:6px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--text-1); cursor:pointer; }
+.sf-add-menu button:hover, .sf-add-menu button:focus { background:var(--black-3); outline:none; }
+.sf-add-menu .sf-menu-sep { height:1px; margin:5px 4px; background:var(--border); }
+.sf-modal { position:fixed; inset:0; z-index:1250; align-items:flex-start; justify-content:center; padding:24px; overflow-y:auto; background:rgba(15,23,42,.46); }
+.sf-dialog { width:min(760px, 100%); margin:auto 0; background:#fff; border-radius:10px; box-shadow:0 24px 70px rgba(15,23,42,.25); }
+.sf-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 22px; border-bottom:1px solid var(--border); }
+.sf-head strong { font-size:16px; color:var(--text-1); }
+.sf-steps { display:grid; grid-template-columns:repeat(4, 1fr); margin:0; padding:18px 22px 16px; list-style:none; border-bottom:1px solid var(--border); position:relative; }
+.sf-steps li { position:relative; text-align:center; }
+.sf-steps li + li::before { content:''; position:absolute; top:17px; right:50%; width:100%; height:2px; background:var(--border); z-index:0; }
+.sf-steps li.done + li::before, .sf-steps li.done + li.active::before { background:var(--green); }
+.sf-steps button { position:relative; z-index:1; display:inline-flex; flex-direction:column; align-items:center; gap:6px; border:0; background:transparent; font-family:'DM Sans',sans-serif; font-size:11px; color:var(--text-3); cursor:pointer; }
+.sf-steps button:disabled { cursor:default; }
+.sf-steps span { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; background:var(--black-3); border:2px solid var(--border); color:var(--text-2); font-size:14px; font-weight:700; }
+.sf-steps li.active button { color:var(--green); font-weight:700; }
+.sf-steps li.active span { background:var(--green); border-color:var(--green); color:#fff; }
+.sf-steps li.done span { background:var(--green-bg); border-color:var(--green); color:var(--green); }
+.sf-body { padding:20px 22px 6px; }
+.sf-step { display:none; }
+.sf-step.active { display:block; }
+.sf-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px 16px; margin-bottom:16px; }
+.sf-grid-2 { grid-template-columns:repeat(2, minmax(0,1fr)); }
+.sf-span-2 { grid-column:span 2; }
+.sf-span-3 { grid-column:1 / -1; }
+.sf-grid textarea { resize:vertical; min-height:72px; font-family:'DM Sans',sans-serif; }
+.sf-label-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.sf-add-new { border:1px solid var(--green); background:transparent; color:var(--green); border-radius:4px; padding:1px 7px; font-size:10px; font-weight:700; letter-spacing:0; text-transform:none; cursor:pointer; }
+.sf-add-new:hover { background:var(--green-bg); }
+.sf-hint { font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-3); }
+.sf-photo { display:flex; flex-direction:column; align-items:flex-start; gap:0; margin-bottom:16px; }
+.sf-photo-frame { width:128px; height:128px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-bottom:0; border-radius:6px 6px 0 0; background:var(--black-3); color:#cbd5e1; overflow:hidden; }
+.sf-photo-frame svg { width:70%; height:70%; }
+.sf-photo-frame img { width:100%; height:100%; object-fit:cover; }
+.sf-photo-btn { width:128px; justify-content:center; border-radius:0 0 6px 6px; padding:7px 0; font-size:12px; cursor:pointer; }
+.sf-check { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--text-2); cursor:pointer; }
+.sf-note { align-self:end; padding:10px 12px; border-radius:6px; background:var(--black-3); border:1px solid var(--border); font-size:12px; color:var(--text-2); line-height:1.45; }
+.sf-section-title { margin:2px 0 12px; font-size:13px; font-weight:700; color:var(--text-1); }
+.sf-section-title:not(:first-child) { margin-top:8px; padding-top:16px; border-top:1px solid var(--border); }
+.sf-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 22px; border-top:1px solid var(--border); }
+.sf-foot button { padding:9px 18px; font-size:12px; }
+.sf-invalid { border-color:var(--red) !important; }
+@media (max-width:640px) {
+  .sf-modal { padding:10px; }
+  .sf-grid, .sf-grid-2 { grid-template-columns:1fr; }
+  .sf-span-2 { grid-column:auto; }
+  .sf-steps button { font-size:10px; }
+}
 .staff-subjects-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; color:#64748b; font-size:13px; }
 .staff-subjects-table { width:100%; }
 .teacher-subjects-dialog { width:min(1080px, 96vw); }
@@ -2637,8 +2688,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <button type="button" class="sub-nav-item result-child" data-tab="classAllocation" onclick="switchTab('classAllocation', this)">Promote / Move Students</button>
           </div>
           <button type="button" class="sub-nav-item" data-tab="parents" onclick="switchTab('parents', this)"><span>Parents</span></button>
-          <button type="button" class="sub-nav-item" data-tab="staff" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')"><span>Staff / Employees</span></button>
-          <button type="button" class="sub-nav-item" data-tab="addStaff" data-title="Add Staff" data-sub="Add a Staff / Employee" data-keywords="new teacher employee hire register create" onclick="openAddStaff()"><span>Add Staff</span></button>
+          <button type="button" class="sub-nav-item" data-tab="staff" data-keywords="add staff new teacher employee hire register create" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')"><span>Staff / Employees</span></button>
           <button type="button" class="sub-nav-item" data-tab="selfRegistration" onclick="switchTab('selfRegistration', this); sregOpen('dashboard')"><span>Self Registration</span></button>
         </div>
 
@@ -3354,6 +3404,10 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 
           <div class="staff-directory-shell">
             <div class="staff-toolbar">
+              <div class="sf-add-wrap">
+                <button type="button" class="post-btn sf-add-btn" id="sf-add-btn" aria-haspopup="true" aria-expanded="false" onclick="toggleAddStaffMenu(event)">+ Add Staff ▾</button>
+                <div class="sf-add-menu" id="sf-add-menu" role="menu" hidden></div>
+              </div>
               <button type="button" class="staff-export-btn" onclick="exportStaffList()">Export List ▾</button>
               <input class="staff-search-light" id="staff-search" placeholder="Search" oninput="filterStaff()">
             </div>
@@ -3377,53 +3431,102 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         </div>
       </div>
 
-      <!-- ADD STAFF (its own page, like Enroll Students) -->
-      <div class="tab-panel" id="tab-addStaff">
-        <div class="staff-employee-page">
-          <div class="staff-form-light" id="staff-form-card" style="margin-top:0;">
-            <div class="card-head"><span class="card-title" id="staff-form-title">Add Staff / Employee</span></div>
-            <div class="card-body">
-              <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;">
-                <div>
-                  <label class="field-label">Staff ID</label>
-                  <input class="field-input" id="new-staff-id" placeholder="TCH-009 or ADM-002">
-                </div>
-                <div>
-                  <label class="field-label">Password</label>
-                  <input class="field-input" id="new-staff-password" placeholder="Temporary password">
-                </div>
-                <div>
-                  <label class="field-label">Full Name</label>
-                  <input class="field-input" id="new-staff-name" placeholder="Staff name">
-                </div>
-                <div>
-                  <label class="field-label">Initials</label>
-                  <input class="field-input" id="new-staff-initials" placeholder="Optional">
-                </div>
-                <div>
-                  <label class="field-label">Role</label>
-                  <select class="ctrl-select" id="new-staff-role" onchange="syncStaffRoleFields()">
-                    <option value="teacher">Teacher</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="field-label">Teacher Type</label>
-                  <select class="ctrl-select" id="new-staff-teacher-type" onchange="syncStaffRoleFields()">
-                    <option value="class_teacher">Class Teacher</option>
-                    <option value="subject_teacher">Subject Teacher</option>
-                  </select>
-                </div>
-                <div id="new-staff-class-wrap" style="display:none;">
-                  <label class="field-label">Class *</label>
-                  <select class="ctrl-select" id="new-staff-class"><option value="">Select class</option></select>
-                </div>
+      <!-- ADD / EDIT STAFF: 4-step form in a pop-up over the staff list -->
+      <div class="sf-modal" id="sf-modal" role="dialog" aria-modal="true" aria-labelledby="sf-title" style="display:none;">
+        <div class="sf-dialog">
+          <div class="sf-head">
+            <strong id="sf-title">Add Staff</strong>
+            <button type="button" class="staff-profile-close" onclick="closeStaffForm()" aria-label="Close">&times;</button>
+          </div>
+          <ol class="sf-steps" id="sf-steps">
+            <li data-step="1"><button type="button" onclick="sfGoTo(1)"><span>1</span>Bio Data</button></li>
+            <li data-step="2"><button type="button" onclick="sfGoTo(2)"><span>2</span>More Info</button></li>
+            <li data-step="3"><button type="button" onclick="sfGoTo(3)"><span>3</span>Work Details</button></li>
+            <li data-step="4"><button type="button" onclick="sfGoTo(4)"><span>4</span>Next of Kin</button></li>
+          </ol>
+          <div class="sf-body">
+            <!-- 1 · Bio Data -->
+            <section class="sf-step" data-step="1">
+              <div class="sf-photo">
+                <div class="sf-photo-frame" id="sf-photo-preview"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="38" cy="22" r="7"/><path d="M6 54 26 30l14 16 8-8 10 16z"/></svg></div>
+                <label class="btn-outline sf-photo-btn">+ New Photo<input type="file" id="sf-photo" accept="image/*" hidden onchange="sfPhotoChosen(this)"></label>
               </div>
-              <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button class="ann-del" onclick="clearStaffForm()" style="font-size:12px;color:#64748b;">Clear</button>
-                <button class="post-btn" onclick="saveStaff()" id="staff-save-label">Add Staff</button>
+              <div class="sf-grid">
+                <div><label class="field-label" for="sf-title-select">Title</label>
+                  <select class="ctrl-select" id="sf-title-select" data-field="title"><option value=""></option><option>Mr</option><option>Mrs</option><option>Miss</option><option>Ms</option><option>Dr</option><option>Prof</option><option>Rev</option><option>Engr</option><option>Chief</option><option>Barrister</option><option>Alhaji</option><option>Alhaja</option></select></div>
               </div>
-            </div>
+              <div class="sf-grid">
+                <div><label class="field-label" for="sf-surname">Surname *</label><input class="field-input" id="sf-surname" data-field="surname" data-required="Surname"></div>
+                <div><label class="field-label" for="sf-first">First Name *</label><input class="field-input" id="sf-first" data-field="firstName" data-required="First name"></div>
+                <div><label class="field-label" for="sf-other">Other Names</label><input class="field-input" id="sf-other" data-field="otherNames"></div>
+                <div><label class="field-label" for="sf-gender">Gender</label><select class="ctrl-select" id="sf-gender" data-field="gender"><option value="">Select</option><option>Male</option><option>Female</option></select></div>
+                <div><label class="field-label" for="sf-phone">Phone</label><input class="field-input" id="sf-phone" data-field="phone" type="tel" placeholder="0802 123 4567"></div>
+                <div><label class="field-label sf-label-row" for="sf-designation">Designation <button type="button" class="sf-add-new" onclick="sfAddDesignation()">+ Add New</button></label><select class="ctrl-select" id="sf-designation" data-field="designation"></select></div>
+              </div>
+              <div class="sf-grid sf-grid-2">
+                <div><label class="field-label" for="sf-email">Email</label><input class="field-input" id="sf-email" data-field="email" type="email" autocomplete="off"></div>
+                <div class="sf-login-only"><label class="field-label" for="sf-password" id="sf-password-label">Password *</label>
+                  <input class="field-input" id="sf-password" type="text" autocomplete="new-password">
+                  <label class="sf-check"><input type="checkbox" id="sf-auto-password" onchange="sfSyncPassword()"> Auto Generate Password</label></div>
+                <div class="sf-records-only sf-note">This staff type doesn't sign in to the portal. Saving creates their staff record.</div>
+              </div>
+              <div class="sf-grid sf-teacher-only">
+                <div><label class="field-label" for="sf-teacher-type">Teacher Type *</label><select class="ctrl-select" id="sf-teacher-type" onchange="sfSyncTeacher()"><option value="class_teacher">Class Teacher</option><option value="subject_teacher">Subject Teacher</option></select></div>
+                <div id="sf-class-wrap"><label class="field-label" for="sf-class">Class *</label><select class="ctrl-select" id="sf-class"><option value="">Select class</option></select></div>
+              </div>
+            </section>
+            <!-- 2 · More Info -->
+            <section class="sf-step" data-step="2">
+              <div class="sf-grid">
+                <div><label class="field-label" for="sf-dob">Date of Birth</label><input class="field-input" id="sf-dob" data-field="dob" type="date"></div>
+                <div><label class="field-label" for="sf-religion">Religion</label><input class="field-input" id="sf-religion" data-field="religion" list="sf-religions"><datalist id="sf-religions"><option>Christianity</option><option>Islam</option><option>Traditional</option><option>Other</option></datalist></div>
+                <div><label class="field-label" for="sf-blood">Blood Group</label><select class="ctrl-select" id="sf-blood" data-field="bloodGroup"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+                <div><label class="field-label" for="sf-genotype">Genotype</label><select class="ctrl-select" id="sf-genotype" data-field="genotype"><option value="">Select</option><option>AA</option><option>AS</option><option>SS</option><option>AC</option><option>SC</option></select></div>
+                <div><label class="field-label" for="sf-nationality">Nationality</label><input class="field-input" id="sf-nationality" data-field="nationality" list="sf-countries"><datalist id="sf-countries"><option>Nigeria</option><option>Ghana</option><option>Benin</option><option>Cameroon</option><option>Togo</option><option>Niger</option><option>Chad</option><option>Sierra Leone</option><option>Liberia</option><option>Gambia</option><option>Senegal</option><option>Côte d’Ivoire</option><option>South Africa</option><option>Kenya</option><option>United Kingdom</option><option>United States</option><option>Canada</option></datalist></div>
+                <div><label class="field-label" for="sf-state">Province/State (of Origin)</label><input class="field-input" id="sf-state" data-field="stateOfOrigin"></div>
+                <div><label class="field-label" for="sf-lga">ZIP/LGA (of Origin)</label><input class="field-input" id="sf-lga" data-field="lga"></div>
+                <div><label class="field-label" for="sf-town">Town (of Origin)</label><input class="field-input" id="sf-town" data-field="town"></div>
+              </div>
+              <div class="sf-grid sf-grid-2">
+                <div><label class="field-label" for="sf-perm-address">Permanent Address</label><textarea class="field-input" id="sf-perm-address" data-field="permanentAddress" rows="3"></textarea></div>
+                <div><label class="field-label" for="sf-res-address">Residential Address</label><textarea class="field-input" id="sf-res-address" data-field="address" rows="3"></textarea></div>
+              </div>
+            </section>
+            <!-- 3 · Work Details -->
+            <section class="sf-step" data-step="3">
+              <div class="sf-grid">
+                <div class="sf-span-3"><label class="field-label" for="sf-qualifications">Qualification(s) <span class="sf-hint">(comma separated if multiple)</span></label><input class="field-input" id="sf-qualifications" data-field="qualifications" placeholder="e.g. B.Ed, NCE"></div>
+                <div><label class="field-label" for="sf-staff-id">Staff ID / Number</label><input class="field-input" id="sf-staff-id" data-field="id" placeholder="Leave blank to generate"></div>
+                <div><label class="field-label" for="sf-appointed">Date of Appointment</label><input class="field-input" id="sf-appointed" data-field="dateOfAppointment" type="date"></div>
+                <div><label class="field-label" for="sf-started">Date of Starting</label><input class="field-input" id="sf-started" data-field="dateStarted" type="date"></div>
+                <div><label class="field-label" for="sf-department">Department</label><input class="field-input" id="sf-department" data-field="department"></div>
+                <div><label class="field-label" for="sf-area">Area of Work</label><input class="field-input" id="sf-area" data-field="areaOfWork"></div>
+              </div>
+            </section>
+            <!-- 4 · Next of Kin -->
+            <section class="sf-step" data-step="4">
+              <h3 class="sf-section-title">Next of Kin</h3>
+              <div class="sf-grid">
+                <div><label class="field-label" for="sf-nok-name">Name</label><input class="field-input" id="sf-nok-name" data-field="nokName"></div>
+                <div><label class="field-label" for="sf-nok-rel">Relationship to Staff</label><input class="field-input" id="sf-nok-rel" data-field="nokRelationship"></div>
+                <div><label class="field-label" for="sf-nok-phone">Contact Phone</label><input class="field-input" id="sf-nok-phone" data-field="nokPhone" type="tel"></div>
+                <div><label class="field-label" for="sf-nok-email">Contact Email</label><input class="field-input" id="sf-nok-email" data-field="nokEmail" type="email"></div>
+                <div class="sf-span-2"><label class="field-label" for="sf-nok-address">Address</label><input class="field-input" id="sf-nok-address" data-field="nokAddress"></div>
+              </div>
+              <h3 class="sf-section-title">Emergency Contact Person</h3>
+              <div class="sf-grid">
+                <div><label class="field-label" for="sf-em-name">Name</label><input class="field-input" id="sf-em-name" data-field="emergencyName"></div>
+                <div><label class="field-label" for="sf-em-rel">Relationship to Staff</label><input class="field-input" id="sf-em-rel" data-field="emergencyRelationship"></div>
+                <div><label class="field-label" for="sf-em-phone">Contact Phone</label><input class="field-input" id="sf-em-phone" data-field="emergencyPhone" type="tel"></div>
+                <div><label class="field-label" for="sf-em-email">Email</label><input class="field-input" id="sf-em-email" data-field="emergencyEmail" type="email"></div>
+                <div class="sf-span-2"><label class="field-label" for="sf-em-address">Address</label><input class="field-input" id="sf-em-address" data-field="emergencyAddress"></div>
+              </div>
+            </section>
+          </div>
+          <div class="sf-foot">
+            <button type="button" class="btn-outline" id="sf-back" onclick="sfGoTo(sfStep - 1)">&larr; Back</button>
+            <button type="button" class="post-btn" id="sf-next" onclick="sfNext()">Next &rarr;</button>
+            <button type="button" class="post-btn" id="sf-save" onclick="saveStaffForm()">Register Staff</button>
           </div>
         </div>
       </div>

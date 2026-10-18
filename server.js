@@ -214,6 +214,107 @@ function ensureColumn(table, column, definition) {
   if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
+// ── Staff types ──
+// Teachers and admins sign in; every other staff type is a record only
+// (users.role = 'staff', which can never sign in).
+const STAFF_TYPES = [
+  ['teacher', 'Teacher'], ['accountant', 'Accountant/Bursary Officer'], ['librarian', 'Librarian'],
+  ['registrar', 'Registrar'], ['transport_manager', 'Transport Manager'], ['hostel_manager', 'Hostel Manager'],
+  ['store_manager', 'Store Manager'], ['general_staff', 'General Staff / Others'], ['admin', 'Administrator'],
+];
+const STAFF_TYPE_KEYS = STAFF_TYPES.map(([key]) => key);
+const STAFF_ID_PREFIX = { teacher: 'TCH-', admin: 'ADM-', staff: 'STF-' };
+const DEFAULT_STAFF_DESIGNATIONS = [
+  'Head Of School', 'Assistant Head Of School', 'Head of Department', 'Classroom Teacher', 'Subject Teacher',
+  'Administrative', 'Officer I', 'Officer II', 'Childcare', 'Laboratory Attendant', 'Security/Watchman', 'Utility', 'Chauffeur',
+];
+// Add Staff form field → users column (text values, all optional)
+const STAFF_PROFILE_FIELDS = {
+  staffType: 'staff_type', title: 'title', surname: 'surname', otherNames: 'other_names', gender: 'gender',
+  phone: 'phone', designation: 'designation', email: 'email', dob: 'dob', religion: 'religion',
+  bloodGroup: 'blood_group', genotype: 'genotype', nationality: 'nationality', stateOfOrigin: 'state_of_origin',
+  lga: 'lga', town: 'town', permanentAddress: 'permanent_address', address: 'address',
+  qualifications: 'qualifications', dateOfAppointment: 'date_of_appointment', dateStarted: 'date_started',
+  department: 'department', areaOfWork: 'area_of_work',
+  nokName: 'nok_name', nokRelationship: 'nok_relationship', nokPhone: 'nok_phone', nokEmail: 'nok_email', nokAddress: 'nok_address',
+  emergencyName: 'emergency_name', emergencyRelationship: 'emergency_relationship', emergencyPhone: 'emergency_phone',
+  emergencyEmail: 'emergency_email', emergencyAddress: 'emergency_address',
+};
+const STAFF_PROFILE_COLUMNS = Object.values(STAFF_PROFILE_FIELDS)
+  .filter(col => !['gender', 'phone', 'email', 'dob', 'religion', 'blood_group', 'address', 'date_of_appointment'].includes(col));
+
+// Reads the Add/Edit Staff form. Returns { error } or the cleaned values.
+function readStaffForm(body) {
+  const staffType = cleanText(body.staffType);
+  if (!STAFF_TYPE_KEYS.includes(staffType)) return { error: 'Choose a staff type' };
+  const role = staffRoleForType(staffType);
+  const firstName = cleanText(body.firstName);
+  const surname = cleanText(body.surname);
+  if (!surname || !firstName) return { error: 'Surname and first name are required' };
+  const profile = {};
+  for (const [key, col] of Object.entries(STAFF_PROFILE_FIELDS)) {
+    profile[col] = cleanText(body[key]).slice(0, col.endsWith('address') || col === 'qualifications' ? 400 : 150) || null;
+  }
+  profile.staff_type = staffType;
+  if (profile.email) {
+    profile.email = profile.email.toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return { error: 'Enter a valid email address' };
+  }
+  const teacherType = role === 'teacher' ? cleanText(body.teacherType) : null;
+  if (role === 'teacher' && !['class_teacher', 'subject_teacher'].includes(teacherType)) {
+    return { error: 'Choose a teacher type' };
+  }
+  const name = [firstName, cleanText(body.otherNames), surname].filter(Boolean).join(' ');
+  return {
+    staffType, role, teacherType, name, firstName, profile,
+    id: cleanText(body.id).toUpperCase(),
+    initials: initialsFromName(`${firstName} ${surname}`),
+    password: cleanText(body.password),
+    autoPassword: !!body.autoPassword,
+    classCode: cleanText(body.classCode).toUpperCase(),
+    photoDataUrl: cleanText(body.photoDataUrl),
+  };
+}
+
+function staffRoleForType(staffType) {
+  return staffType === 'teacher' ? 'teacher' : staffType === 'admin' ? 'admin' : 'staff';
+}
+
+function nextStaffUserId(role) {
+  const prefix = STAFF_ID_PREFIX[role] || 'STF-';
+  const max = all('SELECT id FROM users WHERE id LIKE ?', `${prefix}%`)
+    .reduce((m, r) => Math.max(m, Number(r.id.slice(prefix.length)) || 0), 0);
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
+}
+
+// The users table was created allowing only student/teacher/admin. SQLite
+// can't ALTER a CHECK, but its documented writable_schema procedure can widen
+// one in place: the stored rows are untouched, only the rule text changes.
+function allowStaffRole() {
+  const table = one("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'");
+  const oldCheck = "CHECK(role IN ('student','teacher','admin'))";
+  if (!table || !table.sql.includes(oldCheck)) return;
+  db.enableDefensive(false);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const version = one('PRAGMA schema_version').schema_version;
+    db.exec('PRAGMA writable_schema = ON');
+    run("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'users'",
+      table.sql.replace(oldCheck, "CHECK(role IN ('student','teacher','admin','staff'))"));
+    db.exec(`PRAGMA schema_version = ${version + 1}`);
+    db.exec('PRAGMA writable_schema = OFF');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('PRAGMA writable_schema = OFF');
+    db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    db.enableDefensive(true);
+  }
+  const check = one('PRAGMA integrity_check').integrity_check;
+  if (check !== 'ok') throw new Error(`users table check failed after widening roles: ${check}`);
+}
+
 function valueFromMeta(key, fallback = '') {
   return one('SELECT value FROM schema_meta WHERE key = ?', key)?.value || fallback;
 }
@@ -664,6 +765,18 @@ function createSchema() {
   // Self-service profile fields (Profile page in every portal).
   for (const col of ['dob', 'date_of_appointment', 'gender', 'religion', 'blood_group', 'address', 'phone', 'photo_path']) {
     ensureColumn('users', col, 'TEXT');
+  }
+  allowStaffRole();
+  // Add Staff form: staff type plus Bio Data / More Info / Work Details / Next of Kin
+  for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_designations (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE
+    );
+  `);
+  if (!one('SELECT id FROM staff_designations LIMIT 1')) {
+    DEFAULT_STAFF_DESIGNATIONS.forEach(name => run('INSERT OR IGNORE INTO staff_designations (name) VALUES (?)', name));
   }
   ensureColumn('academic_terms', 'start_date', 'TEXT');
   ensureColumn('academic_terms', 'end_date', 'TEXT');
@@ -3241,7 +3354,8 @@ async function handleApi(req, res, url) {
 
     const byRegNo = one('SELECT id FROM students WHERE reg_no = ?', String(body.id || '').trim());
     const user = one('SELECT * FROM users WHERE id = ?', id) || (byRegNo && one('SELECT * FROM users WHERE id = ?', byRegNo.id));
-    if (!user || !verifyPassword(password, user.password)) {
+    // records-only staff (role 'staff') have no portal and can never sign in
+    if (!user || user.role === 'staff' || !verifyPassword(password, user.password)) {
       recordFailedLogin(id);
       security.ipFailed(req);
       security.audit(req, user ? { id: user.id, name: user.name, role: user.role } : { id, name: null, role: null },
@@ -3426,7 +3540,7 @@ async function handleApi(req, res, url) {
     }
 
     const user = one('SELECT * FROM users WHERE id = ?', id);
-    if (!user || !user.email) {
+    if (!user || !user.email || user.role === 'staff') {
       recordFailedLogin(rateKey);
       return sendJson(res, 200, { ok: true, message: genericMessage });
     }
@@ -6819,35 +6933,30 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
     const staffId = decodeURIComponent(staffUpdateMatch[1]).trim().toUpperCase();
-    const existing = one('SELECT id, role, teacher_type AS teacherType FROM users WHERE id = ? AND role IN (?, ?)', staffId, 'teacher', 'admin');
-    if (!existing) return sendJson(res, 404, { error: 'Staff account not found' });
-    const body = await readJson(req);
-    const newStaffId = cleanText(body.id).toUpperCase();
-    const name = cleanText(body.name);
-    const password = cleanText(body.password);
-    const role = cleanText(body.role);
-    const teacherType = cleanText(body.teacherType);
-    const initials = cleanText(body.initials).toUpperCase() || initialsFromName(name);
-    const firstName = cleanText(body.firstName) || firstNameFromName(name);
-
-    if (!newStaffId || !name || !role) {
-      return sendJson(res, 400, { error: 'Staff ID, name, and role are required' });
-    }
+    const existing = one("SELECT id, role, teacher_type AS teacherType, photo_path AS photoPath FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", staffId);
+    if (!existing) return sendJson(res, 404, { error: 'Staff member not found' });
+    const form = readStaffForm(await readJson(req));
+    if (form.error) return sendJson(res, 400, { error: form.error });
+    const { role, teacherType, name, firstName, initials, profile } = form;
+    const newStaffId = form.id || staffId;
+    if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(newStaffId)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
     if (newStaffId !== staffId && one('SELECT id FROM users WHERE id = ?', newStaffId)) {
       return sendJson(res, 409, { error: 'That staff ID is already in use' });
-    }
-    if (!['teacher', 'admin'].includes(role)) {
-      return sendJson(res, 400, { error: 'Staff role must be teacher or admin' });
     }
     if (staffId === user.id && role !== 'admin') {
       return sendJson(res, 400, { error: 'You cannot remove admin access from your own account' });
     }
-    if (role === 'teacher' && !['class_teacher', 'subject_teacher'].includes(teacherType)) {
-      return sendJson(res, 400, { error: 'Teacher type is required for teacher staff' });
+    // Moving a records-only staff member to a sign-in type needs a password.
+    let password = form.password;
+    let generatedPassword = null;
+    if (role === 'staff') password = '';
+    else if (form.autoPassword) password = generatedPassword = String(crypto.randomInt(100000, 1000000));
+    else if (existing.role === 'staff' && !password) {
+      return sendJson(res, 400, { error: 'Enter a password or tick Auto Generate Password so they can sign in' });
     }
     const assignmentCount = one('SELECT COUNT(*) AS count FROM teacher_assignments WHERE teacher_id = ?', staffId).count;
-    if (existing.role === 'teacher' && role === 'admin' && assignmentCount > 0) {
-      return sendJson(res, 400, { error: 'Remove this teacher from result assignments before changing them to an admin' });
+    if (existing.role === 'teacher' && role !== 'teacher' && assignmentCount > 0) {
+      return sendJson(res, 400, { error: 'Remove this teacher from result assignments before changing their staff type' });
     }
     if (existing.role === 'teacher' && role === 'teacher' && existing.teacherType !== teacherType) {
       const classArmCount = one('SELECT COUNT(*) AS count FROM class_arms WHERE form_teacher_id = ?', staffId).count;
@@ -6861,6 +6970,13 @@ async function handleApi(req, res, url) {
         return sendJson(res, 400, { error: 'Remove this teacher’s class or subject assignments before changing their role' });
       }
     }
+    let photoPath = existing.photoPath;
+    try {
+      if (form.photoDataUrl) photoPath = saveDataUrl(form.photoDataUrl, `photo-${newStaffId}`);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    const cols = Object.keys(profile);
 
     db.exec('BEGIN IMMEDIATE');
     try {
@@ -6888,12 +7004,15 @@ async function handleApi(req, res, url) {
       }
       run(
         `UPDATE users
-         SET id = ?, role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?
+         SET id = ?, role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?, photo_path = ?,
+             ${cols.map(col => `${col} = ?`).join(', ')}
              ${password ? ', password = ?' : ''}
          WHERE id = ?`,
-        ...(password
-          ? [newStaffId, role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, hashPassword(password), staffId]
-          : [newStaffId, role, name, firstName, initials, role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, staffId])
+        newStaffId, role, name, firstName, initials,
+        role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, photoPath,
+        ...cols.map(col => profile[col]),
+        ...(password ? [hashPassword(password)] : []),
+        staffId
       );
       db.exec('COMMIT');
     } catch (err) {
@@ -6901,7 +7020,7 @@ async function handleApi(req, res, url) {
       throw err;
     }
 
-    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+    return sendJson(res, 200, { ok: true, id: newStaffId, generatedPassword, setup: adminSetupPayload() });
   }
 
   const staffDeleteMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)$/);
@@ -6910,16 +7029,17 @@ async function handleApi(req, res, url) {
     if (!user) return;
     const staffId = decodeURIComponent(staffDeleteMatch[1]).trim().toUpperCase();
     if (staffId === user.id) return sendJson(res, 400, { error: 'You cannot delete your own account' });
-    const teacher = one("SELECT id FROM users WHERE id = ? AND role = 'teacher'", staffId);
-    if (!teacher) return sendJson(res, 404, { error: 'Teacher account not found' });
+    // Teachers and records-only staff can be deleted; admin accounts cannot
+    const teacher = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher', 'staff')", staffId);
+    if (!teacher) return sendJson(res, 404, { error: 'Staff member not found' });
     db.exec('BEGIN IMMEDIATE');
     try {
-      run("DELETE FROM users WHERE id = ? AND role = 'teacher'", staffId);
+      run("DELETE FROM users WHERE id = ? AND role IN ('teacher', 'staff')", staffId);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
       if (String(err.message).includes('FOREIGN KEY constraint failed')) {
-        return sendJson(res, 409, { error: 'This teacher is linked to school records. Reassign or remove those references before deleting the account.' });
+        return sendJson(res, 409, { error: 'This staff member is linked to school records. Reassign or remove those references before deleting them.' });
       }
       throw err;
     }
@@ -6929,59 +7049,55 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/admin/staff') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
-    const body = await readJson(req);
-    const id = cleanText(body.id).toUpperCase();
-    const name = cleanText(body.name);
-    const password = cleanText(body.password);
-    const role = cleanText(body.role);
-    const teacherType = cleanText(body.teacherType);
-    const initials = cleanText(body.initials).toUpperCase() || initialsFromName(name);
-    const firstName = cleanText(body.firstName) || firstNameFromName(name);
-
-    if (!id || !name || !password || !role) {
-      return sendJson(res, 400, { error: 'Staff ID, name, role, and password are required' });
-    }
-    if (!['teacher', 'admin'].includes(role)) {
-      return sendJson(res, 400, { error: 'Staff role must be teacher or admin' });
-    }
-    if (role === 'teacher' && !['class_teacher', 'subject_teacher'].includes(teacherType)) {
-      return sendJson(res, 400, { error: 'Teacher type is required for teacher staff' });
-    }
-    const classCode = cleanText(body.classCode).toUpperCase();
+    const form = readStaffForm(await readJson(req));
+    if (form.error) return sendJson(res, 400, { error: form.error });
+    const { role, teacherType, name, firstName, initials, profile, classCode } = form;
     if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) {
       return sendJson(res, 400, { error: 'Choose a class for this Class Teacher' });
     }
-
-    try {
-      run(
-        `INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        id,
-        role,
-        hashPassword(password),
-        name,
-        firstName,
-        initials,
-        role === 'teacher' ? teacherType : null,
-        role === 'teacher' ? name.toUpperCase() : null
-      );
-    } catch (err) {
-      if (String(err.message).includes('UNIQUE')) {
-        return sendJson(res, 409, { error: 'A staff user with that ID already exists' });
-      }
-      throw err;
+    const id = form.id || nextStaffUserId(role);
+    if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
+    if (one('SELECT id FROM users WHERE id = ?', id)) return sendJson(res, 409, { error: 'A staff member with that ID already exists' });
+    // Records-only staff never sign in, so they get an unguessable password nobody sees.
+    let generatedPassword = null;
+    let password = form.password;
+    if (role === 'staff') password = crypto.randomBytes(24).toString('hex');
+    else if (form.autoPassword || !password) {
+      if (!form.autoPassword) return sendJson(res, 400, { error: 'Enter a password or tick Auto Generate Password' });
+      password = generatedPassword = String(crypto.randomInt(100000, 1000000));
     }
 
-    if (role === 'teacher' && teacherType === 'class_teacher') {
-      const assignment = assignClassTeacherToClass(id, classCode);
-      if (assignment.error) {
-        run('DELETE FROM users WHERE id = ?', id);
-        return sendJson(res, 400, { error: assignment.error });
+    let photoPath = null;
+    try {
+      if (form.photoDataUrl) photoPath = saveDataUrl(form.photoDataUrl, `photo-${id}`);
+    } catch (err) {
+      return sendJson(res, 400, { error: err.message });
+    }
+    const cols = Object.keys(profile);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      run(
+        `INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip, photo_path, ${cols.join(', ')})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ${cols.map(() => '?').join(', ')})`,
+        id, role, hashPassword(password), name, firstName, initials,
+        role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, photoPath,
+        ...cols.map(col => profile[col])
+      );
+      if (role === 'teacher' && teacherType === 'class_teacher') {
+        const assignment = assignClassTeacherToClass(id, classCode, true);
+        if (assignment.error) throw Object.assign(new Error(assignment.error), { status: 400 });
       }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      if (err.status === 400) return sendJson(res, 400, { error: err.message });
+      throw err;
     }
 
     return sendJson(res, 201, {
       ok: true,
+      id,
+      generatedPassword,
       setup: adminSetupPayload(),
     });
   }
@@ -6995,6 +7111,17 @@ async function handleApi(req, res, url) {
     const result = assignClassTeacherToClass(teacherId, classCode);
     if (result.error) return sendJson(res, 400, { error: result.error });
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
+  // Add Staff → Designation → "+ Add New"
+  if (req.method === 'POST' && url.pathname === '/api/admin/staff-designations') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const name = cleanText((await readJson(req)).name).slice(0, 80);
+    if (!name) return sendJson(res, 400, { error: 'Enter a designation name' });
+    run('INSERT OR IGNORE INTO staff_designations (name) VALUES (?)', name);
+    const saved = one('SELECT name FROM staff_designations WHERE name = ?', name).name;
+    return sendJson(res, 200, { ok: true, name: saved, designations: all('SELECT name FROM staff_designations ORDER BY name').map(row => row.name) });
   }
 
   if ((req.method === 'POST' || req.method === 'DELETE') && url.pathname === '/api/admin/subject-teacher-assignments') {
@@ -9200,22 +9327,32 @@ function adminSetupPayload() {
      WHERE role = 'teacher'
      ORDER BY name`
   );
+  const profileSelect = Object.entries(STAFF_PROFILE_FIELDS).map(([key, col]) => `${col} AS ${key}`).join(', ');
   const staff = all(
-    `SELECT id, name, initials, role, teacher_type AS teacherType, active
+    `SELECT id, name, first_name AS firstName, initials, role, teacher_type AS teacherType, active,
+            photo_path AS photoPath, ${profileSelect}
      FROM users
-     WHERE role IN ('teacher', 'admin')
+     WHERE role IN ('teacher', 'admin', 'staff')
      ORDER BY role DESC, name`
-  ).map(row => ({
-    ...row,
-    roleLabel: row.role === 'admin'
-      ? 'Administrator'
-      : row.teacherType === 'subject_teacher'
-        ? 'Subject Teacher'
-        : 'Class Teacher',
-    department: row.role === 'admin' ? 'admin' : 'academic',
-    active: !!row.active,
-    status: row.active ? 'Active' : 'Deactivated',
-  }));
+  ).map(row => {
+    const staffType = row.staffType || (row.role === 'admin' ? 'admin' : row.role === 'teacher' ? 'teacher' : 'general_staff');
+    return {
+      ...row,
+      staffType,
+      staffTypeLabel: STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff',
+      canSignIn: row.role !== 'staff',
+      roleLabel: row.designation || (row.role === 'admin'
+        ? 'Administrator'
+        : row.role === 'teacher'
+          ? (row.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher')
+          : STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff'),
+      department: row.department || (row.role === 'admin' ? 'admin' : row.role === 'teacher' ? 'academic' : ''),
+      active: !!row.active,
+      status: row.active ? 'Active' : 'Deactivated',
+    };
+  });
+  const staffDesignations = all('SELECT name FROM staff_designations ORDER BY name').map(row => row.name);
+  const staffTypes = STAFF_TYPES.map(([value, label]) => ({ value, label }));
   const assignments = all(
     `SELECT
        ta.id,
@@ -9293,7 +9430,7 @@ function adminSetupPayload() {
     ? all('SELECT DISTINCT class_code AS classCode, exam_type AS examType FROM report_publications WHERE academic_id = ?', academic.id)
     : [];
 
-  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
+  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, staffDesignations, staffTypes, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
 // Clean page addresses (/signin, /admin …) and the files behind them.
