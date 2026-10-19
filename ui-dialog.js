@@ -174,4 +174,55 @@
   window.uiNotice = function (title, text, opts = {}) {
     return enqueue({ kind: 'notice', title, text, confirmLabel: opts.closeLabel || 'Close' });
   };
+
+  // ── Keep pop-ups inside the page area ──
+  // The dark background still covers the whole window, but extra left
+  // padding the width of the sidebar centres the pop-up box over the page,
+  // so it never crosses into the menu. --page-left follows the sidebar:
+  // its width when open, 0 when collapsed or on phones. --own-pad keeps
+  // each background's own spacing on top of that.
+  const pageStyle = document.createElement('style');
+  pageStyle.textContent = '.in-page-overlay { padding-left: calc(var(--page-left, 0px) + var(--own-pad, 16px)) !important; }'
+    // a fixed-width box shrinks to the page area rather than spilling over the menu
+    + ' .in-page-overlay > * { max-width: 100%; box-sizing: border-box; }';
+  document.head.appendChild(pageStyle);
+
+  function updatePageLeft() {
+    const main = document.querySelector('.main');
+    const left = main ? Math.max(0, Math.round(main.getBoundingClientRect().left)) : 0;
+    document.documentElement.style.setProperty('--page-left', `${left}px`);
+  }
+
+  // Anything named like a modal/overlay, or fixed inline, that covers the whole window
+  const CANDIDATES = '[class*="modal"], [class*="overlay"], [id*="modal"], [id*="overlay"], [style*="position:fixed"], [style*="position: fixed"]';
+  function markOverlays(root = document) {
+    const nodes = root.querySelectorAll ? [...root.querySelectorAll(CANDIDATES)] : [];
+    if (root.matches?.(CANDIDATES)) nodes.push(root);
+    nodes.forEach(el => {
+      if (el.classList.contains('in-page-overlay') || el.classList.contains('sidebar-overlay') || el.closest('#main-sidebar')) return;
+      const s = getComputedStyle(el);
+      if (s.position === 'fixed' && s.top === '0px' && s.left === '0px' && s.right === '0px' && s.bottom === '0px') {
+        el.style.setProperty('--own-pad', s.paddingLeft);
+        el.classList.add('in-page-overlay');
+      }
+    });
+  }
+
+  function initPageArea() {
+    updatePageLeft();
+    markOverlays();
+    const main = document.querySelector('.main');
+    if (main && 'ResizeObserver' in window) new ResizeObserver(updatePageLeft).observe(main);
+    window.addEventListener('resize', updatePageLeft);
+    // the sidebar slides in/out; settle on its final position
+    document.addEventListener('transitionend', e => { if (e.target === main || e.target.id === 'main-sidebar') updatePageLeft(); });
+    // collapsing/opening the sidebar toggles a class on <body>: measure now and once it has slid
+    new MutationObserver(() => { updatePageLeft(); setTimeout(updatePageLeft, 400); })
+      .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    // pop-ups added later (built by scripts) get the same treatment
+    new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => n.nodeType === 1 && markOverlays(n))))
+      .observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPageArea);
+  else initPageArea();
 })();
