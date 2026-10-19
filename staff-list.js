@@ -148,9 +148,20 @@ function slVisibleRows() {
 }
 
 // ── Rendering ──
+// Some older records have an email or full name saved as "initials";
+// those (and titles like "MR.") fall back to letters from the name.
+function slInitials(s) {
+  const saved = String(s.initials || '').trim();
+  if (/^[A-Za-z]{1,3}$/.test(saved)) return saved.toUpperCase();
+  const words = String(s.name || '').split(/\s+/).map(w => w.replace(/[^A-Za-z]/g, ''))
+    .filter(w => w && !/^(mr|mrs|miss|ms|dr|prof|rev|engr|chief|barrister|alhaji|alhaja)$/i.test(w));
+  const letters = (words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] || '?').slice(0, 2));
+  return letters.toUpperCase();
+}
+
 function slAvatar(s) {
   if (s.photoPath) return `<img class="sl-avatar" src="/${escapeHtml(s.photoPath)}" alt="">`;
-  return `<span class="sl-avatar sl-avatar-initials">${escapeHtml(s.initials || String(s.name || '?').slice(0, 2).toUpperCase())}</span>`;
+  return `<span class="sl-avatar sl-avatar-initials">${escapeHtml(slInitials(s))}</span>`;
 }
 
 function slRenderCards() {
