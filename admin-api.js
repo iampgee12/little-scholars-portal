@@ -1905,11 +1905,12 @@ function toggleAddStaffMenu(event) {
   const open = menu.hidden;
   if (open) {
     const types = sfStaffTypes();
-    // Administrator sits below a divider, apart from the staff types
+    // Administrator sits below a divider, apart from the staff types;
+    // only super admins can add administrators
     menu.innerHTML = types.filter(t => t.value !== 'admin').map(t =>
       `<button type="button" role="menuitem" onclick="openStaffForm('${escapeHtml(t.value)}')">${escapeHtml(t.label)}</button>`).join('')
-      + '<div class="sf-menu-sep"></div>'
-      + `<button type="button" role="menuitem" onclick="openStaffForm('admin')">Administrator</button>`;
+      + (state.user?.adminLevel === 'admin' ? '' : '<div class="sf-menu-sep"></div>'
+      + `<button type="button" role="menuitem" onclick="openStaffForm('admin')">Administrator</button>`);
   }
   menu.hidden = !open;
   button?.setAttribute('aria-expanded', String(open));
@@ -2211,6 +2212,18 @@ async function deleteStudent(id) {
 
 let staffProfileId = '';
 
+// Admin levels (the server enforces these; the page only hides what you can't do)
+function staffLevelLabel(staff) {
+  return staff.adminLevel === 'owner' ? 'Main Super Admin' : staff.adminLevel === 'super' ? 'Super Admin' : 'Administrator';
+}
+function canManageAccount(staff) {
+  if (!staff || staff.role !== 'admin') return true;
+  const mine = state.user?.adminLevel;
+  if (staff.adminLevel === 'owner') return false;
+  if (staff.adminLevel === 'super') return mine === 'owner';
+  return mine === 'owner' || mine === 'super';
+}
+
 function openStaffProfile(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
   if (!staff) return showToast('Staff account not found');
@@ -2219,19 +2232,29 @@ function openStaffProfile(id) {
   if (!modal) return;
   document.getElementById('staff-profile-name').textContent = staff.name || staff.id;
   document.getElementById('staff-profile-role').textContent = staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff');
+  const self = staff.id === state.user?.id;
   const deleteTeacherButton = document.getElementById('staff-delete-teacher');
   if (deleteTeacherButton) {
-    deleteTeacherButton.style.display = staff.role === 'teacher' || staff.role === 'staff' ? '' : 'none';
-    deleteTeacherButton.textContent = staff.role === 'teacher' ? 'Delete Teacher' : 'Delete Staff';
+    deleteTeacherButton.style.display = !self && canManageAccount(staff) ? '' : 'none';
+    deleteTeacherButton.textContent = staff.role === 'teacher' ? 'Delete Teacher' : staff.role === 'admin' ? 'Delete Admin' : 'Delete Staff';
   }
+  const editButton = document.getElementById('staff-edit-details');
+  if (editButton) editButton.style.display = self || canManageAccount(staff) ? '' : 'none';
+  const superButton = document.getElementById('staff-super-toggle');
+  if (superButton) {
+    superButton.style.display = state.user?.adminLevel === 'owner' && staff.role === 'admin' && staff.adminLevel !== 'owner' ? '' : 'none';
+    superButton.textContent = staff.adminLevel === 'super' ? 'Remove Super Admin' : 'Make Super Admin';
+  }
+  if (staff.role === 'admin') document.getElementById('staff-profile-role').textContent = staffLevelLabel(staff);
   modal.style.display = 'flex';
   renderStaffProfileTab('profile');
 }
 
 async function deleteTeacherAccount(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
-  if (!staff || (staff.role !== 'teacher' && staff.role !== 'staff')) return showToast('Admin accounts cannot be deleted here');
-  const what = staff.role === 'teacher' ? 'teacher account' : 'staff record';
+  if (!staff) return showToast('Staff account not found');
+  if (!canManageAccount(staff)) return showToast('Only a higher admin can delete this account');
+  const what = staff.role === 'teacher' ? 'teacher account' : staff.role === 'admin' ? 'administrator account' : 'staff record';
   if (!await uiConfirm(`Delete ${what} “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}`, { method: 'DELETE' });
@@ -2240,7 +2263,24 @@ async function deleteTeacherAccount(id) {
     populateStaff();
     populateAdminControls();
     populateClasses();
-    showToast(staff.role === 'teacher' ? 'Teacher account deleted' : 'Staff record deleted');
+    showToast(staff.role === 'teacher' ? 'Teacher account deleted' : staff.role === 'admin' ? 'Administrator account deleted' : 'Staff record deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+async function toggleSuperAdmin(id) {
+  const staff = (state.setup.staff || []).find(item => item.id === id);
+  if (!staff) return;
+  const on = staff.adminLevel !== 'super';
+  const msg = on
+    ? `Make “${staff.name}” a super admin? They will be able to add, edit and remove ordinary administrators. Only you can remove super admins.`
+    : `Remove super admin from “${staff.name}”? They stay an ordinary administrator.`;
+  if (!await uiConfirm(msg, { confirmLabel: on ? 'Make Super Admin' : 'Remove Super Admin', danger: !on })) return;
+  try {
+    const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(id)}/super-admin`, { method: 'PUT', body: JSON.stringify({ on }) });
+    state.setup = data.setup;
+    populateStaff();
+    openStaffProfile(id);
+    showToast(on ? `${staff.name} is now a super admin` : `${staff.name} is no longer a super admin`, 'success');
   } catch (err) { showToast(err.message); }
 }
 

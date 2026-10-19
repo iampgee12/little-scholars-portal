@@ -195,7 +195,7 @@ function populateStaff() {
     const typeLabel = category === 'Teacher' ? 'Teacher' : category === 'General Staff / Others' ? (staff.role === 'admin' ? 'Admin' : 'Staff') : category.replace('Accountant/Bursary Officer', 'Accountant');
     const designation = slValue(staff, 'designation') || (staff.role === 'admin' ? 'Administrator' : 'Staff');
     const badges = [
-      staff.role === 'admin' ? '<span class="staff-main-pill">Main Account</span>' : '',
+      staff.role === 'admin' ? `<span class="staff-main-pill">${staffLevelLabel(staff)}</span>` : '',
       staff.archived ? '<span class="sl-badge sl-badge-muted">Archived</span>' : '',
       (staff.employmentStatus || 'Active') !== 'Active' ? `<span class="sl-badge sl-badge-warn">${escapeHtml(staff.employmentStatus)}</span>` : '',
     ].join('');
@@ -213,7 +213,7 @@ function populateStaff() {
       <td><div class="staff-designation">${escapeHtml(designation)}</div></td>
       <td class="staff-phone">${escapeHtml(staff.phone || '-')}</td>
       <td><button class="staff-profile-btn" title="Open staff profile" onclick="openStaffProfile('${escapeHtml(staff.id)}')">...</button></td>
-      <td>${staff.canSignIn === false ? '<span class="staff-table-sub">No login</span>' : staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : accountStatusToggle(staff.id, staff.active)}</td>
+      <td>${staff.canSignIn === false ? '<span class="staff-table-sub">No login</span>' : staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : canManageAccount(staff) ? accountStatusToggle(staff.id, staff.active) : `<span class="${staff.active ? 'staff-status-on' : 'staff-table-sub'}" title="Only a higher admin can change this account">${staff.active ? 'ON' : 'OFF'}</span>`}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="8" class="sl-empty">No staff match these filters.</td></tr>';
 

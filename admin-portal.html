@@ -1224,6 +1224,12 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 }
 .staff-profile-head h2 { margin:0; color:#172033; font-size:20px; }
 .staff-profile-role { margin-top:4px; color:#64748b; font-size:12px; }
+.staff-profile-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+@media (max-width:640px) {
+  .staff-profile-head { flex-wrap:wrap; position:relative; padding-right:48px; }
+  .staff-profile-actions { justify-content:flex-start; width:100%; }
+  .staff-profile-actions .staff-profile-close { position:absolute; top:14px; right:14px; }
+}
 .staff-profile-close { border:0; background:transparent; color:#64748b; font-size:24px; cursor:pointer; }
 .staff-profile-tabs { display:flex; gap:4px; padding:10px 24px 0; border-bottom:1px solid #e5e7eb; }
 .staff-profile-tab { border:0; background:transparent; color:#64748b; padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; }
@@ -3924,8 +3930,9 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         <div class="staff-profile-dialog">
           <div class="staff-profile-head">
             <div><h2 id="staff-profile-name">Staff Profile</h2><div class="staff-profile-role" id="staff-profile-role"></div></div>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <button type="button" class="post-btn" onclick="editStaff(staffProfileId)">Edit Details</button>
+            <div class="staff-profile-actions">
+              <button type="button" class="post-btn" id="staff-edit-details" onclick="editStaff(staffProfileId)">Edit Details</button>
+              <button type="button" class="btn-outline" id="staff-super-toggle" onclick="toggleSuperAdmin(staffProfileId)" style="display:none;">Make Super Admin</button>
               <button type="button" class="ann-del" id="staff-delete-teacher" onclick="deleteTeacherAccount(staffProfileId)" style="color:var(--red);display:none;">Delete Teacher</button>
               <button type="button" class="staff-profile-close" onclick="closeStaffProfile()" aria-label="Close staff profile">&times;</button>
             </div>
@@ -7724,7 +7731,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="confirm-password.js"></script>
 <script src="ui-dialog.js?v=3"></script>
 <script src="admin-api.js"></script>
-<script src="staff-list.js?v=3"></script>
+<script src="staff-list.js?v=4"></script>
 <script src="offline-cbt-admin.js?v=1"></script>
 <script src="parents-list.js?v=1"></script>
 <script src="menu-search.js?v=3"></script>

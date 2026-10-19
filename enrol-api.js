@@ -13,7 +13,7 @@ module.exports = function createEnrolment(ctx) {
   const {
     db, one, all, run, ensureColumn, valueFromMeta, setMeta, cleanText, readJson, sendJson,
     requireUser, hashPassword, saveDataUrl, adminSetupPayload, initialsFromName, activeAcademic,
-    classHasArms, parseXlsxFirstSheet, DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator,
+    classHasArms, parseXlsxFirstSheet, DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator, adminLevel,
   } = ctx;
 
   // ── Schema ────────────────────────────────────────────────────────────
@@ -1064,6 +1064,9 @@ module.exports = function createEnrolment(ctx) {
               results.push({ id, ok: true, message: 'Rejected' });
             } else if (body.action === 'accept') {
               if (sub.status === 'accepted') { results.push({ id, ok: false, message: 'Already accepted' }); continue; }
+              if (sub.kind === 'staff' && JSON.parse(sub.data).staff_type === 'admin' && adminLevel(user) === 'admin') {
+                results.push({ id, ok: false, message: 'Only a super admin can accept an administrator' }); continue;
+              }
               const outcome = withTransaction(() => acceptSubmission(sub, body.overrides || {}));
               run("UPDATE self_registrations SET status = 'accepted', reviewed_by = ?, reviewed_at = ?, outcome = ? WHERE id = ?", user.name, nowIso(), outcome, id);
               results.push({ id, ok: true, message: outcome });

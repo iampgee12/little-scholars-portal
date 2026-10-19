@@ -11,7 +11,7 @@ const { createOffsite } = require('./offsite-backup');
 
 module.exports = function createSecurity(ctx) {
   const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, hashPassword, verifyPassword,
-    smtpConfigStatus, smtpSend, zipFiles, IS_PROD, DATA_DIR, UPLOAD_DIR, REPORT_DIR, COOKIE_NAME, parseCookies } = ctx;
+    smtpConfigStatus, smtpSend, zipFiles, IS_PROD, DATA_DIR, UPLOAD_DIR, REPORT_DIR, COOKIE_NAME, parseCookies, adminGuard } = ctx;
 
   const nowIso = () => new Date().toISOString();
   const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
@@ -103,6 +103,7 @@ module.exports = function createSecurity(ctx) {
     [/^POST \/api\/admin\/view-students\/tags/, 'Changed student tags'],
     [/^(POST|PUT) \/api\/admin\/families/, 'Created / changed a family'],
     [/^PUT \/api\/admin\/account-status\//, 'Switched an account on / off'],
+    [/^PUT \/api\/admin\/staff\/[^/]+\/super-admin/, 'Made / removed a super admin'],
     [/^POST \/api\/admin\/reports\/publish/, 'Published results'],
     [/^POST \/api\/admin\/reports\/unpublish/, 'Unpublished results'],
     [/^POST \/api\/admin\/reports\/email/, 'Emailed a result'],
@@ -507,10 +508,24 @@ module.exports = function createSecurity(ctx) {
     if (m === 'POST' && p === '/api/admin/security/sessions/end') {
       const body = await readJson(req);
       let ended = 0;
-      if (body.all) ended = run('DELETE FROM sessions WHERE token <> ?', token).changes;
-      else if (body.userId) ended = run('DELETE FROM sessions WHERE user_id = ? AND token <> ?', cleanText(body.userId).toUpperCase(), token).changes;
-      else if (body.ref) {
-        for (const s of all('SELECT token FROM sessions')) if (sha(s.token).slice(0, 16) === body.ref && s.token !== token) ended += run('DELETE FROM sessions WHERE token = ?', s.token).changes;
+      // admins above you in the admin levels keep their sessions
+      const blocked = userId => userId !== admin.id && adminGuard(admin, userId);
+      if (body.all) {
+        for (const s of all('SELECT token, user_id AS userId FROM sessions WHERE token <> ?', token)) {
+          if (!blocked(s.userId)) ended += run('DELETE FROM sessions WHERE token = ?', s.token).changes;
+        }
+      } else if (body.userId) {
+        const userId = cleanText(body.userId).toUpperCase();
+        const why = blocked(userId);
+        if (why) return sendJson(res, 403, { error: why }), true;
+        ended = run('DELETE FROM sessions WHERE user_id = ? AND token <> ?', userId, token).changes;
+      } else if (body.ref) {
+        for (const s of all('SELECT token, user_id AS userId FROM sessions')) {
+          if (sha(s.token).slice(0, 16) !== body.ref || s.token === token) continue;
+          const why = blocked(s.userId);
+          if (why) return sendJson(res, 403, { error: why }), true;
+          ended += run('DELETE FROM sessions WHERE token = ?', s.token).changes;
+        }
       }
       return sendJson(res, 200, { ok: true, ended }), true;
     }
@@ -522,7 +537,10 @@ module.exports = function createSecurity(ctx) {
       const body = await readJson(req);
       const role = ['teacher', 'student', 'admin'].includes(body.role) ? body.role : null;
       if (!role) return sendJson(res, 400, { error: 'Choose who must change their password' }), true;
-      const n = run('UPDATE users SET password_self_set = 0 WHERE role = ? AND id <> ?', role, admin.id).changes;
+      let n = 0;
+      for (const u of all('SELECT id FROM users WHERE role = ? AND id <> ?', role, admin.id)) {
+        if (!adminGuard(admin, u.id)) n += run('UPDATE users SET password_self_set = 0 WHERE id = ?', u.id).changes;
+      }
       return sendJson(res, 200, { ok: true, updated: n }), true;
     }
     if ((m === 'GET' && p === '/api/admin/security/audit') || (m === 'GET' && p === '/api/admin/security/audit.csv')) {

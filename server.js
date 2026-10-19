@@ -336,6 +336,40 @@ function setMeta(key, value) {
   );
 }
 
+// ── Admin levels ──
+// owner: the original admin (ADM-001), who can never be removed, switched off
+// or demoted, and is the only one who can make or unmake super admins.
+// super: can add, edit and remove ordinary admins (and anyone else), but not
+// other super admins or the owner. admin: runs the portal; cannot add, edit
+// or remove admin accounts.
+function ownerAdminId() {
+  const saved = valueFromMeta('owner_admin_id');
+  if (saved && one("SELECT id FROM users WHERE id = ? AND role = 'admin'", saved)) return saved;
+  const first = one("SELECT id FROM users WHERE id = 'ADM-001' AND role = 'admin'") || one("SELECT id FROM users WHERE role = 'admin' ORDER BY rowid LIMIT 1");
+  if (first) setMeta('owner_admin_id', first.id);
+  return first?.id || '';
+}
+
+function adminLevel(userOrId) {
+  const id = typeof userOrId === 'string' ? userOrId : userOrId?.id;
+  const row = id ? one('SELECT id, role, super_admin AS superAdmin FROM users WHERE id = ?', id) : null;
+  if (!row || row.role !== 'admin') return null;
+  if (row.id === ownerAdminId()) return 'owner';
+  return row.superAdmin ? 'super' : 'admin';
+}
+
+// Why `actor` may not change, switch off or remove `targetId`'s account, or
+// null if they may. Non-admin accounts stay manageable by every admin.
+function adminGuard(actor, targetId) {
+  const target = adminLevel(targetId);
+  if (!target) return null;
+  const mine = adminLevel(actor);
+  if (target === 'owner') return 'The main super admin account cannot be changed, switched off or removed by anyone else';
+  if (target === 'super' && mine !== 'owner') return 'Only the main super admin can change, switch off or remove a super admin';
+  if (target === 'admin' && mine === 'admin') return 'Only a super admin can change, switch off or remove an administrator';
+  return null;
+}
+
 // Grade-based fallback comment: the highest min_score band the average
 // qualifies for, e.g. a band of 80-100 beats a band of 0-100 for a 92%.
 function attendanceCounts(studentId, sessionType) {
@@ -778,6 +812,7 @@ function createSchema() {
   // Add Staff form: staff type plus Bio Data / More Info / Work Details / Next of Kin
   for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
   ensureColumn('users', 'archived', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('users', 'super_admin', 'INTEGER NOT NULL DEFAULT 0');
   db.exec(`
     CREATE TABLE IF NOT EXISTS staff_designations (
       id INTEGER PRIMARY KEY,
@@ -1727,7 +1762,7 @@ loadGradeScale();
 const enrolment = createEnrolment({
   db, one, all, run, ensureColumn, valueFromMeta, setMeta, cleanText, readJson, sendJson, requireUser, hashPassword,
   saveDataUrl, adminSetupPayload, initialsFromName, activeAcademic, classHasArms, parseXlsxFirstSheet,
-  DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator, assignClassTeacherToClass,
+  DEFAULT_STUDENT_PASSWORD, makeStudentIdGenerator, assignClassTeacherToClass, adminLevel,
 });
 enrolment.createSchema();
 // View Students + Students Registry (class history, archive)
@@ -1740,7 +1775,7 @@ studentsMod.createSchema();
 // Password rules, two-step admin login, activity log, idle sign-out, backups
 const security = createSecurity({
   db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, hashPassword, verifyPassword,
-  smtpConfigStatus, smtpSend, zipFiles: enrolment.zipFiles, IS_PROD, DATA_DIR, UPLOAD_DIR, REPORT_DIR, COOKIE_NAME, parseCookies,
+  smtpConfigStatus, smtpSend, zipFiles: enrolment.zipFiles, IS_PROD, DATA_DIR, UPLOAD_DIR, REPORT_DIR, COOKIE_NAME, parseCookies, adminGuard,
 });
 security.createSchema();
 security.startBackups();
@@ -1811,6 +1846,7 @@ function publicUser(row) {
     teacherType: row.teacher_type,
     chip: row.chip,
     grade: row.grade,
+    adminLevel: row.role === 'admin' ? adminLevel(row.id) : null,
     email: row.email || '',
     signaturePath: row.signature_path || '',
     ...profileFields(row),
@@ -3786,6 +3822,8 @@ async function handleApi(req, res, url) {
     const target = one('SELECT id, role FROM users WHERE id = ?', targetId);
     if (!target) return sendJson(res, 404, { error: 'Account not found' });
     if (targetId === admin.id) return sendJson(res, 400, { error: "You can't deactivate your own account" });
+    const guard = adminGuard(admin, targetId);
+    if (guard) return sendJson(res, 403, { error: guard });
     const body = await readJson(req);
     const active = body.active ? 1 : 0;
     run('UPDATE users SET active = ? WHERE id = ?', active, targetId);
@@ -7098,6 +7136,14 @@ async function handleApi(req, res, url) {
     if (staffId === user.id && role !== 'admin') {
       return sendJson(res, 400, { error: 'You cannot remove admin access from your own account' });
     }
+    if (staffId !== user.id) {
+      const guard = adminGuard(user, staffId);
+      if (guard) return sendJson(res, 403, { error: guard });
+    }
+    if (role === 'admin' && existing.role !== 'admin' && adminLevel(user) === 'admin') {
+      return sendJson(res, 403, { error: 'Only a super admin can make someone an administrator' });
+    }
+    const wasOwner = staffId === ownerAdminId();
     // Moving a records-only staff member to a sign-in type needs a password.
     let password = form.password;
     let generatedPassword = null;
@@ -7166,6 +7212,8 @@ async function handleApi(req, res, url) {
         ...(password ? [hashPassword(password)] : []),
         staffId
       );
+      if (wasOwner && newStaffId !== staffId) setMeta('owner_admin_id', newStaffId);
+      if (role !== 'admin') run('UPDATE users SET super_admin = 0 WHERE id = ?', newStaffId);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
@@ -7175,18 +7223,37 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, id: newStaffId, generatedPassword, setup: adminSetupPayload() });
   }
 
+  // Make / remove super admin: only the main super admin may do this
+  const superAdminMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)\/super-admin$/);
+  if (req.method === 'PUT' && superAdminMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    if (adminLevel(user) !== 'owner') return sendJson(res, 403, { error: 'Only the main super admin can make or remove super admins' });
+    const targetId = decodeURIComponent(superAdminMatch[1]).trim().toUpperCase();
+    const level = adminLevel(targetId);
+    if (!level) return sendJson(res, 400, { error: 'Only administrators can be made super admins. Change their staff type to Administrator first.' });
+    if (level === 'owner') return sendJson(res, 400, { error: 'The main super admin is always a super admin' });
+    const on = !!(await readJson(req)).on;
+    run('UPDATE users SET super_admin = ? WHERE id = ?', on ? 1 : 0, targetId);
+    return sendJson(res, 200, { ok: true, adminLevel: adminLevel(targetId), setup: adminSetupPayload() });
+  }
+
   const staffDeleteMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)$/);
   if (req.method === 'DELETE' && staffDeleteMatch) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
     const staffId = decodeURIComponent(staffDeleteMatch[1]).trim().toUpperCase();
     if (staffId === user.id) return sendJson(res, 400, { error: 'You cannot delete your own account' });
-    // Teachers and records-only staff can be deleted; admin accounts cannot
-    const teacher = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher', 'staff')", staffId);
+    // Admin accounts follow the admin levels: super admins remove ordinary
+    // admins, only the main super admin removes super admins, nobody removes the main one
+    const teacher = one("SELECT id FROM users WHERE id = ? AND role IN ('teacher', 'staff', 'admin')", staffId);
     if (!teacher) return sendJson(res, 404, { error: 'Staff member not found' });
+    const guard = adminGuard(user, staffId);
+    if (guard) return sendJson(res, 403, { error: guard });
     db.exec('BEGIN IMMEDIATE');
     try {
-      run("DELETE FROM users WHERE id = ? AND role IN ('teacher', 'staff')", staffId);
+      run('DELETE FROM sessions WHERE user_id = ?', staffId);
+      run("DELETE FROM users WHERE id = ? AND role IN ('teacher', 'staff', 'admin')", staffId);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
@@ -7204,6 +7271,9 @@ async function handleApi(req, res, url) {
     const form = readStaffForm(await readJson(req));
     if (form.error) return sendJson(res, 400, { error: form.error });
     const { role, teacherType, name, firstName, initials, profile, classCode } = form;
+    if (role === 'admin' && adminLevel(user) === 'admin') {
+      return sendJson(res, 403, { error: 'Only a super admin can add an administrator' });
+    }
     if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) {
       return sendJson(res, 400, { error: 'Choose a class for this Class Teacher' });
     }
@@ -7282,6 +7352,8 @@ async function handleApi(req, res, url) {
         const staff = one("SELECT id, name, role FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", id);
         if (!staff) { skipped.push(`${id}: not found`); continue; }
         if (id === user.id && action !== 'restore' && action !== 'activate') { skipped.push(`${staff.name}: that's your own account`); continue; }
+        const guard = id === user.id ? null : adminGuard(user, id);
+        if (guard) { skipped.push(`${staff.name}: ${guard.toLowerCase()}`); continue; }
         if ((action === 'activate' || action === 'deactivate') && staff.role === 'staff') { skipped.push(`${staff.name}: has no portal login`); continue; }
         if (action === 'activate') run('UPDATE users SET active = 1 WHERE id = ?', id);
         if (action === 'deactivate') { run('UPDATE users SET active = 0 WHERE id = ?', id); run('DELETE FROM sessions WHERE user_id = ?', id); }
@@ -7388,6 +7460,7 @@ async function handleApi(req, res, url) {
       });
       if (form.error) return errors.push({ row: rowNo, message: form.error });
       const { role, teacherType, name, firstName, initials, profile } = form;
+      if (role === 'admin' && adminLevel(user) === 'admin') return errors.push({ row: rowNo, message: 'Only a super admin can add an administrator' });
       const classCode = cleanText(value('classCode')).toUpperCase();
       if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });
       const id = form.id || nextStaffUserId(role);
@@ -9665,6 +9738,7 @@ function adminSetupPayload() {
     const staffType = row.staffType || (row.role === 'admin' ? 'admin' : row.role === 'teacher' ? 'teacher' : 'general_staff');
     return {
       ...row,
+      adminLevel: row.role === 'admin' ? adminLevel(row.id) : null,
       staffType,
       staffTypeLabel: STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff',
       canSignIn: row.role !== 'staff',
