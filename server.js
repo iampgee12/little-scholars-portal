@@ -9933,7 +9933,7 @@ function serveStatic(req, res, url) {
   const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.ttf']);
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
-    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js', 'cbt-offline.js', 'security.js', 'offsite-backup.js', 'restore-backup.js'].includes(relParts[relParts.length - 1])
+    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js', 'cbt-offline.js', 'security.js', 'offsite-backup.js', 'restore-backup.js', 'term-setup.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
