@@ -4,7 +4,6 @@ const state = {
   editingStudentId: null,
   pendingDeleteStudentId: null,
   editingStaffId: null,
-  staffFilter: 'All Staff',
   gradebookBatch: null,
   cognitiveRatings: {},
   cognitiveStudentId: null,
@@ -990,80 +989,7 @@ async function toggleAccountStatus(id, makeActive) {
   }
 }
 
-function populateStaff() {
-  const tbody = document.getElementById('staff-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  const staffRows = state.setup.staff || [];
-  const categories = [
-    'All Staff',
-    'Teacher',
-    'Accountant/Bursary Officer',
-    'Librarian',
-    'Registrar',
-    'Transport Manager',
-    'Hostel Manager',
-    'Store Manager',
-    'General Staff / Others',
-  ];
-  const counts = Object.fromEntries(categories.map(category => [category, category === 'All Staff' ? staffRows.length : 0]));
-  staffRows.forEach(staff => {
-    const category = staffCategory(staff);
-    counts[category] = (counts[category] || 0) + 1;
-  });
-  const countMap = {
-    'staff-count-all': counts['All Staff'],
-    'staff-count-teacher': counts.Teacher,
-    'staff-count-accountant': counts['Accountant/Bursary Officer'],
-    'staff-count-librarian': counts.Librarian,
-    'staff-count-registrar': counts.Registrar,
-    'staff-count-transport': counts['Transport Manager'],
-  };
-  Object.entries(countMap).forEach(([id, value]) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value || 0;
-  });
-  const filters = document.getElementById('staff-role-filters');
-  if (filters) {
-    filters.innerHTML = categories.map(category => `
-      <button type="button" class="staff-filter-pill ${state.staffFilter === category ? 'active' : ''}" data-category="${escapeHtml(category)}" onclick="setStaffFilter('${escapeHtml(category)}')">
-        <span>${staffFilterIcon(category)}</span>${escapeHtml(category)}
-      </button>`).join('');
-  }
 
-  staffRows.forEach((staff, index) => {
-    const category = staffCategory(staff);
-    const areas = staffAssignments(staff);
-    const typeLabel = category === 'Teacher' ? 'Teacher' : category === 'General Staff / Others' ? (staff.role === 'admin' ? 'Admin' : 'Staff') : category.replace('Accountant/Bursary Officer', 'Accountant');
-    const designation = staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff');
-    const tr = document.createElement('tr');
-    tr.dataset.search = `${staff.name} ${staff.id} ${staff.roleLabel} ${staff.role} ${category} ${areas}`.toLowerCase();
-    tr.dataset.category = category;
-    tr.innerHTML = `
-      <td class="staff-index">${index + 1}</td>
-      <td>
-        <div class="staff-table-name">${escapeHtml(staff.name)}</div>
-        <div class="staff-table-sub">${escapeHtml(staff.id)}</div>
-        ${staff.role === 'admin' ? '<span class="staff-main-pill">Main Account</span>' : ''}
-      </td>
-      <td><span class="staff-type-pill">${escapeHtml(typeLabel)}</span></td>
-      <td><div class="staff-designation">${escapeHtml(designation)}</div></td>
-      <td class="staff-phone">${escapeHtml(staff.phone || '-')}</td>
-      <td><button class="staff-profile-btn" title="Open staff profile" onclick="openStaffProfile('${escapeHtml(staff.id)}')">...</button></td>
-      <td>${staff.canSignIn === false ? '<span class="staff-table-sub">No login</span>' : staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : accountStatusToggle(staff.id, staff.active)}</td>`;
-    tbody.appendChild(tr);
-  });
-  filterStaff();
-}
-
-function filterStaff() {
-  const q = (document.getElementById('staff-search')?.value || '').toLowerCase();
-  document.querySelectorAll('#staff-tbody tr').forEach(tr => {
-    const matchesSearch = !q || (tr.dataset.search || '').includes(q);
-    const matchesCategory = state.staffFilter === 'All Staff' || tr.dataset.category === state.staffFilter;
-    tr.style.display = matchesSearch && matchesCategory ? '' : 'none';
-  });
-}
 
 function staffAssignments(staff) {
   const assignments = (state.setup.assignments || []).filter(assignment => assignment.teacherId === staff.id);
@@ -1106,37 +1032,7 @@ function staffFilterIcon(category) {
   return icons[category] || 'P';
 }
 
-function setStaffFilter(category) {
-  state.staffFilter = category;
-  document.querySelectorAll('.staff-filter-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.category === category);
-  });
-  filterStaff();
-}
 
-function exportStaffList() {
-  const rows = [['Name', 'Staff ID', 'Type', 'Designation', 'Assignments', 'Status']];
-  (state.setup.staff || []).forEach(staff => {
-    rows.push([
-      staff.name,
-      staff.id,
-      staffCategory(staff),
-      staff.roleLabel || '',
-      staffAssignments(staff),
-      'ON',
-    ]);
-  });
-  const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'staff-employees.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 function populateGradebookControls() {
   const sessionSelect = document.getElementById('gb-session');
@@ -2182,6 +2078,7 @@ function sfResetFields() {
   document.getElementById('sf-auto-password').checked = false;
   document.getElementById('sf-teacher-type').value = 'class_teacher';
   document.getElementById('sf-teacher-type').disabled = false;
+  document.getElementById('sf-employment').value = 'Active';
   sfPhotoDataUrl = '';
   sfSetPhoto('');
 }
@@ -2416,6 +2313,8 @@ function renderStaffProfileTab(tab) {
     ['Residential Address', staff.address], ['Permanent Address', staff.permanentAddress],
     ['Qualifications', staff.qualifications], ['Department', staff.department], ['Area of Work', staff.areaOfWork],
     ['Date of Appointment', staff.dateOfAppointment], ['Date of Starting', staff.dateStarted],
+    ['Employment Status', staff.employmentStatus], ['Date of Leaving', staff.dateOfLeaving],
+    ['Reason for Leaving', staff.reasonForLeaving], ['Archived', staff.archived ? 'Yes' : ''],
     ['Next of Kin', join(staff.nokName, staff.nokRelationship, staff.nokPhone, staff.nokEmail, staff.nokAddress)],
     ['Emergency Contact', join(staff.emergencyName, staff.emergencyRelationship, staff.emergencyPhone, staff.emergencyEmail, staff.emergencyAddress)],
   // the first rows always show; optional details only when filled in

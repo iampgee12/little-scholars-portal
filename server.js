@@ -224,6 +224,7 @@ const STAFF_TYPES = [
 ];
 const STAFF_TYPE_KEYS = STAFF_TYPES.map(([key]) => key);
 const STAFF_ID_PREFIX = { teacher: 'TCH-', admin: 'ADM-', staff: 'STF-' };
+const EMPLOYMENT_STATUSES = ['Active', 'Left', 'Contract Ended', 'Suspended'];
 const DEFAULT_STAFF_DESIGNATIONS = [
   'Head Of School', 'Assistant Head Of School', 'Head of Department', 'Classroom Teacher', 'Subject Teacher',
   'Administrative', 'Officer I', 'Officer II', 'Childcare', 'Laboratory Attendant', 'Security/Watchman', 'Utility', 'Chauffeur',
@@ -236,6 +237,7 @@ const STAFF_PROFILE_FIELDS = {
   lga: 'lga', town: 'town', permanentAddress: 'permanent_address', address: 'address',
   qualifications: 'qualifications', dateOfAppointment: 'date_of_appointment', dateStarted: 'date_started',
   department: 'department', areaOfWork: 'area_of_work',
+  employmentStatus: 'employment_status', dateOfLeaving: 'date_of_leaving', reasonForLeaving: 'reason_for_leaving',
   nokName: 'nok_name', nokRelationship: 'nok_relationship', nokPhone: 'nok_phone', nokEmail: 'nok_email', nokAddress: 'nok_address',
   emergencyName: 'emergency_name', emergencyRelationship: 'emergency_relationship', emergencyPhone: 'emergency_phone',
   emergencyEmail: 'emergency_email', emergencyAddress: 'emergency_address',
@@ -256,6 +258,7 @@ function readStaffForm(body) {
     profile[col] = cleanText(body[key]).slice(0, col.endsWith('address') || col === 'qualifications' ? 400 : 150) || null;
   }
   profile.staff_type = staffType;
+  profile.employment_status = EMPLOYMENT_STATUSES.find(st => st.toLowerCase() === String(profile.employment_status || '').toLowerCase()) || 'Active';
   if (profile.email) {
     profile.email = profile.email.toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return { error: 'Enter a valid email address' };
@@ -769,6 +772,7 @@ function createSchema() {
   allowStaffRole();
   // Add Staff form: staff type plus Bio Data / More Info / Work Details / Next of Kin
   for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
+  ensureColumn('users', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   db.exec(`
     CREATE TABLE IF NOT EXISTS staff_designations (
       id INTEGER PRIMARY KEY,
@@ -2365,6 +2369,101 @@ function parseSheetRows(xml, sharedStrings) {
 // { headers: [...], rows: [[...], ...] } — rows are the sheet's data rows,
 // aligned by column index to `headers` (the first non-empty row is treated
 // as the header row).
+// ── Minimal dependency-free .xlsx writer (staff template and Excel export) ──
+// Bulk Import template columns: [header, form field, required]. Order matters:
+// the template's dropdowns are attached by column position.
+const STAFF_IMPORT_COLUMNS = [
+  ['Staff Type', 'staffType', true], ['Title', 'title', false], ['Surname', 'surname', true],
+  ['First Name', 'firstName', true], ['Other Names', 'otherNames', false], ['Gender', 'gender', false],
+  ['Phone', 'phone', false], ['Email', 'email', false], ['Designation', 'designation', false],
+  ['Staff ID', 'id', false], ['Date of Birth (dd-mm-YYYY)', 'dob', false], ['Religion', 'religion', false],
+  ['Blood Group', 'bloodGroup', false], ['Genotype', 'genotype', false], ['Nationality', 'nationality', false],
+  ['State of Origin', 'stateOfOrigin', false], ['LGA of Origin', 'lga', false], ['Town of Origin', 'town', false],
+  ['Permanent Address', 'permanentAddress', false], ['Residential Address', 'address', false],
+  ['Qualifications', 'qualifications', false], ['Department', 'department', false], ['Area of Work', 'areaOfWork', false],
+  ['Teacher Type', 'teacherType', false], ['Class (Class Teachers)', 'classCode', false],
+  ['Date of Appointment (dd-mm-YYYY)', 'dateOfAppointment', false], ['Date of Starting (dd-mm-YYYY)', 'dateStarted', false],
+  ['Next of Kin Name', 'nokName', false], ['Next of Kin Relationship', 'nokRelationship', false], ['Next of Kin Phone', 'nokPhone', false],
+];
+
+// A spreadsheet date cell (Excel serial number, dd-mm-yyyy or yyyy-mm-dd) → yyyy-mm-dd
+function spreadsheetDate(raw) {
+  const text = cleanText(raw);
+  if (!text) return '';
+  if (/^\d+(\.\d+)?$/.test(text) && Number(text) > 59 && Number(text) < 80000) {
+    return new Date(Math.round((Number(text) - 25569) * 86400000)).toISOString().slice(0, 10);
+  }
+  let m = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  m = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  return text;
+}
+
+function zipBuffers(files) {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const [name, content] of files) {
+    const data = Buffer.from(content, 'utf8');
+    const packed = zlib.deflateRawSync(data);
+    const nameBuf = Buffer.from(name, 'utf8');
+    const crc = zlib.crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6); local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc, 14); local.writeUInt32LE(packed.length, 18); local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    locals.push(local, nameBuf, packed);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(0x0800, 8);
+    central.writeUInt16LE(8, 10); central.writeUInt32LE(crc, 16); central.writeUInt32LE(packed.length, 20);
+    central.writeUInt32LE(data.length, 24); central.writeUInt16LE(nameBuf.length, 28); central.writeUInt32LE(offset, 42);
+    centrals.push(central, nameBuf);
+    offset += 30 + nameBuf.length + packed.length;
+  }
+  const centralBuf = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralBuf.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, centralBuf, end]);
+}
+
+// One-sheet workbook. options.required marks header cells yellow (compulsory);
+// options.lists = { columnIndex: [choices] } adds dropdowns to that column.
+function xlsxWorkbook(sheetName, headers, rows, options = {}) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const colName = i => (i >= 26 ? String.fromCharCode(64 + Math.floor(i / 26)) : '') + String.fromCharCode(65 + (i % 26));
+  const required = options.required || [];
+  const header = headers.map((label, i) => `<c r="${colName(i)}1" t="inlineStr" s="${required[i] ? 1 : 2}"><is><t>${esc(label)}</t></is></c>`).join('');
+  const body = rows.map((row, r) => `<row r="${r + 2}">${row.map((v, i) => (v === '' || v == null ? '' : `<c r="${colName(i)}${r + 2}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`)).join('')}</row>`).join('');
+  const lastRow = Math.max(rows.length + 1, (options.blankRows || 0) + 1);
+  const validations = Object.entries(options.lists || {}).map(([i, choices]) =>
+    `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="${colName(Number(i))}2:${colName(Number(i))}${lastRow}"><formula1>"${esc(choices.join(','))}"</formula1></dataValidation>`).join('');
+  const widths = headers.map((label, i) => {
+    const longest = Math.max(String(label).length, ...rows.slice(0, 200).map(row => String(row[i] ?? '').length));
+    return `<col min="${i + 1}" max="${i + 1}" width="${Math.min(60, Math.max(12, longest + 3))}" customWidth="1"/>`;
+  }).join('');
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths}</cols><sheetData><row r="1" ht="30" customHeight="1">${header}</row>${body}</sheetData>${validations ? `<dataValidations count="${Object.keys(options.lists).length}">${validations}</dataValidations>` : ''}</worksheet>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F497D"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border/><border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf></cellXfs>
+</styleSheet>`;
+  return zipBuffers([
+    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${esc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ['xl/worksheets/sheet1.xml', sheet],
+    ['xl/styles.xml', styles],
+  ]);
+}
+
 function parseXlsxFirstSheet(buffer) {
   const rels = readZipEntries(buffer, ['xl/workbook.xml', 'xl/_rels/workbook.xml.rels']);
   const workbookXml = rels.get('xl/workbook.xml')?.toString('utf8') || '';
@@ -7113,6 +7212,181 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
+  // ── Staff list: Action on Selected ──
+  if (req.method === 'POST' && url.pathname === '/api/admin/staff/bulk') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const action = cleanText(body.action);
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(id => cleanText(id).toUpperCase()).filter(Boolean))];
+    if (!['activate', 'deactivate', 'archive', 'restore'].includes(action)) return sendJson(res, 400, { error: 'Choose an action' });
+    if (!ids.length) return sendJson(res, 400, { error: 'Tick at least one staff member first' });
+    let done = 0;
+    const skipped = [];
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const id of ids) {
+        const staff = one("SELECT id, name, role FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", id);
+        if (!staff) { skipped.push(`${id}: not found`); continue; }
+        if (id === user.id && action !== 'restore' && action !== 'activate') { skipped.push(`${staff.name}: that's your own account`); continue; }
+        if ((action === 'activate' || action === 'deactivate') && staff.role === 'staff') { skipped.push(`${staff.name}: has no portal login`); continue; }
+        if (action === 'activate') run('UPDATE users SET active = 1 WHERE id = ?', id);
+        if (action === 'deactivate') { run('UPDATE users SET active = 0 WHERE id = ?', id); run('DELETE FROM sessions WHERE user_id = ?', id); }
+        // archiving also signs them out and switches off their login
+        if (action === 'archive') { run('UPDATE users SET archived = 1, active = 0 WHERE id = ?', id); run('DELETE FROM sessions WHERE user_id = ?', id); }
+        if (action === 'restore') run('UPDATE users SET archived = 0 WHERE id = ?', id);
+        done++;
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, done, skipped, setup: adminSetupPayload() });
+  }
+
+  // ── Staff Designations manager ──
+  const designationMatch = url.pathname.match(/^\/api\/admin\/staff-designations\/(\d+)$/);
+  if ((req.method === 'PUT' || req.method === 'DELETE') && designationMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const existing = one('SELECT id, name FROM staff_designations WHERE id = ?', Number(designationMatch[1]));
+    if (!existing) return sendJson(res, 404, { error: 'Designation not found' });
+    if (req.method === 'DELETE') {
+      run('DELETE FROM staff_designations WHERE id = ?', existing.id);
+      return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+    }
+    const name = cleanText((await readJson(req)).name).slice(0, 80);
+    if (!name) return sendJson(res, 400, { error: 'Enter a designation name' });
+    const clash = one('SELECT id FROM staff_designations WHERE name = ? AND id != ?', name, existing.id);
+    if (clash) return sendJson(res, 409, { error: 'That designation already exists' });
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      run('UPDATE staff_designations SET name = ? WHERE id = ?', name, existing.id);
+      // staff who had the old name follow the rename
+      run('UPDATE users SET designation = ? WHERE designation = ? COLLATE NOCASE', name, existing.name);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
+  // ── Bulk Import: template ──
+  if (req.method === 'GET' && url.pathname === '/api/admin/staff/template.xlsx') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const typeLabels = STAFF_TYPES.map(([, label]) => label);
+    const file = xlsxWorkbook('Staff', STAFF_IMPORT_COLUMNS.map(([label]) => label), [], {
+      required: STAFF_IMPORT_COLUMNS.map(([, , required]) => required),
+      lists: { 0: typeLabels, 5: ['Male', 'Female'], 23: ['Class Teacher', 'Subject Teacher'] },
+      blankRows: 200,
+    });
+    res.writeHead(200, {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="Staff-Import-Template.xlsx"',
+      'Content-Length': file.length,
+    });
+    return res.end(file);
+  }
+
+  // ── Bulk Import: upload ──
+  if (req.method === 'POST' && url.pathname === '/api/admin/staff/import') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const match = cleanText(body.fileDataUrl).match(/^data:[^;]*;base64,(.+)$/);
+    if (!match) return sendJson(res, 400, { error: 'Choose the staff spreadsheet (.xlsx) file' });
+    const defaultPassword = cleanText(body.defaultPassword);
+    if (defaultPassword && defaultPassword.length < 4) return sendJson(res, 400, { error: 'The default password must be at least 4 characters' });
+    let headers;
+    let rows;
+    try {
+      ({ headers, rows } = parseXlsxFirstSheet(Buffer.from(match[1], 'base64')));
+    } catch (err) {
+      return sendJson(res, 400, { error: `Could not read this file: ${err.message}` });
+    }
+    const key = h => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const keys = headers.map(key);
+    const col = Object.fromEntries(STAFF_IMPORT_COLUMNS.map(([label, field]) => [field, keys.indexOf(key(label))]));
+    if (col.staffType === -1 || col.surname === -1 || col.firstName === -1) {
+      return sendJson(res, 400, { error: 'This is not the staff import template — Staff Type, Surname and First Name columns are missing. Download the template and use it.' });
+    }
+    if (rows.length > 500) return sendJson(res, 400, { error: 'Import at most 500 staff at a time' });
+    const typeByLabel = Object.fromEntries(STAFF_TYPES.flatMap(([value, label]) => [[key(label), value], [key(value), value]]));
+    typeByLabel[key('Accountant')] = 'accountant';
+    typeByLabel[key('General Staff')] = 'general_staff';
+    typeByLabel[key('Admin')] = 'admin';
+    const created = [];
+    const errors = [];
+    rows.forEach((row, r) => {
+      const rowNo = r + 2;
+      const value = field => {
+        const i = col[field];
+        if (i === undefined || i === -1) return '';
+        const raw = row[i];
+        return ['dob', 'dateOfAppointment', 'dateStarted'].includes(field) ? spreadsheetDate(raw) : cleanText(raw);
+      };
+      const form = readStaffForm({
+        ...Object.fromEntries(STAFF_IMPORT_COLUMNS.map(([, field]) => [field, value(field)])),
+        staffType: typeByLabel[key(value('staffType'))] || '',
+        teacherType: /class/i.test(value('teacherType')) ? 'class_teacher' : 'subject_teacher',
+      });
+      if (form.error) return errors.push({ row: rowNo, message: form.error });
+      const { role, teacherType, name, firstName, initials, profile } = form;
+      const classCode = cleanText(value('classCode')).toUpperCase();
+      if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });
+      const id = form.id || nextStaffUserId(role);
+      if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return errors.push({ row: rowNo, message: `Staff ID "${id}" may only use letters, numbers and dashes` });
+      if (one('SELECT id FROM users WHERE id = ?', id)) return errors.push({ row: rowNo, message: `Staff ID ${id} already exists` });
+      // records-only staff never sign in; sign-in staff get the default password, or a generated one shown once
+      const generated = role !== 'staff' && !defaultPassword ? String(crypto.randomInt(100000, 1000000)) : null;
+      const password = role === 'staff' ? crypto.randomBytes(24).toString('hex') : defaultPassword || generated;
+      const cols = Object.keys(profile);
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        run(
+          `INSERT INTO users (id, role, password, name, first_name, initials, teacher_type, chip, ${cols.join(', ')})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${cols.map(() => '?').join(', ')})`,
+          id, role, hashPassword(password), name, firstName, initials,
+          role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null,
+          ...cols.map(c => profile[c])
+        );
+        if (role === 'teacher' && teacherType === 'class_teacher') {
+          const assignment = assignClassTeacherToClass(id, classCode, true);
+          if (assignment.error) throw Object.assign(new Error(assignment.error), { rowError: true });
+        }
+        db.exec('COMMIT');
+        created.push({ row: rowNo, id, name, type: STAFF_TYPES.find(([k]) => k === form.staffType)?.[1], password: generated });
+      } catch (err) {
+        db.exec('ROLLBACK');
+        if (!err.rowError) throw err;
+        errors.push({ row: rowNo, message: err.message });
+      }
+    });
+    if (!created.length && !errors.length) return sendJson(res, 400, { error: 'The spreadsheet has no staff rows' });
+    return sendJson(res, 200, { ok: true, created, errors, setup: adminSetupPayload() });
+  }
+
+  // ── Export List → XLSX (the page sends the rows it is showing) ──
+  if (req.method === 'POST' && url.pathname === '/api/admin/staff/export.xlsx') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const headers = (Array.isArray(body.headers) ? body.headers : []).map(h => cleanText(h).slice(0, 80));
+    const rows = (Array.isArray(body.rows) ? body.rows : []).slice(0, 5000)
+      .map(row => (Array.isArray(row) ? row : []).slice(0, headers.length).map(v => String(v ?? '').slice(0, 2000)));
+    if (!headers.length) return sendJson(res, 400, { error: 'Nothing to export' });
+    const file = xlsxWorkbook(cleanText(body.sheetName).slice(0, 31) || 'Staff', headers, rows, {});
+    res.writeHead(200, {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="staff-employees.xlsx"',
+      'Content-Length': file.length,
+    });
+    return res.end(file);
+  }
+
   // Add Staff → Designation → "+ Add New"
   if (req.method === 'POST' && url.pathname === '/api/admin/staff-designations') {
     const user = requireUser(req, res, 'admin');
@@ -9329,7 +9603,7 @@ function adminSetupPayload() {
   );
   const profileSelect = Object.entries(STAFF_PROFILE_FIELDS).map(([key, col]) => `${col} AS ${key}`).join(', ');
   const staff = all(
-    `SELECT id, name, first_name AS firstName, initials, role, teacher_type AS teacherType, active,
+    `SELECT id, name, first_name AS firstName, initials, role, teacher_type AS teacherType, active, archived,
             photo_path AS photoPath, ${profileSelect}
      FROM users
      WHERE role IN ('teacher', 'admin', 'staff')
@@ -9348,10 +9622,16 @@ function adminSetupPayload() {
           : STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff'),
       department: row.department || (row.role === 'admin' ? 'admin' : row.role === 'teacher' ? 'academic' : ''),
       active: !!row.active,
+      archived: !!row.archived,
+      employmentStatus: row.employmentStatus || 'Active',
       status: row.active ? 'Active' : 'Deactivated',
     };
   });
-  const staffDesignations = all('SELECT name FROM staff_designations ORDER BY name').map(row => row.name);
+  const staffDesignationRows = all(
+    `SELECT d.id, d.name, (SELECT COUNT(*) FROM users u WHERE u.designation = d.name COLLATE NOCASE) AS staffCount
+     FROM staff_designations d ORDER BY d.name`
+  );
+  const staffDesignations = staffDesignationRows.map(row => row.name);
   const staffTypes = STAFF_TYPES.map(([value, label]) => ({ value, label }));
   const assignments = all(
     `SELECT
@@ -9430,7 +9710,7 @@ function adminSetupPayload() {
     ? all('SELECT DISTINCT class_code AS classCode, exam_type AS examType FROM report_publications WHERE academic_id = ?', academic.id)
     : [];
 
-  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, staffDesignations, staffTypes, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
+  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, staffDesignations, staffDesignationRows, staffTypes, employmentStatuses: EMPLOYMENT_STATUSES, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
 // Clean page addresses (/signin, /admin …) and the files behind them.
