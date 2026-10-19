@@ -163,6 +163,8 @@ function createCbtOffline(deps) {
       'set "DATA_DIR=%~dp0exam-data"',
       'set PORT=8080',
       'if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"',
+      // opens the Exam Console in the browser a few seconds after the server starts
+      'start "" /min cmd /c "timeout /t 3 /nobreak >nul & start http://localhost:8080"',
       'node server.js',
       'echo.',
       'echo The exam server has stopped.',
@@ -174,9 +176,12 @@ function createCbtOffline(deps) {
       'command -v node >/dev/null 2>&1 || { echo "Install Node.js 24 LTS from https://nodejs.org first."; exit 1; }',
       'export EXAM_MODE=1 DATA_DIR="$(pwd)/exam-data" PORT=8080',
       'mkdir -p "$DATA_DIR"',
+      '(sleep 3; xdg-open http://localhost:8080 2>/dev/null || open http://localhost:8080 2>/dev/null) &',
       'exec node server.js',
     ].join('\n');
     out.push(['ucs-exam-server/START-EXAM-SERVER.bat', bat]);
+    // double-click to get back to the Exam Console if the browser was closed
+    out.push(['ucs-exam-server/OPEN EXAM CONSOLE.url', '[InternetShortcut]\r\nURL=http://localhost:8080/\r\n']);
     out.push(['ucs-exam-server/start-exam-server.sh', sh]);
     out.push(['ucs-exam-server/EXAM-SERVER-GUIDE.txt', KIT_GUIDE.replace(/\n/g, '\r\n')]);
     return out;
@@ -457,7 +462,8 @@ ON EXAM DAY (no internet needed)
 2. Double-click START-EXAM-SERVER.bat. Leave that black window open for the
    whole exam. If Windows Firewall asks, click "Allow access" (Private
    networks).
-3. On the exam computer, open a browser at http://localhost:8080
+3. The Exam Console opens in the browser by itself after a few seconds.
+   (Closed it? Double-click "OPEN EXAM CONSOLE" in this folder.)
    The first time, load the exam pack (choose the file, type the passphrase).
 4. Sign in with your normal admin ID and password. The Exam Console shows the
    address pupils should open, e.g. http://192.168.0.10:8080
