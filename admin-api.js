@@ -2490,6 +2490,7 @@ const TAB_META = {
   staff: { title: 'People', sub: 'Teachers and Staff' },
   parents: { title: 'Guardian / Parents', sub: 'Parent and Guardian Records' },
   families: { title: 'Families', sub: 'Parents and their wards' },
+  termSetup: { title: 'New Term Setup', sub: 'Sessions, allocations and fees for a new term' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
   studentProfile: { title: 'Student Profile', sub: '' },
@@ -2748,6 +2749,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'offlineCbt') ocInit();
   if (tab === 'parents') plInit();
   if (tab === 'families') fmInit();
+  if (tab === 'termSetup') tsInit();
   if (tab === 'cbtGradebook') cbtgbInit();
   if (tab === 'studentTags') stInit();
   if (tab === 'classAllocation') caInit();

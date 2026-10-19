@@ -116,6 +116,11 @@ module.exports = function createStudents(ctx) {
   function formTeacherFor(classCode, armId) {
     const fromArm = armId && one(`SELECT u.name FROM class_arms ca JOIN users u ON u.id = ca.form_teacher_id WHERE ca.id = ?`, armId);
     if (fromArm?.name) return fromArm.name;
+    const session = activeAcademic()?.sessionLabel;
+    const allocated = !armId && session && one("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'form_teacher_allocations'") && one(
+      `SELECT u.name FROM form_teacher_allocations f JOIN users u ON u.id = f.teacher_id
+       WHERE f.session_label = ? AND f.class_code = ? AND f.class_arm_id IS NULL AND f.removed_at IS NULL ORDER BY f.id DESC LIMIT 1`, session, classCode);
+    if (allocated?.name) return allocated.name;
     const ct = one(`SELECT u.name FROM teacher_assignments ta JOIN users u ON u.id = ta.teacher_id
                     WHERE ta.class_code = ? AND ta.teacher_type = 'class_teacher' ORDER BY ta.id LIMIT 1`, classCode);
     return ct?.name || '';

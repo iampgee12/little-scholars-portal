@@ -8,6 +8,7 @@ const zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
 const createEnrolment = require('./enrol-api');
+const createTermSetup = require('./term-setup');
 const createStudents = require('./students-api');
 const createSecurity = require('./security');
 const { createCbtOffline } = require('./cbt-offline');
@@ -1772,6 +1773,13 @@ const studentsMod = createStudents({
   hashPassword, absoluteAssetPath, gradeScale: () => gradeScale, UPLOAD_DIR, DATA_DIR,
 });
 studentsMod.createSchema();
+// Academics › New Term Setup
+const termSetup = createTermSetup({
+  db, one, all, run, cleanText, readJson, sendJson, requireUser, valueFromMeta, setMeta,
+  activeAcademic, classHasArms, adminSetupPayload,
+  recordHistory: (...args) => studentsMod.recordHistory(...args),
+});
+termSetup.createSchema();
 // Password rules, two-step admin login, activity log, idle sign-out, backups
 const security = createSecurity({
   db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, hashPassword, verifyPassword,
@@ -1973,6 +1981,7 @@ function computeSchoolDays(academicId) {
   const term = one('SELECT start_date AS startDate, end_date AS endDate FROM academic_terms WHERE id = ?', academicId);
   if (!term || !term.startDate || !term.endDate) return null;
   const holidays = new Set(all('SELECT holiday_date AS d FROM term_holidays WHERE academic_id = ?', academicId).map(r => r.d));
+  termSetup.holidayDates(term.startDate, term.endDate).forEach(d => holidays.add(d));
   let count = 0;
   const cursor = new Date(`${term.startDate}T00:00:00Z`);
   const end = new Date(`${term.endDate}T00:00:00Z`);
@@ -3551,6 +3560,7 @@ function validateFeeAmount(value) {
 async function handleApi(req, res, url) {
   if (await enrolment.handle(req, res, url)) return;
   if (await studentsMod.handle(req, res, url)) return;
+  if (await termSetup.handle(req, res, url)) return;
   if (await security.handleAdmin(req, res, url)) return;
   if (await security.handleLoginSteps(req, res, url, publicUser)) return;
   if (req.method === 'POST' && url.pathname === '/api/login') {
@@ -7944,7 +7954,7 @@ async function handleApi(req, res, url) {
     const termLabel = cleanText(body.termLabel);
     if (!sessionLabel || !termLabel) return sendJson(res, 400, { error: 'Session and term are required' });
     if (!/^\d{4}\/\d{4}$/.test(sessionLabel)) return sendJson(res, 400, { error: 'Session must be in the form 2026/2027' });
-    if (!['Term 1', 'Term 2', 'Term 3'].includes(termLabel)) return sendJson(res, 400, { error: 'Term must be Term 1, Term 2, or Term 3' });
+    if (!termSetup.termNames().includes(termLabel)) return sendJson(res, 400, { error: `Term must be one of: ${termSetup.termNames().join(', ')}` });
     let row = one('SELECT id FROM academic_terms WHERE session_label = ? AND term_label = ?', sessionLabel, termLabel);
     if (!row) {
       const result = run('INSERT INTO academic_terms (session_label, term_label, is_active) VALUES (?, ?, 0)', sessionLabel, termLabel);
@@ -7952,6 +7962,8 @@ async function handleApi(req, res, url) {
     }
     run('UPDATE academic_terms SET is_active = 0');
     run('UPDATE academic_terms SET is_active = 1 WHERE id = ?', row.id);
+    termSetup.ensureSession(sessionLabel);
+    termSetup.applySessionAllocations(sessionLabel);
     return sendJson(res, 200, { ok: true, id: row.id });
   }
 
