@@ -789,35 +789,6 @@ async function ecgUnassignStudent(studentId) {
   } catch (err) { showToast(err.message); }
 }
 
-function populateParents() {
-  const tbody = document.getElementById('parents-tbody');
-  if (!tbody) return;
-  const rows = [...(state.setup.students || [])]
-    .filter(student => student.parentEmail)
-    .sort((a, b) => String(a.parentEmail).localeCompare(String(b.parentEmail)));
-  const label = document.getElementById('parents-count-label');
-  if (label) label.textContent = `${rows.length} parent contact${rows.length === 1 ? '' : 's'}`;
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-3);padding:16px;">No parent email records yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = rows.map(student => `
-    <tr data-search="${escapeHtml(`${student.parentEmail} ${student.name} ${student.id} ${student.classCode}`.toLowerCase())}">
-      <td><strong>${escapeHtml(student.parentEmail)}</strong></td>
-      <td>${escapeHtml(student.name)}</td>
-      <td style="font-family:'DM Mono',monospace;color:var(--text-3);">${escapeHtml(student.regNo || student.id)}</td>
-      <td>${escapeHtml(student.classCode)}</td>
-      <td><span style="font-size:11px;color:var(--green);font-family:'DM Mono',monospace;">Linked</span></td>
-    </tr>`).join('');
-}
-
-function filterParents() {
-  const q = document.getElementById('parents-search').value.toLowerCase();
-  document.querySelectorAll('#parents-tbody tr').forEach(tr => {
-    tr.style.display = !q || (tr.dataset.search || '').includes(q) ? '' : 'none';
-  });
-}
-
 // ── ADMISSION APPLICATIONS ──
 let admissionConvertId = null;
 
@@ -2473,7 +2444,8 @@ const TAB_META = {
   admissions: { title: 'Admission', sub: 'Applications Summary' },
   students: { title: 'View Students', sub: 'Students Information System' },
   staff: { title: 'People', sub: 'Teachers and Staff' },
-  parents: { title: 'Parents', sub: 'Parent and Guardian Records' },
+  parents: { title: 'Guardian / Parents', sub: 'Parent and Guardian Records' },
+  families: { title: 'Families', sub: 'Parents and their wards' },
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
   studentProfile: { title: 'Student Profile', sub: '' },
@@ -2730,6 +2702,8 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'cbtSchedules') csInit();
   if (tab === 'cbtScores') cscInit();
   if (tab === 'offlineCbt') ocInit();
+  if (tab === 'parents') plInit();
+  if (tab === 'families') fmInit();
   if (tab === 'cbtGradebook') cbtgbInit();
   if (tab === 'studentTags') stInit();
   if (tab === 'classAllocation') caInit();

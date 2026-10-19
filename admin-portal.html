@@ -1387,6 +1387,39 @@ th.sl-sort.desc::after { content:'▼'; color:var(--green); }
 .af-preview { margin-left:12px; font-size:12px; font-weight:700; color:var(--green); }
 .af-foot { align-items:center; }
 .af-spacer { flex:1; }
+/* Parents & Families */
+.pf-type { width:auto; min-width:180px; }
+.pf-type-wide { max-width:340px; }
+.pf-pill { display:inline-block; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:700; line-height:16px; white-space:nowrap; }
+.pf-pill-in { background:var(--green-bg); color:var(--green); }
+.pf-pill-out { background:#fdecec; color:#b42318; }
+.pf-pill-warn { background:#fff4e5; color:#b54708; margin-top:3px; }
+.pf-pill-rel { background:var(--black-3); color:var(--text-2); border:1px solid var(--border); }
+.pf-family-name { font-weight:700; color:var(--text-1); margin-bottom:6px; }
+.pf-person { margin:4px 0; font-size:13px; }
+.pf-ward-line { margin:2px 0; font-size:13px; }
+.pf-links { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pf-links-col { flex-direction:column; align-items:flex-start; margin-top:0; }
+.pf-actions { white-space:nowrap; }
+.pf-actions .sf-add-new { margin-left:6px; }
+.sf-dialog.pf-dialog-wide { width:min(900px, 100%); }
+.pf-slot { border:1px solid var(--border); border-radius:8px; padding:14px; margin-top:14px; }
+.pf-slot-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.pf-seg { display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.pf-seg button { border:0; background:transparent; padding:6px 12px; font-size:12px; color:var(--text-2); cursor:pointer; }
+.pf-seg button.active { background:var(--green); color:#fff; }
+.pf-results { display:flex; flex-direction:column; margin-top:6px; max-height:240px; overflow-y:auto; }
+.pf-result { display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--border); background:transparent; padding:8px; font-size:13px; color:var(--text-1); cursor:pointer; }
+button.pf-result:hover { background:var(--green-bg); }
+.pf-result-row { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:default; }
+.pf-result-row .post-btn { padding:5px 12px; font-size:12px; }
+.pf-picked-card { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px; border:1px solid var(--green); border-radius:6px; background:var(--green-bg); font-size:13px; }
+.fam-cards { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-bottom:16px; }
+.fam-card { border:1px solid var(--border); border-radius:8px; padding:12px; }
+.fam-card-top { display:flex; gap:10px; align-items:flex-start; font-size:13px; }
+.pf-members { margin-bottom:16px; }
+.pf-members .del-btn { padding:4px 10px; font-size:12px; }
+@media (max-width:700px) { .fam-cards { grid-template-columns:1fr; } .pf-type, .pf-type-wide { min-width:0; max-width:100%; width:100%; } }
 /* Bulk Import */
 .si-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:12px; }
 .si-card { border:1px solid var(--border); border-radius:8px; padding:16px; }
@@ -2823,7 +2856,11 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <button type="button" class="sub-nav-item result-child" data-tab="extracurricularGroups" onclick="switchTab('extracurricularGroups', this)">Extracurricular Groups</button>
             <button type="button" class="sub-nav-item result-child" data-tab="classAllocation" onclick="switchTab('classAllocation', this)">Promote / Move Students</button>
           </div>
-          <button type="button" class="sub-nav-item" data-tab="parents" onclick="switchTab('parents', this)"><span>Parents</span></button>
+          <button type="button" class="sub-nav-item" data-keywords="parents guardians families" onclick="toggleDropdown('parents-children','parents-chev',this)"><span>Parents</span><span class="sub-chev" id="parents-chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg></span></button>
+          <div id="parents-children" class="result-gradebook-children" style="display:none;">
+            <button type="button" class="sub-nav-item result-child" data-tab="parents" data-keywords="guardian parent" onclick="switchTab('parents', this)">Guardian / Parents</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="families" data-keywords="family siblings wards" onclick="switchTab('families', this)">Families</button>
+          </div>
           <button type="button" class="sub-nav-item" data-tab="staff" data-keywords="add staff new teacher employee hire register create" data-title="Staff / Employees" data-sub="Teachers and Staff Records" onclick="switchTab('staff', this, 'Staff / Employees', 'Teachers and Staff Records')"><span>Staff / Employees</span></button>
           <button type="button" class="sub-nav-item" data-tab="selfRegistration" onclick="switchTab('selfRegistration', this); sregOpen('dashboard')"><span>Self Registration</span></button>
         </div>
@@ -7064,22 +7101,92 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         </div>
       </div>
       <div class="tab-panel" id="tab-parents">
-        <div class="page-header"><h2>Parents</h2><p>Parent and guardian records</p></div>
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">Parent Contacts - <span id="parents-count-label">0 contacts</span></span>
-            <input class="search-input" id="parents-search" placeholder="Search parents or students..." oninput="filterParents()">
-          </div>
-          <div class="card-body" style="padding:0;">
-            <div style="overflow-x:auto;padding:0 18px 14px;">
-              <table class="data-table">
-                <thead><tr><th>Parent Email</th><th>Student</th><th>Student ID</th><th>Class</th><th>Status</th></tr></thead>
-                <tbody id="parents-tbody"></tbody>
-              </table>
+        <div class="page-header"><h2>Guardian / Parents</h2><p>Every parent and guardian on record, and the families they belong to.</p></div>
+        <div class="staff-directory-shell pf-shell">
+          <div class="sl-list-head">
+            <div class="sl-card-title">Guardian / Parents</div>
+            <div class="sl-head-actions">
+              <select class="ctrl-select pf-type" id="pl-type" aria-label="Which parents" onchange="plView.type=this.value;plView.page=1;plRender()">
+                <option value="all">All Parents</option>
+                <option value="nofamily">Parents Without a Family</option>
+              </select>
+              <button type="button" class="post-btn sf-add-btn" onclick="openCreateFamily()">+ Create Family</button>
             </div>
           </div>
+          <div class="sl-toolbar" style="margin-top:16px;">
+            <div class="sl-menu-wrap">
+              <button type="button" class="staff-export-btn" onclick="slToggleMenu('pl-export-menu', event)">Export List ▾</button>
+              <div class="sf-add-menu sl-menu" id="pl-export-menu" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="plExport('doc')">DOC</button>
+                <button type="button" role="menuitem" onclick="plExport('csv')">CSV</button>
+                <button type="button" role="menuitem" onclick="plExport('xls')">XLS</button>
+                <button type="button" role="menuitem" onclick="plExport('xlsx')">XLSX</button>
+              </div>
+            </div>
+            <button type="button" class="staff-export-btn" onclick="openRuleFilter('parents')">Advanced Filter<span id="pl-rule-count"></span></button>
+          </div>
+          <div class="staff-toolbar sl-toolbar-2">
+            <label class="staff-page-size"><select id="pl-per-page" onchange="plView.perPage=this.value==='All'?0:Number(this.value);plView.page=1;plRender()" aria-label="Records per page"><option selected>10</option><option>25</option><option>50</option><option>100</option><option>All</option></select> records per page</label>
+            <input class="staff-search-light" id="pl-search" placeholder="Search" aria-label="Search parents" oninput="plView.search=this.value;plView.page=1;plRender()">
+          </div>
+          <div class="sl-adv-banner" id="pl-rule-banner" hidden></div>
+          <div style="overflow-x:auto;"><table class="staff-table">
+            <thead><tr><th>#</th><th>Photo</th><th class="sl-sort" data-sort="name" onclick="plSort('name')">Guardian's Name</th><th>Email</th><th>Phone</th><th>Relationship with Ward(s)</th><th>Ward(s)</th><th>Profile</th></tr></thead>
+            <tbody id="pl-tbody"><tr><td colspan="8" class="sl-empty">Loading…</td></tr></tbody>
+          </table></div>
+          <div class="sl-footer"><span id="pl-info"></span><div class="sl-pages" id="pl-pages"></div></div>
         </div>
       </div>
+
+      <div class="tab-panel" id="tab-families">
+        <div class="page-header"><h2>Families</h2><p>Parents grouped with their wards. Siblings share one family.</p></div>
+        <div class="staff-directory-shell pf-shell">
+          <div class="sl-list-head">
+            <div class="sl-card-title">Families</div>
+            <div class="sl-head-actions">
+              <select class="ctrl-select pf-type pf-type-wide" id="fm-filter" aria-label="Which families" onchange="fmView.filter=this.value;fmView.page=1;fmRender()">
+                <option value="all">All families</option>
+                <option value="active">Families with active wards (at least one ward still active)</option>
+                <option value="someLeft">Families with wards who have graduated or left (at least one)</option>
+                <option value="allLeft">Families whose wards have all graduated or left (no ward still active)</option>
+                <option value="allActive">Families with no wards graduated or left yet (all wards still active)</option>
+              </select>
+              <button type="button" class="post-btn sf-add-btn" onclick="openCreateFamily()">+ Create Family</button>
+            </div>
+          </div>
+          <div class="sl-toolbar" style="margin-top:16px;">
+            <div class="sl-menu-wrap">
+              <button type="button" class="staff-export-btn sl-action-btn" onclick="slToggleMenu('fm-action-menu', event)">Action on Selected ▾</button>
+              <div class="sf-add-menu sl-menu" id="fm-action-menu" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="fmWardAccounts(false)">Deactivate Wards Accounts</button>
+                <button type="button" role="menuitem" onclick="fmWardAccounts(true)">Activate Wards Accounts</button>
+              </div>
+            </div>
+            <div class="sl-menu-wrap">
+              <button type="button" class="staff-export-btn" onclick="slToggleMenu('fm-export-menu', event)">Export List ▾</button>
+              <div class="sf-add-menu sl-menu" id="fm-export-menu" role="menu" hidden>
+                <button type="button" role="menuitem" onclick="fmExport('doc')">DOC</button>
+                <button type="button" role="menuitem" onclick="fmExport('csv')">CSV</button>
+                <button type="button" role="menuitem" onclick="fmExport('xls')">XLS</button>
+                <button type="button" role="menuitem" onclick="fmExport('xlsx')">XLSX</button>
+              </div>
+            </div>
+            <button type="button" class="staff-export-btn" onclick="openFamilyAdvancedExport()">Advanced Export</button>
+            <button type="button" class="staff-export-btn" onclick="openRuleFilter('families')">Advanced Filter<span id="fm-rule-count"></span></button>
+          </div>
+          <div class="staff-toolbar sl-toolbar-2">
+            <label class="staff-page-size"><select id="fm-per-page" onchange="fmView.perPage=this.value==='All'?0:Number(this.value);fmView.page=1;fmRender()" aria-label="Records per page"><option selected>10</option><option>25</option><option>50</option><option>100</option><option>All</option></select> records per page</label>
+            <input class="staff-search-light" id="fm-search" placeholder="Search" aria-label="Search families" oninput="fmView.search=this.value;fmView.page=1;fmRender()">
+          </div>
+          <div class="sl-adv-banner" id="fm-rule-banner" hidden></div>
+          <div style="overflow-x:auto;"><table class="staff-table">
+            <thead><tr><th class="sl-check"><input type="checkbox" id="fm-check-all" aria-label="Select all on this page" onchange="fmToggleAll(this.checked)"></th><th>#</th><th>Parents</th><th>Wards</th><th>Family Fees</th></tr></thead>
+            <tbody id="fm-tbody"><tr><td colspan="5" class="sl-empty">Loading…</td></tr></tbody>
+          </table></div>
+          <div class="sl-footer"><span id="fm-info"></span><div class="sl-pages" id="fm-pages"></div></div>
+        </div>
+      </div>
+      <div id="pf-modal-host"></div>
       <div class="tab-panel" id="tab-selfRegistration">
         <div id="sr-root"></div>
       </div>
@@ -7619,6 +7726,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="admin-api.js"></script>
 <script src="staff-list.js?v=3"></script>
 <script src="offline-cbt-admin.js?v=1"></script>
+<script src="parents-list.js?v=1"></script>
 <script src="menu-search.js?v=3"></script>
 <script src="enrol-common.js"></script>
 <script src="enrol-admin.js"></script>

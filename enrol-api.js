@@ -867,6 +867,117 @@ module.exports = function createEnrolment(ctx) {
         });
         return sendJson(res, 200, { ok: true, families: familyList() }), true;
       }
+      // ── Parents & Families pages ──
+      if (m === 'GET' && p === '/api/admin/parents/list') {
+        const families = all('SELECT id, name, parent1_id AS p1, parent2_id AS p2 FROM families');
+        const wards = all(`SELECT st.id, st.name, st.family_id AS familyId, st.status, c.label AS classLabel
+                           FROM students st LEFT JOIN classes c ON c.code = st.class_code WHERE st.family_id IS NOT NULL`);
+        const parents = all('SELECT * FROM parents ORDER BY full_name').map(row => {
+          const fams = families.filter(f => f.p1 === row.id || f.p2 === row.id);
+          return {
+            ...parentRow(row),
+            families: fams.map(f => ({ id: f.id, name: f.name })),
+            wards: wards.filter(w => fams.some(f => f.id === w.familyId)).map(w => ({ id: w.id, name: w.name, classLabel: w.classLabel || '', status: w.status || 'active' })),
+          };
+        });
+        return sendJson(res, 200, { parents }), true;
+      }
+      if (m === 'GET' && p === '/api/admin/families/list') {
+        const parents = new Map(all('SELECT * FROM parents').map(row => [row.id, parentRow(row)]));
+        const wards = all(`SELECT st.id, st.name, st.family_id AS familyId, st.status, st.gender, st.reg_no AS regNo, st.class_code AS classCode,
+                                  c.label AS classLabel, ca.name AS armName, u.active
+                           FROM students st LEFT JOIN classes c ON c.code = st.class_code
+                           LEFT JOIN class_arms ca ON ca.id = st.class_arm_id LEFT JOIN users u ON u.id = st.id
+                           WHERE st.family_id IS NOT NULL ORDER BY st.name`);
+        const families = all('SELECT * FROM families ORDER BY name').map(f => ({
+          id: f.id, name: f.name, createdAt: f.created_at,
+          parents: [f.parent1_id, f.parent2_id].map(id => parents.get(id)).filter(Boolean),
+          wards: wards.filter(w => w.familyId === f.id).map(w => ({
+            id: w.id, name: w.name, regNo: w.regNo || '', classLabel: [w.classLabel, w.armName].filter(Boolean).join(' '),
+            status: w.status || 'active', accountActive: w.active == null ? true : !!w.active, gender: w.gender || '',
+          })),
+        }));
+        return sendJson(res, 200, { families }), true;
+      }
+      const famWardMatch = p.match(/^\/api\/admin\/families\/(\d+)\/wards(?:\/([^/]+))?$/);
+      if (famWardMatch && (m === 'POST' || m === 'DELETE')) {
+        const familyId = Number(famWardMatch[1]);
+        if (!one('SELECT id FROM families WHERE id = ?', familyId)) return sendJson(res, 404, { error: 'Family not found' }), true;
+        const studentId = (m === 'POST' ? text((await readJson(req)).studentId, 40) : decodeURIComponent(famWardMatch[2] || '')).toUpperCase();
+        const student = one('SELECT id, family_id AS familyId FROM students WHERE id = ?', studentId);
+        if (!student) return sendJson(res, 404, { error: 'Student not found' }), true;
+        withTransaction(() => {
+          if (m === 'POST') {
+            // linking a pupil who belongs to another family moves them here
+            run('UPDATE students SET family_id = ? WHERE id = ?', familyId, studentId);
+            if (student.familyId && student.familyId !== familyId) syncFamilyEmails(student.familyId);
+            syncFamilyEmails(familyId);
+          } else {
+            if (student.familyId !== familyId) throw new Error('That pupil is not in this family');
+            run('UPDATE students SET family_id = NULL, parent_email = NULL WHERE id = ?', studentId);
+          }
+        });
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      const famParentMatch = p.match(/^\/api\/admin\/families\/(\d+)\/parents(?:\/(\d+))?$/);
+      if (famParentMatch && (m === 'POST' || m === 'DELETE')) {
+        const fam = one('SELECT * FROM families WHERE id = ?', Number(famParentMatch[1]));
+        if (!fam) return sendJson(res, 404, { error: 'Family not found' }), true;
+        if (m === 'POST') {
+          const body = await readJson(req);
+          if (fam.parent1_id && fam.parent2_id) return sendJson(res, 400, { error: 'This family already has two parents. Remove one first.' }), true;
+          withTransaction(() => {
+            let parentId;
+            if (body.existingId) {
+              parentId = Number(body.existingId);
+              if (!one('SELECT id FROM parents WHERE id = ?', parentId)) throw new Error('That parent no longer exists');
+              if (parentId === fam.parent1_id || parentId === fam.parent2_id) throw new Error('That parent is already in this family');
+            } else {
+              const cleaned = cleanParent(body);
+              if (!cleaned) throw new Error("The parent's full name is required");
+              parentId = saveParent(cleaned);
+            }
+            run(fam.parent1_id ? 'UPDATE families SET parent2_id = ? WHERE id = ?' : 'UPDATE families SET parent1_id = ? WHERE id = ?', parentId, fam.id);
+            syncFamilyEmails(fam.id);
+          });
+          return sendJson(res, 200, { ok: true }), true;
+        }
+        const parentId = Number(famParentMatch[2]);
+        if (parentId !== fam.parent1_id && parentId !== fam.parent2_id) return sendJson(res, 404, { error: 'That parent is not in this family' }), true;
+        const remaining = [fam.parent1_id, fam.parent2_id].filter(id => id && id !== parentId);
+        if (!remaining.length) return sendJson(res, 400, { error: 'A family needs at least one parent' }), true;
+        withTransaction(() => {
+          run('UPDATE families SET parent1_id = ?, parent2_id = NULL WHERE id = ?', remaining[0], fam.id);
+          syncFamilyEmails(fam.id);
+        });
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      const parentEditMatch = p.match(/^\/api\/admin\/parents\/(\d+)$/);
+      if (m === 'PUT' && parentEditMatch) {
+        const id = Number(parentEditMatch[1]);
+        if (!one('SELECT id FROM parents WHERE id = ?', id)) return sendJson(res, 404, { error: 'Parent not found' }), true;
+        const cleaned = cleanParent(await readJson(req));
+        if (!cleaned) return sendJson(res, 400, { error: "The parent's full name is required" }), true;
+        withTransaction(() => {
+          saveParent(cleaned, id);
+          all('SELECT id FROM families WHERE parent1_id = ? OR parent2_id = ?', id, id).forEach(f => syncFamilyEmails(f.id));
+        });
+        return sendJson(res, 200, { ok: true }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/families/wards-accounts') {
+        const body = await readJson(req);
+        const ids = (Array.isArray(body.familyIds) ? body.familyIds : []).map(Number).filter(Boolean);
+        if (!ids.length) return sendJson(res, 400, { error: 'Tick at least one family first' }), true;
+        const active = body.active ? 1 : 0;
+        const pupils = all(`SELECT id FROM students WHERE family_id IN (${ids.map(() => '?').join(',')})`, ...ids).map(r => r.id);
+        withTransaction(() => {
+          pupils.forEach(id => {
+            run("UPDATE users SET active = ? WHERE id = ? AND role = 'student'", active, id);
+            if (!active) run('DELETE FROM sessions WHERE user_id = ?', id);
+          });
+        });
+        return sendJson(res, 200, { ok: true, changed: pupils.length }), true;
+      }
       if (m === 'GET' && p === '/api/admin/parents/search') {
         const q = `%${cleanText(url.searchParams.get('q')).toLowerCase()}%`;
         const rows = all('SELECT * FROM parents WHERE LOWER(full_name) LIKE ? OR LOWER(COALESCE(email, \'\')) LIKE ? OR COALESCE(phone, \'\') LIKE ? ORDER BY full_name LIMIT 12', q, q, q);
