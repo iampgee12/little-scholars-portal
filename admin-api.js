@@ -1982,7 +1982,7 @@ function sfSyncType() {
   modal.querySelectorAll('.sf-records-only').forEach(el => { el.style.display = signsIn ? 'none' : ''; });
   modal.querySelectorAll('.sf-teacher-only').forEach(el => { el.style.display = sfType === 'teacher' ? '' : 'none'; });
   const editingRecordOnly = state.editingStaffId && (state.setup.staff || []).find(s => s.id === state.editingStaffId)?.canSignIn === false;
-  document.getElementById('sf-password-label').textContent = state.editingStaffId && !editingRecordOnly ? 'Password' : 'Password *';
+  document.getElementById('sf-password-label').innerHTML = state.editingStaffId && !editingRecordOnly ? 'Password' : 'Password <span class="sf-req" aria-hidden="true">*</span>';
   const note = modal.querySelector('.sf-records-only');
   if (note) note.textContent = `${sfTypeLabel(sfType)} staff don’t sign in to the portal. Saving creates their staff record.`;
   sfSyncPassword();
