@@ -162,7 +162,7 @@ function slRenderCards() {
   wrap.innerHTML = ['All Staff', ...SL_TYPES].map(type => `
     <button type="button" class="staff-summary-card ${type === 'All Staff' ? '' : SL_CARD_STYLE[type]} ${slView.type === type ? 'active' : ''}" onclick="slSetType('${escapeHtml(type)}')" title="Show ${escapeHtml(type)}">
       <span class="staff-summary-icon">${staffFilterIcon(type)}</span>
-      <div><div class="staff-summary-count">${counts[type] || 0}</div><div class="staff-summary-label">${escapeHtml(type)}</div></div>
+      <div><div class="staff-summary-count">${counts[type] || 0}</div><div class="staff-summary-label">${escapeHtml(type).replace(/\//g, '/<wbr>')}</div></div>
     </button>`).join('');
 }
 
