@@ -1289,6 +1289,26 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
   .sf-span-2 { grid-column:auto; }
   .sf-steps button { font-size:10px; }
 }
+/* ── Offline CBT (LAN) ── */
+.oc-steps { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px; margin-bottom:18px; }
+.oc-card .card-body { display:flex; flex-direction:column; gap:8px; }
+.oc-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--green); color:#fff; font-size:12px; margin-right:6px; }
+.oc-once { margin-left:6px; font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; }
+.oc-text { margin:0; font-size:13px; color:var(--text-2); line-height:1.5; }
+.oc-hint { display:block; font-size:11px; color:var(--text-3); line-height:1.4; }
+.oc-list { margin:0; padding-left:18px; font-size:13px; color:var(--text-2); line-height:1.7; }
+.oc-btn { align-self:flex-start; margin-top:6px; padding:10px 16px; font-size:13px; text-decoration:none; }
+.oc-schedules { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; }
+.oc-schedule { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:13px; }
+.oc-schedule input { margin-top:3px; accent-color:var(--green); }
+.oc-disabled { opacity:.55; cursor:default; }
+.oc-pass-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.oc-report { margin-top:10px; padding:12px; border-radius:8px; background:var(--green-bg); font-size:13px; color:var(--text-1); }
+.oc-report p { margin:0 0 6px; }
+.oc-report-title { font-weight:700; margin-top:8px !important; }
+.oc-warn { color:var(--amber, #b45309); }
+.oc-report-list { margin:0 0 6px; padding-left:18px; color:var(--text-2); }
+@media (max-width:1100px) { .oc-steps { grid-template-columns:1fr; } }
 /* ── Staff list: filters, cards, selection, paging (SchoolsFocus-style) ── */
 .sl-filters { padding:18px 22px 20px; margin-bottom:22px; }
 .sl-card-title { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--text-1); }
@@ -2832,6 +2852,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <button type="button" class="sub-nav-item result-child" data-tab="cbtSchedules" onclick="switchTab('cbtSchedules', this)">CBT Schedules</button>
             <button type="button" class="sub-nav-item result-child" data-tab="cbtScores" onclick="switchTab('cbtScores', this)">CBT Scores</button>
             <button type="button" class="sub-nav-item result-child" data-tab="examPractice" onclick="switchTab('examPractice', this)">Exam Practice</button>
+            <button type="button" class="sub-nav-item result-child" data-tab="offlineCbt" data-keywords="offline lan network wifi exam server pack" onclick="switchTab('offlineCbt', this)">Offline CBT (LAN)</button>
           </div>
         </div>
 
@@ -3487,6 +3508,59 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
       </div>
 
       <!-- ALL STAFF -->
+      <!-- OFFLINE CBT (LAN) -->
+      <div class="tab-panel" id="tab-offlineCbt">
+        <div class="page-header"><h2>Offline CBT (LAN)</h2><p>Let pupils write CBT on the school's own Wi-Fi, with no internet needed during the exam. Questions are still set here; results come back here afterwards.</p></div>
+        <div class="oc-steps">
+          <div class="card oc-card">
+            <div class="card-head"><span class="card-title"><span class="oc-num">1</span> Exam server kit <span class="oc-once">one-time setup</span></span></div>
+            <div class="card-body">
+              <p class="oc-text">Install this on the school computer that will run the exams. You only need to do this once (and again after a portal update).</p>
+              <ol class="oc-list">
+                <li>Install <b>Node.js 24 LTS</b> from nodejs.org on that computer.</li>
+                <li>Download the kit, unzip it, and keep the folder.</li>
+                <li>On exam day, double-click <b>START-EXAM-SERVER.bat</b>. Full steps are in <b>EXAM-SERVER-GUIDE.txt</b>.</li>
+              </ol>
+              <a class="post-btn oc-btn" href="/api/admin/cbt/offline/kit.zip" download>Download Exam Server Kit</a>
+            </div>
+          </div>
+          <div class="card oc-card">
+            <div class="card-head"><span class="card-title"><span class="oc-num">2</span> Download exam pack</span></div>
+            <div class="card-body">
+              <p class="oc-text">Tick the CBT schedule(s) to write offline. The pack holds those papers, their questions and the pupils' sign-in details, locked with your passphrase.</p>
+              <div class="oc-schedules" id="oc-schedules"><span class="oc-text">Loading…</span></div>
+              <div class="oc-pass-row">
+                <div><label class="field-label" for="oc-pass">Passphrase</label><input class="field-input" type="password" id="oc-pass" autocomplete="new-password" placeholder="At least 6 characters"></div>
+                <div><label class="field-label" for="oc-pass2">Type it again</label><input class="field-input" type="password" id="oc-pass2" autocomplete="new-password"></div>
+              </div>
+              <p class="oc-hint">You'll need the same passphrase on the exam computer and when uploading results. Don't share it with pupils.</p>
+              <button type="button" class="post-btn oc-btn" id="oc-pack-btn" onclick="ocDownloadPack()">Download Exam Pack</button>
+            </div>
+          </div>
+          <div class="card oc-card">
+            <div class="card-head"><span class="card-title"><span class="oc-num">3</span> Upload results</span></div>
+            <div class="card-body">
+              <p class="oc-text">After the exam, export the results file from the exam computer's Exam Console and upload it here. Scores go into <b>CBT Scores</b> and the <b>CBT Grade Book</b>.</p>
+              <label class="field-label" for="oc-results-file">Results file (.ucsres)</label>
+              <input class="field-input" type="file" id="oc-results-file" accept=".ucsres">
+              <label class="field-label" for="oc-results-pass" style="margin-top:12px;">Passphrase</label>
+              <input class="field-input" type="password" id="oc-results-pass" autocomplete="off">
+              <button type="button" class="post-btn oc-btn" id="oc-results-btn" onclick="ocUploadResults()">Upload Results</button>
+              <div id="oc-report"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Exam packs made</span></div>
+          <div class="card-body" style="padding:0;">
+            <div style="overflow-x:auto;"><table class="data-table">
+              <thead><tr><th>Made</th><th>By</th><th>Papers</th><th>Pupils</th><th>Questions</th><th>Results uploaded</th></tr></thead>
+              <tbody id="oc-packs"><tr><td colspan="6" style="padding:18px;color:var(--text-3);">Loading…</td></tr></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+
       <div class="tab-panel" id="tab-staff">
         <div class="staff-employee-page">
           <!-- Filters -->
@@ -7544,6 +7618,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="ui-dialog.js?v=3"></script>
 <script src="admin-api.js"></script>
 <script src="staff-list.js?v=3"></script>
+<script src="offline-cbt-admin.js?v=1"></script>
 <script src="menu-search.js?v=3"></script>
 <script src="enrol-common.js"></script>
 <script src="enrol-admin.js"></script>

@@ -185,12 +185,15 @@ async function beginExam(id, btn) {
       warned: {},
     };
     // Resume at the first unanswered question
+    const restored = restorePendingAnswers();
+    if (restored) toast(`${restored} answer${restored === 1 ? '' : 's'} kept on this device ${restored === 1 ? 'was' : 'were'} restored and ${restored === 1 ? 'is' : 'are'} being saved.`, 'warn', 6000);
     const firstOpen = currentExam.questions.findIndex(q => !currentExam.answersMap.has(q.id));
     currentExam.currentIndex = firstOpen === -1 ? 0 : firstOpen;
     document.getElementById('cbt-exam-title').textContent = currentExam.subjectName;
     showOnly('cbt-exam-view');
     renderExamView();
     startTimer();
+    if (saveQueue.size) processSaveQueue();
   } catch (err) {
     toast(err.network ? 'No internet connection — check it and try again.' : err.message, 'danger');
     if (err.status === 409) { await loadExams(); showListView(); }
@@ -327,7 +330,7 @@ function renderReview() {
         <div class="cbt-review-stat flagged"><strong>${flagged}</strong>Marked for review</div>
       </div>
       ${unanswered ? `<div class="cbt-warn-box">You have <strong>${unanswered}</strong> question${unanswered === 1 ? '' : 's'} not answered. You can still go back and answer ${unanswered === 1 ? 'it' : 'them'}.</div>` : ''}
-      ${pending ? `<div class="cbt-warn-box">${pending} answer${pending === 1 ? ' is' : 's are'} still saving. Check your internet connection.</div>` : ''}
+      ${pending ? `<div class="cbt-warn-box">${pending} answer${pending === 1 ? ' is' : 's are'} still being sent. ${saveOffline ? 'You\'re offline — they are kept safely on this device.' : 'Please wait a moment.'}</div>` : ''}
       <div class="cbt-review-grid">${qs.map((q, i) => `<button class="${qnumClass(q, i)}" onclick="goToQuestion(${i})">${i + 1}</button>`).join('')}</div>
       <div id="cbt-confirm"></div>
     </div>`;
@@ -356,13 +359,41 @@ function renderConfirm() {
 const saveQueue = new Map(); // questionId -> selectedOption (null = cleared)
 let saving = false;
 let saveFailed = false;
+let saveOffline = false; // last failure was the connection, not the server
 let retryTimer = null;
+
+// Unsent answers are also kept on the device, so a refresh, crash or restart
+// while the connection is down loses nothing; they're re-sent on return.
+function pendingKey(attemptId = currentExam?.attemptId) { return `cbt-pending-${attemptId}`; }
+function persistQueue() {
+  if (!currentExam) return;
+  try {
+    if (saveQueue.size) localStorage.setItem(pendingKey(), JSON.stringify([...saveQueue]));
+    else localStorage.removeItem(pendingKey());
+  } catch { /* storage unavailable: answers still retry while the page is open */ }
+}
+function restorePendingAnswers() {
+  let pending = [];
+  try { pending = JSON.parse(localStorage.getItem(pendingKey()) || '[]'); } catch { pending = []; }
+  const ids = new Set(currentExam.questions.map(q => q.id));
+  pending.filter(([questionId]) => ids.has(questionId)).forEach(([questionId, option]) => {
+    if (option === null) currentExam.answersMap.delete(questionId);
+    else currentExam.answersMap.set(questionId, option);
+    saveQueue.set(questionId, option);
+  });
+  return saveQueue.size;
+}
+function clearPending(attemptId) {
+  saveQueue.clear();
+  try { localStorage.removeItem(pendingKey(attemptId)); } catch { /* ignore */ }
+}
 
 function selectAnswer(questionId, option) {
   if (!currentExam || currentExam.submitting) return;
   if (option === null) currentExam.answersMap.delete(questionId);
   else currentExam.answersMap.set(questionId, option);
   saveQueue.set(questionId, option);
+  persistQueue();
   renderExamView();
   processSaveQueue();
 }
@@ -370,7 +401,8 @@ function selectAnswer(questionId, option) {
 function renderSaveState() {
   const el = document.getElementById('cbt-save-state');
   if (!el) return;
-  if (saveFailed && saveQueue.size) { el.className = 'cbt-save-state bad'; el.textContent = 'Not saved — retrying…'; }
+  if (saveFailed && saveOffline && saveQueue.size) { el.className = 'cbt-save-state bad'; el.textContent = 'Offline — your answers are kept on this device'; }
+  else if (saveFailed && saveQueue.size) { el.className = 'cbt-save-state bad'; el.textContent = 'Not saved — retrying…'; }
   else if (saving || saveQueue.size) { el.className = 'cbt-save-state busy'; el.textContent = 'Saving…'; }
   else { el.className = 'cbt-save-state ok'; el.textContent = '✓ Saved'; }
 }
@@ -389,12 +421,15 @@ async function processSaveQueue() {
       });
       // only drop it if the pupil hasn't changed the answer meanwhile
       if (saveQueue.get(questionId) === selectedOption) saveQueue.delete(questionId);
+      persistQueue();
       saveFailed = false;
+      saveOffline = false;
     }
   } catch (err) {
-    if (err.status === 410) { saveQueue.clear(); saving = false; finishExam(true); return; }
-    if (err.status === 409) { saveQueue.clear(); saving = false; toast('This exam has already been submitted.', 'danger'); showListView(); return; }
+    if (err.status === 410) { clearPending(); saving = false; finishExam(true); return; }
+    if (err.status === 409) { clearPending(); saving = false; toast('This exam has already been submitted.', 'danger'); showListView(); return; }
     saveFailed = true;
+    saveOffline = !!err.network;
     retryTimer = setTimeout(processSaveQueue, 3000);
   } finally {
     saving = false;
@@ -456,7 +491,7 @@ async function finishExam(auto, btn) {
     if (!allSaved) {
       currentExam.submitting = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit my exam'; }
-      toast('Some answers haven\'t saved yet. Check your internet connection, then try again.', 'danger', 6000);
+      toast(saveOffline ? 'You\'re offline. Your answers are safe on this device — submit again when the connection is back.' : 'Some answers haven\'t saved yet. Wait a moment, then try again.', 'danger', 7000);
       return;
     }
   } else {
@@ -467,12 +502,13 @@ async function finishExam(auto, btn) {
   try {
     const data = await apiFetch(`/api/student/cbt/exams/${currentExam.id}/submit`, { method: 'POST' });
     try { localStorage.removeItem(`cbt-flags-${currentExam.attemptId}`); } catch { /* ignore */ }
+    clearPending(currentExam.attemptId);
     showResultView(data, auto);
   } catch (err) {
     if (err.status === 409) { toast('This exam was already submitted.'); showListView(); return; }
     currentExam.submitting = false;
     if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit my exam'; }
-    toast(err.network ? 'No internet connection — your answers are saved. Try submitting again.' : err.message, 'danger', 6000);
+    toast(err.network ? `Connection lost — your answers are safe. ${auto ? 'Handing in again automatically…' : 'Try submitting again in a moment.'}` : err.message, 'danger', 6000);
     if (auto) setTimeout(() => finishExam(true), 4000); // keep trying after time is up
   }
 }

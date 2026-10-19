@@ -2500,6 +2500,7 @@ const TAB_META = {
   instructionSets: { title: 'Instruction Sets', sub: 'Reusable CBT Exam Instructions' },
   cbtSchedules: { title: 'CBT Schedules', sub: 'Computer-Based Test Schedules' },
   cbtScores: { title: 'CBT Scores', sub: 'Computer-Based Test Results' },
+  offlineCbt: { title: 'Offline CBT (LAN)', sub: 'Write CBT on the school network' },
   examPractice: { title: 'Exam Practice', sub: 'Self-Paced CBT Practice' },
   studentTags: { title: 'Student Tags', sub: 'Group and Filter Students by Tag' },
   classAllocation: { title: 'Promote / Move Students', sub: 'Promote, transfer or graduate pupils' },
@@ -2728,6 +2729,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'instructionSets') isInit();
   if (tab === 'cbtSchedules') csInit();
   if (tab === 'cbtScores') cscInit();
+  if (tab === 'offlineCbt') ocInit();
   if (tab === 'cbtGradebook') cbtgbInit();
   if (tab === 'studentTags') stInit();
   if (tab === 'classAllocation') caInit();

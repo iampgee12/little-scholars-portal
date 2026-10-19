@@ -16,3 +16,8 @@ published_reports/
 
 # Database backups live on the volume, never in the image
 backups/
+
+# Offline CBT exam-computer data and exam/results files
+exam-data/
+*.ucscbt
+*.ucsres

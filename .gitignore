@@ -19,3 +19,8 @@ school.sqlite.bak-*
 
 # Database backups (contain everyone's personal data)
 backups/
+
+# Offline CBT: exam-computer data and exam/results files (questions, answers, pupils)
+exam-data/
+*.ucscbt
+*.ucsres

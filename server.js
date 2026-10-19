@@ -10,6 +10,7 @@ const { layoutReportSheet, drawLayoutPdf } = require('./report-sheet');
 const createEnrolment = require('./enrol-api');
 const createStudents = require('./students-api');
 const createSecurity = require('./security');
+const { createCbtOffline } = require('./cbt-offline');
 
 const ROOT = __dirname;
 
@@ -44,6 +45,10 @@ const DATA_DIR = process.env.DATA_DIR || ROOT;
 const DB_PATH = path.join(DATA_DIR, 'school.sqlite');
 const PORT = Number(process.env.PORT || 3000);
 const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
+// Offline CBT exam computer (START-EXAM-SERVER.bat sets this): no demo data, no
+// emailed admin codes (there's no internet), and only the exam pages.
+const EXAM_MODE = process.env.EXAM_MODE === '1';
+if (EXAM_MODE) process.env.DISABLE_ADMIN_2FA = 'true';
 const COOKIE_NAME = 'ls_session';
 const EXAM_TYPES = ['Mid-Term Exam', 'Final Exam'];
 const DEFAULT_STUDENT_PASSWORD = '1234';
@@ -1705,7 +1710,9 @@ createSchema();
 createFeesSchema();
 createFinancePayrollSchema();
 createStoreAccountingSchema();
-if (IS_PROD) {
+if (EXAM_MODE) {
+  // everything comes from the exam pack loaded in the Exam Console
+} else if (IS_PROD) {
   bootstrapProduction();
 } else {
   seedDatabase();
@@ -1737,6 +1744,12 @@ const security = createSecurity({
 });
 security.createSchema();
 security.startBackups();
+// Offline (LAN) CBT: exam packs, exam-server kit, results upload, exam mode
+const cbtOffline = createCbtOffline({
+  db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, zipFiles: enrolment.zipFiles,
+  markCbtAttempt, valueFromMeta, setMeta, ROOT, EXAM_MODE, PORT,
+});
+cbtOffline.createSchema();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -3334,6 +3347,53 @@ function smtpSend({ host, port, user, pass, from, to, message }) {
   });
 }
 
+// Marks a CBT attempt against the paper's current questions, stamps it
+// submitted and records the score. Shared by the student Submit button, the
+// exam computer closing a paper, and uploading offline (LAN) results.
+function markCbtAttempt(scheduleSubjectId, studentId, attemptId, recordedBy, submittedAt = new Date().toISOString()) {
+  const ss = one('SELECT class_code AS classCode, subject_id AS subjectId FROM cbt_schedule_subjects WHERE id = ?', scheduleSubjectId);
+  const questions = all(
+    `SELECT id, marks, options FROM cbt_questions
+     WHERE class_code = ? AND subject_id = ? AND question_type = 'Multiple Choice Question' AND vetted = 1 AND archived = 0`,
+    ss.classCode, ss.subjectId
+  );
+  const answered = new Map(
+    all('SELECT question_id AS questionId, selected_option AS selectedOption FROM cbt_attempt_answers WHERE attempt_id = ?', attemptId)
+      .map(a => [a.questionId, a.selectedOption])
+  );
+  let score = 0;
+  let totalMarks = 0;
+  let questionsAttempted = 0;
+  questions.forEach(q => {
+    totalMarks += Number(q.marks) || 0;
+    const selected = answered.get(q.id);
+    if (selected === undefined || selected === null) return;
+    questionsAttempted += 1;
+    let options = [];
+    try { options = q.options ? JSON.parse(q.options) : []; } catch { options = []; }
+    if (options[selected]?.correct) score += Number(q.marks) || 0;
+  });
+  const ownTransaction = !db.isTransaction;
+  if (ownTransaction) db.exec('BEGIN');
+  try {
+    run('UPDATE cbt_attempts SET submitted_at = ? WHERE id = ?', submittedAt, attemptId);
+    run(
+      `INSERT INTO cbt_scores (schedule_subject_id, student_id, score, total_marks, questions_presented, questions_attempted, recorded_by, recorded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(schedule_subject_id, student_id) DO UPDATE SET
+         score = excluded.score, total_marks = excluded.total_marks,
+         questions_presented = excluded.questions_presented, questions_attempted = excluded.questions_attempted,
+         recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at`,
+      scheduleSubjectId, studentId, score, totalMarks, questions.length, questionsAttempted, recordedBy, new Date().toISOString()
+    );
+    if (ownTransaction) db.exec('COMMIT');
+  } catch (err) {
+    if (ownTransaction) db.exec('ROLLBACK');
+    throw err;
+  }
+  return { score, totalMarks, questionsPresented: questions.length, questionsAttempted };
+}
+
 // Accounts a sign-in name can mean: the account ID, a pupil's Reg. No., or an
 // email address (the account's email, or a pupil's own student email).
 // Only an email can match more than one account.
@@ -4390,7 +4450,8 @@ async function handleApi(req, res, url) {
     if (!attempt) return sendJson(res, 400, { error: 'Start the exam before answering' });
     if (attempt.submittedAt) return sendJson(res, 409, { error: 'This exam has already been submitted' });
     const deadline = new Date(attempt.startedAt).getTime() + ss.durationMinutes * 60000;
-    if (Date.now() > deadline) return sendJson(res, 410, { error: 'Time is up for this exam' });
+    // answers picked before time ran out may arrive a little late after a network blip
+    if (Date.now() > deadline + 120000) return sendJson(res, 410, { error: 'Time is up for this exam' });
     if (!one('SELECT id FROM cbt_questions WHERE id = ?', questionId)) {
       return sendJson(res, 400, { error: 'Question not found' });
     }
@@ -4415,46 +4476,8 @@ async function handleApi(req, res, url) {
     if (!attempt) return sendJson(res, 400, { error: 'You have not started this exam' });
     if (attempt.submittedAt) return sendJson(res, 409, { error: 'This exam has already been submitted' });
 
-    const questions = all(
-      `SELECT id, marks, options FROM cbt_questions
-       WHERE class_code = ? AND subject_id = ? AND question_type = 'Multiple Choice Question' AND vetted = 1 AND archived = 0`,
-      ss.classCode, ss.subjectId
-    );
-    const answered = new Map(
-      all('SELECT question_id AS questionId, selected_option AS selectedOption FROM cbt_attempt_answers WHERE attempt_id = ?', attempt.id)
-        .map(a => [a.questionId, a.selectedOption])
-    );
-    let score = 0;
-    let totalMarks = 0;
-    let questionsAttempted = 0;
-    questions.forEach(q => {
-      totalMarks += Number(q.marks) || 0;
-      const selected = answered.get(q.id);
-      if (selected === undefined || selected === null) return;
-      questionsAttempted += 1;
-      let options = [];
-      try { options = q.options ? JSON.parse(q.options) : []; } catch { options = []; }
-      if (options[selected]?.correct) score += Number(q.marks) || 0;
-    });
-
-    db.exec('BEGIN');
-    try {
-      run('UPDATE cbt_attempts SET submitted_at = ? WHERE id = ?', new Date().toISOString(), attempt.id);
-      run(
-        `INSERT INTO cbt_scores (schedule_subject_id, student_id, score, total_marks, questions_presented, questions_attempted, recorded_by, recorded_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(schedule_subject_id, student_id) DO UPDATE SET
-           score = excluded.score, total_marks = excluded.total_marks,
-           questions_presented = excluded.questions_presented, questions_attempted = excluded.questions_attempted,
-           recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at`,
-        scheduleSubjectId, student.id, score, totalMarks, questions.length, questionsAttempted, student.id, new Date().toISOString()
-      );
-      db.exec('COMMIT');
-    } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
-    }
-    return sendJson(res, 200, { ok: true, score, totalMarks, questionsPresented: questions.length, questionsAttempted });
+    const result = markCbtAttempt(scheduleSubjectId, student.id, attempt.id, student.id);
+    return sendJson(res, 200, { ok: true, ...result });
   }
 
   if (req.method === 'GET' && url.pathname === '/api/student/results') {
@@ -9755,6 +9778,13 @@ const PAGE_ROUTES = {
 };
 // Old addresses (bookmarks, emailed links) → their clean address
 const PAGE_REDIRECTS = Object.fromEntries(Object.entries(PAGE_ROUTES).map(([route, file]) => [file, route]));
+// On the exam computer the admin lands in the Exam Console and pupils go straight to the CBT
+if (EXAM_MODE) {
+  PAGE_ROUTES['/admin'] = '/exam-console.html';
+  PAGE_ROUTES['/exam-console'] = '/exam-console.html';
+  PAGE_ROUTES['/student'] = '/student-cbt.html';
+  ['/teacher', '/register', '/reset-password'].forEach(route => delete PAGE_ROUTES[route]);
+}
 
 function redirectTo(res, location) {
   res.writeHead(302, { Location: location });
@@ -9815,7 +9845,7 @@ function serveStatic(req, res, url) {
   const publicExt = new Set(['.html', '.js', '.css', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.webp', '.ttf']);
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
-    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js'].includes(relParts[relParts.length - 1])
+    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js', 'cbt-offline.js', 'security.js', 'offsite-backup.js', 'restore-backup.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -9851,6 +9881,7 @@ const server = http.createServer(async (req, res) => {
     security.applyHeaders(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       security.trackRequest(req, res, url, sessionUser(req));
+      if (await cbtOffline.handle(req, res, url)) return;
       await handleApi(req, res, url);
       return;
     }
@@ -9864,4 +9895,11 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
+  if (EXAM_MODE) {
+    const lan = Object.values(require('node:os').networkInterfaces()).flat().filter(a => a && a.family === 'IPv4' && !a.internal);
+    console.log('\n  OFFLINE CBT EXAM SERVER');
+    console.log(`  On this computer:  http://localhost:${PORT}`);
+    lan.forEach(a => console.log(`  Pupils open:       http://${a.address}:${PORT}`));
+    console.log('  Keep this window open during the exam.\n');
+  }
 });
