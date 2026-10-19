@@ -3372,7 +3372,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
           </div>
         </div>
         <div class="card" id="ecg-detail-card" style="display:none;">
-          <div class="card-head"><span class="card-title" id="ecg-detail-title">Group</span><button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="ecgCloseDetail()">&larr; Back to Groups</button></div>
+          <div class="card-head"><span class="card-title" id="ecg-detail-title">Group</span><button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="ecgCloseDetail()">Back to Groups</button></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:2fr auto;gap:12px;align-items:end;margin-bottom:14px;">
               <div><label class="field-label">Add Student to Group</label><select class="ctrl-select" id="ecg-add-student" style="width:100%;"></select></div>
@@ -3416,7 +3416,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
           </div>
         </div>
         <div class="card" id="st-detail-card" style="display:none;">
-          <div class="card-head"><span class="card-title" id="st-detail-title">Tag</span><button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="stCloseDetail()">&larr; Back to Tags</button></div>
+          <div class="card-head"><span class="card-title" id="st-detail-title">Tag</span><button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="stCloseDetail()">Back to Tags</button></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:2fr auto;gap:12px;align-items:end;margin-bottom:14px;">
               <div><label class="field-label">Add Student to Tag</label><select class="ctrl-select" id="st-add-student" style="width:100%;"></select></div>
@@ -3696,8 +3696,8 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             </section>
           </div>
           <div class="sf-foot">
-            <button type="button" class="btn-outline" id="ae-back" onclick="aeGoTo(ae.step - 1)">&larr; Back</button>
-            <button type="button" class="post-btn" id="ae-next" onclick="aeGoTo(ae.step + 1)">Next &rarr;</button>
+            <button type="button" class="btn-outline" id="ae-back" onclick="aeGoTo(ae.step - 1)">Back</button>
+            <button type="button" class="post-btn" id="ae-next" onclick="aeGoTo(ae.step + 1)">Next</button>
             <button type="button" class="post-btn" id="ae-export" onclick="aeExport()">Export</button>
           </div>
         </div>
@@ -3877,8 +3877,8 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             </section>
           </div>
           <div class="sf-foot">
-            <button type="button" class="btn-outline" id="sf-back" onclick="sfGoTo(sfStep - 1)">&larr; Back</button>
-            <button type="button" class="post-btn" id="sf-next" onclick="sfNext()">Next &rarr;</button>
+            <button type="button" class="btn-outline" id="sf-back" onclick="sfGoTo(sfStep - 1)">Back</button>
+            <button type="button" class="post-btn" id="sf-next" onclick="sfNext()">Next</button>
             <button type="button" class="post-btn" id="sf-save" onclick="saveStaffForm()">Register Staff</button>
           </div>
         </div>
@@ -3962,7 +3962,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               <label class="field-label">Message</label>
               <textarea class="field-input" id="ann-body-in" placeholder="Write your announcement here…" style="height:90px;resize:vertical;font-family:'DM Sans',sans-serif;line-height:1.5;"></textarea>
             </div>
-            <button class="post-btn" onclick="postAnnouncement()">Post Announcement →</button>
+            <button class="post-btn" onclick="postAnnouncement()">Post Announcement</button>
           </div>
         </div>
 
@@ -4821,7 +4821,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;align-items:end;">
               <div><label class="field-label">Class *</label><select class="ctrl-select" id="qb-class"><option value="">Select Class</option></select></div>
               <div><label class="field-label">Subject *</label><select class="ctrl-select" id="qb-subject"><option value="">Select Subject</option></select></div>
-              <div><button class="post-btn" onclick="qbGoToBank()">Go to Question Bank &rsaquo;</button></div>
+              <div><button class="post-btn" onclick="qbGoToBank()">Go to Question Bank</button></div>
             </div>
           </div>
         </div>
@@ -4972,7 +4972,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
         <div class="card" id="cs-detail-card" style="display:none;">
           <div class="card-head">
             <span class="card-title" id="cs-detail-title">Schedule</span>
-            <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="csdClose()">&larr; Back to Schedules</button>
+            <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="csdClose()">Back to Schedules</button>
           </div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:14px;">

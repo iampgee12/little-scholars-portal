@@ -506,7 +506,7 @@ function stuInfoBody(inPage) {
       <span class="stu-card-badge">Student</span>
       <div class="stu-card-icons">${s.studentEmail ? `<a href="mailto:${escapeHtml(s.studentEmail)}" title="Email ${escapeHtml(s.studentEmail)}">${STU_ICON_MAIL}</a>` : ''}</div>
     </div>
-    ${inPage ? '' : `<div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button></div>`}
+    ${inPage ? '' : `<div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page</button></div>`}
     <div class="stu-sec">Student Biodata</div>
     <table class="stu-info"><tbody>
       ${row('Surname', txt(s.surname))}${row('First Name', txt(s.firstName))}${row('Other Names', txt(s.otherNames))}
@@ -538,7 +538,7 @@ function stuInfoBody(inPage) {
     ${inPage ? `<div class="stu-card-foot spf-prof-foot"><button class="btn-outline" onclick="stuPrintCard('#spf-profile-body')">Print</button>
         <span class="en-foot-gap"></span><button class="btn-danger" onclick="spfDelete()">Delete Account</button>
         ${s.archived ? '<button class="btn-outline" onclick="spfArchive(false)">Restore Account (Unarchive)</button>' : '<button class="btn-outline" onclick="spfArchive(true)">Archive Account</button>'}</div>`
-      : `<div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page &rarr;</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`}`;
+      : `<div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`}`;
 }
 
 function stuGoToProfile(id) {

@@ -191,8 +191,8 @@ function enrolRenderWizard() {
     <div class="en-foot">
       ${EN.editId ? '<button type="button" class="btn-danger" onclick="enrolDelete()">Delete Student</button>' : ''}
       <span class="en-foot-gap"></span>
-      <button type="button" class="btn-outline" id="en-back" onclick="enrolGoStep(EN.step - 1)">&larr; Back</button>
-      <button type="button" class="post-btn" id="en-next" onclick="enrolNext()">Next &rarr;</button>
+      <button type="button" class="btn-outline" id="en-back" onclick="enrolGoStep(EN.step - 1)">Back</button>
+      <button type="button" class="post-btn" id="en-next" onclick="enrolNext()">Next</button>
       <button type="button" class="post-btn" id="en-save" onclick="enrolSave(this)">${EN.editId ? 'Save Changes' : 'Register Student'}</button>
     </div>
   </div>`;
@@ -573,7 +573,7 @@ function bulkRender(view = 'start', result = null) {
   }
   const classes = (state.setup?.classes || []).filter(c => !c.archived);
   const meta = EN.meta || {};
-  body.innerHTML = `<div class="card"><div class="card-head"><span class="card-title">Students Bulk Enroll - Import List</span><button class="btn-outline btn-sm" onclick="bulkRender('start')">&larr; Back</button></div><div class="card-body">
+  body.innerHTML = `<div class="card"><div class="card-head"><span class="card-title">Students Bulk Enroll - Import List</span><button class="btn-outline btn-sm" onclick="bulkRender('start')">Back</button></div><div class="card-body">
     <div class="en-grid three">
       ${enField('Class', `<select class="ctrl-select" id="bk-class" onchange="bulkClassChanged()">${enrolOptions(classes.map(c => [c.code, c.label]), '', 'Select')}</select>`, { required: true })}
       ${enField('Class Arm', '<select class="ctrl-select" id="bk-arm" disabled><option value="">Select Class First</option></select>', { required: true })}

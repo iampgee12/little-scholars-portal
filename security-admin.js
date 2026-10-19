@@ -98,7 +98,7 @@ async function secLog() {
         <td class="stu-mono">${secEsc(r.ip)}<div class="en-hint">${secEsc(r.device)}</div></td></tr>`).join('') : '<tr><td colspan="5" class="sr-empty">Nothing recorded yet</td></tr>'}
     </tbody></table></div>
     <div class="sr-foot"><span>${d.total} record(s)</span><div class="sr-pages">
-      <button ${f.page <= 1 ? 'disabled' : ''} onclick="SEC.log.page--; secLog()">&lsaquo; Prev</button><span class="sec-page">Page ${f.page} of ${pages}</span><button ${f.page >= pages ? 'disabled' : ''} onclick="SEC.log.page++; secLog()">Next &rsaquo;</button>
+      <button ${f.page <= 1 ? 'disabled' : ''} onclick="SEC.log.page--; secLog()">Prev</button><span class="sec-page">Page ${f.page} of ${pages}</span><button ${f.page >= pages ? 'disabled' : ''} onclick="SEC.log.page++; secLog()">Next</button>
     </div></div>`);
 }
 

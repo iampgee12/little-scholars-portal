@@ -42,7 +42,7 @@ function rgCodeStep(error = '') {
   rgBody().innerHTML = `${rgMsg(error)}
     <label class="field-label" for="rg-code">Access Code</label>
     <input class="field-input" id="rg-code" placeholder="Enter the code the school gave you" autocomplete="off" style="text-transform:uppercase;font-family:'DM Mono',monospace;">
-    <div class="rg-actions">${RG.staffOnly ? '<span></span>' : '<button class="btn btn-line" onclick="rgStart()">&larr; Back</button>'}<button class="btn btn-green" onclick="rgOpen(this)">Continue</button></div>`;
+    <div class="rg-actions">${RG.staffOnly ? '<span></span>' : '<button class="btn btn-line" onclick="rgStart()">Back</button>'}<button class="btn btn-green" onclick="rgOpen(this)">Continue</button></div>`;
   document.getElementById('rg-code').addEventListener('keydown', e => { if (e.key === 'Enter') rgOpen(); });
 }
 
@@ -116,7 +116,7 @@ function rgRenderForm(error = '') {
   } else {
     html += rgSection(f.fields, 'rg-');
   }
-  html += `<div class="rg-actions"><button class="btn btn-line" onclick="${RG.staffOnly ? 'rgCodeStep()' : 'rgStart()'}">&larr; Back</button><button class="btn btn-green" onclick="rgSubmit(this)">Submit Registration</button></div>`;
+  html += `<div class="rg-actions"><button class="btn btn-line" onclick="${RG.staffOnly ? 'rgCodeStep()' : 'rgStart()'}">Back</button><button class="btn btn-green" onclick="rgSubmit(this)">Submit Registration</button></div>`;
   rgBody().innerHTML = html;
   if (RG.kind === 'parent') { RG.children = 0; rgAddChild(); }
 }

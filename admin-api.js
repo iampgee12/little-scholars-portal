@@ -1534,7 +1534,7 @@ function renderCognitiveModalBody(student, rating, editMode, selection) {
         ${infoRows.map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}
       </table>
       <div class="cog-panel-actions">
-        <button class="cog-profile-btn">Go to profile page ›</button>
+        <button class="cog-profile-btn">Go to profile page</button>
         <button class="cog-print-btn" onclick="window.print()">Print</button>
       </div>
     </div>`;
@@ -4560,7 +4560,7 @@ async function csLoadSchedules() {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
             <span style="background:var(--black-3);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;">Classes: ${s.classCount}</span>
             <div style="display:flex;gap:6px;">
-              <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="csdOpen(${s.id})">View Schedule &rsaquo;</button>
+              <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="csdOpen(${s.id})">View Schedule</button>
               <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="csArchiveToggle(${s.id}, ${s.archived})">${s.archived ? 'Unarchive' : 'Archive'}</button>
             </div>
           </div>

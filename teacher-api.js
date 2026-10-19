@@ -858,7 +858,7 @@ function renderStudentPanel() {
   document.getElementById('results-main').innerHTML = `
     <div class="entry-panel">
       <div class="ep-nav">
-        <button class="ep-back-btn" onclick="backToGrid()">&larr; Back to Grid</button>
+        <button class="ep-back-btn" onclick="backToGrid()">Back to Grid</button>
         <span style="font-size:11px;color:var(--text-3);">Student ${idx + 1} of ${state.students.length}</span>
         <div class="ep-nav-arrows">
           <button class="ep-arr-btn" onclick="navigateStudent(-1)" ${idx <= 0 ? 'disabled' : ''} title="Previous student">&lt;</button>

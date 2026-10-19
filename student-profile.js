@@ -69,7 +69,7 @@ function spfRender() {
   root.innerHTML = `<div class="spf-head card"><div class="card-body" id="spf-head"></div></div>
     <div class="spf-wrap">
       <div class="spf-tabs card">
-        <button class="spf-back" onclick="spfBack()">&larr; Back to Students List</button>
+        <button class="spf-back" onclick="spfBack()">Back to Students List</button>
         ${SPF_TABS.map(([key, label, icon]) => `<button class="spf-tab" data-spf="${key}" onclick="spfTab('${key}')">${spfSvg(icon)}<span>${label}</span></button>`).join('')}
       </div>
       <div class="spf-body card"><div class="card-body" id="spf-body"></div></div>

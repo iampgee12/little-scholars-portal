@@ -204,7 +204,6 @@ function setLoading(isLoading) {
   const btn = document.getElementById('btn');
   btn.disabled = isLoading;
   document.getElementById('btn-txt').textContent  = isLoading ? 'Signing in...' : 'Sign In';
-  document.getElementById('btn-arr').style.display = isLoading ? 'none' : '';
   document.getElementById('spin').style.display    = isLoading ? 'block' : 'none';
 }
 

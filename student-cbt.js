@@ -162,8 +162,8 @@ function openLobby(id) {
         </ul>
       </div>
       <div class="cbt-lobby-actions">
-        <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">&larr; Back</button>
-        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam(${e.id}, this)">${resuming ? 'Continue Exam' : 'Begin Exam'} &rarr;</button>
+        <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">Back</button>
+        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam(${e.id}, this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
       </div>
     </div>`;
   showOnly('cbt-lobby-view');
@@ -274,7 +274,7 @@ function renderCurrentQuestion() {
       <div class="cbt-question-tools">
         <button type="button" class="cbt-tool-btn ${flagged ? 'on' : ''}" onclick="toggleFlag(${q.id})">&#9873; ${flagged ? 'Marked for review' : 'Mark for review'}</button>
         ${chosen !== undefined ? `<button type="button" class="cbt-tool-btn" onclick="selectAnswer(${q.id}, null)">Clear my answer</button>` : ''}
-        <button type="button" class="cbt-tool-btn" onclick="showReview()">Review &amp; Submit &rarr;</button>
+        <button type="button" class="cbt-tool-btn" onclick="showReview()">Review &amp; Submit</button>
       </div>
     </div>`;
 }
@@ -282,16 +282,16 @@ function renderCurrentQuestion() {
 function renderNavButtons() {
   const inner = document.getElementById('cbt-nav-inner');
   if (currentExam.mode === 'review') {
-    inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="backToQuestions()">&larr; Back to questions</button>
+    inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="backToQuestions()">Back to questions</button>
       <button class="cbt-btn cbt-btn-green" onclick="askSubmit()">Submit Exam</button>`;
     return;
   }
   const i = currentExam.currentIndex;
   const isLast = i === currentExam.questions.length - 1;
-  inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="goToQuestion(${i - 1})" ${i === 0 ? 'disabled' : ''}>&larr; Previous</button>
+  inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="goToQuestion(${i - 1})" ${i === 0 ? 'disabled' : ''}>Previous</button>
     ${isLast
       ? '<button class="cbt-btn cbt-btn-green" onclick="showReview()">Review &amp; Submit</button>'
-      : `<button class="cbt-btn" onclick="goToQuestion(${i + 1})">Next &rarr;</button>`}`;
+      : `<button class="cbt-btn" onclick="goToQuestion(${i + 1})">Next</button>`}`;
 }
 
 function goToQuestion(i) {
