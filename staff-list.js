@@ -29,10 +29,12 @@ function slAge(dob) {
 }
 function slNameParts(s) {
   const parts = String(s.name || '').split(/\s+/).filter(Boolean);
+  // a record saved with no surname keeps its own first / other names
+  const structured = !!s.surname || (!!s.firstName && [s.firstName, s.otherNames].filter(Boolean).join(' ') === s.name);
   return {
-    first: s.surname ? s.firstName : parts[0] || '',
-    surname: s.surname || (parts.length > 1 ? parts[parts.length - 1] : ''),
-    other: s.surname ? s.otherNames : parts.slice(1, -1).join(' '),
+    first: structured ? s.firstName : parts[0] || '',
+    surname: structured ? s.surname || '' : (parts.length > 1 ? parts[parts.length - 1] : ''),
+    other: structured ? s.otherNames || '' : parts.slice(1, -1).join(' '),
   };
 }
 const SL_FIELDS = [

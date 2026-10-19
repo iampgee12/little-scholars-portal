@@ -257,7 +257,7 @@ function readStaffForm(body) {
   const role = staffRoleForType(staffType);
   const firstName = cleanText(body.firstName);
   const surname = cleanText(body.surname);
-  if (!surname || !firstName) return { error: 'Surname and first name are required' };
+  if (!firstName) return { error: 'First name is required' };
   const profile = {};
   for (const [key, col] of Object.entries(STAFF_PROFILE_FIELDS)) {
     profile[col] = cleanText(body[key]).slice(0, col.endsWith('address') || col === 'qualifications' ? 400 : 150) || null;
@@ -2422,9 +2422,9 @@ function parseSheetRows(xml, sharedStrings) {
 // Bulk Import template columns: [header, form field, required]. Order matters:
 // the template's dropdowns are attached by column position.
 const STAFF_IMPORT_COLUMNS = [
-  ['Staff Type', 'staffType', true], ['Title', 'title', false], ['Surname', 'surname', true],
+  ['Staff Type', 'staffType', true], ['Title', 'title', false], ['Surname', 'surname', false],
   ['First Name', 'firstName', true], ['Other Names', 'otherNames', false], ['Gender', 'gender', false],
-  ['Phone', 'phone', false], ['Email', 'email', false], ['Designation', 'designation', false],
+  ['Phone', 'phone', false], ['Email', 'email', true], ['Designation', 'designation', false],
   ['Staff ID', 'id', false], ['Date of Birth (dd-mm-YYYY)', 'dob', false], ['Religion', 'religion', false],
   ['Blood Group', 'bloodGroup', false], ['Genotype', 'genotype', false], ['Nationality', 'nationality', false],
   ['State of Origin', 'stateOfOrigin', false], ['LGA of Origin', 'lga', false], ['Town of Origin', 'town', false],
@@ -7274,6 +7274,7 @@ async function handleApi(req, res, url) {
     if (role === 'admin' && adminLevel(user) === 'admin') {
       return sendJson(res, 403, { error: 'Only a super admin can add an administrator' });
     }
+    if (!profile.email) return sendJson(res, 400, { error: 'Email is required' });
     if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) {
       return sendJson(res, 400, { error: 'Choose a class for this Class Teacher' });
     }
@@ -7435,8 +7436,8 @@ async function handleApi(req, res, url) {
     const key = h => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const keys = headers.map(key);
     const col = Object.fromEntries(STAFF_IMPORT_COLUMNS.map(([label, field]) => [field, keys.indexOf(key(label))]));
-    if (col.staffType === -1 || col.surname === -1 || col.firstName === -1) {
-      return sendJson(res, 400, { error: 'This is not the staff import template — Staff Type, Surname and First Name columns are missing. Download the template and use it.' });
+    if (col.staffType === -1 || col.firstName === -1 || col.email === -1) {
+      return sendJson(res, 400, { error: 'This is not the staff import template — Staff Type, First Name and Email columns are missing. Download the template and use it.' });
     }
     if (rows.length > 500) return sendJson(res, 400, { error: 'Import at most 500 staff at a time' });
     const typeByLabel = Object.fromEntries(STAFF_TYPES.flatMap(([value, label]) => [[key(label), value], [key(value), value]]));
@@ -7461,6 +7462,7 @@ async function handleApi(req, res, url) {
       if (form.error) return errors.push({ row: rowNo, message: form.error });
       const { role, teacherType, name, firstName, initials, profile } = form;
       if (role === 'admin' && adminLevel(user) === 'admin') return errors.push({ row: rowNo, message: 'Only a super admin can add an administrator' });
+      if (!profile.email) return errors.push({ row: rowNo, message: 'Email is required' });
       const classCode = cleanText(value('classCode')).toUpperCase();
       if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });
       const id = form.id || nextStaffUserId(role);

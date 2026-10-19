@@ -1983,6 +1983,9 @@ function sfSyncType() {
   modal.querySelectorAll('.sf-teacher-only').forEach(el => { el.style.display = sfType === 'teacher' ? '' : 'none'; });
   const editingRecordOnly = state.editingStaffId && (state.setup.staff || []).find(s => s.id === state.editingStaffId)?.canSignIn === false;
   document.getElementById('sf-password-label').innerHTML = state.editingStaffId && !editingRecordOnly ? 'Password' : 'Password <span class="sf-req" aria-hidden="true">*</span>';
+  const email = document.getElementById('sf-email');
+  if (state.editingStaffId) delete email.dataset.required; else email.dataset.required = 'Email';
+  document.getElementById('sf-email-label').innerHTML = state.editingStaffId ? 'Email' : 'Email <span class="sf-req" aria-hidden="true">*</span>';
   const note = modal.querySelector('.sf-records-only');
   if (note) note.textContent = `${sfTypeLabel(sfType)} staff don’t sign in to the portal. Saving creates their staff record.`;
   sfSyncPassword();
@@ -2068,11 +2071,12 @@ function openStaffForm(type, staff = null) {
   if (staff) {
     // older records only have a full name: split it into the name boxes
     const parts = String(staff.name || '').split(/\s+/).filter(Boolean);
+    const structured = !!staff.surname || (!!staff.firstName && [staff.firstName, staff.otherNames].filter(Boolean).join(' ') === staff.name);
     const values = {
       ...staff,
-      firstName: staff.surname ? staff.firstName : parts[0] || '',
-      surname: staff.surname || (parts.length > 1 ? parts[parts.length - 1] : ''),
-      otherNames: staff.surname ? staff.otherNames : parts.slice(1, -1).join(' '),
+      firstName: structured ? staff.firstName : parts[0] || '',
+      surname: structured ? staff.surname || '' : (parts.length > 1 ? parts[parts.length - 1] : ''),
+      otherNames: structured ? staff.otherNames || '' : parts.slice(1, -1).join(' '),
     };
     modal.querySelectorAll('[data-field]').forEach(el => {
       const value = values[el.dataset.field];
