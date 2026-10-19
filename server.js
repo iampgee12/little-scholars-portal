@@ -3334,6 +3334,25 @@ function smtpSend({ host, port, user, pass, from, to, message }) {
   });
 }
 
+// Accounts a sign-in name can mean: the account ID, a pupil's Reg. No., or an
+// email address (the account's email, or a pupil's own student email).
+// Only an email can match more than one account.
+function findSignInAccounts(rawName) {
+  const name = String(rawName || '').trim();
+  if (!name) return [];
+  const byId = one('SELECT * FROM users WHERE id = ?', name.toUpperCase());
+  if (byId) return [byId];
+  const byRegNo = one('SELECT id FROM students WHERE reg_no = ?', name);
+  if (byRegNo) return [one('SELECT * FROM users WHERE id = ?', byRegNo.id)].filter(Boolean);
+  if (!name.includes('@')) return [];
+  const email = name.toLowerCase();
+  const ids = new Set([
+    ...all('SELECT id FROM users WHERE LOWER(TRIM(email)) = ?', email).map(r => r.id),
+    ...all('SELECT id FROM students WHERE LOWER(TRIM(student_email)) = ?', email).map(r => r.id),
+  ]);
+  return [...ids].map(id => one('SELECT * FROM users WHERE id = ?', id)).filter(Boolean);
+}
+
 // Simple in-memory brute-force protection for /api/login. Keyed by the
 // login identifier (not IP) so repeated attempts against one account are
 // throttled regardless of source. No external store needed at this scale.
@@ -3451,10 +3470,19 @@ async function handleApi(req, res, url) {
       return sendJson(res, 429, { error: rateLimit.message });
     }
 
-    const byRegNo = one('SELECT id FROM students WHERE reg_no = ?', String(body.id || '').trim());
-    const user = one('SELECT * FROM users WHERE id = ?', id) || (byRegNo && one('SELECT * FROM users WHERE id = ?', byRegNo.id));
-    // records-only staff (role 'staff') have no portal and can never sign in
-    if (!user || user.role === 'staff' || !verifyPassword(password, user.password)) {
+    // ID, pupil Reg. No. or email address; records-only staff (role 'staff') never sign in
+    const candidates = findSignInAccounts(body.id).filter(u => u.role !== 'staff');
+    let matches = candidates.filter(u => verifyPassword(password, u.password));
+    // one email shared by several accounts: the portal picked on the sign-in page decides
+    if (matches.length > 1 && ['admin', 'teacher', 'student'].includes(body.role)) {
+      const forRole = matches.filter(u => u.role === body.role);
+      if (forRole.length) matches = forRole;
+    }
+    if (matches.length > 1) {
+      return sendJson(res, 409, { error: 'This email address is used by more than one account. Please sign in with your ID instead.' });
+    }
+    const user = matches[0] || candidates[0];
+    if (!matches.length) {
       recordFailedLogin(id);
       security.ipFailed(req);
       security.audit(req, user ? { id: user.id, name: user.name, role: user.role } : { id, name: null, role: null },
@@ -3628,8 +3656,8 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/forgot-password') {
     const body = await readJson(req);
     const id = String(body.id || '').trim().toUpperCase();
-    const genericMessage = 'If that ID has an email address on file, a reset link has been sent to it.';
-    if (!id) return sendJson(res, 400, { error: 'Enter your ID' });
+    const genericMessage = 'If that ID or email matches an account with an email address on file, a reset link has been sent to it.';
+    if (!id) return sendJson(res, 400, { error: 'Enter your ID or email address' });
 
     if (security.ipBlocked(req)) return sendJson(res, 429, { error: 'Too many attempts from this network. Please try again later.' });
     const rateKey = `FORGOT-${id}`;
@@ -3638,7 +3666,9 @@ async function handleApi(req, res, url) {
       return sendJson(res, 429, { error: rateLimit.message });
     }
 
-    const user = one('SELECT * FROM users WHERE id = ?', id);
+    // ID, Reg. No. or email; an email shared by several accounts gets the generic reply
+    const found = findSignInAccounts(body.id);
+    const user = found.length === 1 ? found[0] : null;
     if (!user || !user.email || user.role === 'staff') {
       recordFailedLogin(rateKey);
       return sendJson(res, 200, { ok: true, message: genericMessage });

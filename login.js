@@ -9,8 +9,8 @@ const ROLE_META = {
     title:       'Admin Login',
     badge:       'ADMIN',
     badgeClass:  'admin',
-    idLabel:     'Admin ID',
-    placeholder: 'e.g. ADM-001',
+    idLabel:     'Admin ID or Email',
+    placeholder: 'e.g. ADM-001 or name@example.com',
     prefix:      'ADM-',
     color:       'var(--blue)',
     portalLabel: 'Admin Portal',
@@ -19,8 +19,8 @@ const ROLE_META = {
     title:       'Staff Login',
     badge:       'STAFF',
     badgeClass:  'teacher',
-    idLabel:     'Staff ID',
-    placeholder: 'e.g. TCH-001',
+    idLabel:     'Staff ID or Email',
+    placeholder: 'e.g. TCH-001 or name@example.com',
     prefix:      'TCH-',
     color:       'var(--amber)',
     portalLabel: 'Teacher Portal',
@@ -29,8 +29,8 @@ const ROLE_META = {
     title:       'Pupil Login',
     badge:       'PUPIL',
     badgeClass:  'student',
-    idLabel:     'Student ID',
-    placeholder: 'e.g. STU-2024-0421',
+    idLabel:     'Student ID or Email',
+    placeholder: 'e.g. STU-2024-0421 or name@example.com',
     prefix:      'STU-',
     color:       'var(--green)',
     portalLabel: 'Student Portal',
@@ -228,13 +228,13 @@ async function handleLogin() {
   let valid = true;
   if (!sid) {
     sidEl.classList.add('error');
-    sidErr.textContent = 'Please enter your ID.';
+    sidErr.textContent = 'Please enter your ID or email address.';
     sidErr.classList.add('show');
     valid = false;
-  } else if (!sid.toUpperCase().startsWith(meta.prefix)) {
-    // ID does not belong to the selected role
+  } else if (Object.entries(ROLE_META).some(([role, m]) => role !== selectedRole && sid.toUpperCase().startsWith(m.prefix))) {
+    // an ID that clearly belongs to another portal (emails, Reg. Nos and other IDs go through)
     sidEl.classList.add('error');
-    sidErr.textContent = `${meta.idLabel}s start with "${meta.prefix}". Check your ID or go back.`;
+    sidErr.textContent = `${meta.idLabel.replace(' or Email', '')}s start with "${meta.prefix}". Check your ID or go back.`;
     sidErr.classList.add('show');
     valid = false;
   }
@@ -251,11 +251,11 @@ async function handleLogin() {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: sid, password: pw }),
+      body: JSON.stringify({ id: sid, password: pw, role: selectedRole }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(res.status === 401 ? 'Incorrect ID or password. Please try again.' : (data.error || 'Sign-in failed. Please try again.'));
+      throw new Error(res.status === 401 ? 'Incorrect ID, email or password. Please try again.' : (data.error || 'Sign-in failed. Please try again.'));
     }
     if (data.step) {
       setLoading(false);
@@ -301,7 +301,7 @@ async function submitForgotPassword() {
     alertEl.style.color = '';
     alertEl.style.background = '';
     alertEl.style.borderColor = '';
-    alertEl.textContent = 'Please enter your ID.';
+    alertEl.textContent = 'Please enter your ID or email address.';
     alertEl.classList.add('show');
     return;
   }
