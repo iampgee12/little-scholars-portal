@@ -1,0 +1,5 @@
+/* DM Sans + DM Mono served from the portal itself, so pages keep the portal's
+   look on an offline exam computer (no Google Fonts there). OFL — see DM-OFL.txt. */
+@font-face { font-family: 'DM Sans'; src: url('/report_assets/fonts/DMSans-Variable.ttf') format('truetype'); font-weight: 100 1000; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DM Mono'; src: url('/report_assets/fonts/DMMono-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'DM Mono'; src: url('/report_assets/fonts/DMMono-Medium.ttf') format('truetype'); font-weight: 500; font-style: normal; font-display: swap; }

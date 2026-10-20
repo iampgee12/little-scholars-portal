@@ -12,6 +12,7 @@ const createTermSetup = require('./term-setup');
 const createStudents = require('./students-api');
 const createSecurity = require('./security');
 const { createCbtOffline } = require('./cbt-offline');
+const createExamSync = require('./exam-sync');
 
 const ROOT = __dirname;
 
@@ -1793,6 +1794,12 @@ const cbtOffline = createCbtOffline({
   markCbtAttempt, valueFromMeta, setMeta, ROOT, EXAM_MODE, PORT,
 });
 cbtOffline.createSchema();
+// Exam servers connected to the portal with keys (sync down, push results up)
+const examSync = createExamSync({
+  db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, valueFromMeta, setMeta,
+  adminLevel, schoolInfoFromMeta, ROOT, UPLOAD_DIR, EXAM_MODE, cbtOffline,
+});
+examSync.createSchema();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -9934,7 +9941,7 @@ function serveStatic(req, res, url) {
   const blocked = !filePath.startsWith(ROOT + path.sep)
     || relParts.some(part => part.startsWith('.') || part === 'node_modules')
     || ['exam-app', 'dist'].includes(relParts[0])
-    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js', 'cbt-offline.js', 'security.js', 'offsite-backup.js', 'restore-backup.js', 'term-setup.js'].includes(relParts[relParts.length - 1])
+    || ['server.js', 'report-sheet.js', 'enrol-api.js', 'students-api.js', 'cbt-offline.js', 'security.js', 'offsite-backup.js', 'restore-backup.js', 'term-setup.js', 'exam-sync.js'].includes(relParts[relParts.length - 1])
     || !publicExt.has(path.extname(filePath).toLowerCase());
   if (blocked) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -9970,6 +9977,7 @@ const server = http.createServer(async (req, res) => {
     security.applyHeaders(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       security.trackRequest(req, res, url, sessionUser(req));
+      if (await examSync.handle(req, res, url)) return;
       if (await cbtOffline.handle(req, res, url)) return;
       await handleApi(req, res, url);
       return;

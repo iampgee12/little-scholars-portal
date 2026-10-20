@@ -178,26 +178,37 @@ function createCbtOffline(deps) {
     const { payload } = unseal(RESULTS_FORMAT, text, passphrase);
     const pack = one('SELECT * FROM cbt_offline_packs WHERE id = ?', payload.packId);
     if (!pack) throw new Error('These results come from an exam pack this portal did not create.');
-    const source = `offline:${payload.packId}`;
-    const report = { imported: 0, alreadyUploaded: 0, conflicts: [], skipped: [], scoreChanged: [], notSubmitted: (payload.notSubmitted || []).length };
+    const report = importAttempts(payload.attempts || [], `offline:${payload.packId}`, admin.id);
+    report.notSubmitted = (payload.notSubmitted || []).length;
+    run('UPDATE cbt_offline_packs SET results_uploaded_at = ?, results_count = results_count + ? WHERE id = ?', new Date().toISOString(), report.imported, pack.id);
+    return report;
+  }
+
+  // Takes in finished attempts written on an exam computer (from a results file
+  // or pushed by a connected exam server) and marks them against the portal's
+  // questions. `outcomes` says what happened to each, so a push knows what's done.
+  function importAttempts(attempts, source, recordedBy) {
+    const report = { imported: 0, alreadyUploaded: 0, conflicts: [], skipped: [], scoreChanged: [], outcomes: [] };
     const label = (ssId, studentId) => {
       const r = one(`SELECT st.name, sub.name AS subject, c.label AS cls FROM students st, cbt_schedule_subjects ss
                      JOIN subjects sub ON sub.id = ss.subject_id JOIN classes c ON c.code = ss.class_code
                      WHERE st.id = ? AND ss.id = ?`, studentId, ssId);
       return r ? `${r.name} — ${r.cls} ${r.subject}` : `${studentId} (paper ${ssId})`;
     };
+    const outcome = (a, status) => report.outcomes.push({ scheduleSubjectId: Number(a.scheduleSubjectId), studentId: cleanText(a.studentId), status });
     db.exec('BEGIN IMMEDIATE');
     try {
-      for (const a of payload.attempts || []) {
+      for (const a of attempts) {
         const ssId = Number(a.scheduleSubjectId);
         const studentId = cleanText(a.studentId);
         if (!one('SELECT id FROM cbt_schedule_subjects WHERE id = ?', ssId) || !one('SELECT id FROM students WHERE id = ?', studentId)) {
           report.skipped.push(`${studentId}: paper or pupil no longer exists online`);
+          outcome(a, 'skipped');
           continue;
         }
         const existing = one('SELECT id, submitted_at AS submittedAt, source FROM cbt_attempts WHERE schedule_subject_id = ? AND student_id = ?', ssId, studentId);
-        if (existing && existing.source === source) { report.alreadyUploaded++; continue; }
-        if (existing && existing.submittedAt) { report.conflicts.push(`${label(ssId, studentId)}: already wrote this paper online — kept the online result`); continue; }
+        if (existing && existing.source === source) { report.alreadyUploaded++; outcome(a, 'already'); continue; }
+        if (existing && existing.submittedAt) { report.conflicts.push(`${label(ssId, studentId)}: already wrote this paper online — kept the online result`); outcome(a, 'conflict'); continue; }
         if (existing) run('DELETE FROM cbt_attempts WHERE id = ?', existing.id); // an unfinished online try gives way
         const inserted = run(
           'INSERT INTO cbt_attempts (schedule_subject_id, student_id, started_at, submitted_at, source) VALUES (?, ?, ?, NULL, ?)',
@@ -210,11 +221,11 @@ function createCbtOffline(deps) {
             attemptId, Number(questionId), selected === null || selected === undefined ? null : Number(selected));
         }
         // marked again here against the portal's questions, so the online score is authoritative
-        const result = markCbtAttempt(ssId, studentId, attemptId, admin.id, cleanText(a.submittedAt) || new Date().toISOString());
-        if (Number(a.score) !== result.score) report.scoreChanged.push(`${label(ssId, studentId)}: ${a.score} on the exam computer → ${result.score} here (questions changed since the pack was made)`);
+        const result = markCbtAttempt(ssId, studentId, attemptId, recordedBy, cleanText(a.submittedAt) || new Date().toISOString());
+        if (Number(a.score) !== result.score) report.scoreChanged.push(`${label(ssId, studentId)}: ${a.score} on the exam computer → ${result.score} here (questions changed since the exam computer was set up)`);
         report.imported++;
+        outcome(a, 'imported');
       }
-      run('UPDATE cbt_offline_packs SET results_uploaded_at = ?, results_count = results_count + ? WHERE id = ?', new Date().toISOString(), report.imported, pack.id);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
@@ -363,7 +374,7 @@ function createCbtOffline(deps) {
       if (!EXAM_MODE) return sendJson(res, 404, { error: 'Not found' }), true;
       const hasUsers = !!one('SELECT id FROM users LIMIT 1');
       if (m === 'GET' && p === '/api/exam/status') {
-        return sendJson(res, 200, { examMode: true, setUp: hasUsers && !!currentPack(), pack: currentPack(), lanAddresses: lanAddresses(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
+        return sendJson(res, 200, { examMode: true, setUp: hasUsers && (!!currentPack() || !!valueFromMeta('exam_synced', '')), connected: !!valueFromMeta('sync_api_number', ''), pack: currentPack(), lanAddresses: lanAddresses(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
       }
       if (m === 'POST' && p === '/api/exam/import') {
         // the very first load happens before any admin exists on this computer
@@ -432,7 +443,7 @@ function createCbtOffline(deps) {
     }
   }
 
-  return { createSchema, handle };
+  return { createSchema, handle, importAttempts, insertRows, tableExists, lanAddresses, currentPack, papersOverview };
 }
 
 const KIT_GUIDE = `UNIQUE CHILDREN'S SCHOOL — OFFLINE CBT EXAM SERVER

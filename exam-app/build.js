@@ -63,7 +63,8 @@ function makeBundle() {
   const len = Buffer.alloc(4);
   len.writeUInt32LE(header.length, 0);
   const raw = Buffer.concat([len, header, ...files.map(f => f[1])]);
-  const build = crypto.createHash('sha256').update(raw).digest('hex').slice(0, 12);
+  // the version ID covers the portal files and the launcher, so either changing counts as an update
+  const build = crypto.createHash('sha256').update(raw).update(fs.readFileSync(path.join(__dirname, 'launcher.js'))).digest('hex').slice(0, 12);
   return { bundle: zlib.gzipSync(raw, { level: 9 }), build, count: files.length };
 }
 
@@ -105,34 +106,42 @@ WHAT YOU NEED
 - A Wi-Fi router or network switch. It does NOT need internet.
 - Devices for pupils (computer lab, tablets or phones) with a web browser.
 
-BEFORE EACH EXAM (needs internet, on any computer)
-1. Sign in to the online portal as admin.
-2. Open Offline CBT (LAN) > tick the CBT schedule(s) > choose a passphrase >
-   Download Exam Pack. Keep the passphrase safe.
-3. Copy the .ucscbt file to the exam computer (USB stick is fine).
+FIRST TIME: CONNECT TO THE SCHOOL PORTAL (needs internet)
+1. A super admin opens the online portal > E-Class > CBT > Offline CBT (LAN)
+   > Exam server connections > + New Connection, and copies the three keys.
+2. Open "UCS Exam Server". On "Connect School Account" type the API Number,
+   API Authentication Key and API Secret Key, then click Connect.
+3. Tick "I confirm" and click Fetch Data. Then sign in with your usual admin
+   ID or email and password.
+
+BEFORE EACH EXAM (needs internet)
+- Data Management & Sync > Refresh Data > Refresh All (or just CBT / Exams).
+  This copies the latest pupils, staff and CBT papers from the portal.
 
 ON EXAM DAY (no internet needed)
 1. Connect the exam computer to the school router/Wi-Fi.
-2. Open "UCS Exam Server" (desktop or Start menu). Leave its black window
-   open for the whole exam. If Windows Firewall asks, click "Allow access"
-   (Private networks).
-3. The Exam Console opens in the browser by itself. The first time, load
-   the exam pack (choose the file, type the passphrase).
-4. Sign in with your normal admin ID and password. The Exam Console shows the
-   address pupils should open, e.g. http://192.168.0.10:8080
-5. Pupils connect to the same Wi-Fi, open that address, choose Pupil and sign
+2. Open "UCS Exam Server" (desktop or Start menu). It opens in its own
+   window. If Windows Firewall asks, click "Allow access" (Private networks).
+3. The Dashboard shows the address pupils open, e.g. http://192.168.0.10:8080
+4. Pupils connect to the same Wi-Fi, open that address, choose Pupil and sign
    in with their usual ID (or email) and password.
-6. Click "Open" on a paper to start it and "Close" when it ends. Closing
-   hands in any paper still being written.
+5. In the Exam Console click "Open" on a paper to start it and "Close" when
+   it ends. Closing hands in any paper still being written.
 
-AFTER THE EXAM
-1. In the Exam Console click "Export Results". Copy the .ucsres file to a
-   computer with internet.
-2. Online portal > Offline CBT (LAN) > Upload Results > choose the file >
-   same passphrase. Scores appear in CBT Scores and the CBT Grade Book.
+AFTER THE EXAM (needs internet)
+- Computer-Based Tests > Push Results Online > Push. Scores appear in CBT
+  Scores and the CBT Grade Book. Pushing twice is safe.
+- Every exam written here stays in Submissions Archive.
+
+NO INTERNET AT SYNC TIME? (the file backup)
+- Connection & Files > Load Exam Pack File (made on the portal with a
+  passphrase), and afterwards Export Results File to upload on the portal.
 
 TIPS
-- Opening "UCS Exam Server" again while it runs just reopens the Exam Console.
+- Closing the window asks whether to stop the exam server or keep it running
+  in the background. Open "UCS Exam Server" again to bring the window back.
+- Check for Updates (Help) installs a newer version from the portal.
+- The server's log is %LOCALAPPDATA%\\UCS Exam Server\\server.log
 - Keep the exam computer plugged in and stop it from sleeping during exams.
 - If a pupil's device drops off the Wi-Fi, their answers are kept on that
   device and sent again automatically when it reconnects.
@@ -152,6 +161,8 @@ async function main() {
   const { bundle, build, count } = makeBundle();
   fs.writeFileSync(path.join(WORK, 'app.bundle'), bundle);
   fs.writeFileSync(path.join(WORK, 'build.txt'), `${build}\n`);
+  fs.writeFileSync(path.join(WORK, 'version.txt'), `${version}\n`);
+  fs.writeFileSync(path.join(WORK, 'portal.txt'), `${process.env.PORTAL_URL || 'https://portal.uniquechildrenschool.com'}\n`);
   step(`${count} files, ${(bundle.length / 1e6).toFixed(1)} MB packed, build ${build}`);
 
   const config = {
@@ -160,7 +171,7 @@ async function main() {
     disableExperimentalSEAWarning: true,
     useSnapshot: false,
     useCodeCache: false,
-    assets: { 'app.bundle': path.join(WORK, 'app.bundle'), 'build.txt': path.join(WORK, 'build.txt') },
+    assets: { 'app.bundle': path.join(WORK, 'app.bundle'), 'build.txt': path.join(WORK, 'build.txt'), 'version.txt': path.join(WORK, 'version.txt'), 'portal.txt': path.join(WORK, 'portal.txt') },
   };
   fs.writeFileSync(path.join(WORK, 'sea-config.json'), JSON.stringify(config, null, 2));
   execFileSync(process.execPath, ['--experimental-sea-config', path.join(WORK, 'sea-config.json')], { stdio: 'inherit' });
@@ -174,6 +185,12 @@ async function main() {
   step('packing the exam server into the app…');
   const { inject } = require('postject');
   await inject(exe, 'NODE_SEA_BLOB', fs.readFileSync(config.output), { sentinelFuse: 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2', overwrite: true });
+  // a windowed program (no console window): PE optional header Subsystem 3 (console) → 2 (GUI)
+  const pe = fs.readFileSync(exe);
+  const subsystemAt = pe.readUInt32LE(0x3c) + 0x5c;
+  if (pe.readUInt16LE(subsystemAt) !== 3) throw new Error('Unexpected PE subsystem value');
+  pe.writeUInt16LE(2, subsystemAt);
+  fs.writeFileSync(exe, pe);
   fs.rmSync(final, { force: true });
   fs.renameSync(exe, final);
   fs.writeFileSync(path.join(DIST, 'EXAM-SERVER-GUIDE.txt'), APP_GUIDE.replace(/\n/g, '\r\n'));

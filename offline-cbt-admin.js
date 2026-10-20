@@ -14,8 +14,66 @@ async function ocAppInfo() {
   } catch { /* leave the buttons as they are */ }
 }
 
+// ── Exam server connections (keys a UCS Exam Server uses to sync with this portal) ──
+const ocWhen = d => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+async function ocLoadConnections() {
+  const body = document.getElementById('oc-conns');
+  try {
+    const { canManage, connections } = await apiFetch('/api/admin/exam-servers');
+    document.getElementById('oc-conn-new').hidden = !canManage;
+    document.getElementById('oc-conn-who').textContent = canManage ? '' : 'Only a super admin can create or revoke keys.';
+    body.innerHTML = connections.length ? connections.map(c => `<tr>
+        <td><b>${escapeHtml(c.name)}</b><div class="oc-hint">by ${escapeHtml(c.createdBy || '')}</div></td>
+        <td style="font-family:'DM Mono',monospace;">${escapeHtml(c.apiNumber)}</td>
+        <td>${ocWhen(c.createdAt)}</td><td>${ocWhen(c.lastSyncAt)}</td><td>${ocWhen(c.lastPushAt)}</td>
+        <td>${c.revokedAt ? '<span class="pf-pill pf-pill-out">Revoked</span>' : c.lastUsedAt ? '<span class="pf-pill pf-pill-in">Connected</span>' : '<span class="pf-pill pf-pill-warn">Not used yet</span>'}</td>
+        <td>${canManage && !c.revokedAt ? `<button type="button" class="sf-add-new ts-danger" onclick="ocRevokeConnection(${c.id}, '${escapeHtml(c.name).replace(/'/g, '&#39;')}')">Revoke</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="7" style="padding:18px;color:var(--text-3);">No exam servers connected yet.</td></tr>';
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="7" style="padding:18px;color:var(--text-3);">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+function ocConnModal(title, body, foot) {
+  document.getElementById('oc-conn-modal-host').innerHTML = `<div class="sf-modal" id="oc-conn-modal" role="dialog" aria-modal="true" aria-labelledby="oc-conn-title" style="display:flex;">
+    <div class="sf-dialog"><div class="sf-head"><strong id="oc-conn-title">${title}</strong><button type="button" class="staff-profile-close" onclick="ocCloseConnModal()" aria-label="Close">&times;</button></div>
+    <div class="sf-body">${body}</div><div class="sf-foot">${foot}</div></div></div>`;
+}
+function ocCloseConnModal() { document.getElementById('oc-conn-modal-host').innerHTML = ''; }
+function ocOpenNewConnection() {
+  ocConnModal('New Exam Server Connection', `
+    <label class="field-label" for="oc-conn-name">Name <span class="sf-req">*</span></label>
+    <input class="field-input" id="oc-conn-name" placeholder="e.g. ICT Lab exam computer" maxlength="80">
+    <p class="oc-hint" style="margin-top:8px;">Use one connection per exam computer, so you can revoke one without affecting the others.</p>`,
+  '<button type="button" class="btn-outline" onclick="ocCloseConnModal()">Cancel</button><button type="button" class="post-btn" onclick="ocCreateConnection()">Create Keys</button>');
+  setTimeout(() => document.getElementById('oc-conn-name')?.focus(), 50);
+}
+async function ocCreateConnection() {
+  const name = document.getElementById('oc-conn-name').value.trim();
+  if (!name) return showToast('Give the connection a name');
+  try {
+    const { keys, connection } = await apiFetch('/api/admin/exam-servers', { method: 'POST', body: JSON.stringify({ name }) });
+    const row = (label, value, id) => `<div class="oc-key-row"><label class="field-label" for="${id}">${label}</label>
+      <div class="ae-inline"><input class="field-input oc-key" id="${id}" value="${escapeHtml(value)}" readonly onclick="this.select()"><button type="button" class="btn-outline" onclick="ocCopyKey('${id}')">Copy</button></div></div>`;
+    ocConnModal(`Keys for “${escapeHtml(connection.name)}”`, `
+      <div class="ts-note"><b>Copy these now.</b> The Secret Key is shown only this once; the portal keeps no readable copy. Type them into the UCS Exam Server's “Connect School Account” screen. Anyone with these keys can pull pupil and exam data, so don't share them.</div>
+      ${row('API Number', keys.apiNumber, 'oc-k1')}${row('API Authentication Key', keys.authKey, 'oc-k2')}${row('API Secret Key', keys.secret, 'oc-k3')}`,
+    '<button type="button" class="post-btn" onclick="ocCloseConnModal()">I\'ve copied them</button>');
+    ocLoadConnections();
+  } catch (err) { showToast(err.message); }
+}
+async function ocCopyKey(id) {
+  const el = document.getElementById(id);
+  try { await navigator.clipboard.writeText(el.value); } catch { el.select(); document.execCommand('copy'); }
+  showToast('Copied', 'success');
+}
+async function ocRevokeConnection(id, name) {
+  if (!await uiConfirm(`Revoke “${name}”? That exam server will no longer be able to sync or push results until it's given new keys.`, { confirmLabel: 'Revoke', danger: true })) return;
+  try { await apiFetch(`/api/admin/exam-servers/${id}/revoke`, { method: 'POST' }); showToast('Connection revoked', 'success'); ocLoadConnections(); } catch (err) { showToast(err.message); }
+}
+
 async function ocInit() {
   ocAppInfo();
+  ocLoadConnections();
   try {
     ocData = await apiFetch('/api/admin/cbt/offline/overview');
   } catch (err) {

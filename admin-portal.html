@@ -1311,6 +1311,11 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .oc-more { margin-top:12px; font-size:13px; color:var(--text-2); }
 .oc-more summary { cursor:pointer; font-weight:600; color:var(--text-2); }
 .oc-more[open] summary { margin-bottom:8px; }
+.oc-conn-card { margin-bottom:14px; }
+.oc-conn-card .card-head { justify-content:space-between; }
+.oc-conn-new { padding:8px 14px; font-size:12px; }
+.oc-key-row { margin-top:12px; }
+.oc-key { font-family:'DM Mono',monospace; font-size:13px; letter-spacing:.02em; }
 .oc-schedules { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; }
 .oc-schedule { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:13px; }
 .oc-schedule input { margin-top:3px; accent-color:var(--green); }
@@ -3691,6 +3696,17 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             </div>
           </div>
         </div>
+        <div class="card oc-conn-card">
+          <div class="card-head"><span class="card-title">Exam server connections</span><button type="button" class="post-btn oc-conn-new" id="oc-conn-new" onclick="ocOpenNewConnection()" hidden>+ New Connection</button></div>
+          <div class="card-body">
+            <p class="oc-text" style="margin-top:0;">Link a UCS Exam Server to this portal with keys, so it can pull pupils, staff and CBT papers down and push finished exams back up by itself, with no files to carry. Each exam computer gets its own keys. <span id="oc-conn-who"></span></p>
+            <div style="overflow-x:auto;"><table class="data-table">
+              <thead><tr><th>Name</th><th>API Number</th><th>Created</th><th>Last sync</th><th>Last push</th><th>Status</th><th></th></tr></thead>
+              <tbody id="oc-conns"><tr><td colspan="7" style="padding:18px;color:var(--text-3);">Loading…</td></tr></tbody>
+            </table></div>
+          </div>
+        </div>
+        <div id="oc-conn-modal-host"></div>
         <div class="card">
           <div class="card-head"><span class="card-title">Exam packs made</span></div>
           <div class="card-body" style="padding:0;">
@@ -7835,7 +7851,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="ui-dialog.js?v=3"></script>
 <script src="admin-api.js"></script>
 <script src="staff-list.js?v=5"></script>
-<script src="offline-cbt-admin.js?v=2"></script>
+<script src="offline-cbt-admin.js?v=3"></script>
 <script src="parents-list.js?v=1"></script>
 <script src="term-setup-admin.js?v=1"></script>
 <script src="menu-search.js?v=3"></script>
