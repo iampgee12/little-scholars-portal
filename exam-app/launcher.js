@@ -42,21 +42,42 @@ function waitUntilUp(tries = 40) {
   });
 }
 
-// The bundle: gzip( [4-byte header length][header JSON][file bytes…] )
-function unpack(bundle, dir) {
+// Antivirus (e.g. Windows Defender) briefly holds freshly written files open,
+// so a write that fails with EPERM/EBUSY/EACCES is retried for a few seconds.
+const sleep = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function withRetry(fn) {
+  for (let attempt = 1; ; attempt++) {
+    try { return fn(); } catch (err) {
+      if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err;
+      sleep(250);
+    }
+  }
+}
+const READY = '.ready';
+
+// The bundle: gzip( [4-byte header length][header JSON][file bytes…] ).
+// Files go straight into the version's folder (no folder rename, which
+// antivirus can block); the .ready marker is written last, so an
+// interrupted unpack is simply redone next time.
+function unpack(bundle, dir, build) {
   const raw = zlib.gunzipSync(Buffer.from(bundle));
   const headerLength = raw.readUInt32LE(0);
   const header = JSON.parse(raw.subarray(4, 4 + headerLength).toString('utf8'));
   const base = 4 + headerLength;
-  const tmp = `${dir}.part`;
-  fs.rmSync(tmp, { recursive: true, force: true });
   for (const [rel, offset, length] of header.files) {
-    const file = path.join(tmp, ...rel.split('/'));
+    const file = path.join(dir, ...rel.split('/'));
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, raw.subarray(base + offset, base + offset + length));
+    withRetry(() => fs.writeFileSync(file, raw.subarray(base + offset, base + offset + length)));
   }
-  fs.renameSync(tmp, dir);
+  withRetry(() => fs.writeFileSync(path.join(dir, READY), build));
   return header;
+}
+// Old versions and leftovers from an interrupted unpack; never fatal
+function tidyOld(appRoot, keep) {
+  for (const name of fs.readdirSync(appRoot)) {
+    if (name === keep) continue;
+    try { fs.rmSync(path.join(appRoot, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* try again next time */ }
+  }
 }
 
 // First run from anywhere: put a shortcut on the desktop (the installer makes its own)
@@ -80,14 +101,13 @@ async function main() {
   const appDir = path.join(HOME, 'app', build);
   const dataDir = path.join(HOME, 'exam-data');
   fs.mkdirSync(dataDir, { recursive: true });
-  if (!fs.existsSync(path.join(appDir, 'server.js'))) {
+  const ready = () => { try { return fs.readFileSync(path.join(appDir, READY), 'utf8').trim() === build; } catch { return false; } };
+  if (!ready()) {
     say('Preparing the exam server (first run of this version)…');
-    unpack(sea.getAsset('app.bundle'), appDir);
-    // tidy up older versions
-    for (const old of fs.readdirSync(path.join(HOME, 'app'))) {
-      if (old !== build) fs.rmSync(path.join(HOME, 'app', old), { recursive: true, force: true });
-    }
+    fs.mkdirSync(appDir, { recursive: true });
+    unpack(sea.getAsset('app.bundle'), appDir, build);
   }
+  tidyOld(path.join(HOME, 'app'), build);
   if (!/\\Programs\\UCS Exam Server\\/i.test(process.execPath)) desktopShortcut();
 
   process.env.EXAM_MODE = '1';
