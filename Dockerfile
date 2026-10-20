@@ -1,9 +1,10 @@
 # ── Stage 1: build the Windows exam-server app and its Setup wizard ──
-# (official Windows node.exe + the portal files, see exam-app/build.js).
+# (the Electron window + the official Windows node.exe engine with the portal
+# files, see exam-app/build.js).
 # If this stage fails the portal still deploys; the Offline CBT page then
 # offers only the zip kit.
 FROM node:24-slim AS exam-app
-RUN apt-get update && apt-get install -y --no-install-recommends nsis ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends nsis unzip ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -1,4 +1,7 @@
-// UCS Exam Server.exe — the entry point packed into the Windows app.
+// The exam server engine — the entry point packed into the Node.js build.
+// With --engine (how the UCS Exam Server desktop app starts it) it only runs
+// the server: no window, dialogs or shortcuts; the app shows the window.
+// Without it (the single-file build) it also does the following itself.
 // Unpacks the bundled portal files into the user's AppData folder (once per
 // version), starts the exam server from there with no console window (output
 // goes to a log file), and shows the app in a Microsoft Edge app window
@@ -14,7 +17,8 @@ const http = require('node:http');
 const { spawn, spawnSync } = require('node:child_process');
 const { createRequire } = require('node:module');
 
-const PORT = 8080;
+const ENGINE = process.argv.includes('--engine');
+const PORT = Number(process.env.UCS_EXAM_PORT) || 8080; // UCS_EXAM_PORT: testing only
 const BASE_URL = `http://localhost:${PORT}`;
 const APP_URL = `${BASE_URL}/exam-console`;
 const APP_TITLE = 'UCS Exam Server';
@@ -46,6 +50,7 @@ function messageBox(text, buttons = 'OK', icon = 'Information') {
 const psString = s => `'${String(s).replace(/'/g, "''")}'`;
 async function fatal(message) {
   say(message);
+  if (ENGINE) process.exit(1); // the app reads the log and shows the message
   await messageBox(`${message}\n\nDetails are in ${LOG}`, 'OK', 'Error');
   process.exit(1);
 }
@@ -164,6 +169,7 @@ async function main() {
   say('UCS Exam Server starting');
   if (await alreadyRunning()) {
     // a second launch: ask the running server's window loop to show the window, or open one here
+    if (ENGINE) { say('Already running.'); process.exit(3); }
     say('Already running; opening the window.');
     await new Promise(resolve => {
       const req = http.request(`${BASE_URL}/api/exam/app-window`, { method: 'POST', timeout: 2000 }, res => { res.resume(); res.on('end', resolve); });
@@ -187,7 +193,7 @@ async function main() {
     unpack(sea.getAsset('app.bundle'), appDir, build);
   }
   tidyOld(path.join(HOME, 'app'), build);
-  if (!/\\Programs\\UCS Exam Server\\/i.test(process.execPath)) desktopShortcut();
+  if (!ENGINE && !/\\Programs\\UCS Exam Server\\/i.test(process.execPath)) desktopShortcut();
 
   process.env.EXAM_MODE = '1';
   process.env.DATA_DIR = dataDir;
@@ -197,12 +203,14 @@ async function main() {
   if (!process.env.UCS_PORTAL_URL && asset('portal.txt')) process.env.UCS_PORTAL_URL = asset('portal.txt');
   // the server asks for the window when a second launch wants it back
   globalThis.ucsShowAppWindow = () => { if (reopenRequest) { const r = reopenRequest; reopenRequest = null; r(); } else openWindow(); };
-  globalThis.ucsCloseAppWindow = closeAppWindow;
+  // the desktop app closes itself when the engine exits for an update
+  globalThis.ucsCloseAppWindow = ENGINE ? () => {} : closeAppWindow;
   process.chdir(appDir);
   say(`Exam data is kept in: ${dataDir}`);
   waitUntilUp().then(up => {
     if (!up) return fatal('The exam server did not start.');
-    windowLoop();
+    say('Exam server is up.');
+    if (!ENGINE) windowLoop();
   });
   createRequire(path.join(appDir, 'server.js'))('./server.js');
 }

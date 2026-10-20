@@ -286,7 +286,7 @@ module.exports = function createExamSync(ctx) {
     authKey: valueFromMeta('sync_auth_key', ''),
     secret: valueFromMeta('sync_secret', ''),
   });
-  async function callPortal(pathname, { method = 'GET', body, conn = connection(), raw = false } = {}) {
+  async function callPortal(pathname, { method = 'GET', body, conn = connection(), raw = false, timeout = 120_000 } = {}) {
     if (!conn.apiNumber) throw new Error('This exam server is not connected to the school portal yet');
     let res;
     try {
@@ -294,7 +294,7 @@ module.exports = function createExamSync(ctx) {
         method,
         headers: { 'X-UCS-Api-Number': conn.apiNumber, 'X-UCS-Auth-Key': conn.authKey, 'X-UCS-Secret': conn.secret, 'X-UCS-Machine': require('node:os').hostname(), 'Accept-Encoding': 'gzip', ...(body ? { 'Content-Type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(timeout),
       });
     } catch (err) {
       throw new Error(`Couldn't reach the school portal (${conn.portal}). Check this computer's internet connection. (${err.cause?.code || err.message})`);
@@ -527,7 +527,8 @@ module.exports = function createExamSync(ctx) {
   // Downloads the new Setup from the portal, starts it and closes this server so it can be replaced
   async function updateInstall() {
     if (process.platform !== 'win32' || !process.env.UCS_APP_BUILD) throw new Error('Updates install from the UCS Exam Server app on Windows');
-    const res = await callPortal('/api/exam-sync/setup.exe', { raw: true });
+    // the Setup is large (it carries the app's own window engine): allow a slow line plenty of time
+    const res = await callPortal('/api/exam-sync/setup.exe', { raw: true, timeout: 45 * 60e3 });
     const file = path.join(require('node:os').tmpdir(), `UCS Exam Server Setup ${Date.now()}.exe`);
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     // close the app window first, so the updated app opens the only window

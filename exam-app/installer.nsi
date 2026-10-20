@@ -23,7 +23,7 @@ ManifestDPIAware true
 Name "${APP_NAME}"
 OutFile "${DIST}/${APP_NAME} Setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
-InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
+; always this folder (no folder page): updates replace it whole, and Uninstall removes it
 BrandingText "Unique Children's School"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
@@ -52,7 +52,6 @@ VIAddVersionKey "LegalCopyright" "Unique Children's School"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -60,15 +59,18 @@ VIAddVersionKey "LegalCopyright" "Unique Children's School"
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Install"
-  SetOutPath "$INSTDIR"
-  ; the app can't be replaced while its window is open
+  ; the app can't be replaced while it is running (window or tray)
   retry:
   ClearErrors
   Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\engine\ucs-exam-engine.exe"
   IfErrors 0 +3
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP_NAME} is running. Close its black window (this stops the exam server), then click Retry." IDRETRY retry
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP_NAME} is running. Close it (choose Stop the exam server), or right-click its tray icon and choose Stop, then click Retry." IDRETRY retry
     Abort
-  File "${DIST}/${APP_EXE}"
+  ; start from an empty folder so nothing from an older version is left behind
+  RMDir /r "$INSTDIR"
+  SetOutPath "$INSTDIR"
+  File /r "${DIST}/app/*.*"
   File "${DIST}/EXAM-SERVER-GUIDE.txt"
   WriteUninstaller "$INSTDIR\Uninstall ${APP_NAME}.exe"
 
@@ -87,19 +89,18 @@ Section "Install"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "QuietUninstallString" '"$INSTDIR\Uninstall ${APP_NAME}.exe" /S'
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
-  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "EstimatedSize" 110000
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "EstimatedSize" 340000
 SectionEnd
 
 Section "Uninstall"
   uretry:
   ClearErrors
   Delete "$INSTDIR\${APP_EXE}"
+  Delete "$INSTDIR\engine\ucs-exam-engine.exe"
   IfErrors 0 +3
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP_NAME} is running. Close its black window, then click Retry." IDRETRY uretry
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${APP_NAME} is running. Close it (choose Stop the exam server), or right-click its tray icon and choose Stop, then click Retry." IDRETRY uretry
     Abort
-  Delete "$INSTDIR\EXAM-SERVER-GUIDE.txt"
-  Delete "$INSTDIR\Uninstall ${APP_NAME}.exe"
-  RMDir "$INSTDIR"
+  RMDir /r "$INSTDIR"
   Delete "$SMPROGRAMS\${APP_NAME}\*.lnk"
   RMDir "$SMPROGRAMS\${APP_NAME}"
   Delete "$DESKTOP\${APP_NAME}.lnk"

@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-// Builds the Windows exam-server app (and, with makensis available, the
-// Setup wizard) into dist/:
-//   dist/UCS Exam Server.exe        — one file, nothing else to install
+// Builds the Windows exam-server desktop app (and, with makensis available,
+// the Setup wizard) into dist/:
+//   dist/app/                       — the app: UCS Exam Server.exe (Electron, the
+//                                     window) + engine/ucs-exam-engine.exe (the server)
 //   dist/UCS Exam Server Setup.exe  — installer: Start menu, desktop shortcut, uninstaller
-// Runs on Linux (the deploy image) or Windows: node exam-app/build.js [--installer] [--node <win node.exe>]
-// The app is the official Windows node.exe with launcher.js and the portal
-// files packed inside (Node single executable application).
+// Runs on Linux (the deploy image) or Windows:
+//   node exam-app/build.js [--installer] [--keep-app] [--node <win node.exe>]
+// The engine is the official Windows node.exe with launcher.js and the portal
+// files packed inside (Node single executable application). The window is the
+// official Electron build for Windows, with exam-app/electron-main.js as its app.
+// With --installer the dist/app folder is removed afterwards (only the Setup is
+// served) unless --keep-app is given.
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
@@ -18,6 +23,8 @@ const DIST = path.join(ROOT, 'dist');
 const WORK = path.join(DIST, 'build');
 const CACHE = path.join(__dirname, '.cache');
 const APP_NAME = 'UCS Exam Server';
+const ELECTRON_VERSION = '44.5.1';
+const APP_DIR = path.join(DIST, 'app');
 const args = process.argv.slice(2);
 const flag = name => args.includes(name);
 const option = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
@@ -54,6 +61,35 @@ async function windowsNode() {
   return file;
 }
 
+const fetchText = url => new Promise((resolve, reject) => https.get(url, res => {
+  if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) return resolve(fetchText(res.headers.location));
+  if (res.statusCode !== 200) return reject(new Error(`${url} → HTTP ${res.statusCode}`));
+  let s = ''; res.on('data', d => { s += d; }); res.on('end', () => resolve(s));
+}).on('error', reject));
+
+// The official Electron build for Windows, checked against its published checksums
+async function electronZip() {
+  const name = `electron-v${ELECTRON_VERSION}-win32-x64.zip`;
+  const file = path.join(CACHE, name);
+  const base = `https://github.com/electron/electron/releases/download/v${ELECTRON_VERSION}`;
+  const sums = await fetchText(`${base}/SHASUMS256.txt`);
+  const expected = (sums.split('\n').find(l => l.trim().endsWith(`*${name}`)) || '').split(/\s+/)[0];
+  if (!expected) throw new Error(`No checksum published for ${name}`);
+  const ok = () => fs.existsSync(file) && crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === expected;
+  if (ok()) return file;
+  fs.mkdirSync(CACHE, { recursive: true });
+  step(`downloading Electron ${ELECTRON_VERSION} for Windows…`);
+  await download(`${base}/${name}`, file);
+  if (!ok()) { fs.rmSync(file, { force: true }); throw new Error('Downloaded Electron does not match its published checksum'); }
+  return file;
+}
+function unzip(zip, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  // Windows' own tar reads zips (Git's tar, which may come first on the PATH, does not)
+  if (process.platform === 'win32') execFileSync(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-xf', zip, '-C', dest], { stdio: 'inherit' });
+  else execFileSync('unzip', ['-q', '-o', zip, '-d', dest], { stdio: 'inherit' });
+}
+
 function makeBundle() {
   const { appFiles } = require(path.join(ROOT, 'cbt-offline.js'));
   const files = appFiles(ROOT);
@@ -63,12 +99,13 @@ function makeBundle() {
   const len = Buffer.alloc(4);
   len.writeUInt32LE(header.length, 0);
   const raw = Buffer.concat([len, header, ...files.map(f => f[1])]);
-  // the version ID covers the portal files and the launcher, so either changing counts as an update
-  const build = crypto.createHash('sha256').update(raw).update(fs.readFileSync(path.join(__dirname, 'launcher.js'))).digest('hex').slice(0, 12);
+  // the version ID covers the portal files, the engine, the window app and Electron, so any change counts as an update
+  const build = crypto.createHash('sha256').update(raw).update(fs.readFileSync(path.join(__dirname, 'launcher.js')))
+    .update(fs.readFileSync(path.join(__dirname, 'electron-main.js'))).update(ELECTRON_VERSION).digest('hex').slice(0, 12);
   return { bundle: zlib.gzipSync(raw, { level: 9 }), build, count: files.length };
 }
 
-async function setIconAndVersion(exePath, version) {
+async function setIconAndVersion(exePath, version, { description, internalName, originalName }) {
   const ResEdit = await import('resedit');
   const R = ResEdit.default || ResEdit;
   const exe = R.NtExecutable.from(fs.readFileSync(exePath), { ignoreCert: true });
@@ -83,10 +120,10 @@ async function setIconAndVersion(exePath, version) {
   info.setProductVersion(a, b, c, 0, 1033);
   info.setStringValues({ lang: 1033, codepage: 1200 }, {
     CompanyName: 'Unique Group of Schools',
-    FileDescription: `${APP_NAME} — offline CBT exam server`,
+    FileDescription: description,
     ProductName: APP_NAME,
-    InternalName: 'ucs-exam-server',
-    OriginalFilename: `${APP_NAME}.exe`,
+    InternalName: internalName,
+    OriginalFilename: originalName,
     LegalCopyright: `© ${new Date().getFullYear()} Unique Children's School`,
   });
   info.outputToResourceEntries(res.entries);
@@ -140,7 +177,10 @@ NO INTERNET AT SYNC TIME? (the file backup)
 
 TIPS
 - Closing the window asks whether to stop the exam server or keep it running
-  in the background. Open "UCS Exam Server" again to bring the window back.
+  in the background. In the background it sits in the system tray (bottom
+  right); click it, or open "UCS Exam Server" again, to bring the window back.
+- Only administrators sign in to the app, and every time the window is
+  closed you must sign in again when it opens.
 - Check for Updates (Help) installs a newer version from the portal.
 - The server's log is %LOCALAPPDATA%\\UCS Exam Server\\server.log
 - Keep the exam computer plugged in and stop it from sleeping during exams.
@@ -177,12 +217,15 @@ async function main() {
   fs.writeFileSync(path.join(WORK, 'sea-config.json'), JSON.stringify(config, null, 2));
   execFileSync(process.execPath, ['--experimental-sea-config', path.join(WORK, 'sea-config.json')], { stdio: 'inherit' });
 
+  fs.rmSync(APP_DIR, { recursive: true, force: true });
+  fs.rmSync(path.join(DIST, `${APP_NAME}.exe`), { force: true }); // the old single-file build
   // work on a temporary name: antivirus can hold a fresh .exe open for a moment
-  const final = path.join(DIST, `${APP_NAME}.exe`);
+  const final = path.join(APP_DIR, 'engine', 'ucs-exam-engine.exe');
+  fs.mkdirSync(path.dirname(final), { recursive: true });
   const exe = path.join(WORK, 'app.tmp');
   fs.copyFileSync(await windowsNode(), exe);
   step('setting the icon and version details…');
-  await setIconAndVersion(exe, version);
+  await setIconAndVersion(exe, version, { description: `${APP_NAME} engine`, internalName: 'ucs-exam-engine', originalName: 'ucs-exam-engine.exe' });
   step('packing the exam server into the app…');
   const { inject } = require('postject');
   await inject(exe, 'NODE_SEA_BLOB', fs.readFileSync(config.output), { sentinelFuse: 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2', overwrite: true });
@@ -194,8 +237,25 @@ async function main() {
   fs.writeFileSync(exe, pe);
   fs.rmSync(final, { force: true });
   fs.renameSync(exe, final);
+  step(`built the engine (${(fs.statSync(final).size / 1e6).toFixed(0)} MB)`);
+
+  // the window: Electron, renamed and branded, with only English kept
+  unzip(await electronZip(), APP_DIR);
+  const localesDir = path.join(APP_DIR, 'locales');
+  for (const name of fs.readdirSync(localesDir)) if (name !== 'en-US.pak') fs.rmSync(path.join(localesDir, name), { force: true });
+  fs.rmSync(path.join(APP_DIR, 'resources', 'default_app.asar'), { force: true });
+  const appExe = path.join(APP_DIR, `${APP_NAME}.exe`);
+  fs.renameSync(path.join(APP_DIR, 'electron.exe'), appExe);
+  step('branding the app window…');
+  await setIconAndVersion(appExe, version, { description: APP_NAME, internalName: 'ucs-exam-server', originalName: `${APP_NAME}.exe` });
+  const appSrc = path.join(APP_DIR, 'resources', 'app');
+  fs.mkdirSync(appSrc, { recursive: true });
+  fs.writeFileSync(path.join(appSrc, 'package.json'), JSON.stringify({ name: 'ucs-exam-server', productName: APP_NAME, version, main: 'main.js', private: true }, null, 2));
+  fs.copyFileSync(path.join(__dirname, 'electron-main.js'), path.join(appSrc, 'main.js'));
+  fs.copyFileSync(path.join(__dirname, 'app-icon.ico'), path.join(appSrc, 'app-icon.ico'));
   fs.writeFileSync(path.join(DIST, 'EXAM-SERVER-GUIDE.txt'), APP_GUIDE.replace(/\n/g, '\r\n'));
-  step(`built ${final} (${(fs.statSync(final).size / 1e6).toFixed(0)} MB)`);
+  const folderSize = dir => fs.readdirSync(dir, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? folderSize(path.join(dir, e.name)) : fs.statSync(path.join(dir, e.name)).size), 0);
+  step(`built the app in ${APP_DIR} (${(folderSize(APP_DIR) / 1e6).toFixed(0)} MB, Electron ${ELECTRON_VERSION})`);
 
   if (flag('--installer')) {
     const makensis = spawnSync('makensis', ['-VERSION'], { encoding: 'utf8' });
@@ -204,7 +264,9 @@ async function main() {
     execFileSync('makensis', ['-V2', `-DVERSION=${version}`, `-DBUILD=${build}`, `-DDIST=${DIST}`, `-DICON=${path.join(__dirname, 'app-icon.ico')}`, `-DART=${__dirname}`, path.join(__dirname, 'installer.nsi')], { stdio: 'inherit' });
     step(`built ${path.join(DIST, `${APP_NAME} Setup.exe`)} (${(fs.statSync(path.join(DIST, `${APP_NAME} Setup.exe`)).size / 1e6).toFixed(0)} MB)`);
   }
-  fs.writeFileSync(path.join(DIST, 'exam-app.json'), JSON.stringify({ version, build, builtAt: new Date().toISOString(), node: process.version, installer: flag('--installer') }, null, 2));
+  fs.writeFileSync(path.join(DIST, 'exam-app.json'), JSON.stringify({ version, build, builtAt: new Date().toISOString(), node: process.version, electron: ELECTRON_VERSION, installer: flag('--installer') }, null, 2));
+  // only the Setup is served; the unpacked app is just its input
+  if (flag('--installer') && !flag('--keep-app')) fs.rmSync(APP_DIR, { recursive: true, force: true });
   fs.rmSync(WORK, { recursive: true, force: true });
 }
 

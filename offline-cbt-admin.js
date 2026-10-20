@@ -4,13 +4,11 @@ let ocData = { schedules: [], packs: [] };
 // Shows the Windows app downloads once the deploy has built them
 async function ocAppInfo() {
   try {
-    const { appSize, setupSize } = await apiFetch('/api/admin/cbt/offline/app-info');
+    const { setupSize } = await apiFetch('/api/admin/cbt/offline/app-info');
     const mb = n => (n ? `(${Math.round(n / 1e6)} MB)` : '');
-    document.getElementById('oc-app-ready').hidden = !appSize;
-    document.getElementById('oc-app-missing').hidden = !!appSize;
-    document.querySelector('a[href$="/setup.exe"]').hidden = !setupSize;
+    document.getElementById('oc-app-ready').hidden = !setupSize;
+    document.getElementById('oc-app-missing').hidden = !!setupSize;
     document.getElementById('oc-setup-size').textContent = mb(setupSize);
-    document.getElementById('oc-app-size').textContent = mb(appSize);
   } catch { /* leave the buttons as they are */ }
 }
 
