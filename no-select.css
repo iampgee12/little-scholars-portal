@@ -1,0 +1,13 @@
+/* Pages can't be highlighted (drag, double-click or Ctrl+A), so text isn't
+   casually copied. Places people type in, and the few things meant to be
+   copied (mark them with .allow-select), stay selectable. */
+html, body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea, select, [contenteditable], [contenteditable] *,
+.allow-select, .allow-select *,
+.ec-address code, .ea-addr-chip {
+  -webkit-user-select: text;
+  user-select: text;
+}
