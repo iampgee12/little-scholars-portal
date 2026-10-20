@@ -185,11 +185,11 @@ async function loadPack() {
 // ══ APP SHELL ══
 const MENU = [
   [null, [['dashboard', 'Dashboard']]],
-  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'CBT Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']]],
-  ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']]],
+  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'CBT Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']], { dropdown: 'cbt' }],
+  ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']], { dropdown: 'sync' }],
   ['Students', [['students', 'Students Info-system']], { dropdown: 'students', search: true }],
   ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']], { dropdown: 'staff' }],
-  ['Help', [['updates', 'Check for Updates']]],
+  ['Help', [['updates', 'Check for Updates']], { dropdown: 'help' }],
 ];
 const TITLES = {
   dashboard: ['Dashboard', 'This exam computer at a glance'], console: ['Exam Console', 'Open and close papers, watch pupils, allow retakes'],
@@ -211,7 +211,7 @@ function navGroup([group, items, opt = {}]) {
   const open = state.navOpen.has(opt.dropdown);
   const here = items.some(([k]) => k === state.page);
   return `<div class="ea-drop ${open ? 'open' : ''}" id="nav-${opt.dropdown}">
-    <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}<span class="ea-caret" aria-hidden="true"></span></button>
+    <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}${items.some(([k]) => k === 'push') && state.sync?.unpushed ? `<span class="ea-badge ea-head-badge" title="Results waiting to be pushed online">${state.sync.unpushed}</span>` : ''}<span class="ea-caret" aria-hidden="true"></span></button>
     <div class="ea-drop-body">${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
 }
 function toggleNav(key) {

@@ -39,6 +39,9 @@ button { font-family: inherit; }
 .ea-drop.open .ea-caret { transform: rotate(-135deg); margin-top: 3px; }
 .ea-drop-body { display: none; padding-bottom: 4px; }
 .ea-drop.open .ea-drop-body { display: block; }
+.ea-nav .ea-drop-head .ea-head-badge { margin-left: 8px; letter-spacing: 0; }
+.ea-drop.open .ea-head-badge { display: none; }
+.ea-head-badge + .ea-caret { margin-left: auto; }
 .ea-nav .ea-badge { margin-left: auto; background: var(--amber-bg); color: var(--amber); font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
 .ea-side-foot { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .ea-side-foot button { width: 100%; }
@@ -150,6 +153,6 @@ button { font-family: inherit; }
 <body>
   <div id="ea-root"><div class="ea-setup"><div class="ec-muted">Loading…</div></div></div>
 <script src="ui-dialog.js?v=4"></script>
-<script src="exam-console.js?v=7"></script>
+<script src="exam-console.js?v=8"></script>
 </body>
 </html>
