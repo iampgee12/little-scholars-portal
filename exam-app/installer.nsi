@@ -6,6 +6,8 @@
 Unicode true
 SetCompressor /SOLID lzma
 RequestExecutionLevel user
+; draw at the screen's real resolution instead of being stretched (blurry) by Windows
+ManifestDPIAware true
 
 !define APP_NAME "UCS Exam Server"
 !define APP_EXE "UCS Exam Server.exe"
@@ -33,6 +35,13 @@ VIAddVersionKey "LegalCopyright" "Unique Children's School"
 !include "MUI2.nsh"
 !define MUI_ICON "${ICON}"
 !define MUI_UNICON "${ICON}"
+; school-branded pictures (drawn at twice the size, so they stay sharp on high-resolution screens)
+!define MUI_WELCOMEFINISHPAGE_BITMAP "${ART}/setup-welcome.bmp"
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "${ART}/setup-welcome.bmp"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_HEADERIMAGE_BITMAP "${ART}/setup-header.bmp"
+!define MUI_HEADERIMAGE_UNBITMAP "${ART}/setup-header.bmp"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Install ${APP_NAME}"
 !define MUI_WELCOMEPAGE_TEXT "This installs the offline CBT exam server for Unique Children's School on this computer.$\r$\n$\r$\nPupils can then write their CBT on the school's own Wi-Fi, with no internet needed during the exam.$\r$\n$\r$\nNo administrator password is needed. Click Next to continue."

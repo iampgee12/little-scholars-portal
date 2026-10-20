@@ -201,7 +201,7 @@ async function main() {
     const makensis = spawnSync('makensis', ['-VERSION'], { encoding: 'utf8' });
     if (makensis.error) throw new Error('makensis (NSIS) is not installed, so the Setup wizard was not built');
     step('building the Setup wizard…');
-    execFileSync('makensis', ['-V2', `-DVERSION=${version}`, `-DBUILD=${build}`, `-DDIST=${DIST}`, `-DICON=${path.join(__dirname, 'app-icon.ico')}`, path.join(__dirname, 'installer.nsi')], { stdio: 'inherit' });
+    execFileSync('makensis', ['-V2', `-DVERSION=${version}`, `-DBUILD=${build}`, `-DDIST=${DIST}`, `-DICON=${path.join(__dirname, 'app-icon.ico')}`, `-DART=${__dirname}`, path.join(__dirname, 'installer.nsi')], { stdio: 'inherit' });
     step(`built ${path.join(DIST, `${APP_NAME} Setup.exe`)} (${(fs.statSync(path.join(DIST, `${APP_NAME} Setup.exe`)).size / 1e6).toFixed(0)} MB)`);
   }
   fs.writeFileSync(path.join(DIST, 'exam-app.json'), JSON.stringify({ version, build, builtAt: new Date().toISOString(), node: process.version, installer: flag('--installer') }, null, 2));

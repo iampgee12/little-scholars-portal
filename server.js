@@ -3584,7 +3584,8 @@ async function handleApi(req, res, url) {
     }
 
     // ID, pupil Reg. No. or email address; records-only staff (role 'staff') never sign in
-    const candidates = findSignInAccounts(body.id).filter(u => u.role !== 'staff');
+    // on the exam server only pupils and admins sign in
+    const candidates = findSignInAccounts(body.id).filter(u => u.role !== 'staff' && !(EXAM_MODE && u.role === 'teacher'));
     let matches = candidates.filter(u => verifyPassword(password, u.password));
     // one email shared by several accounts: the portal picked on the sign-in page decides
     if (matches.length > 1 && ['admin', 'teacher', 'student'].includes(body.role)) {

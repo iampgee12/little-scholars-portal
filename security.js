@@ -192,6 +192,9 @@ module.exports = function createSecurity(ctx) {
 
   // Must this user choose a new password before getting in?
   function mustChangePassword(user, plainPassword) {
+    // the exam server copies its accounts from the portal (a change made there
+    // would be overwritten at the next refresh), so it never asks for one
+    if (process.env.EXAM_MODE === '1') return false;
     if (user.password_self_set === 1) return false;
     if (user.password_self_set === 0) return true;
     // set before these rules: fine if it already meets them

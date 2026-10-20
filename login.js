@@ -345,6 +345,16 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// On the offline exam server only pupils (and admins) sign in, and there's no
+// email for password resets: hide Staff and "Forgot Password?"
+fetch('/api/exam/status').then(r => (r.ok ? r.json() : null)).then(status => {
+  if (!status?.examMode) return;
+  document.querySelector('.role-card[data-role="teacher"]')?.remove();
+  document.querySelectorAll('.forgot').forEach(el => el.remove());
+  const cards = document.querySelector('.role-cards');
+  if (cards) cards.style.gridTemplateColumns = 'repeat(2, 1fr)';
+}).catch(() => {});
+
 // Clear any stale session on page load
 localStorage.removeItem('ls_user_id');
 localStorage.removeItem('ls_user_role');

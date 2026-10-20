@@ -103,19 +103,50 @@ async function firstRefresh() {
   document.getElementById('ec-progress').innerHTML = '<p class="ec-hint" style="margin-top:12px;">Connecting to the online school portal to fetch data… Please be patient.</p><div class="ea-progress"><i></i></div>';
   try {
     const { report } = await api('/api/exam/refresh', { method: 'POST', body: JSON.stringify({ confirm: true, group: 'all' }) });
-    setupScreen('Data fetched', `${reportTable(report)}<p class="ec-muted" style="margin-top:14px;">Now sign in with your usual <b>admin ID or email and password</b>.</p>
-      <a class="post-btn" style="display:inline-block;text-decoration:none;margin-top:6px;" href="/signin">Sign In</a>`);
+    setupScreen('Data fetched', `${reportTable(report)}<p class="ec-muted" style="margin-top:14px;">Now sign in as an administrator.</p>
+      <button class="post-btn" style="margin-top:6px;" onclick="renderSignIn()">Sign In</button>`);
   } catch (e) {
     document.getElementById('ec-progress').innerHTML = '';
     document.getElementById('ec-err').textContent = e.message;
     btn.disabled = false;
   }
 }
-function renderSignIn() {
-  setupScreen('Sign in to run the exams', `
-    <p class="ec-muted">This exam computer is ready. Sign in with your usual <b>admin ID or email and password</b>.</p>
-    <a class="post-btn" style="display:inline-block;text-decoration:none;margin-top:6px;" href="/signin">Sign In</a>
-    ${addressBlock(state.status.lanAddresses)}`);
+// Only administrators sign in to the app (pupils sign in on their own devices)
+function renderSignIn(note = '') {
+  setupScreen('Administrator sign in', `
+    ${note ? `<div class="ec-note">${note}</div>` : ''}
+    <p class="ec-muted">Sign in with your usual <b>admin ID or email</b> and password.</p>
+    <form onsubmit="adminSignIn(); return false;" autocomplete="on">
+      <div class="ec-field"><label for="ec-sid">Admin ID or email</label><input class="ec-input" id="ec-sid" autocomplete="username"></div>
+      <div class="ec-field"><label for="ec-pw">Password</label><input class="ec-input" id="ec-pw" type="password" autocomplete="current-password"></div>
+      <div style="margin-top:16px;"><button class="post-btn" type="submit" id="ec-signin">Sign In</button></div>
+    </form>
+    <div class="ec-error" id="ec-err"></div>
+    ${state.status?.lanAddresses ? addressBlock(state.status.lanAddresses) : ''}`);
+  setTimeout(() => document.getElementById('ec-sid')?.focus(), 50);
+}
+async function adminSignIn() {
+  const id = document.getElementById('ec-sid').value.trim();
+  const password = document.getElementById('ec-pw').value;
+  const err = document.getElementById('ec-err');
+  err.textContent = '';
+  if (!id || !password) { err.textContent = 'Enter your admin ID or email and your password.'; return; }
+  const btn = document.getElementById('ec-signin');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res = await fetch('/api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password, role: 'admin' }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(res.status === 401 ? 'Incorrect ID, email or password.' : (data.error || 'Sign-in failed.'));
+    if (data.user && data.user.role !== 'admin') {
+      await api('/api/logout', { method: 'POST' }).catch(() => {});
+      throw new Error('Only administrators can sign in to the exam server app. Pupils sign in on their own devices.');
+    }
+    if (data.step) throw new Error('This account needs an extra sign-in step that the exam server can\'t do. Ask a super admin.');
+    start();
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
 }
 function renderLoadPack(firstTime) {
   const body = `
@@ -509,7 +540,9 @@ async function installUpdate() {
 
 async function signOut() {
   try { await api('/api/logout', { method: 'POST' }); } catch { /* ignore */ }
-  location.href = '/signin';
+  state.user = null;
+  location.hash = '';
+  start();
 }
 
 start();
