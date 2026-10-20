@@ -120,6 +120,7 @@ function showToast(msg, type = '') {
   t.classList.toggle('toast-info', status === 'info');
   t.setAttribute('role', status === 'error' ? 'alert' : 'status');
   t.style.display = 'block';
+  if (window.uiPlaceToast) window.uiPlaceToast(t);
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => { t.style.display = 'none'; }, 3000);
 }

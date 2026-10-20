@@ -225,4 +225,22 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPageArea);
   else initPageArea();
+
+  // ── Notifications (toasts) never hide behind a pop-up ──
+  // They sit bottom-right; when an open pop-up's box covers that corner, the
+  // toast moves to the bottom-left of the screen instead.
+  window.uiPlaceToast = function (toast) {
+    if (!toast) return;
+    toast.style.left = '';
+    toast.style.right = '';
+    const t = toast.getBoundingClientRect();
+    const covered = [...document.querySelectorAll('.in-page-overlay, .ui-dialog-overlay')].some(overlay => {
+      if (getComputedStyle(overlay).display === 'none' || !overlay.getClientRects().length) return false;
+      return [...overlay.children].some(box => {
+        const r = box.getBoundingClientRect();
+        return r.width && r.height && r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top;
+      });
+    });
+    if (covered) { toast.style.left = '24px'; toast.style.right = 'auto'; }
+  };
 })();

@@ -7146,7 +7146,8 @@ async function handleApi(req, res, url) {
     if (form.error) return sendJson(res, 400, { error: form.error });
     const { role, teacherType, name, firstName, initials, profile } = form;
     const newStaffId = form.id || staffId;
-    if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(newStaffId)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
+    // only a new ID is checked, so older records with other IDs can still be saved
+    if (newStaffId !== staffId && !/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(newStaffId)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
     if (newStaffId !== staffId && one('SELECT id FROM users WHERE id = ?', newStaffId)) {
       return sendJson(res, 409, { error: 'That staff ID is already in use' });
     }
