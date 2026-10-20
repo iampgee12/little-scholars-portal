@@ -1,7 +1,8 @@
 // UCS Exam Server — the app's screens (runs on the exam computer, EXAM_MODE).
 // Setup: Connect School Account → first Refresh → Sign in. Then a portal-style
 // shell: Dashboard, Exam Console, CBT Schedules, Push Results, Archive, Refresh
-// Data, Sync Report, Connection & Files, Students, Staff, Check for Updates.
+// Data, Sync Report, Connection & Files, Students Info-system, Teachers / General
+// Staff, Administrator, Check for Updates.
 const rootEl = document.getElementById('ea-root');
 const state = { page: 'dashboard', user: null, status: null, sync: null, dash: null, overview: null, openPaperId: null, timer: null };
 
@@ -186,7 +187,8 @@ const MENU = [
   [null, [['dashboard', 'Dashboard']]],
   ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'CBT Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']]],
   ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']]],
-  ['People', [['students', 'Students'], ['staff', 'Staff']]],
+  ['Students', [['students', 'Students Info-system']], 'student-search'],
+  ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']]],
   ['Help', [['updates', 'Check for Updates']]],
 ];
 const TITLES = {
@@ -194,7 +196,8 @@ const TITLES = {
   schedules: ['CBT Schedules', 'Papers copied from the online portal'], push: ['Push Results Online', 'Send finished exams to the online portal'],
   archive: ['Submissions Archive', 'Every exam written on this computer'], refresh: ['Refresh Data', 'Copy the latest data from the online portal'],
   report: ['Sync Report', 'What the last refresh copied'], connection: ['Connection & Files', 'The school portal link, and the file backup'],
-  students: ['Students', 'Read-only list copied from the portal'], staff: ['Staff', 'Read-only list copied from the portal'],
+  students: ['Students Info-system', 'Pupils copied from the online portal'], teachers: ['Teachers / General Staff', 'Staff copied from the online portal'],
+  admins: ['Administrator', 'Admins who can sign in to this exam server'],
   updates: ['Check for Updates', 'Keep the exam server up to date'],
 };
 function shell() {
@@ -204,7 +207,7 @@ function shell() {
     <aside class="ea-side">
       <div class="ea-brand"><img src="/report_assets/exam-app-icon.png" alt=""><div><b>${esc(state.sync?.school || "Unique Children's School")}</b><small>UCS Exam Server</small></div></div>
       <div class="ea-user"><span class="ea-avatar">${esc(initials(state.user.name))}</span><div><b>${esc(state.user.name)}</b><small>Administration</small></div></div>
-      <nav class="ea-nav">${MENU.map(([group, items]) => `${group ? `<h4>${group}</h4>` : ''}${items.map(([k, l]) => `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`).join('')}`).join('')}</nav>
+      <nav class="ea-nav">${MENU.map(([group, items, extra]) => `${group ? `<h4>${group}</h4>` : ''}${items.map(([k, l]) => `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`).join('')}${extra === 'student-search' ? studentSearchBox() : ''}`).join('')}</nav>
       <div class="ea-side-foot"><button type="button" class="btn-outline" onclick="signOut()">Sign Out</button><div class="ea-version">${state.dash?.app?.version ? `v${esc(state.dash.app.version)} · ${esc(state.dash.app.build)}` : 'UCS Exam Server'}</div></div>
     </aside>
     <div class="ea-main">
@@ -218,6 +221,7 @@ function shell() {
     </div></div>`;
 }
 async function go(page) {
+  if (page === 'staff') page = 'teachers';
   if (!TITLES[page]) page = 'dashboard';
   clearInterval(state.timer);
   state.page = page;
@@ -226,7 +230,7 @@ async function go(page) {
     [state.dash, state.sync] = await Promise.all([api('/api/exam/dashboard'), api('/api/exam/sync-status')]);
   } catch (err) { if (err.status === 401 || err.status === 403) return start(); }
   shell();
-  const render = { dashboard: renderDashboard, console: renderConsole, schedules: renderSchedules, push: renderPush, archive: renderArchive, refresh: renderRefresh, report: renderReport, connection: renderConnection, students: renderStudents, staff: renderStaff, updates: renderUpdates }[page];
+  const render = { dashboard: renderDashboard, console: renderConsole, schedules: renderSchedules, push: renderPush, archive: renderArchive, refresh: renderRefresh, report: renderReport, connection: renderConnection, students: renderStudents, teachers: renderTeachers, admins: renderAdmins, updates: renderUpdates }[page];
   await render();
 }
 const pageEl = () => document.getElementById('ea-page');
@@ -488,26 +492,147 @@ async function exportResults() {
 }
 
 // ── People (read-only) ──
-async function renderStudents(classCode = '', armId = '') {
-  const q = new URLSearchParams({ classCode, armId });
-  const data = await api(`/api/exam/people/students?${q}`);
-  const arms = data.arms.filter(a => a.classCode === classCode);
-  pageEl().innerHTML = `<div class="ec-card">
-    <div class="ec-filters"><div><label class="ec-label" for="ec-cls">Class</label><select class="ec-select" id="ec-cls" onchange="renderStudents(this.value, '')"><option value="">All classes</option>${data.classes.map(c => `<option value="${esc(c.code)}" ${c.code === classCode ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
-      <div><label class="ec-label" for="ec-arm">Class arm</label><select class="ec-select" id="ec-arm" onchange="renderStudents('${esc(classCode)}', this.value)" ${arms.length ? '' : 'disabled'}><option value="">All arms</option>${arms.map(a => `<option value="${a.id}" ${String(a.id) === String(armId) ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
-      <span class="ec-hint">${plural(data.students.length, 'pupil')}</span></div>
-    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Reg. No.</th><th>Class</th><th>Gender</th></tr></thead><tbody>
-    ${data.students.map((s, i) => `<tr><td>${i + 1}</td><td>${s.photo ? `<img class="ec-photo" src="/${esc(s.photo)}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ea-avatar">${esc(initials(s.name))}</span>`}</td><td><b>${esc(s.name)}</b></td><td class="ec-mono">${esc(s.regNo || s.id)}</td><td>${esc(s.classLabel || '')}${s.armName ? ` ${esc(s.armName)}` : ''}</td><td>${esc(s.gender || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="ec-hint">No pupils. Refresh Students data.</td></tr>'}
-    </tbody></table></div></div>`;
+const photoCell = p => (p.photo
+  ? `<img class="ec-photo" src="/${esc(p.photo)}" alt="" onerror="this.outerHTML='<span class=&quot;ea-avatar&quot;>${esc(initials(p.name))}</span>'">`
+  : `<span class="ea-avatar">${esc(initials(p.name))}</span>`);
+
+// A list with "records per page", a search box and page buttons
+state.tables = {};
+function dataTable(id, { rows, head, row, match, empty }) {
+  state.tables[id] = { rows, head, row, match, empty, page: 1, per: 10, q: '' };
+  return `<div id="dt-${id}"></div>`;
 }
-async function renderStaff() {
+function dtSet(id, changes) {
+  Object.assign(state.tables[id], changes);
+  dtDraw(id);
+}
+function dtSearch(id, input) {
+  dtSet(id, { q: input.value, page: 1 });
+  const el = document.querySelector(`#dt-${id} .ec-dt-search`);
+  el.focus();
+  el.setSelectionRange(el.value.length, el.value.length);
+}
+function dtDraw(id) {
+  const t = state.tables[id];
+  const box = document.getElementById(`dt-${id}`);
+  if (!t || !box) return;
+  const q = t.q.trim().toLowerCase();
+  const list = q ? t.rows.filter(r => t.match(r).toLowerCase().includes(q)) : t.rows;
+  const pages = Math.max(1, Math.ceil(list.length / t.per));
+  t.page = Math.min(t.page, pages);
+  const from = (t.page - 1) * t.per;
+  const shown = list.slice(from, from + t.per);
+  const nums = [];
+  for (let n = Math.max(1, t.page - 2); n <= Math.min(pages, t.page + 2); n++) nums.push(n);
+  box.innerHTML = `<div class="ec-dt-bar">
+      <label class="ec-dt-per"><select class="ec-select" onchange="dtSet('${id}', { per: Number(this.value), page: 1 })">${[10, 25, 50, 100].map(n => `<option ${n === t.per ? 'selected' : ''}>${n}</option>`).join('')}</select> records per page</label>
+      <input class="ec-input ec-dt-search" type="search" placeholder="Search" aria-label="Search" value="${esc(t.q)}" oninput="dtSearch('${id}', this)"></div>
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr>${t.head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>
+      ${shown.map((r, i) => t.row(r, from + i)).join('') || `<tr><td colspan="${t.head.length}" class="ec-hint">${q ? 'Nothing matches your search.' : t.empty}</td></tr>`}</tbody></table></div>
+    <div class="ec-dt-foot"><span class="ec-hint">${list.length ? `Showing ${from + 1} to ${from + shown.length} of ${list.length} entries` : 'No entries'}</span>
+      <div class="ec-pager"><button type="button" ${t.page <= 1 ? 'disabled' : ''} onclick="dtSet('${id}', { page: ${t.page - 1} })" aria-label="Previous page">‹</button>${nums.map(n => `<button type="button" class="${n === t.page ? 'on' : ''}" onclick="dtSet('${id}', { page: ${n} })">${n}</button>`).join('')}<button type="button" ${t.page >= pages ? 'disabled' : ''} onclick="dtSet('${id}', { page: ${t.page + 1} })" aria-label="Next page">›</button></div></div>`;
+}
+
+// Students Info-system: choose a class and arm, then View (or search from the menu)
+function studentSearchBox() {
+  return `<form class="ea-side-search" onsubmit="searchStudents(this.q.value); return false;"><input name="q" type="search" placeholder="Search student" value="${esc(state.studentSearch || '')}" aria-label="Search student"><button type="submit" aria-label="Search">&#9906;</button></form>`;
+}
+function searchStudents(q) {
+  state.studentSearch = String(q || '').trim();
+  go('students');
+}
+async function renderStudents() {
+  const data = await api('/api/exam/people/students?classCode=__none__');
+  state.peopleMeta = data;
+  const pick = state.studentPick || {};
+  const active = data.sessions.find(x => x.active)?.label || data.sessions[0]?.label || '';
+  pageEl().innerHTML = `<div class="ec-card"><h2>Select Class</h2>
+    <div class="ec-filters" style="margin-top:10px;">
+      <div><label class="ec-label" for="ec-cls">Class <span class="ec-req">*</span></label><select class="ec-select" id="ec-cls" onchange="studentArms()"><option value="">Select Class</option>${data.classes.map(c => `<option value="${esc(c.code)}" ${c.code === pick.classCode ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
+      <div><label class="ec-label" for="ec-arm">Class Division / Arm <span class="ec-req">*</span></label><select class="ec-select" id="ec-arm"></select></div>
+      <div><label class="ec-label" for="ec-ses">Academic Session <span class="ec-req">*</span></label><select class="ec-select" id="ec-ses">${data.sessions.map(x => `<option ${x.label === (pick.session || active) ? 'selected' : ''}>${esc(x.label)}</option>`).join('') || '<option value="">—</option>'}</select></div>
+      <div><button class="post-btn" type="button" onclick="viewStudents()">View</button></div>
+    </div><div class="ec-error" id="ec-err"></div></div>
+    <div id="ec-students"></div>`;
+  studentArms(pick.armId);
+  if (state.studentSearch) return showStudents({ q: state.studentSearch }, `Search results for “${esc(state.studentSearch)}”`);
+  if (pick.classCode) return showStudents({ classCode: pick.classCode, armId: pick.armId }, pick.title);
+}
+function studentArms(armId = '') {
+  const code = document.getElementById('ec-cls').value;
+  const arms = (state.peopleMeta?.arms || []).filter(a => a.classCode === code);
+  const sel = document.getElementById('ec-arm');
+  sel.disabled = !code;
+  sel.innerHTML = !code ? '<option value="">Select Class First</option>'
+    : `<option value="">All arms</option>${arms.map(a => `<option value="${a.id}" ${String(a.id) === String(armId) ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}`;
+}
+function viewStudents() {
+  const classCode = document.getElementById('ec-cls').value;
+  const armId = document.getElementById('ec-arm').value;
+  const err = document.getElementById('ec-err');
+  if (!classCode) { err.textContent = 'Select a class.'; return; }
+  err.textContent = '';
+  state.studentSearch = '';
+  const box = document.querySelector('.ea-side-search input');
+  if (box) box.value = '';
+  const cls = state.peopleMeta.classes.find(c => c.code === classCode)?.label || classCode;
+  const arm = state.peopleMeta.arms.find(a => String(a.id) === String(armId))?.name || '';
+  const title = esc(`${cls}${arm ? ` ${arm}` : ''}`);
+  state.studentPick = { classCode, armId, session: document.getElementById('ec-ses').value, title };
+  showStudents({ classCode, armId }, title);
+}
+async function showStudents(params, title) {
+  const out = document.getElementById('ec-students');
+  out.innerHTML = '<div class="ec-card"><div class="ec-muted">Loading…</div></div>';
+  const { students } = await api(`/api/exam/people/students?${new URLSearchParams(params)}`);
+  out.innerHTML = `<div class="ec-card"><h2>${title}</h2>${dataTable('students', {
+    rows: students, head: ['#', 'Photo', 'Name', 'Reg. No.', 'Class', 'Gender'], empty: 'No pupils found. Refresh Students data if this looks wrong.',
+    match: p => `${p.name} ${p.regNo || ''} ${p.id}`,
+    row: (p, i) => `<tr><td>${i + 1}</td><td>${photoCell(p)}</td><td><b>${esc(p.name)}</b></td><td class="ec-mono">${esc(p.regNo || p.id)}</td><td>${esc(p.classLabel || '')}${p.armName ? ` ${esc(p.armName)}` : ''}</td><td>${esc(p.gender || '')}</td></tr>`,
+  })}</div>`;
+  dtDraw('students');
+}
+
+// Staff / Employees
+async function loadStaff() {
   const { staff } = await api('/api/exam/people/staff');
-  const role = s => (s.role === 'admin' ? 'Administrator' : s.role === 'teacher' ? 'Teacher' : 'Staff');
-  pageEl().innerHTML = `<div class="ec-card"><span class="ec-hint">${plural(staff.length, 'staff member')} · only administrators can sign in to this exam server</span>
-    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>#</th><th>Photo</th><th>Name</th><th>Role</th><th>Designation</th><th>Phone</th><th>Email</th></tr></thead><tbody>
-    ${staff.map((s, i) => `<tr><td>${i + 1}</td><td>${s.photo ? `<img class="ec-photo" src="/${esc(s.photo)}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="ea-avatar">${esc(initials(s.name))}</span>`}</td><td><b>${esc(s.name)}</b><div class="ec-hint">${esc(s.id)}</div></td>
-      <td><span class="ec-pill ${s.role === 'admin' ? 'ok' : 'muted'}">${role(s)}</span></td><td>${esc(s.designation || '')}</td><td>${esc(s.phone || '')}</td><td>${esc(s.email || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="ec-hint">No staff. Refresh Staff data.</td></tr>'}
-    </tbody></table></div></div>`;
+  state.staff = staff;
+  return staff;
+}
+const numbered = items => (items.length ? `<ol class="ec-ol">${items.map(x => `<li>${x}</li>`).join('')}</ol>` : '<span class="ec-hint">—</span>');
+const subjectItems = u => u.subjects.map(x => `${esc(x.subject)} <span class="ec-hint">(${esc(x.classLabel)})</span>`);
+async function renderTeachers() {
+  const staff = (await loadStaff()).filter(u => u.role !== 'admin');
+  pageEl().innerHTML = `<div class="ec-card"><h2>Teacher / General Staff List</h2>${dataTable('teachers', {
+    rows: staff, head: ['Photo', 'Name', 'Designation', 'Phone', 'Subject(s) in Charge', 'Form Class(es)', 'Profile', 'User Status'], empty: 'No staff. Refresh Staff data.',
+    match: u => `${u.name} ${u.id} ${u.designation || ''} ${u.phone || ''} ${u.subjects.map(x => x.subject).join(' ')} ${u.formClasses.join(' ')}`,
+    row: u => `<tr><td>${photoCell(u)}</td><td><b>${esc(u.name)}</b><div class="ec-hint">${esc(u.id)}</div></td><td>${esc(u.designation || (u.role === 'teacher' ? 'Teacher' : 'Staff'))}</td><td>${esc(u.phone || '')}</td>
+      <td>${numbered(subjectItems(u))}</td><td>${numbered(u.formClasses.map(esc))}</td>
+      <td><button class="btn-outline" style="padding:5px 12px;font-size:12px;" onclick="staffProfile('${esc(u.id)}')">View</button></td>
+      <td><span class="ec-pill ${u.active === 0 ? 'bad' : 'ok'}">${u.active === 0 ? 'Inactive' : 'Active'}</span></td></tr>`,
+  })}</div>`;
+  dtDraw('teachers');
+}
+const levelLabel = u => (u.level === 'owner' || u.level === 'super' ? 'Super Admin' : 'Admin');
+async function renderAdmins() {
+  const admins = (await loadStaff()).filter(u => u.role === 'admin');
+  pageEl().innerHTML = `<div class="ec-card"><h2>Admin List</h2><p class="ec-hint">Only these accounts can sign in to this exam server, with their usual portal password.</p>${dataTable('admins', {
+    rows: admins, head: ['Photo', 'Name', 'Designation', 'Phone'], empty: 'No admins. Refresh Staff data.',
+    match: u => `${u.name} ${u.id} ${u.email || ''} ${u.designation || ''} ${u.phone || ''} ${levelLabel(u)}`,
+    row: u => `<tr><td>${photoCell(u)}</td><td><b>${esc(u.name)}</b>${u.email ? `<div><span class="ec-chip">${esc(u.email)}</span></div>` : ''}</td>
+      <td>${levelLabel(u)}${u.designation ? `<div><span class="ec-chip">${esc(u.designation)}</span></div>` : ''}</td><td>${esc(u.phone || '')}</td></tr>`,
+  })}</div>`;
+  dtDraw('admins');
+}
+function staffProfile(id) {
+  const u = (state.staff || []).find(x => x.id === id);
+  if (!u) return;
+  const line = (k, v) => (v ? `<tr><td class="ec-hint">${k}</td><td>${v}</td></tr>` : '');
+  modal(esc(u.name), `<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">${photoCell(u)}<div><b>${esc(u.name)}</b><div class="ec-hint">${esc(u.id)}</div></div></div>
+    <table class="ec-table"><tbody>${line('Designation', esc(u.designation || ''))}${line('Department', esc(u.department || ''))}${line('Phone', esc(u.phone || ''))}${line('Email', esc(u.email || ''))}
+    ${line('Gender', esc(u.gender || ''))}${line('Qualifications', esc(u.qualifications || ''))}${line('Date of appointment', esc(u.dateOfAppointment || ''))}
+    ${line('Subject(s) in charge', u.subjects.length ? numbered(subjectItems(u)) : '')}${line('Form class(es)', u.formClasses.length ? numbered(u.formClasses.map(esc)) : '')}
+    ${line('User status', u.active === 0 ? 'Inactive' : 'Active')}</tbody></table>`, '<button class="btn-outline" onclick="closeModal()">Close</button>');
 }
 
 // ── Updates ──

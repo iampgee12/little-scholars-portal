@@ -20,7 +20,7 @@ const DATASET_LABELS = {
   school: 'School Branding', academic_terms: 'Academic Years & Terms', classes: 'Classes', class_arms: 'Class Arms & Sections',
   subjects: 'Subjects', students: 'Students', student_users: 'Student Accounts', staff_users: 'Staff Accounts',
   cbt_instruction_sets: 'CBT Instructions', cbt_schedules: 'CBT Exam Schedules', cbt_schedule_subjects: 'CBT Papers',
-  cbt_questions: 'CBT Questions', photos: 'Photos',
+  cbt_questions: 'CBT Questions', teacher_assignments: 'Teacher Subjects', photos: 'Photos',
 };
 const PUSH_BATCH = 100;
 
@@ -118,7 +118,7 @@ module.exports = function createExamSync(ctx) {
     const want = new Set(groups.includes('all') ? GROUPS : groups);
     const tables = {};
     const scrub = u => ({ ...u, reset_token: null, reset_token_expires: null });
-    if (want.has('students') || want.has('cbt')) {
+    if (want.has('students') || want.has('cbt') || want.has('staff')) {
       tables.classes = all('SELECT * FROM classes');
       tables.class_arms = all('SELECT * FROM class_arms');
     }
@@ -131,6 +131,9 @@ module.exports = function createExamSync(ctx) {
       // admins sign in to the exam server; other staff are listed only, so they get no usable password
       tables.staff_users = all("SELECT * FROM users WHERE role IN ('admin', 'teacher', 'staff') AND COALESCE(archived, 0) = 0 AND active = 1")
         .map(u => scrub(u.role === 'admin' ? u : { ...u, password: '!' }));
+      // for the staff lists: subjects in charge and form classes
+      tables.subjects = all('SELECT * FROM subjects');
+      tables.teacher_assignments = all('SELECT * FROM teacher_assignments');
     }
     if (want.has('cbt')) {
       tables.academic_terms = all('SELECT * FROM academic_terms');
@@ -152,7 +155,7 @@ module.exports = function createExamSync(ctx) {
         try { const st = fs.statSync(path.join(UPLOAD_DIR, name)); seen.add(name); photos.push({ name, size: st.size }); } catch { /* missing on disk */ }
       }
     }
-    const school = { ...schoolInfoFromMeta(), session: one('SELECT session_label s, term_label t FROM academic_terms WHERE is_active = 1') || null };
+    const school = { ...schoolInfoFromMeta(), ownerAdminId: valueFromMeta('owner_admin_id', ''), session: one('SELECT session_label s, term_label t FROM academic_terms WHERE is_active = 1') || null };
     const counts = { school: 1, ...Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.length])) };
     if (want.has('images')) counts.photos = photos.length;
     return { groups: [...want], school, tables, photos, counts };
@@ -305,7 +308,7 @@ module.exports = function createExamSync(ctx) {
 
   // Replaces the refreshed tables. Results written here (cbt_attempts,
   // answers, scores) are never deleted, pushed or not.
-  const APPLY_ORDER = ['academic_terms', 'classes', 'class_arms', 'subjects', 'staff_users', 'student_users', 'students', 'cbt_instruction_sets', 'cbt_schedules', 'cbt_schedule_subjects', 'cbt_questions'];
+  const APPLY_ORDER = ['academic_terms', 'classes', 'class_arms', 'subjects', 'staff_users', 'student_users', 'students', 'teacher_assignments', 'cbt_instruction_sets', 'cbt_schedules', 'cbt_schedule_subjects', 'cbt_questions'];
   const KEEP = new Set(['cbt_attempts', 'cbt_attempt_answers', 'cbt_scores']);
   function applyData(data) {
     const { tables } = data;
@@ -337,7 +340,7 @@ module.exports = function createExamSync(ctx) {
           const fk = all(`PRAGMA foreign_key_list("${v.table}")`).find(f => f.id === v.fkid);
           try { run(`UPDATE "${v.table}" SET "${fk.from}" = NULL WHERE rowid = ?`, v.rowid); } catch { run(`DELETE FROM "${v.table}" WHERE rowid = ?`, v.rowid); }
         }
-        for (const [k, val] of Object.entries({ school_name: data.school?.name, school_address: data.school?.address, school_phone: data.school?.phone, school_email: data.school?.email, school_website: data.school?.website })) {
+        for (const [k, val] of Object.entries({ owner_admin_id: data.school?.ownerAdminId, school_name: data.school?.name, school_address: data.school?.address, school_phone: data.school?.phone, school_email: data.school?.email, school_website: data.school?.website })) {
           if (val) setMeta(k, val);
         }
         db.exec('COMMIT');
@@ -471,17 +474,40 @@ module.exports = function createExamSync(ctx) {
       ...statusInfo(), app: appBuild(), pack: cbtOffline.currentPack(),
     };
   }
-  function studentsList(classCode, armId) {
+  function studentsList(classCode, armId, search = '') {
     return all(`SELECT st.id, st.name, st.reg_no AS regNo, st.gender, st.photo_path AS photo, st.class_code AS classCode, c.label AS classLabel, ca.name AS armName
                 FROM students st LEFT JOIN classes c ON c.code = st.class_code LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
                 WHERE (st.status IS NULL OR st.status = 'active') ${classCode ? 'AND st.class_code = ?' : ''} ${armId ? 'AND st.class_arm_id = ?' : ''}
-                ORDER BY c.label, ca.name, st.name`, ...[classCode, armId].filter(Boolean));
+                  ${search ? "AND (st.name LIKE ? OR st.id LIKE ? OR COALESCE(st.reg_no, '') LIKE ?)" : ''}
+                ORDER BY c.label, ca.name, st.name`, ...[classCode, armId].filter(Boolean), ...(search ? Array(3).fill(`%${search}%`) : []));
   }
   function staffList() {
     const cols = new Set(all('PRAGMA table_info(users)').map(c => c.name));
     const pick = c => (cols.has(c) ? c : 'NULL');
-    return all(`SELECT id, name, role, ${pick('designation')} AS designation, ${pick('phone')} AS phone, ${pick('email')} AS email, ${pick('photo_path')} AS photo, ${pick('staff_type')} AS staffType
-                FROM users WHERE role IN ('admin', 'teacher', 'staff') ORDER BY role, name`);
+    const subjects = new Map();
+    for (const r of all(`SELECT ta.teacher_id AS teacherId, sub.name AS subject, c.label AS classLabel FROM teacher_assignments ta
+                         JOIN subjects sub ON sub.id = ta.subject_id JOIN classes c ON c.code = ta.class_code ORDER BY c.rowid, sub.name`)) {
+      if (!subjects.has(r.teacherId)) subjects.set(r.teacherId, []);
+      subjects.get(r.teacherId).push({ subject: r.subject, classLabel: r.classLabel });
+    }
+    const forms = new Map();
+    for (const r of all(`SELECT ca.form_teacher_id AS teacherId, c.label AS classLabel, ca.name AS armName FROM class_arms ca
+                         JOIN classes c ON c.code = ca.class_code WHERE ca.form_teacher_id IS NOT NULL ORDER BY c.rowid, ca.name`)) {
+      if (!forms.has(r.teacherId)) forms.set(r.teacherId, []);
+      forms.get(r.teacherId).push(`${r.classLabel} ${r.armName}`.trim());
+    }
+    // as on report cards: without an arm of their own, a class's Class Teacher is its form teacher
+    for (const r of all(`SELECT DISTINCT ta.teacher_id AS teacherId, c.label AS classLabel FROM teacher_assignments ta JOIN classes c ON c.code = ta.class_code
+                         WHERE ta.teacher_type = 'class_teacher' ORDER BY c.rowid`)) {
+      if (!forms.has(r.teacherId)) forms.set(r.teacherId, []);
+      const list = forms.get(r.teacherId);
+      if (!list.some(x => x === r.classLabel || x.startsWith(`${r.classLabel} `))) list.push(r.classLabel);
+    }
+    return all(`SELECT id, name, role, ${pick('designation')} AS designation, ${pick('phone')} AS phone, ${pick('email')} AS email, ${pick('photo_path')} AS photo,
+                       ${pick('staff_type')} AS staffType, ${pick('gender')} AS gender, ${pick('department')} AS department, ${pick('qualifications')} AS qualifications,
+                       ${pick('date_of_appointment')} AS dateOfAppointment, ${pick('active')} AS active
+                FROM users WHERE role IN ('admin', 'teacher', 'staff') ORDER BY name COLLATE NOCASE`)
+      .map(u => ({ ...u, level: u.role === 'admin' ? adminLevel(u.id) : null, subjects: subjects.get(u.id) || [], formClasses: forms.get(u.id) || [] }));
   }
   function schedulesList() {
     return all(`SELECT sc.id, sc.title, sc.session_label AS session, sc.term_label AS term,
@@ -525,7 +551,8 @@ module.exports = function createExamSync(ctx) {
       try {
         if (m === 'GET' && p === '/api/exam/dashboard') return sendJson(res, 200, dashboard()), true;
         if (m === 'GET' && p === '/api/exam/people/students') {
-          return sendJson(res, 200, { students: studentsList(cleanText(url.searchParams.get('classCode')).toUpperCase(), Number(url.searchParams.get('armId')) || null),
+          return sendJson(res, 200, { students: studentsList(cleanText(url.searchParams.get('classCode')).toUpperCase(), Number(url.searchParams.get('armId')) || null, cleanText(url.searchParams.get('q'))),
+            sessions: all('SELECT DISTINCT session_label AS label, MAX(is_active) AS active FROM academic_terms GROUP BY session_label ORDER BY session_label DESC'),
             classes: all('SELECT code, label FROM classes WHERE COALESCE(archived, 0) = 0 ORDER BY rowid'), arms: all('SELECT id, class_code AS classCode, name FROM class_arms ORDER BY name') }), true;
         }
         if (m === 'GET' && p === '/api/exam/people/staff') return sendJson(res, 200, { staff: staffList() }), true;
