@@ -11,7 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const http = require('node:http');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { createRequire } = require('node:module');
 
 const PORT = 8080;
@@ -78,9 +78,18 @@ function openWindow() {
     child.on('exit', () => resolve(Date.now() - opened < 4000 ? 'handed-over' : 'closed'));
   });
 }
+// Closes the app window without asking anything (an update is about to replace the app).
+// Finds it by its own profile folder, so a window opened by an earlier launch closes too.
+let closingForUpdate = false;
+function closeAppWindow() {
+  closingForUpdate = true;
+  const ps = `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like ${psString(`*${path.join(HOME, 'window')}*`)} } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+  try { spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', ps], { windowsHide: true, timeout: 15000 }); } catch { /* the installer asks to close it */ }
+}
 async function windowLoop() {
   for (;;) {
     const how = await openWindow();
+    if (closingForUpdate) return;
     if (how !== 'closed') return; // no window to watch from here
     const answer = await messageBox('Stop the exam server?\n\nYes — stop it. Pupils still writing will be disconnected.\nNo — keep it running in the background. Open "UCS Exam Server" again to bring the window back.', 'YesNo', 'Question');
     if (answer === 'Yes') { say('Stopped from the window.'); process.exit(0); }
@@ -188,6 +197,7 @@ async function main() {
   if (!process.env.UCS_PORTAL_URL && asset('portal.txt')) process.env.UCS_PORTAL_URL = asset('portal.txt');
   // the server asks for the window when a second launch wants it back
   globalThis.ucsShowAppWindow = () => { if (reopenRequest) { const r = reopenRequest; reopenRequest = null; r(); } else openWindow(); };
+  globalThis.ucsCloseAppWindow = closeAppWindow;
   process.chdir(appDir);
   say(`Exam data is kept in: ${dataDir}`);
   waitUntilUp().then(up => {

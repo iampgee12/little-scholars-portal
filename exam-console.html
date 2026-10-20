@@ -33,6 +33,12 @@ button { font-family: inherit; }
 .ea-nav button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left; padding: 9px 16px 9px 20px; font-size: 13px; color: var(--text-2); cursor: pointer; border-left: 3px solid transparent; }
 .ea-nav button:hover { background: var(--black-2); color: var(--text-1); }
 .ea-nav button.active { background: var(--green-bg); color: var(--green); border-left-color: var(--green); font-weight: 600; }
+.ea-nav .ea-drop-head { margin-top: 6px; padding-left: 16px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
+.ea-nav .ea-drop-head.here { color: var(--green); }
+.ea-caret { margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .15s; margin-top: -3px; }
+.ea-drop.open .ea-caret { transform: rotate(-135deg); margin-top: 3px; }
+.ea-drop-body { display: none; padding-bottom: 4px; }
+.ea-drop.open .ea-drop-body { display: block; }
 .ea-nav .ea-badge { margin-left: auto; background: var(--amber-bg); color: var(--amber); font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
 .ea-side-foot { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
 .ea-side-foot button { width: 100%; }
@@ -97,7 +103,7 @@ button { font-family: inherit; }
 /* lists: records per page, search, pages */
 .ea-side-search { display: flex; margin: 6px 16px 4px 20px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--black-3); overflow: hidden; }
 .ea-side-search input { flex: 1; min-width: 0; border: 0; background: none; padding: 8px 10px; font: inherit; font-size: 12px; color: var(--text-1); outline: none; }
-.ea-side-search button { border: 0; background: none; padding: 0 10px; color: var(--text-3); cursor: pointer; font-size: 14px; }
+.ea-nav .ea-side-search button { width: auto; flex: 0 0 auto; border: 0; background: none; padding: 0 10px; color: var(--text-3); cursor: pointer; font-size: 14px; }
 .ea-side-search:focus-within { border-color: rgba(34,197,94,.5); }
 .ec-dt-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .ec-dt-per { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
@@ -144,6 +150,6 @@ button { font-family: inherit; }
 <body>
   <div id="ea-root"><div class="ea-setup"><div class="ec-muted">Loading…</div></div></div>
 <script src="ui-dialog.js?v=4"></script>
-<script src="exam-console.js?v=5"></script>
+<script src="exam-console.js?v=7"></script>
 </body>
 </html>

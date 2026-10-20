@@ -530,8 +530,12 @@ module.exports = function createExamSync(ctx) {
     const res = await callPortal('/api/exam-sync/setup.exe', { raw: true });
     const file = path.join(require('node:os').tmpdir(), `UCS Exam Server Setup ${Date.now()}.exe`);
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-    require('node:child_process').spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
-    setTimeout(() => process.exit(0), 1500);
+    // close the app window first, so the updated app opens the only window
+    setTimeout(() => {
+      if (typeof globalThis.ucsCloseAppWindow === 'function') globalThis.ucsCloseAppWindow();
+      require('node:child_process').spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => process.exit(0), 1000);
+    }, 800);
     return { started: true };
   }
 

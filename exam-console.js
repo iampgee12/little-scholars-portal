@@ -187,8 +187,8 @@ const MENU = [
   [null, [['dashboard', 'Dashboard']]],
   ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'CBT Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']]],
   ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']]],
-  ['Students', [['students', 'Students Info-system']], 'student-search'],
-  ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']]],
+  ['Students', [['students', 'Students Info-system']], { dropdown: 'students', search: true }],
+  ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']], { dropdown: 'staff' }],
   ['Help', [['updates', 'Check for Updates']]],
 ];
 const TITLES = {
@@ -200,14 +200,39 @@ const TITLES = {
   admins: ['Administrator', 'Admins who can sign in to this exam server'],
   updates: ['Check for Updates', 'Keep the exam server up to date'],
 };
+// Menu groups marked as drop-downs open and close on click; the one holding
+// the current page starts open
+state.navOpen = new Set();
+function navItem([k, l]) {
+  return `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`;
+}
+function navGroup([group, items, opt = {}]) {
+  if (!opt.dropdown) return `${group ? `<h4>${group}</h4>` : ''}${items.map(navItem).join('')}`;
+  const open = state.navOpen.has(opt.dropdown);
+  const here = items.some(([k]) => k === state.page);
+  return `<div class="ea-drop ${open ? 'open' : ''}" id="nav-${opt.dropdown}">
+    <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}<span class="ea-caret" aria-hidden="true"></span></button>
+    <div class="ea-drop-body">${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
+}
+function toggleNav(key) {
+  const el = document.getElementById(`nav-${key}`);
+  const open = !state.navOpen.has(key);
+  if (open) state.navOpen.add(key); else state.navOpen.delete(key);
+  el.classList.toggle('open', open);
+  el.querySelector('.ea-drop-head').setAttribute('aria-expanded', open);
+}
 function shell() {
   const t = state.dash?.term;
+  // the menu is redrawn on every page: keep it where the user had scrolled it
+  const oldNav = document.querySelector('.ea-nav');
+  const navScroll = oldNav?.scrollTop || 0;
+  for (const [, items, opt] of MENU) if (opt?.dropdown && items.some(([k]) => k === state.page)) state.navOpen.add(opt.dropdown);
   const addr = (state.dash?.lanAddresses || state.status?.lanAddresses || [])[0];
   rootEl.innerHTML = `<div class="ea-shell" id="ea-shell">
     <aside class="ea-side">
       <div class="ea-brand"><img src="/report_assets/exam-app-icon.png" alt=""><div><b>${esc(state.sync?.school || "Unique Children's School")}</b><small>UCS Exam Server</small></div></div>
       <div class="ea-user"><span class="ea-avatar">${esc(initials(state.user.name))}</span><div><b>${esc(state.user.name)}</b><small>Administration</small></div></div>
-      <nav class="ea-nav">${MENU.map(([group, items, extra]) => `${group ? `<h4>${group}</h4>` : ''}${items.map(([k, l]) => `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`).join('')}${extra === 'student-search' ? studentSearchBox() : ''}`).join('')}</nav>
+      <nav class="ea-nav">${MENU.map(navGroup).join('')}</nav>
       <div class="ea-side-foot"><button type="button" class="btn-outline" onclick="signOut()">Sign Out</button><div class="ea-version">${state.dash?.app?.version ? `v${esc(state.dash.app.version)} · ${esc(state.dash.app.build)}` : 'UCS Exam Server'}</div></div>
     </aside>
     <div class="ea-main">
@@ -219,6 +244,11 @@ function shell() {
       </header>
       <main class="ea-wrap" id="ea-page"><div class="ec-muted">Loading…</div></main>
     </div></div>`;
+  const nav = document.querySelector('.ea-nav');
+  nav.scrollTop = navScroll;
+  // first draw: bring the current page's menu item into the middle of the menu
+  const active = !oldNav && nav.querySelector('button.active');
+  if (active) nav.scrollTop += active.getBoundingClientRect().top - nav.getBoundingClientRect().top - nav.clientHeight / 2;
 }
 async function go(page) {
   if (page === 'staff') page = 'teachers';
@@ -652,14 +682,14 @@ async function checkUpdates() {
     out.innerHTML = !r.latest || !r.setupSize
       ? '<div class="ec-note warn">The school portal has no exam server app to offer yet, so there is nothing to compare with.</div>'
       : r.available
-        ? `<div class="ec-note">A new version is available (${esc(r.latest.build)}, built ${when(r.latest.builtAt)}, ${Math.round(r.setupSize / 1e6)} MB).</div><button class="post-btn" onclick="installUpdate()">Download and Install</button>`
+        ? `<div class="ec-note">A new version is available (${when(r.latest.builtAt)}, ${Math.round(r.setupSize / 1e6)} MB).</div><button class="post-btn" onclick="installUpdate()">Download and Install</button>`
         : `<div class="ec-note">You have the latest version (${esc(r.latest.build)}).</div>`;
   } catch (err) { out.innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
 }
 async function installUpdate() {
   const writing = state.dash?.writing || 0;
   if (!await uiConfirm(`Install the update now? The exam server closes while the new version installs${writing ? `, and ${plural(writing, 'pupil')} still writing will be disconnected` : ''}. Push results first if you can.`, { confirmLabel: 'Install', danger: !!writing })) return;
-  document.getElementById('ec-update-out').innerHTML = '<p class="ec-hint">Downloading the update… The installer opens by itself, then the exam server closes.</p><div class="ea-progress"><i></i></div>';
+  document.getElementById('ec-update-out').innerHTML = '<p class="ec-hint">Downloading the update… This window then closes and the installer opens. Click Finish at the end and the updated app opens.</p><div class="ea-progress"><i></i></div>';
   try { await api('/api/exam/update-install', { method: 'POST' }); } catch (err) { document.getElementById('ec-update-out').innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
 }
 
