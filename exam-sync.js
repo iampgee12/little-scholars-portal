@@ -51,6 +51,19 @@ module.exports = function createExamSync(ctx) {
       );
     `);
     // exam computer: which finished attempts have reached the portal
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS exam_server_machines (
+        id INTEGER PRIMARY KEY,
+        key_id INTEGER NOT NULL,
+        machine TEXT NOT NULL,
+        first_seen TEXT NOT NULL,
+        last_seen TEXT NOT NULL,
+        last_sync TEXT,
+        last_push TEXT,
+        last_ip TEXT,
+        UNIQUE(key_id, machine)
+      );
+    `);
     ensureColumn('cbt_attempts', 'pushed_at', 'TEXT');
     ensureColumn('cbt_attempts', 'push_note', 'TEXT');
   }
@@ -163,32 +176,42 @@ module.exports = function createExamSync(ctx) {
     const p = url.pathname;
     const m = req.method;
 
-    // ── admin screens ──
+    // ── admin screens: the school's one set of API keys ──
+    // Generated once; the secret is shown that one time and only its hash is
+    // kept. Every exam computer uses the same set. Reset Keys (super admins,
+    // typed confirmation) cancels the set and makes a new one, for lost or
+    // leaked keys.
     if (p.startsWith('/api/admin/exam-servers')) {
       const admin = requireUser(req, res, 'admin');
       if (!admin) return true;
       const canManage = ['owner', 'super'].includes(adminLevel(admin));
-      if (m === 'GET' && p === '/api/admin/exam-servers') {
-        return sendJson(res, 200, { canManage, connections: all('SELECT * FROM exam_server_keys ORDER BY revoked_at IS NOT NULL, id DESC').map(r => keyRow(r)) }), true;
-      }
-      if (!canManage) return sendJson(res, 403, { error: 'Only a super admin can create or revoke exam server keys' }), true;
-      if (m === 'POST' && p === '/api/admin/exam-servers') {
-        const name = cleanText((await readJson(req)).name).slice(0, 80);
-        if (!name) return sendJson(res, 400, { error: 'Give the connection a name, e.g. "ICT Lab exam computer"' }), true;
+      const active = () => one('SELECT * FROM exam_server_keys WHERE revoked_at IS NULL ORDER BY id DESC LIMIT 1');
+      const issue = () => {
         const apiNumber = newApiNumber();
         const authKey = crypto.randomBytes(16).toString('hex');
         const secret = crypto.randomBytes(24).toString('base64url');
         const id = Number(run('INSERT INTO exam_server_keys (name, api_number, auth_key, secret_hash, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          name, apiNumber, authKey, sha(secret), admin.id, nowIso()).lastInsertRowid);
-        // the secret is shown this once; only its hash is kept
-        return sendJson(res, 201, { ok: true, connection: keyRow(one('SELECT * FROM exam_server_keys WHERE id = ?', id)), keys: { apiNumber, authKey, secret } }), true;
+          'School API keys', apiNumber, authKey, sha(secret), admin.id, nowIso()).lastInsertRowid);
+        return { id, keys: { apiNumber, authKey, secret } };
+      };
+      if (m === 'GET' && p === '/api/admin/exam-servers') {
+        const key = active();
+        const machines = key ? all('SELECT * FROM exam_server_machines WHERE key_id = ? ORDER BY last_seen DESC', key.id).map(r => ({
+          machine: r.machine, firstSeen: r.first_seen, lastSeen: r.last_seen, lastSyncAt: r.last_sync, lastPushAt: r.last_push, lastIp: r.last_ip,
+        })) : [];
+        return sendJson(res, 200, { canManage, key: key ? keyRow(key) : null, machines }), true;
       }
-      const revoke = p.match(/^\/api\/admin\/exam-servers\/(\d+)\/revoke$/);
-      if (m === 'POST' && revoke) {
-        const row = one('SELECT id, revoked_at FROM exam_server_keys WHERE id = ?', Number(revoke[1]));
-        if (!row) return sendJson(res, 404, { error: 'Connection not found' }), true;
-        if (!row.revoked_at) run('UPDATE exam_server_keys SET revoked_at = ?, revoked_by = ? WHERE id = ?', nowIso(), admin.id, row.id);
-        return sendJson(res, 200, { ok: true }), true;
+      if (!canManage) return sendJson(res, 403, { error: 'Only a super admin can generate or reset the school\'s API keys' }), true;
+      if (m === 'POST' && p === '/api/admin/exam-servers') {
+        if (active()) return sendJson(res, 409, { error: 'The school\'s API keys have already been generated. They are shown only once; if they are lost, a super admin can reset them.' }), true;
+        const { id, keys } = issue();
+        return sendJson(res, 201, { ok: true, key: keyRow(one('SELECT * FROM exam_server_keys WHERE id = ?', id)), keys }), true;
+      }
+      if (m === 'POST' && p === '/api/admin/exam-servers/reset') {
+        if (cleanText((await readJson(req)).confirm).toUpperCase() !== 'RESET') return sendJson(res, 400, { error: 'Type RESET to confirm' }), true;
+        run('UPDATE exam_server_keys SET revoked_at = ?, revoked_by = ? WHERE revoked_at IS NULL', nowIso(), admin.id);
+        const { id, keys } = issue();
+        return sendJson(res, 201, { ok: true, key: keyRow(one('SELECT * FROM exam_server_keys WHERE id = ?', id)), keys }), true;
       }
       return false;
     }
@@ -199,8 +222,13 @@ module.exports = function createExamSync(ctx) {
     if (blocked(ip)) return sendJson(res, 429, { error: 'Too many wrong keys from this address. Wait 15 minutes and try again.' }), true;
     const key = authenticate(req);
     if (!key) { miss(ip); return sendJson(res, 401, { error: 'These keys were not accepted. Check the API Number, Authentication Key and Secret Key.' }), true; }
-    if (key.revoked_at) return sendJson(res, 403, { error: 'This exam server connection has been revoked on the portal. Ask a super admin for new keys.' }), true;
+    if (key.revoked_at) return sendJson(res, 403, { error: 'These API keys were reset on the portal. Ask a super admin for the new keys.' }), true;
     run('UPDATE exam_server_keys SET last_used_at = ?, last_ip = ? WHERE id = ?', nowIso(), ip, key.id);
+    // which exam computer is calling (they all share the school's keys)
+    const machine = cleanText(req.headers['x-ucs-machine']).slice(0, 60) || 'Unnamed computer';
+    run(`INSERT INTO exam_server_machines (key_id, machine, first_seen, last_seen, last_ip) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(key_id, machine) DO UPDATE SET last_seen = excluded.last_seen, last_ip = excluded.last_ip`, key.id, machine, nowIso(), nowIso(), ip);
+    const touch = col => run(`UPDATE exam_server_machines SET ${col} = ? WHERE key_id = ? AND machine = ?`, nowIso(), key.id, machine);
 
     if (m === 'GET' && p === '/api/exam-sync/hello') {
       return sendJson(res, 200, { ok: true, connection: { name: key.name, apiNumber: key.api_number }, school: syncData([]).school, app: appInfo() }), true;
@@ -209,6 +237,7 @@ module.exports = function createExamSync(ctx) {
       const groups = cleanText(url.searchParams.get('groups') || 'all').split(',').map(g => g.trim()).filter(g => g === 'all' || GROUPS.includes(g));
       if (!groups.length) return sendJson(res, 400, { error: 'Choose what to refresh' }), true;
       run('UPDATE exam_server_keys SET last_sync_at = ? WHERE id = ?', nowIso(), key.id);
+      touch('last_sync');
       return sendGzipJson(req, res, syncData(groups)), true;
     }
     if (m === 'GET' && p === '/api/exam-sync/photo') {
@@ -227,6 +256,7 @@ module.exports = function createExamSync(ctx) {
       // marked under the super admin who made the keys
       const report = cbtOffline.importAttempts(attempts, `sync:${key.id}`, key.created_by);
       run('UPDATE exam_server_keys SET last_push_at = ? WHERE id = ?', nowIso(), key.id);
+      touch('last_push');
       return sendJson(res, 200, { ok: true, report }), true;
     }
     if (m === 'GET' && p === '/api/exam-sync/update') {
@@ -259,7 +289,7 @@ module.exports = function createExamSync(ctx) {
     try {
       res = await fetch(new URL(pathname, conn.portal), {
         method,
-        headers: { 'X-UCS-Api-Number': conn.apiNumber, 'X-UCS-Auth-Key': conn.authKey, 'X-UCS-Secret': conn.secret, 'Accept-Encoding': 'gzip', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        headers: { 'X-UCS-Api-Number': conn.apiNumber, 'X-UCS-Auth-Key': conn.authKey, 'X-UCS-Secret': conn.secret, 'X-UCS-Machine': require('node:os').hostname(), 'Accept-Encoding': 'gzip', ...(body ? { 'Content-Type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(120_000),
       });
@@ -416,7 +446,7 @@ module.exports = function createExamSync(ctx) {
     let lastPush = null;
     try { lastPush = JSON.parse(valueFromMeta('sync_last_push', '') || 'null'); } catch { /* none */ }
     return {
-      connected: !!conn.apiNumber, portal: conn.portal, apiNumber: conn.apiNumber,
+      connected: !!conn.apiNumber, portal: conn.portal, apiNumber: conn.apiNumber, machine: require('node:os').hostname(),
       connectionName: valueFromMeta('sync_connection_name', ''), school: valueFromMeta('school_name', ''),
       synced, lastPush,
       unpushed: one('SELECT COUNT(*) n FROM cbt_attempts WHERE submitted_at IS NOT NULL AND pushed_at IS NULL').n,

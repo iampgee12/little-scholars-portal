@@ -14,23 +14,29 @@ async function ocAppInfo() {
   } catch { /* leave the buttons as they are */ }
 }
 
-// ── Exam server connections (keys a UCS Exam Server uses to sync with this portal) ──
+// ── School API keys (one set, generated once, that every UCS Exam Server uses) ──
 const ocWhen = d => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 async function ocLoadConnections() {
-  const body = document.getElementById('oc-conns');
+  const box = document.getElementById('oc-key-box');
   try {
-    const { canManage, connections } = await apiFetch('/api/admin/exam-servers');
-    document.getElementById('oc-conn-new').hidden = !canManage;
-    document.getElementById('oc-conn-who').textContent = canManage ? '' : 'Only a super admin can create or revoke keys.';
-    body.innerHTML = connections.length ? connections.map(c => `<tr>
-        <td><b>${escapeHtml(c.name)}</b><div class="oc-hint">by ${escapeHtml(c.createdBy || '')}</div></td>
-        <td style="font-family:'DM Mono',monospace;">${escapeHtml(c.apiNumber)}</td>
-        <td>${ocWhen(c.createdAt)}</td><td>${ocWhen(c.lastSyncAt)}</td><td>${ocWhen(c.lastPushAt)}</td>
-        <td>${c.revokedAt ? '<span class="pf-pill pf-pill-out">Revoked</span>' : c.lastUsedAt ? '<span class="pf-pill pf-pill-in">Connected</span>' : '<span class="pf-pill pf-pill-warn">Not used yet</span>'}</td>
-        <td>${canManage && !c.revokedAt ? `<button type="button" class="sf-add-new ts-danger" onclick="ocRevokeConnection(${c.id}, '${escapeHtml(c.name).replace(/'/g, '&#39;')}')">Revoke</button>` : ''}</td>
-      </tr>`).join('') : '<tr><td colspan="7" style="padding:18px;color:var(--text-3);">No exam servers connected yet.</td></tr>';
+    const { canManage, key, machines } = await apiFetch('/api/admin/exam-servers');
+    document.getElementById('oc-conn-new').hidden = !(canManage && !key);
+    document.getElementById('oc-conn-who').textContent = canManage ? '' : 'Only a super admin can generate or reset the keys.';
+    box.innerHTML = key ? `<div class="oc-key-summary">
+        <div><span class="oc-hint">API Number</span><b class="oc-key-num">${escapeHtml(key.apiNumber)}</b></div>
+        <div><span class="oc-hint">Generated</span><b>${ocWhen(key.createdAt)}</b><span class="oc-hint">by ${escapeHtml(key.createdBy || '')}</span></div>
+        <div><span class="oc-hint">Last used</span><b>${ocWhen(key.lastUsedAt)}</b></div>
+        ${canManage ? '<div class="oc-key-reset"><button type="button" class="sf-add-new ts-danger" onclick="ocResetKeys()">Reset Keys</button></div>' : ''}
+      </div>
+      <p class="oc-hint" style="margin:8px 0 0;">The Authentication Key and Secret Key are not shown again. If they are lost, a super admin can reset them, and every exam computer must then enter the new keys.</p>`
+      : `<div class="ts-note">No API keys yet. ${canManage ? 'Click <b>Generate API Keys</b> once, then write the keys down.' : 'Ask a super admin to generate them.'}</div>`;
+    document.getElementById('oc-machines-wrap').hidden = !key;
+    document.getElementById('oc-conns').innerHTML = machines.length ? machines.map(c => `<tr>
+        <td><b>${escapeHtml(c.machine)}</b>${c.lastIp ? `<div class="oc-hint">${escapeHtml(c.lastIp)}</div>` : ''}</td>
+        <td>${ocWhen(c.firstSeen)}</td><td>${ocWhen(c.lastSeen)}</td><td>${ocWhen(c.lastSyncAt)}</td><td>${ocWhen(c.lastPushAt)}</td>
+      </tr>`).join('') : '<tr><td colspan="5" style="padding:18px;color:var(--text-3);">No exam computer has connected yet.</td></tr>';
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="7" style="padding:18px;color:var(--text-3);">${escapeHtml(err.message)}</td></tr>`;
+    box.innerHTML = `<p class="oc-hint">${escapeHtml(err.message)}</p>`;
   }
 }
 function ocConnModal(title, body, foot) {
@@ -39,25 +45,46 @@ function ocConnModal(title, body, foot) {
     <div class="sf-body">${body}</div><div class="sf-foot">${foot}</div></div></div>`;
 }
 function ocCloseConnModal() { document.getElementById('oc-conn-modal-host').innerHTML = ''; }
-function ocOpenNewConnection() {
-  ocConnModal('New Exam Server Connection', `
-    <label class="field-label" for="oc-conn-name">Name <span class="sf-req">*</span></label>
-    <input class="field-input" id="oc-conn-name" placeholder="e.g. ICT Lab exam computer" maxlength="80">
-    <p class="oc-hint" style="margin-top:8px;">Use one connection per exam computer, so you can revoke one without affecting the others.</p>`,
-  '<button type="button" class="btn-outline" onclick="ocCloseConnModal()">Cancel</button><button type="button" class="post-btn" onclick="ocCreateConnection()">Create Keys</button>');
-  setTimeout(() => document.getElementById('oc-conn-name')?.focus(), 50);
+// The keys are shown once: closing needs the "I've written them down" tick
+function ocShowKeys(keys, title) {
+  const row = (label, value, id) => `<div class="oc-key-row"><label class="field-label" for="${id}">${label}</label>
+    <div class="ae-inline"><input class="field-input oc-key" id="${id}" value="${escapeHtml(value)}" readonly onclick="this.select()"><button type="button" class="btn-outline" onclick="ocCopyKey('${id}')">Copy</button></div></div>`;
+  ocConnModal(title, `
+    <div class="ts-note"><b>Write these down now and keep them safe.</b> They are shown only this once; the portal keeps no readable copy of the Secret Key. Type them into each UCS Exam Server's “Connect School Account” screen. Anyone with these keys can pull pupil and exam data, so don't share them.</div>
+    ${row('API Number', keys.apiNumber, 'oc-k1')}${row('API Authentication Key', keys.authKey, 'oc-k2')}${row('API Secret Key', keys.secret, 'oc-k3')}
+    <label class="sf-check" style="margin-top:14px;"><input type="checkbox" id="oc-k-noted" onchange="document.getElementById('oc-k-done').disabled=!this.checked"> I have written these keys down somewhere safe</label>`,
+  '<button type="button" class="btn-outline" onclick="ocPrintKeys()">Print</button><button type="button" class="post-btn" id="oc-k-done" disabled onclick="ocCloseConnModal()">Done</button>');
+  // closing with × or the background is not allowed until they're noted
+  document.querySelector('#oc-conn-modal .staff-profile-close').onclick = () => { if (document.getElementById('oc-k-noted').checked) ocCloseConnModal(); else showToast('Tick the box once you have written the keys down'); };
 }
-async function ocCreateConnection() {
-  const name = document.getElementById('oc-conn-name').value.trim();
-  if (!name) return showToast('Give the connection a name');
+function ocPrintKeys() {
+  const v = id => escapeHtml(document.getElementById(id).value);
+  const w = window.open('', '_blank', 'width=640,height=480');
+  if (!w) return showToast('Allow pop-ups to print');
+  w.document.write(`<!DOCTYPE html><title>School API keys</title><body style="font-family:'DM Sans',Arial,sans-serif;padding:32px;">
+    <h2 style="margin:0 0 6px;">${escapeHtml(document.title.split(' - ')[0] || 'School')} — UCS Exam Server API keys</h2><p style="color:#555;">Printed ${new Date().toLocaleString('en-GB')}. Keep this somewhere safe.</p>
+    <table style="font-size:15px;border-collapse:collapse;">${[['API Number', 'oc-k1'], ['API Authentication Key', 'oc-k2'], ['API Secret Key', 'oc-k3']].map(([l, id]) => `<tr><td style="padding:8px 16px 8px 0;color:#555;">${l}</td><td style="padding:8px 0;font-family:monospace;font-size:16px;">${v(id)}</td></tr>`).join('')}</table>
+    <script>window.print()<\/script></body>`);
+  w.document.close();
+}
+async function ocGenerateKeys() {
+  if (!await uiConfirm('Generate the school\'s API keys? They are shown only once, so have somewhere ready to write them down.', { confirmLabel: 'Generate' })) return;
   try {
-    const { keys, connection } = await apiFetch('/api/admin/exam-servers', { method: 'POST', body: JSON.stringify({ name }) });
-    const row = (label, value, id) => `<div class="oc-key-row"><label class="field-label" for="${id}">${label}</label>
-      <div class="ae-inline"><input class="field-input oc-key" id="${id}" value="${escapeHtml(value)}" readonly onclick="this.select()"><button type="button" class="btn-outline" onclick="ocCopyKey('${id}')">Copy</button></div></div>`;
-    ocConnModal(`Keys for “${escapeHtml(connection.name)}”`, `
-      <div class="ts-note"><b>Copy these now.</b> The Secret Key is shown only this once; the portal keeps no readable copy. Type them into the UCS Exam Server's “Connect School Account” screen. Anyone with these keys can pull pupil and exam data, so don't share them.</div>
-      ${row('API Number', keys.apiNumber, 'oc-k1')}${row('API Authentication Key', keys.authKey, 'oc-k2')}${row('API Secret Key', keys.secret, 'oc-k3')}`,
-    '<button type="button" class="post-btn" onclick="ocCloseConnModal()">I\'ve copied them</button>');
+    const { keys } = await apiFetch('/api/admin/exam-servers', { method: 'POST' });
+    ocShowKeys(keys, 'School API keys');
+    ocLoadConnections();
+  } catch (err) { showToast(err.message); }
+}
+function ocResetKeys() {
+  ocConnModal('Reset School API Keys', `
+    <div class="ts-note"><b>Only do this if the keys are lost or someone who shouldn't have them does.</b> The current keys stop working straight away, and every exam computer must enter the new keys before it can sync or push results again.</div>
+    <label class="field-label" for="oc-reset-confirm">Type RESET to confirm</label><input class="field-input" id="oc-reset-confirm" autocomplete="off">`,
+  '<button type="button" class="btn-outline" onclick="ocCloseConnModal()">Cancel</button><button type="button" class="post-btn ts-danger" onclick="ocDoReset()">Reset Keys</button>');
+}
+async function ocDoReset() {
+  try {
+    const { keys } = await apiFetch('/api/admin/exam-servers/reset', { method: 'POST', body: JSON.stringify({ confirm: document.getElementById('oc-reset-confirm').value }) });
+    ocShowKeys(keys, 'New School API keys');
     ocLoadConnections();
   } catch (err) { showToast(err.message); }
 }
@@ -65,10 +92,6 @@ async function ocCopyKey(id) {
   const el = document.getElementById(id);
   try { await navigator.clipboard.writeText(el.value); } catch { el.select(); document.execCommand('copy'); }
   showToast('Copied', 'success');
-}
-async function ocRevokeConnection(id, name) {
-  if (!await uiConfirm(`Revoke “${name}”? That exam server will no longer be able to sync or push results until it's given new keys.`, { confirmLabel: 'Revoke', danger: true })) return;
-  try { await apiFetch(`/api/admin/exam-servers/${id}/revoke`, { method: 'POST' }); showToast('Connection revoked', 'success'); ocLoadConnections(); } catch (err) { showToast(err.message); }
 }
 
 async function ocInit() {

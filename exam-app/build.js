@@ -107,8 +107,9 @@ WHAT YOU NEED
 - Devices for pupils (computer lab, tablets or phones) with a web browser.
 
 FIRST TIME: CONNECT TO THE SCHOOL PORTAL (needs internet)
-1. A super admin opens the online portal > E-Class > CBT > Offline CBT (LAN)
-   > Exam server connections > + New Connection, and copies the three keys.
+1. Use the school's API keys. A super admin generated them once on the online
+   portal (E-Class > CBT > Offline CBT (LAN) > School API keys) and wrote them
+   down. Every exam computer uses the same keys.
 2. Open "UCS Exam Server". On "Connect School Account" type the API Number,
    API Authentication Key and API Secret Key, then click Connect.
 3. Tick "I confirm" and click Fetch Data. Then sign in with your usual admin

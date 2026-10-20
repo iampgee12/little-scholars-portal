@@ -61,7 +61,7 @@ function setupScreen(title, body) {
 function renderConnect(error = '') {
   const s = state.sync || {};
   setupScreen('Connect School Account', `
-    <p class="ec-muted">Ask a super admin to open the online portal at <b>E-Class › CBT › Offline CBT (LAN) › Exam server connections</b>, click <b>+ New Connection</b>, and give you the three keys. Type them below.</p>
+    <p class="ec-muted">Type the school's API keys. They were written down when a super admin generated them on the online portal (<b>E-Class › CBT › Offline CBT (LAN) › School API keys</b>). Every exam computer uses the same keys.</p>
     <div class="ec-field"><label for="ec-api">API Number <span class="ec-req">*</span></label><input class="ec-input" id="ec-api" placeholder="UCS12345678" autocomplete="off"></div>
     <div class="ec-field"><label for="ec-auth">API Authentication Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-auth" autocomplete="off"></div>
     <div class="ec-field"><label for="ec-secret">API Secret Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-secret" type="password" autocomplete="off"></div>
@@ -91,7 +91,7 @@ async function connectPortal() {
 }
 function renderFirstRefresh() {
   setupScreen('Fetch your school\'s data', `
-    <p class="ec-muted">Connected${state.sync.connectionName ? ` as <b>${esc(state.sync.connectionName)}</b>` : ''}. Now copy pupils, staff and CBT papers from the online portal onto this computer.</p>
+    <p class="ec-muted">Connected to <b>${esc(state.sync.school || 'the school portal')}</b>. Now copy pupils, staff and CBT papers from the online portal onto this computer.</p>
     <label class="ec-check"><input type="checkbox" id="ec-confirm"> I confirm that I want to fetch all necessary data from the online portal</label>
     <div style="margin-top:16px;"><button class="post-btn" id="ec-go" onclick="firstRefresh()">Fetch Data</button></div>
     <div id="ec-progress"></div><div class="ec-error" id="ec-err"></div>`);
@@ -219,7 +219,7 @@ async function renderDashboard() {
     </div>
     <div class="ec-grid-2">
       <div class="ec-card"><h2>School portal</h2>
-        ${d.connected ? `<p class="ec-muted">Connected${d.connectionName ? ` as <b>${esc(d.connectionName)}</b>` : ''} to <span class="ec-mono">${esc(d.portal)}</span>.</p>` : '<p class="ec-muted">Not connected. This computer was set up with an exam pack file.</p>'}
+        ${d.connected ? `<p class="ec-muted">Connected with the school's API keys to <span class="ec-mono">${esc(d.portal)}</span>.</p>` : '<p class="ec-muted">Not connected. This computer was set up with an exam pack file.</p>'}
         <p class="ec-hint">Last refresh: ${d.synced ? `${when(d.synced.at)} (${esc(d.synced.scope)})` : 'never'} · Last push: ${d.lastPush ? when(d.lastPush.at) : 'never'}</p>
         <div class="ec-actions" style="margin-top:10px;">${d.connected ? `<button class="post-btn" onclick="go('push')">Push Results Online</button><button class="btn-outline" onclick="go('refresh')">Refresh Data</button>` : '<button class="post-btn" onclick="go(\'connection\')">Connect School Account</button>'}</div>
       </div>
@@ -420,7 +420,7 @@ async function renderConnection() {
   const s = state.sync;
   pageEl().innerHTML = `
     <div class="ec-card"><h2>School portal connection</h2>
-      ${s.connected ? `<p class="ec-muted">Connected${s.connectionName ? ` as <b>${esc(s.connectionName)}</b>` : ''}.</p>
+      ${s.connected ? `<p class="ec-muted">Connected with the school's API keys. This computer shows on the portal as <b>${esc(s.machine || 'this computer')}</b>.</p>
         <table class="ec-table" style="max-width:640px;"><tbody><tr><td class="ec-hint">Portal</td><td class="ec-mono">${esc(s.portal)}</td></tr><tr><td class="ec-hint">API Number</td><td class="ec-mono">${esc(s.apiNumber)}</td></tr></tbody></table>
         <div class="ec-actions" style="margin-top:12px;"><button class="btn-outline" onclick="openReconnect()">Change Keys</button><button class="btn-danger" onclick="disconnect()">Disconnect</button></div>`
       : `<p class="ec-muted">Not connected. Connect to sync data and push results over the internet.</p><button class="post-btn" onclick="openReconnect()">Connect School Account</button>`}

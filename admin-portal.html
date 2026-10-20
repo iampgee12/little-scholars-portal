@@ -1316,6 +1316,12 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .oc-conn-new { padding:8px 14px; font-size:12px; }
 .oc-key-row { margin-top:12px; }
 .oc-key { font-family:'DM Mono',monospace; font-size:13px; letter-spacing:.02em; }
+.oc-key-summary { display:flex; flex-wrap:wrap; gap:10px 28px; align-items:flex-end; border:1px solid var(--border); border-left:4px solid var(--green); border-radius:8px; padding:12px 16px; }
+.oc-key-summary > div { display:flex; flex-direction:column; gap:2px; }
+.oc-key-summary b { font-size:14px; color:var(--text-1); }
+.oc-key-num { font-family:'DM Mono',monospace; font-size:18px !important; letter-spacing:.04em; color:var(--green) !important; }
+.oc-key-reset { margin-left:auto; }
+.oc-sub { margin:18px 0 6px; font-size:13px; color:var(--text-1); }
 .oc-schedules { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto; }
 .oc-schedule { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border:1px solid var(--border); border-radius:6px; cursor:pointer; font-size:13px; }
 .oc-schedule input { margin-top:3px; accent-color:var(--green); }
@@ -3697,13 +3703,17 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
           </div>
         </div>
         <div class="card oc-conn-card">
-          <div class="card-head"><span class="card-title">Exam server connections</span><button type="button" class="post-btn oc-conn-new" id="oc-conn-new" onclick="ocOpenNewConnection()" hidden>+ New Connection</button></div>
+          <div class="card-head"><span class="card-title">School API keys</span><button type="button" class="post-btn oc-conn-new" id="oc-conn-new" onclick="ocGenerateKeys()" hidden>Generate API Keys</button></div>
           <div class="card-body">
-            <p class="oc-text" style="margin-top:0;">Link a UCS Exam Server to this portal with keys, so it can pull pupils, staff and CBT papers down and push finished exams back up by itself, with no files to carry. Each exam computer gets its own keys. <span id="oc-conn-who"></span></p>
-            <div style="overflow-x:auto;"><table class="data-table">
-              <thead><tr><th>Name</th><th>API Number</th><th>Created</th><th>Last sync</th><th>Last push</th><th>Status</th><th></th></tr></thead>
-              <tbody id="oc-conns"><tr><td colspan="7" style="padding:18px;color:var(--text-3);">Loading…</td></tr></tbody>
-            </table></div>
+            <p class="oc-text" style="margin-top:0;">The school's API keys link the UCS Exam Server app to this portal, so it can pull pupils, staff and CBT papers down and push finished exams back up, with no files to carry. They are generated <b>once</b> and shown <b>only once</b>: write them down and keep them somewhere safe. Every exam computer uses the same keys. <span id="oc-conn-who"></span></p>
+            <div id="oc-key-box"><p class="oc-hint">Loading…</p></div>
+            <div id="oc-machines-wrap" hidden>
+              <h4 class="oc-sub">Exam computers using these keys</h4>
+              <div style="overflow-x:auto;"><table class="data-table">
+                <thead><tr><th>Computer</th><th>First connected</th><th>Last seen</th><th>Last sync</th><th>Last push</th></tr></thead>
+                <tbody id="oc-conns"></tbody>
+              </table></div>
+            </div>
           </div>
         </div>
         <div id="oc-conn-modal-host"></div>
@@ -7851,7 +7861,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 <script src="ui-dialog.js?v=3"></script>
 <script src="admin-api.js"></script>
 <script src="staff-list.js?v=5"></script>
-<script src="offline-cbt-admin.js?v=3"></script>
+<script src="offline-cbt-admin.js?v=4"></script>
 <script src="parents-list.js?v=1"></script>
 <script src="term-setup-admin.js?v=1"></script>
 <script src="menu-search.js?v=3"></script>
