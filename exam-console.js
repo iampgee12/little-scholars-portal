@@ -185,7 +185,7 @@ async function loadPack() {
 // ══ APP SHELL ══
 const MENU = [
   [null, [['dashboard', 'Dashboard']]],
-  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'CBT Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']], { dropdown: 'cbt' }],
+  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'Computer Based Test / Exam Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']], { dropdown: 'cbt' }],
   ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']], { dropdown: 'sync' }],
   ['Students', [['students', 'Students Info-system']], { dropdown: 'students', search: true }],
   ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']], { dropdown: 'staff' }],
@@ -193,7 +193,7 @@ const MENU = [
 ];
 const TITLES = {
   dashboard: ['Dashboard', 'This exam computer at a glance'], console: ['Exam Console', 'Open and close papers, watch pupils, allow retakes'],
-  schedules: ['CBT Schedules', 'Papers copied from the online portal'], push: ['Push Results Online', 'Send finished exams to the online portal'],
+  schedules: ['Exam Schedules', 'View Exam Schedule — papers copied from the online portal'], push: ['Push Results Online', 'Send finished exams to the online portal'],
   archive: ['Submissions Archive', 'Every exam written on this computer'], refresh: ['Refresh Data', 'Copy the latest data from the online portal'],
   report: ['Sync Report', 'What the last refresh copied'], connection: ['Connection & Files', 'The school portal link, and the file backup'],
   students: ['Students Info-system', 'Pupils copied from the online portal'], teachers: ['Teachers / General Staff', 'Staff copied from the online portal'],
@@ -376,16 +376,58 @@ async function allowRetake(id, studentId, name) {
 }
 
 // ── CBT Schedules (read-only) ──
+// Pick a session, exam, class and arm, then View lists that exam's papers by mode
 async function renderSchedules() {
-  const { rows } = await api('/api/exam/schedules');
-  const groups = new Map();
-  rows.forEach(r => { if (!groups.has(r.id)) groups.set(r.id, { title: r.title, session: r.session, term: r.term, papers: [] }); groups.get(r.id).papers.push(r); });
-  pageEl().innerHTML = [...groups.values()].map(g => `<div class="ec-card">
-      <div class="ec-flex"><h2>${esc(g.title)}</h2><span class="ec-hint">${esc([g.session, g.term].filter(Boolean).join(' · '))}</span></div>
-      <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Class</th><th>Subject</th><th>Date</th><th>Time</th><th>Duration</th><th>Questions</th><th>Status</th></tr></thead><tbody>
-      ${g.papers.map(p => `<tr><td>${esc(p.classLabel)}${p.armName ? ` ${esc(p.armName)}` : ''}</td><td><b>${esc(p.subject)}</b></td><td>${esc(p.examDate || '—')}</td><td>${esc(p.examTime || '—')}</td><td>${p.durationMinutes} min</td><td>${p.questions}</td>
+  const [{ rows }, meta] = await Promise.all([api('/api/exam/schedules'), api('/api/exam/people/students?classCode=__none__')]);
+  const exams = new Map();
+  rows.forEach(r => { if (!exams.has(r.id)) exams.set(r.id, { id: r.id, title: r.title, session: r.session, papers: [] }); exams.get(r.id).papers.push(r); });
+  state.sched = { exams: [...exams.values()], classes: meta.classes, arms: meta.arms };
+  if (!state.sched.exams.length) { pageEl().innerHTML = '<div class="ec-card ec-muted">No CBT schedules on this computer yet. Refresh CBT / Exams data.</div>'; return; }
+  const sessions = [...new Set(state.sched.exams.map(e => e.session))];
+  const pick = state.schedPick || { session: sessions[0], examId: '', classCode: '', armId: '', mode: 'Computer Based' };
+  pageEl().innerHTML = `<div class="ec-card"><h2>Select Exam Schedule to View</h2>
+    <div class="ec-filters" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+      <div><label class="ec-label" for="sc-ses">Session</label><select class="ec-select" id="sc-ses" onchange="schedExams()">${sessions.map(s => `<option ${s === pick.session ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
+      <div><label class="ec-label" for="sc-exam">For Exam</label><select class="ec-select" id="sc-exam"></select></div>
+      <div><label class="ec-label" for="sc-cls">Class</label><select class="ec-select" id="sc-cls" onchange="schedArms()"><option value="">All</option>${state.sched.classes.map(c => `<option value="${esc(c.code)}" ${c.code === pick.classCode ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
+      <div><label class="ec-label" for="sc-arm">Class Arm</label><select class="ec-select" id="sc-arm"></select></div>
+    </div>
+    <div style="text-align:center;margin-top:16px;"><button class="post-btn" type="button" onclick="viewSchedule()">View</button></div></div>
+    <div id="sc-out"></div>`;
+  schedExams(pick.examId);
+  schedArms(pick.armId);
+  viewSchedule(pick.mode);
+}
+function schedExams(examId = '') {
+  const session = document.getElementById('sc-ses').value;
+  document.getElementById('sc-exam').innerHTML = state.sched.exams.filter(e => e.session === session)
+    .map(e => `<option value="${e.id}" ${String(e.id) === String(examId) ? 'selected' : ''}>${esc(e.title)}</option>`).join('');
+}
+function schedArms(armId = '') {
+  const code = document.getElementById('sc-cls').value;
+  const sel = document.getElementById('sc-arm');
+  sel.disabled = !code;
+  sel.innerHTML = !code ? '<option value=""></option>'
+    : `<option value="">All arms</option>${state.sched.arms.filter(a => a.classCode === code).map(a => `<option value="${a.id}" ${String(a.id) === String(armId) ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}`;
+}
+function viewSchedule(mode) {
+  const pick = {
+    session: document.getElementById('sc-ses').value, examId: document.getElementById('sc-exam').value,
+    classCode: document.getElementById('sc-cls').value, armId: document.getElementById('sc-arm').value,
+    mode: mode || document.getElementById('sc-mode')?.value || state.schedPick?.mode || 'Computer Based',
+  };
+  state.schedPick = pick;
+  const exam = state.sched.exams.find(e => String(e.id) === pick.examId);
+  const papers = (exam?.papers || []).filter(p => (!pick.classCode || p.classCode === pick.classCode)
+    && (!pick.armId || !p.armId || String(p.armId) === pick.armId) && (p.mode || 'Computer Based') === pick.mode);
+  document.getElementById('sc-out').innerHTML = `<div class="ec-card">
+    <h2>${esc(pick.session.toUpperCase())} TESTS &amp; EXAM SCHEDULES${exam ? ` &nbsp;|&nbsp; ${esc(exam.title.toUpperCase())}` : ''}</h2>
+    <div style="text-align:center;margin:14px 0;"><select class="ec-select" id="sc-mode" style="max-width:340px;" onchange="viewSchedule(this.value)">
+      ${['Computer Based', 'Paper Based', 'Others'].map(m => `<option ${m === pick.mode ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+    ${papers.length ? `<div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Class</th><th>Subject</th><th>Date</th><th>Time</th><th>Duration</th><th>Questions</th><th>Status</th></tr></thead><tbody>
+      ${papers.map(p => `<tr><td>${esc(p.classLabel)}${p.armName ? ` ${esc(p.armName)}` : ''}</td><td><b>${esc(p.subject)}</b></td><td>${esc(p.examDate || '—')}</td><td>${esc(p.examTime || '—')}</td><td>${p.durationMinutes} min</td><td>${p.questions}</td>
         <td><span class="ec-pill ${esc(p.status)}">${p.status === 'live' ? 'Open' : p.status === 'closed' ? 'Closed' : 'Not open'}</span></td></tr>`).join('')}
-      </tbody></table></div></div>`).join('') || '<div class="ec-card ec-muted">No CBT schedules on this computer yet. Refresh CBT / Exams data.</div>';
+      </tbody></table></div>` : '<div class="ec-muted" style="text-align:center;padding:14px;">No papers for this selection.</div>'}</div>`;
 }
 
 // ── Push results ──

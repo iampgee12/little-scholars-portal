@@ -511,7 +511,7 @@ module.exports = function createExamSync(ctx) {
   }
   function schedulesList() {
     return all(`SELECT sc.id, sc.title, sc.session_label AS session, sc.term_label AS term,
-                       ss.id AS paperId, ss.status, ss.exam_date AS examDate, ss.exam_time AS examTime, ss.duration_minutes AS durationMinutes,
+                       ss.id AS paperId, ss.status, ss.mode, ss.class_code AS classCode, ss.class_arm_id AS armId, ss.exam_date AS examDate, ss.exam_time AS examTime, ss.duration_minutes AS durationMinutes,
                        c.label AS classLabel, ca.name AS armName, sub.name AS subject,
                        (SELECT COUNT(*) FROM cbt_questions q WHERE q.class_code = ss.class_code AND q.subject_id = ss.subject_id AND q.question_type = 'Multiple Choice Question' AND q.vetted = 1 AND q.archived = 0) AS questions
                 FROM cbt_schedules sc JOIN cbt_schedule_subjects ss ON ss.schedule_id = sc.id
