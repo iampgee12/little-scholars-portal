@@ -138,22 +138,8 @@ function createCbtOffline(deps) {
   }
 
   // ── ONLINE: exam-server kit (app files + libraries + start scripts + guide) ──
-  const KIT_SKIP = /(^|\/)(\.git|\.claude|backups|uploads|published_reports|exam-data)(\/|$)|\.codex-backup-|\.sqlite|email-settings\.env|^node_modules\/pdf-lib\/(dist|es|src)\/|\.map$|\.d\.ts$/;
   function kitFiles() {
-    const out = [];
-    const walk = rel => {
-      for (const entry of fs.readdirSync(path.join(ROOT, rel), { withFileTypes: true })) {
-        const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-        if (KIT_SKIP.test(childRel)) continue;
-        if (entry.isDirectory()) {
-          if (!rel && !['report_assets', 'node_modules'].includes(entry.name)) continue;
-          walk(childRel);
-        } else if (rel || /\.(html|js|css|json)$/.test(entry.name)) {
-          out.push([`ucs-exam-server/${childRel}`, fs.readFileSync(path.join(ROOT, childRel))]);
-        }
-      }
-    };
-    walk('');
+    const out = appFiles(ROOT).map(([rel, data]) => [`ucs-exam-server/${rel}`, data]);
     const bat = [
       '@echo off',
       'title Unique Children\'s School - CBT Exam Server',
@@ -346,6 +332,21 @@ function createCbtOffline(deps) {
                VALUES (?, ?, ?, ?, ?, ?, ?)`, packId, payload.createdAt, admin.id, JSON.stringify(body.scheduleIds), summary.papers, summary.students, summary.questions);
           return sendFile(res, `cbt-exam-pack-${today()}.ucscbt`, file), true;
         }
+        // The Windows app and Setup wizard are built into dist/ when the portal is deployed
+        if (m === 'GET' && p === '/api/admin/cbt/offline/app-info') {
+          const info = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'dist', 'exam-app.json'), 'utf8')); } catch { return null; } })();
+          const size = name => { try { return fs.statSync(path.join(ROOT, 'dist', name)).size; } catch { return 0; } };
+          return sendJson(res, 200, { info, appSize: size('UCS Exam Server.exe'), setupSize: size('UCS Exam Server Setup.exe') }), true;
+        }
+        const appMatch = { '/api/admin/cbt/offline/app.exe': 'UCS Exam Server.exe', '/api/admin/cbt/offline/setup.exe': 'UCS Exam Server Setup.exe' }[p];
+        if (m === 'GET' && appMatch) {
+          const file = path.join(ROOT, 'dist', appMatch);
+          let stat;
+          try { stat = fs.statSync(file); } catch { return sendJson(res, 404, { error: 'The Windows app is built when the portal is deployed and isn\'t on this server yet. Use the zip kit for now.' }), true; }
+          res.writeHead(200, { 'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Disposition': `attachment; filename="${appMatch}"`, 'Content-Length': stat.size, 'Cache-Control': 'no-store' });
+          fs.createReadStream(file).pipe(res);
+          return true;
+        }
         if (m === 'GET' && p === '/api/admin/cbt/offline/kit.zip') {
           return sendFile(res, 'ucs-exam-server.zip', zipFiles(kitFiles()), 'application/zip'), true;
         }
@@ -488,4 +489,26 @@ TIPS
   nothing is lost. Pupils just sign in again and continue.
 `;
 
-module.exports = { createCbtOffline };
+// The portal files an exam computer needs (app files, report assets and
+// libraries), as [relative path, contents]. Shared by the zip kit and the
+// Windows exam-server app build (exam-app/build.js).
+const KIT_SKIP = /(^|\/)(\.git|\.claude|backups|uploads|published_reports|exam-data|exam-app|dist)(\/|$)|\.codex-backup-|\.sqlite|email-settings\.env|^node_modules\/pdf-lib\/(dist|es|src)\/|^node_modules\/(postject|resedit|pe-library|commander|\.bin)\/|^node_modules\/\.package-lock\.json$|\.map$|\.d\.ts$/;
+function appFiles(root) {
+  const out = [];
+  const walk = rel => {
+    for (const entry of fs.readdirSync(path.join(root, rel), { withFileTypes: true })) {
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (KIT_SKIP.test(childRel)) continue;
+      if (entry.isDirectory()) {
+        if (!rel && !['report_assets', 'node_modules'].includes(entry.name)) continue;
+        walk(childRel);
+      } else if (rel || /\.(html|js|css|json)$/.test(entry.name)) {
+        out.push([childRel, fs.readFileSync(path.join(root, childRel))]);
+      }
+    }
+  };
+  walk('');
+  return out;
+}
+
+module.exports = { createCbtOffline, appFiles, KIT_GUIDE };

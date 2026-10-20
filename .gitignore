@@ -24,3 +24,7 @@ backups/
 exam-data/
 *.ucscbt
 *.ucsres
+
+# Windows exam-server app build output (built at deploy)
+dist/
+exam-app/.cache/

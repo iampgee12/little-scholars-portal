@@ -13,5 +13,9 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "postject": "^1.0.0-alpha.6",
+    "resedit": "^3.1.0"
   }
 }

@@ -21,3 +21,7 @@ backups/
 exam-data/
 *.ucscbt
 *.ucsres
+
+# Windows exam-server app: built inside the image, never uploaded
+dist/
+exam-app/.cache/
