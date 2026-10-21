@@ -287,7 +287,8 @@ async function renderDashboard() {
   const d = state.dash;
   const p = d.papers || {};
   pageEl().innerHTML = `
-    <div class="ec-card">${addressBlock(d.lanNetworks || d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils choose <b>Pupil</b> and sign in with their usual ID or email and password.</p></div>
+    <div class="ec-card">${addressBlock(d.lanNetworks || d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils sign in with their username and password.</p></div>
+    <div id="ec-lan"></div>
     <div class="ec-stats">
       <div class="ec-stat green"><small>Active pupils</small><b>${d.activeStudents}</b><em>signed in, last 10 minutes</em></div>
       <div class="ec-stat"><small>Total pupils</small><b>${d.totalStudents}</b><em>on this computer</em></div>
@@ -305,6 +306,45 @@ async function renderDashboard() {
         <div class="ec-actions" style="margin-top:10px;"><button class="post-btn" onclick="go('console')">Open Exam Console</button></div>
       </div>
     </div>`;
+  checkLanAccess();
+}
+
+// Windows can block pupils on a LAN cable (a "public" network) while Wi-Fi works: say so, and fix it
+async function checkLanAccess(fresh) {
+  let access;
+  try { ({ access } = await api(`/api/exam/lan-access${fresh ? '?fresh=1' : ''}`)); } catch { return; }
+  showLanAccess(access);
+}
+function showLanAccess(access, note = '') {
+  const el = document.getElementById('ec-lan');
+  if (!el) return;
+  if (!access || access.state === 'ok' || access.state === 'unknown') { el.innerHTML = note ? `<div class="ec-card"><p class="ec-muted">${note}</p></div>` : ''; return; }
+  el.innerHTML = access.state === 'blockall'
+    ? `<div class="ec-card" style="border-color:var(--amber);"><h2>Pupils on a LAN cable can't reach this computer</h2>
+        <p class="ec-muted">Windows is set to block <b>every</b> incoming connection on cable networks, even allowed apps. Wi-Fi may still work.</p>
+        <p class="ec-hint">To fix it: open <b>Windows Security</b> → <b>Firewall &amp; network protection</b> → <b>Public network</b>, and untick <b>Blocks all incoming connections</b>. Then click Check again.</p>
+        <div class="ec-actions" style="margin-top:10px;"><button class="btn-outline" onclick="recheckLan(this)">Check again</button></div></div>`
+    : `<div class="ec-card" style="border-color:var(--amber);"><h2>Pupils on a LAN cable can't reach this computer</h2>
+        <p class="ec-muted">Windows is blocking the exam server on cable networks, so pupils plugged in by cable see "This site can't be reached". Wi-Fi may still work.</p>
+        <p class="ec-hint">Click <b>Fix LAN access</b>. When Windows asks "Do you want to allow this app to make changes?", click <b>Yes</b>.</p>
+        ${note ? `<p class="ec-error">${note}</p>` : ''}
+        <div class="ec-actions" style="margin-top:10px;"><button class="post-btn" onclick="fixLan(this)">Fix LAN access</button><button class="btn-outline" onclick="recheckLan(this)">Check again</button></div></div>`;
+}
+async function fixLan(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Waiting for Windows…';
+  try {
+    const { access } = await api('/api/exam/lan-access/fix', { method: 'POST' });
+    showLanAccess(access, access?.state === 'ok' ? 'LAN access fixed: pupils can now connect with a LAN cable.'
+      : access?.permitted === false ? 'Windows did not give permission. Click Fix LAN access again and choose Yes.' : 'That did not work. Click Fix LAN access again.');
+  } catch (err) { showLanAccess({ state: 'missing' }, esc(err.message)); }
+}
+async function recheckLan(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  let access;
+  try { ({ access } = await api('/api/exam/lan-access?fresh=1')); } catch { access = null; }
+  showLanAccess(access, access?.state === 'ok' ? 'Checked: Windows lets pupils connect with a LAN cable.' : '');
 }
 
 // ── Exam Console (papers) ──

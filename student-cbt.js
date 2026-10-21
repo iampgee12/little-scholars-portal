@@ -34,6 +34,21 @@ function escapeHtml(value) {
 let examsCache = [];
 let currentExam = null;
 let timerInterval = null;
+const pupil = { name: '', classLabel: '' };
+
+// Top bar: "Hi, name" and the class; during an exam the subject, the class and
+// "Hi, name" on the left and the timer on the right
+function renderHeader() {
+  const inExam = !!currentExam && document.getElementById('cbt-exam-view').style.display !== 'none';
+  const hi = pupil.name ? `Hi, ${pupil.name}` : 'Hi there';
+  document.getElementById('cbt-who-main').textContent = inExam ? currentExam.subjectName : hi;
+  document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.classLabel, hi] : [pupil.classLabel]).filter(Boolean).join(' · ');
+  document.getElementById('cbt-timer').style.display = inExam ? '' : 'none';
+  for (const id of ['cbt-back-portal', 'cbt-signout']) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = inExam ? 'none' : '';
+  }
+}
 
 // ── Small helpers ──
 let toastTimer = null;
@@ -52,6 +67,7 @@ function showOnly(viewId) {
   ['cbt-list-view', 'cbt-lobby-view', 'cbt-exam-view', 'cbt-result-view'].forEach(id => {
     document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
   });
+  renderHeader();
   window.scrollTo(0, 0);
 }
 
@@ -71,7 +87,8 @@ async function init() {
       window.location.replace('/signin');
       return;
     }
-    document.getElementById('cbt-student-name').textContent = session.user.name;
+    pupil.name = session.user.name;
+    renderHeader();
     document.getElementById('cbt-hello').textContent = `Hello, ${session.user.firstName || session.user.name}!`;
     await loadExams();
   } catch (err) {
@@ -82,6 +99,9 @@ async function init() {
 async function loadExams() {
   const data = await apiFetch('/api/student/cbt/exams');
   examsCache = data.exams || [];
+  pupil.name = data.student?.name || pupil.name;
+  pupil.classLabel = data.student?.classLabel || '';
+  renderHeader();
   renderExamList();
 }
 
@@ -154,14 +174,17 @@ function openLobby(id) {
       ${resuming ? '<div class="cbt-resume-note">You already started this exam. Your answers are saved and the timer has kept running — continue now.</div><br>' : ''}
       ${custom}
       <div class="cbt-instructions">
-        <h3>How it works</h3>
+        <h3>Instructions</h3>
         <ul>
-          <li>Tap an answer to choose it. You can change it any time before you submit.</li>
-          <li>Your answers save by themselves — watch for <strong>✓ Saved</strong> at the top.</li>
+          <li>Read each question carefully before you choose an answer.</li>
+          <li>Choose only <strong>one</strong> answer for each question. The next question comes up by itself.</li>
+          <li>Do not talk to anyone or copy from anyone.</li>
+          <li>Keep an eye on the timer at the top of the screen.</li>
           <li>Not sure? Tap <strong>Mark for review</strong> and come back to it later.</li>
-          <li>The numbers at the top take you to any question. Green means answered.</li>
-          <li>When you finish, tap <strong>Review &amp; Submit</strong> to check everything before submitting.</li>
-          <li>If time runs out, your exam is submitted for you with the answers you have chosen.</li>
+          <li>The numbers at the bottom take you to any question. Green means answered.</li>
+          <li>Raise your hand if you need help. Do not close or refresh the page.</li>
+          <li>When you finish, check your answers, then tap <strong>Review &amp; Submit</strong>.</li>
+          <li>If time runs out, your exam is handed in for you.</li>
         </ul>
       </div>
       <div class="cbt-lobby-actions">
@@ -192,7 +215,6 @@ async function beginExam(id, btn) {
     if (restored) toast(`${restored} answer${restored === 1 ? '' : 's'} kept on this device ${restored === 1 ? 'was' : 'were'} restored and ${restored === 1 ? 'is' : 'are'} being saved.`, 'warn', 6000);
     const firstOpen = currentExam.questions.findIndex(q => !currentExam.answersMap.has(q.id));
     currentExam.currentIndex = firstOpen === -1 ? 0 : firstOpen;
-    document.getElementById('cbt-exam-title').textContent = currentExam.subjectName;
     showOnly('cbt-exam-view');
     renderExamView();
     startTimer();
@@ -234,7 +256,6 @@ function renderProgress() {
   const total = currentExam.questions.length;
   const done = currentExam.questions.filter(q => currentExam.answersMap.has(q.id)).length;
   document.getElementById('cbt-progress-text').textContent = `${done} of ${total} answered`;
-  document.getElementById('cbt-progress-fill').style.width = total ? `${(done / total) * 100}%` : '0';
 }
 
 function qnumClass(q, i) {
@@ -282,22 +303,21 @@ function renderCurrentQuestion() {
     </div>`;
 }
 
+// The bottom dock only shows while answering; the review screen has its own buttons
 function renderNavButtons() {
-  const inner = document.getElementById('cbt-nav-inner');
-  if (currentExam.mode === 'review') {
-    inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="backToQuestions()">Back to questions</button>
-      <button class="cbt-btn cbt-btn-green" onclick="askSubmit()">Submit Exam</button>`;
-    return;
-  }
+  const inReview = currentExam.mode === 'review';
+  document.getElementById('cbt-nav-buttons').style.display = inReview ? 'none' : '';
+  if (inReview) return;
   const i = currentExam.currentIndex;
   const isLast = i === currentExam.questions.length - 1;
-  inner.innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="goToQuestion(${i - 1})" ${i === 0 ? 'disabled' : ''}>Previous</button>
-    ${isLast
-      ? '<button class="cbt-btn cbt-btn-green" onclick="showReview()">Review &amp; Submit</button>'
-      : `<button class="cbt-btn" onclick="goToQuestion(${i + 1})">Next</button>`}`;
+  document.getElementById('cbt-prev-slot').innerHTML = `<button class="cbt-btn cbt-btn-secondary" onclick="goToQuestion(${i - 1})" ${i === 0 ? 'disabled' : ''}>&#8592; Previous</button>`;
+  document.getElementById('cbt-next-slot').innerHTML = isLast
+    ? '<button class="cbt-btn cbt-btn-green" onclick="showReview()">Review &amp; Submit</button>'
+    : `<button class="cbt-btn" onclick="goToQuestion(${i + 1})">Next &#8594;</button>`;
 }
 
 function goToQuestion(i) {
+  clearTimeout(advanceTimer);
   if (!currentExam || i < 0 || i >= currentExam.questions.length) return;
   currentExam.currentIndex = i;
   currentExam.mode = 'question';
@@ -311,8 +331,8 @@ function backToQuestions() {
 }
 
 function showReview() {
+  clearTimeout(advanceTimer);
   currentExam.mode = 'review';
-  currentExam.confirming = false;
   renderExamView();
   window.scrollTo(0, 0);
 }
@@ -335,27 +355,41 @@ function renderReview() {
       ${unanswered ? `<div class="cbt-warn-box">You have <strong>${unanswered}</strong> question${unanswered === 1 ? '' : 's'} not answered. You can still go back and answer ${unanswered === 1 ? 'it' : 'them'}.</div>` : ''}
       ${pending ? `<div class="cbt-warn-box">${pending} answer${pending === 1 ? ' is' : 's are'} still being sent. ${saveOffline ? 'You\'re offline — they are kept safely on this device.' : 'Please wait a moment.'}</div>` : ''}
       <div class="cbt-review-grid">${qs.map((q, i) => `<button class="${qnumClass(q, i)}" onclick="goToQuestion(${i})">${i + 1}</button>`).join('')}</div>
-      <div id="cbt-confirm"></div>
+      <div class="cbt-legend" style="margin-bottom:18px;"><span><i class="l-answered"></i>Answered</span><span><i></i>Not answered</span><span><i class="l-flagged"></i>Marked for review</span></div>
+      <div class="cbt-review-actions">
+        <button class="cbt-btn cbt-btn-secondary" onclick="backToQuestions()">&#8592; Back to questions</button>
+        <button class="cbt-btn cbt-btn-green" onclick="askSubmit()">I'm finished – Submit</button>
+      </div>
     </div>`;
-  if (currentExam.confirming) renderConfirm();
 }
 
+// The final check: a card in the middle of a dimmed screen, so the buttons never
+// swap under a pupil's finger and a double tap can't hand the exam in by mistake
 function askSubmit() {
-  currentExam.confirming = true;
-  renderConfirm();
-  document.getElementById('cbt-confirm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  closeConfirm();
+  const qs = currentExam.questions;
+  const answered = qs.filter(q => currentExam.answersMap.has(q.id)).length;
+  const missing = qs.length - answered;
+  const back = document.createElement('div');
+  back.className = 'cbt-modal-back';
+  back.id = 'cbt-confirm';
+  back.innerHTML = `<div class="cbt-modal" role="dialog" aria-modal="true" aria-labelledby="cbt-confirm-title">
+      <h2 id="cbt-confirm-title">Are you sure you're finished?</h2>
+      <p>You answered <strong>${answered}</strong> of <strong>${qs.length}</strong> questions.</p>
+      ${missing ? `<p class="cbt-modal-missing">${missing} question${missing === 1 ? ' is' : 's are'} not answered.</p>` : ''}
+      <p>You can't change your answers after this.</p>
+      <div class="cbt-modal-actions">
+        <button class="cbt-btn cbt-btn-secondary" onclick="closeConfirm()">No, go back</button>
+        <button class="cbt-btn cbt-btn-green" id="cbt-final-submit" onclick="finishExam(false, this)">Yes, submit</button>
+      </div>
+    </div>`;
+  back.addEventListener('click', e => { if (e.target === back && !currentExam?.submitting) closeConfirm(); });
+  document.body.appendChild(back);
+  back.querySelector('.cbt-btn-secondary').focus();
 }
 
-function renderConfirm() {
-  const box = document.getElementById('cbt-confirm');
-  if (!box) return;
-  box.innerHTML = `<div class="cbt-warn-box" style="background:#fffbeb;border-color:#fde68a;color:#92400e;">
-      <strong>Are you sure you want to submit?</strong> You can't change your answers after this.
-    </div>
-    <div class="cbt-lobby-actions" style="margin-top:0;">
-      <button class="cbt-btn cbt-btn-secondary" onclick="currentExam.confirming=false;renderReview();">Not yet</button>
-      <button class="cbt-btn cbt-btn-green" id="cbt-final-submit" onclick="finishExam(false, this)">Yes, submit my exam</button>
-    </div>`;
+function closeConfirm() {
+  document.getElementById('cbt-confirm')?.remove();
 }
 
 // ── Saving answers: queued, retried until the server has them ──
@@ -391,6 +425,9 @@ function clearPending(attemptId) {
   try { localStorage.removeItem(pendingKey(attemptId)); } catch { /* ignore */ }
 }
 
+// Young pupils: choosing an answer moves on to the next question by itself, after a
+// moment so they see their choice marked. The last question stays put.
+let advanceTimer = null;
 function selectAnswer(questionId, option) {
   if (!currentExam || currentExam.submitting) return;
   if (option === null) currentExam.answersMap.delete(questionId);
@@ -399,6 +436,11 @@ function selectAnswer(questionId, option) {
   persistQueue();
   renderExamView();
   processSaveQueue();
+  clearTimeout(advanceTimer);
+  const i = currentExam.currentIndex;
+  if (option !== null && currentExam.mode === 'question' && i < currentExam.questions.length - 1) {
+    advanceTimer = setTimeout(() => { if (currentExam?.mode === 'question' && currentExam.currentIndex === i) goToQuestion(i + 1); }, 700);
+  }
 }
 
 function renderSaveState() {
@@ -493,7 +535,7 @@ async function finishExam(auto, btn) {
     const allSaved = await flushSaves(8000);
     if (!allSaved) {
       currentExam.submitting = false;
-      if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit my exam'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit'; }
       toast(saveOffline ? 'You\'re offline. Your answers are safe on this device — submit again when the connection is back.' : 'Some answers haven\'t saved yet. Wait a moment, then try again.', 'danger', 7000);
       return;
     }
@@ -510,26 +552,28 @@ async function finishExam(auto, btn) {
   } catch (err) {
     if (err.status === 409) { toast('This exam was already submitted.'); showListView(); return; }
     currentExam.submitting = false;
-    if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit my exam'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Yes, submit'; }
     toast(err.network ? `Connection lost — your answers are safe. ${auto ? 'Handing in again automatically…' : 'Try submitting again in a moment.'}` : err.message, 'danger', 6000);
     if (auto) setTimeout(() => finishExam(true), 4000); // keep trying after time is up
   }
 }
 
-function showResultView(data, auto) {
+// Name, class, subject, then the score: nothing else
+function showResultView(data) {
+  closeConfirm();
   const pct = data.totalMarks ? Math.round((data.score / data.totalMarks) * 100) : 0;
-  const cheer = pct >= 70 ? ['', 'Excellent work!'] : pct >= 50 ? ['', 'Good effort!'] : ['', 'Keep practising — you can do it!'];
   document.getElementById('cbt-result-score').innerHTML = `
-        <h2>${cheer[1]}</h2>
-    ${auto ? '<p class="cbt-muted">Time was up, so your exam was submitted automatically.</p>' : '<p class="cbt-muted">Your exam has been submitted.</p>'}
+    <div class="cbt-result-name">${escapeHtml(pupil.name)}${pupil.classLabel ? `<span class="cbt-result-class">${escapeHtml(pupil.classLabel)}</span>` : ''}</div>
+    <div class="cbt-result-subject">${escapeHtml(currentExam.subjectName)}</div>
+    <div class="cbt-result-label">Score</div>
     <div class="cbt-result-big">${data.score} / ${data.totalMarks}</div>
-    <div class="cbt-result-pct">${pct}%</div>
-    <div class="cbt-muted" style="margin-top:6px;">You answered ${data.questionsAttempted} of ${data.questionsPresented} questions.</div>`;
+    <div class="cbt-result-pct">${pct}%</div>`;
   currentExam = null;
   showOnly('cbt-result-view');
 }
 
 function showListView() {
+  closeConfirm();
   clearInterval(timerInterval);
   currentExam = null;
   showOnly('cbt-list-view');
@@ -544,6 +588,7 @@ async function signOut() {
 
 // ── Keyboard: A–E / 1–5 answer, ← → move, F flag ──
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('cbt-confirm') && !currentExam?.submitting) { closeConfirm(); return; }
   if (!currentExam || currentExam.mode !== 'question' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
   const q = currentExam.questions[currentExam.currentIndex];

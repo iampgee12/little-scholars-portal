@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const { execFile } = require('node:child_process');
 
 const PACK_FORMAT = 'ucs-cbt-pack';
 const RESULTS_FORMAT = 'ucs-cbt-results';
@@ -87,9 +88,10 @@ function createCbtOffline(deps) {
     res.end(body);
   }
   // Every network this computer is on (Wi-Fi, LAN cable): pupils can use either.
-  // Virtual adapters (Hyper-V, VirtualBox, VPNs…) aren't reachable by pupils, so they're left out.
+  // Virtual adapters (Hyper-V, VirtualBox, VPNs…) aren't reachable by pupils, so they're left out,
+  // and so are Windows' hidden ones ("Local Area Connection* 1" is Wi-Fi Direct, not a cable).
   function lanNetworks() {
-    const VIRTUAL = /vethernet|virtualbox|vmware|hyper-v|loopback|bluetooth|tailscale|zerotier|vpn|wsl|docker|npcap/i;
+    const VIRTUAL = /\*|vethernet|virtualbox|vmware|hyper-v|loopback|bluetooth|tailscale|zerotier|vpn|wsl|docker|npcap|miniport/i;
     const kind = name => (/wi-?fi|wlan|wireless/i.test(name) ? 'Wi-Fi' : /ethernet|^eth|^en|local area/i.test(name) ? 'LAN cable' : name);
     const list = Object.entries(os.networkInterfaces())
       .filter(([name]) => !VIRTUAL.test(name))
@@ -99,6 +101,44 @@ function createCbtOffline(deps) {
     return list.sort((a, b) => (a.label === 'LAN cable' ? 0 : 1) - (b.label === 'LAN cable' ? 0 : 1));
   }
   const lanAddresses = () => lanNetworks().map(n => n.url);
+
+  // A LAN cable to a switch (no router) is a "Public" network to Windows. Pupils on it are
+  // blocked unless Windows' firewall lets the engine in on public networks: the installer asks
+  // once, but a "No" there, or an earlier "Allow access" prompt, leaves Wi-Fi working and the
+  // cable silently blocked. Checked here so the Dashboard can say so and fix it.
+  // Only for the installed engine (ucs-exam-engine.exe); null when there's nothing to check.
+  const ENGINE_EXE = process.platform === 'win32' && /ucs-exam-engine\.exe$/i.test(process.execPath) ? process.execPath : null;
+  const psQuote = s => `'${String(s).replace(/'/g, "''")}'`;
+  function powershell(script) {
+    return new Promise(resolve => {
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+        { windowsHide: true, timeout: 120000 }, (err, stdout) => resolve({ ok: !err, out: String(stdout || '').trim() }));
+    });
+  }
+  let lanAccessCache = null;
+  async function lanAccess(fresh) {
+    if (!ENGINE_EXE) return null;
+    if (lanAccessCache && !fresh) return lanAccessCache;
+    const { out } = await powershell(`
+      $p = ${psQuote(ENGINE_EXE)}
+      $pub = Get-NetFirewallProfile -Name Public
+      if ("$($pub.Enabled)" -ne 'True') { 'ok'; return }
+      if ("$($pub.AllowInboundRules)" -eq 'False') { 'blockall'; return }
+      $mine = Get-NetFirewallApplicationFilter | Where-Object { $_.Program -ieq $p } | Get-NetFirewallRule |
+        Where-Object { "$($_.Enabled)" -eq 'True' -and "$($_.Direction)" -eq 'Inbound' -and "$($_.Profile)" -match 'Any|Public' }
+      if ($mine | Where-Object { "$($_.Action)" -eq 'Block' }) { 'blocked' } elseif ($mine | Where-Object { "$($_.Action)" -eq 'Allow' }) { 'ok' } else { 'missing' }`);
+    const state = ['ok', 'blockall', 'blocked', 'missing'].includes(out) ? out : 'unknown';
+    lanAccessCache = { state, checkedAt: new Date().toISOString() };
+    return lanAccessCache;
+  }
+  // Same change as the installer: clear the engine's old rules and allow it on every network
+  // type. Windows asks the person at the computer for permission first.
+  async function fixLanAccess() {
+    if (!ENGINE_EXE) return null;
+    const cmd = `/c netsh advfirewall firewall delete rule name=all dir=in program="${ENGINE_EXE}" & netsh advfirewall firewall add rule name="UCS Exam Server" dir=in action=allow program="${ENGINE_EXE}" protocol=TCP localport=${Number(PORT) || 8080} profile=any enable=yes`;
+    const { ok } = await powershell(`Start-Process -FilePath cmd.exe -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList ${psQuote(cmd)}`);
+    return { permitted: ok, ...(await lanAccess(true)) };
+  }
   const today = () => new Date().toISOString().slice(0, 10);
 
   // ── ONLINE: build the exam pack ──
@@ -400,6 +440,12 @@ function createCbtOffline(deps) {
       if (!admin) return true;
       if (m === 'GET' && p === '/api/exam/overview') {
         return sendJson(res, 200, { pack: currentPack(), papers: papersOverview(), lanAddresses: lanAddresses(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
+      }
+      if (m === 'GET' && p === '/api/exam/lan-access') {
+        return sendJson(res, 200, { access: await lanAccess(url.searchParams.has('fresh')) }), true;
+      }
+      if (m === 'POST' && p === '/api/exam/lan-access/fix') {
+        return sendJson(res, 200, { access: await fixLanAccess() }), true;
       }
       const statusMatch = p.match(/^\/api\/exam\/papers\/(\d+)\/status$/);
       if (m === 'POST' && statusMatch) {
