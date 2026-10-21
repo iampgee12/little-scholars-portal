@@ -297,7 +297,6 @@ function renderCurrentQuestion() {
       <div class="cbt-question-tools">
         <button type="button" class="cbt-tool-btn ${flagged ? 'on' : ''}" onclick="toggleFlag(${q.id})">&#9873; ${flagged ? 'Marked for review' : 'Mark for review'}</button>
         ${chosen !== undefined ? `<button type="button" class="cbt-tool-btn" onclick="selectAnswer(${q.id}, null)">Clear my answer</button>` : ''}
-        <button type="button" class="cbt-tool-btn" onclick="showReview()">Review &amp; Submit</button>
       </div>
     </div>`;
 }
