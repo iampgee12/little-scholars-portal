@@ -31,7 +31,7 @@ const ROLE_META = {
     badgeClass:  'student',
     // pupils sign in with their username (their portal ID, Reg. No. and email still work)
     idLabel:     'Username',
-    placeholder: 'e.g. 2201',
+    placeholder: 'e.g. 0000',
     prefix:      'STU-',
     color:       'var(--green)',
     portalLabel: 'Student Portal',
