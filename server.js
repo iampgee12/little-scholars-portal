@@ -9885,6 +9885,8 @@ if (EXAM_MODE) {
   PAGE_ROUTES['/admin'] = '/exam-console.html';
   PAGE_ROUTES['/exam-console'] = '/exam-console.html';
   PAGE_ROUTES['/student'] = '/student-cbt.html';
+  // pupils' address: just username and password (admins use the exam server app)
+  PAGE_ROUTES['/signin'] = '/exam-signin.html';
   ['/teacher', '/register', '/reset-password'].forEach(route => delete PAGE_ROUTES[route]);
 }
 

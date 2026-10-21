@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unique Children's School — CBT Sign In</title>
+<link rel="icon" type="image/png" href="/report_assets/favicon.png?v=2">
+<link rel="stylesheet" href="/report_assets/fonts/dm-fonts.css">
+<style>
+/* The exam server's pupil sign-in: one simple form (same look as the portal's sign-in) */
+:root {
+  --white: #ffffff; --bg: #f8fafc; --field: #f1f5f9; --border: #e2e8f0; --border-2: #cbd5e1;
+  --green: #16a34a; --green-bg: rgba(22,163,74,0.08); --red: #dc2626; --red-bg: rgba(220,38,38,0.08);
+  --text-1: #0f172a; --text-2: #475569; --text-3: #94a3b8; --radius-sm: 8px; --radius: 14px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text-1); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; -webkit-font-smoothing:antialiased; }
+.card { width:100%; max-width:400px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 4px 24px rgba(15,23,42,0.08); overflow:hidden; animation:cardIn 0.35s ease both; }
+@keyframes cardIn { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+.top { padding:36px 32px 26px; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; border-bottom:1px solid var(--border); }
+.top img { height:72px; width:auto; object-fit:contain; }
+.top .name { font-size:16px; font-weight:700; letter-spacing:-0.3px; }
+.top .sub { font-size:10px; color:var(--text-3); font-weight:500; letter-spacing:0.7px; text-transform:uppercase; font-family:'DM Mono',monospace; }
+form { padding:24px 32px 30px; }
+.alert { display:none; background:var(--red-bg); border:1px solid rgba(239,68,68,0.2); border-radius:var(--radius-sm); padding:9px 12px; margin-bottom:16px; font-size:12px; color:var(--red); }
+.alert.show { display:block; }
+.field { margin-bottom:14px; }
+label { display:block; font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:6px; }
+.wrap { position:relative; display:flex; align-items:center; }
+.icon { position:absolute; left:12px; display:flex; color:var(--text-3); pointer-events:none; }
+.icon svg, .eye svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+input { width:100%; background:var(--field); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 40px 12px 38px; font-family:inherit; font-size:14px; color:var(--text-1); outline:none; transition:all 0.18s ease; }
+input::placeholder { color:var(--text-3); }
+input:focus { border-color:rgba(22,163,74,0.4); background:var(--white); box-shadow:0 0 0 3px rgba(22,163,74,0.07); }
+.eye { position:absolute; right:10px; background:none; border:none; cursor:pointer; color:var(--text-3); display:flex; padding:0; }
+.eye:hover { color:var(--text-1); }
+button[type="submit"] { width:100%; margin-top:8px; background:var(--green); color:#fff; border:none; border-radius:var(--radius-sm); padding:13px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; transition:background 0.18s ease; }
+button[type="submit"]:hover { background:#15803d; }
+button[type="submit"]:disabled { opacity:0.65; cursor:not-allowed; }
+/* Phones zoom in on text boxes smaller than 16px when tapped */
+@media (max-width:768px) { input { font-size:16px; } }
+</style>
+<link rel="stylesheet" href="/no-select.css">
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <img src="/report_assets/school-logo.png" alt="Unique Group of Schools">
+    <div class="name">Unique Children's School</div>
+    <div class="sub">Computer-Based Test</div>
+  </div>
+  <form id="signin" novalidate>
+    <div class="alert" id="alert" role="alert"></div>
+    <div class="field">
+      <label for="user">Username</label>
+      <div class="wrap">
+        <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+        <input type="text" id="user" placeholder="e.g. 0000" autocomplete="username" autocapitalize="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="field">
+      <label for="pw">Password</label>
+      <div class="wrap">
+        <span class="icon"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+        <input type="password" id="pw" placeholder="Enter your password" autocomplete="current-password">
+        <button type="button" class="eye" id="eye" aria-label="Show or hide password"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <button type="submit" id="go">Sign In</button>
+  </form>
+</div>
+<script src="exam-signin.js"></script>
+</body>
+</html>

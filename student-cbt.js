@@ -1,3 +1,6 @@
+// On the exam server this page is /student itself and there is no portal to go back to
+if (location.pathname === '/student') document.getElementById('cbt-back-portal')?.remove();
+
 async function apiFetch(url, options = {}) {
   let res;
   try {
