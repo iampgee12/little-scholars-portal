@@ -189,7 +189,7 @@ const MENU = [
   ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']], { dropdown: 'sync' }],
   ['Students', [['students', 'Students Info-system']], { dropdown: 'students', search: true }],
   ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']], { dropdown: 'staff' }],
-  ['Help', [['updates', 'Check for Updates']], { dropdown: 'help' }],
+  [null, [['updates', 'Check for Updates']]],
 ];
 const TITLES = {
   dashboard: ['Dashboard', 'This exam computer at a glance'], console: ['Exam Console', 'Open and close papers, watch pupils, allow retakes'],
@@ -240,6 +240,7 @@ function shell() {
         <button class="ea-menu-btn" aria-label="Menu" onclick="document.getElementById('ea-shell').classList.toggle('menu-open')">☰</button>
         <div><h1>${TITLES[state.page][0]}</h1><div class="sub">${TITLES[state.page][1]}</div></div>
         <div class="right">${addr ? `<span class="ea-addr-chip" title="Pupils open this address">${esc(addr.replace(/^https?:\/\//, ''))}</span>` : ''}
+          <button type="button" class="ea-reload" title="Refresh the app" aria-label="Refresh the app" onclick="reloadApp(this)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg></button>
           <div class="ea-term">Academic Session <b>${esc(t?.session || '—')}</b><br>Active Term <b class="blue">${esc(t?.term || '—')}</b></div></div>
       </header>
       <main class="ea-wrap" id="ea-page"><div class="ec-muted">Loading…</div></main>
@@ -249,6 +250,13 @@ function shell() {
   // first draw: bring the current page's menu item into the middle of the menu
   const active = !oldNav && nav.querySelector('button.active');
   if (active) nav.scrollTop += active.getBoundingClientRect().top - nav.getBoundingClientRect().top - nav.clientHeight / 2;
+}
+// Reloads the whole app (like pull-to-refresh), e.g. after the internet comes
+// back; the sign-in and the current page are kept
+function reloadApp(btn) {
+  btn.classList.add('spin');
+  btn.disabled = true;
+  location.reload();
 }
 async function go(page) {
   if (page === 'staff') page = 'teachers';
