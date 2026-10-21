@@ -200,33 +200,34 @@ const TITLES = {
   admins: ['Administrator', 'Admins who can sign in to this exam server'],
   updates: ['Check for Updates', 'Keep the exam server up to date'],
 };
-// Menu groups marked as drop-downs open and close on click; the one holding
-// the current page starts open
-state.navOpen = new Set();
+// Menu groups marked as drop-downs open and close on click, one at a time
+// (opening one closes the other); the one holding the current page starts open
+state.navOpen = '';
 function navItem([k, l]) {
   return `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`;
 }
 function navGroup([group, items, opt = {}]) {
   if (!opt.dropdown) return `${group ? `<h4>${group}</h4>` : ''}${items.map(navItem).join('')}`;
-  const open = state.navOpen.has(opt.dropdown);
+  const open = state.navOpen === opt.dropdown;
   const here = items.some(([k]) => k === state.page);
   return `<div class="ea-drop ${open ? 'open' : ''}" id="nav-${opt.dropdown}">
     <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}${items.some(([k]) => k === 'push') && state.sync?.unpushed ? `<span class="ea-badge ea-head-badge" title="Results waiting to be pushed online">${state.sync.unpushed}</span>` : ''}<span class="ea-caret" aria-hidden="true"></span></button>
     <div class="ea-drop-body">${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
 }
 function toggleNav(key) {
-  const el = document.getElementById(`nav-${key}`);
-  const open = !state.navOpen.has(key);
-  if (open) state.navOpen.add(key); else state.navOpen.delete(key);
-  el.classList.toggle('open', open);
-  el.querySelector('.ea-drop-head').setAttribute('aria-expanded', open);
+  state.navOpen = state.navOpen === key ? '' : key;
+  document.querySelectorAll('.ea-drop').forEach(el => {
+    const open = el.id === `nav-${state.navOpen}`;
+    el.classList.toggle('open', open);
+    el.querySelector('.ea-drop-head').setAttribute('aria-expanded', open);
+  });
 }
 function shell() {
   const t = state.dash?.term;
   // the menu is redrawn on every page: keep it where the user had scrolled it
   const oldNav = document.querySelector('.ea-nav');
   const navScroll = oldNav?.scrollTop || 0;
-  for (const [, items, opt] of MENU) if (opt?.dropdown && items.some(([k]) => k === state.page)) state.navOpen.add(opt.dropdown);
+  for (const [, items, opt] of MENU) if (opt?.dropdown && items.some(([k]) => k === state.page)) state.navOpen = opt.dropdown;
   const nets = state.dash?.lanNetworks || state.status?.lanNetworks || (state.dash?.lanAddresses || state.status?.lanAddresses || []).map(url => ({ url }));
   rootEl.innerHTML = `<div class="ea-shell" id="ea-shell">
     <aside class="ea-side">
