@@ -356,7 +356,7 @@ function renderReview() {
       <div class="cbt-legend" style="margin-bottom:18px;"><span><i class="l-answered"></i>Answered</span><span><i></i>Not answered</span><span><i class="l-flagged"></i>Marked for review</span></div>
       <div class="cbt-review-actions">
         <button class="cbt-btn cbt-btn-secondary" onclick="backToQuestions()">&#8592; Back to questions</button>
-        <button class="cbt-btn cbt-btn-green" onclick="askSubmit()">I'm finished – Submit</button>
+        <button class="cbt-btn cbt-btn-green" onclick="askSubmit()">Submit</button>
       </div>
     </div>`;
 }
