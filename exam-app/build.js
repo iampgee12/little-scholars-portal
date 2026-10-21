@@ -181,7 +181,7 @@ TIPS
   right); click it, or open "UCS Exam Server" again, to bring the window back.
 - Only administrators sign in to the app, and every time the window is
   closed you must sign in again when it opens.
-- Check for Updates (Help) installs a newer version from the portal.
+- Check for Updates installs a newer version from the portal.
 - The server's log is %LOCALAPPDATA%\\UCS Exam Server\\server.log
 - Keep the exam computer plugged in and stop it from sleeping during exams.
 - If a pupil's device drops off the Wi-Fi, their answers are kept on that
@@ -193,8 +193,11 @@ TIPS
 `;
 
 async function main() {
-  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-  const version = /^\d+\.\d+\.\d+$/.test(pkg.version) ? pkg.version : '1.0.0';
+  // every build gets a new version from its date and time (Lagos): year.monthday.hourminute,
+  // e.g. 26.1022.1435 for 22 Oct 2026 at 14:35 — each part stays a plain number for Windows
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  const version = [Number(p.year), Number(p.month + p.day), Number(p.hour + p.minute)].join('.');
   fs.rmSync(WORK, { recursive: true, force: true });
   fs.mkdirSync(WORK, { recursive: true });
 

@@ -719,7 +719,7 @@ function staffProfile(id) {
 async function renderUpdates() {
   const app = state.dash?.app || {};
   pageEl().innerHTML = `<div class="ec-card"><h2>Software version</h2>
-    <p class="ec-muted">Current version: <b class="ec-mono">${esc(app.version || 'not running as the app')}</b>${app.build ? ` <span class="ec-hint ec-mono">(${esc(app.build)})</span>` : ''}</p>
+    <p class="ec-muted">Current version: <b class="ec-mono">${app.version ? `v${esc(app.version)}` : 'not running as the app'}</b>${app.build ? ` <span class="ec-hint ec-mono">(${esc(app.build)})</span>` : ''}</p>
     ${state.sync.connected ? '<button class="post-btn" id="ec-check" onclick="checkUpdates()">Check for Updates</button>' : '<div class="ec-note warn">Connect to the school portal to check for updates.</div>'}
     <div id="ec-update-out"></div></div>`;
 }
@@ -732,8 +732,8 @@ async function checkUpdates() {
     out.innerHTML = !r.latest || !r.setupSize
       ? '<div class="ec-note warn">The school portal has no exam server app to offer yet, so there is nothing to compare with.</div>'
       : r.available
-        ? `<div class="ec-note">A new version is available (${when(r.latest.builtAt)}, ${Math.round(r.setupSize / 1e6)} MB).</div><button class="post-btn" onclick="installUpdate()">Download and Install</button>`
-        : `<div class="ec-note">You have the latest version (${esc(r.latest.build)}).</div>`;
+        ? `<div class="ec-note">A new version is available: <b class="ec-mono">v${esc(r.latest.version)}</b> (${when(r.latest.builtAt)}, ${Math.round(r.setupSize / 1e6)} MB).</div><button class="post-btn" onclick="installUpdate()">Download and Install</button>`
+        : `<div class="ec-note">You have the latest version (<span class="ec-mono">v${esc(r.latest.version)} · ${esc(r.latest.build)}</span>).</div>`;
   } catch (err) { out.innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
 }
 async function installUpdate() {
