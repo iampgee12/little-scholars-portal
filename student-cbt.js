@@ -36,13 +36,12 @@ let currentExam = null;
 let timerInterval = null;
 const pupil = { name: '', classLabel: '' };
 
-// Top bar: "Hi, name" and the class; during an exam the subject, the class and
-// "Hi, name" on the left and the timer on the right
+// Top bar: "Hi, name" and the class; during an exam the subject, then the name
+// and class, on the left and the timer on the right
 function renderHeader() {
   const inExam = !!currentExam && document.getElementById('cbt-exam-view').style.display !== 'none';
-  const hi = pupil.name ? `Hi, ${pupil.name}` : 'Hi there';
-  document.getElementById('cbt-who-main').textContent = inExam ? currentExam.subjectName : hi;
-  document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.classLabel, hi] : [pupil.classLabel]).filter(Boolean).join(' · ');
+  document.getElementById('cbt-who-main').textContent = inExam ? currentExam.subjectName : (pupil.name ? `Hi, ${pupil.name}` : 'Hi there');
+  document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.name, pupil.classLabel] : [pupil.classLabel]).filter(Boolean).join(' · ');
   document.getElementById('cbt-timer').style.display = inExam ? '' : 'none';
   for (const id of ['cbt-back-portal', 'cbt-signout']) {
     const el = document.getElementById(id);
