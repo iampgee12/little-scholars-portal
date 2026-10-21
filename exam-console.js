@@ -123,7 +123,7 @@ function renderSignIn(note = '') {
       <div style="margin-top:16px;"><button class="post-btn" type="submit" id="ec-signin">Sign In</button></div>
     </form>
     <div class="ec-error" id="ec-err"></div>
-    ${state.status?.lanAddresses ? addressBlock(state.status.lanAddresses) : ''}`);
+    ${state.status?.lanAddresses ? addressBlock(state.status.lanNetworks || state.status.lanAddresses) : ''}`);
   setTimeout(() => document.getElementById('ec-sid')?.focus(), 50);
 }
 async function adminSignIn() {
@@ -227,7 +227,7 @@ function shell() {
   const oldNav = document.querySelector('.ea-nav');
   const navScroll = oldNav?.scrollTop || 0;
   for (const [, items, opt] of MENU) if (opt?.dropdown && items.some(([k]) => k === state.page)) state.navOpen.add(opt.dropdown);
-  const addr = (state.dash?.lanAddresses || state.status?.lanAddresses || [])[0];
+  const nets = state.dash?.lanNetworks || state.status?.lanNetworks || (state.dash?.lanAddresses || state.status?.lanAddresses || []).map(url => ({ url }));
   rootEl.innerHTML = `<div class="ea-shell" id="ea-shell">
     <aside class="ea-side">
       <div class="ea-brand"><img src="/report_assets/exam-app-icon.png" alt=""><div><b>${esc(state.sync?.school || "Unique Children's School")}</b><small>UCS Exam Server</small></div></div>
@@ -239,7 +239,7 @@ function shell() {
       <header class="ea-top">
         <button class="ea-menu-btn" aria-label="Menu" onclick="document.getElementById('ea-shell').classList.toggle('menu-open')">☰</button>
         <div><h1>${TITLES[state.page][0]}</h1><div class="sub">${TITLES[state.page][1]}</div></div>
-        <div class="right">${addr ? `<span class="ea-addr-chip" title="Pupils open this address">${esc(addr.replace(/^https?:\/\//, ''))}</span>` : ''}
+        <div class="right">${nets.map(n => `<span class="ea-addr-chip" title="Pupils on ${esc(n.label || 'the network')} open this address">${n.label && nets.length > 1 ? `${esc(n.label)} · ` : ''}${esc(n.url.replace(/^https?:\/\//, ''))}</span>`).join('')}
           <button type="button" class="ea-reload" title="Refresh the app" aria-label="Refresh the app" onclick="reloadApp(this)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg></button>
           <div class="ea-term">Academic Session <b>${esc(t?.session || '—')}</b><br>Active Term <b class="blue">${esc(t?.term || '—')}</b></div></div>
       </header>
@@ -273,9 +273,12 @@ async function go(page) {
 }
 const pageEl = () => document.getElementById('ea-page');
 function showToastish(text) { if (typeof uiNotice === 'function') uiNotice(text, ''); }
-function addressBlock(addresses) {
-  return `<div class="ec-field"><label>Pupils open this address on the school Wi-Fi</label>
-    <div class="ec-address">${(addresses || []).map(a => `<code>${esc(a)}</code>`).join('') || '<span class="ec-error">This computer is not connected to a network yet. Connect it to the school router/Wi-Fi.</span>'}</div></div>`;
+// one address per network this computer is on: pupils open the one for the network they're on
+function addressBlock(networks) {
+  const list = (networks || []).map(n => (typeof n === 'string' ? { url: n } : n));
+  return `<div class="ec-field"><label>Pupils open this address (Wi-Fi or LAN cable, whichever they're connected to)</label>
+    <div class="ec-address">${list.map(n => `<code>${n.label ? `<span class="ec-hint">${esc(n.label)}:</span> ` : ''}${esc(n.url)}</code>`).join('') || '<span class="ec-error">This computer is not connected to a network yet. Connect it to the school Wi-Fi or plug in the LAN cable.</span>'}</div>
+    ${list.some(n => n.selfAssigned) ? '<p class="ec-hint" style="margin-top:6px;">A 169.254… address means the cable network has no router handing out addresses. It still works if the pupils\' computers are on the same switch, but a fixed address (e.g. 192.168.10.1) is easier to type.</p>' : ''}</div>`;
 }
 
 // ── Dashboard ──
@@ -283,7 +286,7 @@ async function renderDashboard() {
   const d = state.dash;
   const p = d.papers || {};
   pageEl().innerHTML = `
-    <div class="ec-card">${addressBlock(d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils choose <b>Pupil</b> and sign in with their usual ID or email and password.</p></div>
+    <div class="ec-card">${addressBlock(d.lanNetworks || d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils choose <b>Pupil</b> and sign in with their usual ID or email and password.</p></div>
     <div class="ec-stats">
       <div class="ec-stat green"><small>Active pupils</small><b>${d.activeStudents}</b><em>signed in, last 10 minutes</em></div>
       <div class="ec-stat"><small>Total pupils</small><b>${d.totalStudents}</b><em>on this computer</em></div>

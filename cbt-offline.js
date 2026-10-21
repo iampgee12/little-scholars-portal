@@ -86,11 +86,19 @@ function createCbtOffline(deps) {
     res.writeHead(200, { 'Content-Type': type, 'Content-Disposition': `attachment; filename="${name}"`, 'Content-Length': body.length, 'Cache-Control': 'no-store' });
     res.end(body);
   }
-  function lanAddresses() {
-    return Object.values(os.networkInterfaces()).flat()
-      .filter(a => a && a.family === 'IPv4' && !a.internal)
-      .map(a => `http://${a.address}${PORT && Number(PORT) !== 80 ? `:${PORT}` : ''}`);
+  // Every network this computer is on (Wi-Fi, LAN cable): pupils can use either.
+  // Virtual adapters (Hyper-V, VirtualBox, VPNs…) aren't reachable by pupils, so they're left out.
+  function lanNetworks() {
+    const VIRTUAL = /vethernet|virtualbox|vmware|hyper-v|loopback|bluetooth|tailscale|zerotier|vpn|wsl|docker|npcap/i;
+    const kind = name => (/wi-?fi|wlan|wireless/i.test(name) ? 'Wi-Fi' : /ethernet|^eth|^en|local area/i.test(name) ? 'LAN cable' : name);
+    const list = Object.entries(os.networkInterfaces())
+      .filter(([name]) => !VIRTUAL.test(name))
+      .flatMap(([name, addrs]) => (addrs || []).filter(a => a.family === 'IPv4' && !a.internal)
+        .map(a => ({ label: kind(name), url: `http://${a.address}${PORT && Number(PORT) !== 80 ? `:${PORT}` : ''}`, selfAssigned: a.address.startsWith('169.254.') })));
+    // cable first: it's the connection made on purpose for the exam
+    return list.sort((a, b) => (a.label === 'LAN cable' ? 0 : 1) - (b.label === 'LAN cable' ? 0 : 1));
   }
+  const lanAddresses = () => lanNetworks().map(n => n.url);
   const today = () => new Date().toISOString().slice(0, 10);
 
   // ── ONLINE: build the exam pack ──
@@ -374,7 +382,7 @@ function createCbtOffline(deps) {
       if (!EXAM_MODE) return sendJson(res, 404, { error: 'Not found' }), true;
       const hasUsers = !!one('SELECT id FROM users LIMIT 1');
       if (m === 'GET' && p === '/api/exam/status') {
-        return sendJson(res, 200, { examMode: true, setUp: hasUsers && (!!currentPack() || !!valueFromMeta('exam_synced', '')), connected: !!valueFromMeta('sync_api_number', ''), pack: currentPack(), lanAddresses: lanAddresses(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
+        return sendJson(res, 200, { examMode: true, setUp: hasUsers && (!!currentPack() || !!valueFromMeta('exam_synced', '')), connected: !!valueFromMeta('sync_api_number', ''), pack: currentPack(), lanAddresses: lanAddresses(), lanNetworks: lanNetworks(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
       }
       if (m === 'POST' && p === '/api/exam/import') {
         // the very first load happens before any admin exists on this computer
@@ -443,7 +451,7 @@ function createCbtOffline(deps) {
     }
   }
 
-  return { createSchema, handle, importAttempts, insertRows, tableExists, lanAddresses, currentPack, papersOverview };
+  return { createSchema, handle, importAttempts, insertRows, tableExists, lanAddresses, lanNetworks, currentPack, papersOverview };
 }
 
 const KIT_GUIDE = `UNIQUE CHILDREN'S SCHOOL — OFFLINE CBT EXAM SERVER

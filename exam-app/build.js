@@ -157,12 +157,13 @@ BEFORE EACH EXAM (needs internet)
   This copies the latest pupils, staff and CBT papers from the portal.
 
 ON EXAM DAY (no internet needed)
-1. Connect the exam computer to the school router/Wi-Fi.
-2. Open "UCS Exam Server" (desktop or Start menu). It opens in its own
-   window. If Windows Firewall asks, click "Allow access" (Private networks).
-3. The Dashboard shows the address pupils open, e.g. http://192.168.0.10:8080
-4. Pupils connect to the same Wi-Fi, open that address, choose Pupil and sign
-   in with their usual ID (or email) and password.
+1. Connect the exam computer to the school Wi-Fi, or plug it into the LAN
+   switch with a cable (or both).
+2. Open "UCS Exam Server" (desktop or Start menu). It opens in its own window.
+3. The Dashboard shows the address pupils open, one for each connection,
+   e.g. "LAN cable: http://169.254.234.6:8080" and "Wi-Fi: http://192.168.0.10:8080"
+4. Pupils on the cable open the LAN cable address; pupils on the Wi-Fi open the
+   Wi-Fi one. They choose Pupil and sign in with their username and password.
 5. In the Exam Console click "Open" on a paper to start it and "Close" when
    it ends. Closing hands in any paper still being written.
 

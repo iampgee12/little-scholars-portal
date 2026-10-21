@@ -464,7 +464,7 @@ module.exports = function createExamSync(ctx) {
     const hasSeen = all('PRAGMA table_info(sessions)').some(c => c.name === 'last_seen_at');
     return {
       school: valueFromMeta('school_name', ''), term,
-      lanAddresses: cbtOffline.lanAddresses(),
+      lanAddresses: cbtOffline.lanAddresses(), lanNetworks: cbtOffline.lanNetworks(),
       totalStudents: one("SELECT COUNT(*) n FROM students WHERE status IS NULL OR status = 'active'").n,
       activeStudents: hasSeen ? one(`SELECT COUNT(DISTINCT s.user_id) n FROM sessions s JOIN users u ON u.id = s.user_id
                                      WHERE u.role = 'student' AND s.expires_at > ? AND COALESCE(s.last_seen_at, s.created_at) > ?`, nowIso(), since).n : 0,

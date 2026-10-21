@@ -1,7 +1,8 @@
 ; UCS Exam Server — Setup wizard (NSIS). Built by exam-app/build.js --installer:
 ;   makensis -DVERSION=1.0.0 -DBUILD=abc123 -DDIST=<dist dir> -DICON=<app-icon.ico> installer.nsi
-; Installs for the current user (no admin rights needed), with Start menu and
-; desktop shortcuts and an uninstaller listed in Windows "Apps & features".
+; Installs for the current user, with Start menu and desktop shortcuts and an
+; uninstaller listed in Windows "Apps & features". Only the one firewall rule
+; (added the first time) asks Windows for permission.
 
 Unicode true
 SetCompressor /SOLID lzma
@@ -44,7 +45,7 @@ VIAddVersionKey "LegalCopyright" "Unique Children's School"
 !define MUI_HEADERIMAGE_UNBITMAP "${ART}/setup-header.bmp"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Install ${APP_NAME}"
-!define MUI_WELCOMEPAGE_TEXT "This installs the offline CBT exam server for Unique Children's School on this computer.$\r$\n$\r$\nPupils can then write their CBT on the school's own Wi-Fi, with no internet needed during the exam.$\r$\n$\r$\nNo administrator password is needed. Click Next to continue."
+!define MUI_WELCOMEPAGE_TEXT "This installs the offline CBT exam server for Unique Children's School on this computer.$\r$\n$\r$\nPupils can then write their CBT over the school's Wi-Fi or a LAN cable, with no internet needed during the exam.$\r$\n$\r$\nThe first time, Windows asks once for permission so pupils' computers can connect: click Yes. Click Next to continue."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Start ${APP_NAME} now"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\EXAM-SERVER-GUIDE.txt"
@@ -90,6 +91,23 @@ Section "Install"
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "EstimatedSize" 340000
+
+  ; Pupils connect over Wi-Fi or a LAN cable/switch. A switch with no internet is a
+  ; "public" network to Windows, which blocks them unless the engine is allowed on
+  ; every network type. Added once (Windows asks for permission); this also clears
+  ; the "block on public networks" rule left by an earlier "Allow access" prompt.
+  nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${APP_NAME}"'
+  Pop $0
+  Pop $1
+  StrCmp $0 0 fwdone
+    ExecShellWait "runas" "$SYSDIR\cmd.exe" '/c netsh advfirewall firewall delete rule name=all dir=in program="$INSTDIR\engine\ucs-exam-engine.exe" & netsh advfirewall firewall add rule name="${APP_NAME}" dir=in action=allow program="$INSTDIR\engine\ucs-exam-engine.exe" protocol=TCP localport=8080 profile=any enable=yes' SW_HIDE
+    nsExec::ExecToStack 'netsh advfirewall firewall show rule name="${APP_NAME}"'
+    Pop $0
+    Pop $1
+    StrCmp $0 0 fwdone
+    IfSilent fwdone
+    MessageBox MB_OK|MB_ICONINFORMATION "Windows did not give permission, so pupils may only reach the exam server on Wi-Fi.$\r$\n$\r$\nTo let them connect with a LAN cable too, run this Setup again and click Yes when Windows asks."
+  fwdone:
 SectionEnd
 
 Section "Uninstall"
