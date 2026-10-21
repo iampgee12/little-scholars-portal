@@ -2663,6 +2663,10 @@ function visibleNavItem(tab) {
   return document.querySelector(`.sub-menu:not(.menu-hidden) .sub-nav-item[data-tab="${tab}"]`);
 }
 
+// Brought back from the browser's memory (Back/Forward): load it afresh, which
+// sends a signed-out visitor to sign-in instead of showing the saved page
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+
 // Back / Forward: reopen the page named in the address (none: the dashboard)
 let fromHistory = false;
 window.addEventListener('popstate', () => {
@@ -5457,7 +5461,8 @@ async function signOut() {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   localStorage.removeItem('ls_user_id');
   localStorage.removeItem('ls_user_role');
-  window.location.href = '/signin';
+  // replace: Forward after signing out can't reopen the account
+  window.location.replace('/signin');
 }
 
 /* ── CLASSES & SUBJECTS ── */

@@ -29,8 +29,9 @@ const ROLE_META = {
     title:       'Pupil Login',
     badge:       'PUPIL',
     badgeClass:  'student',
-    idLabel:     'Student ID or Email',
-    placeholder: 'e.g. STU-2024-0421 or name@example.com',
+    // pupils sign in with their username (their portal ID, Reg. No. and email still work)
+    idLabel:     'Username',
+    placeholder: 'e.g. 2201',
     prefix:      'STU-',
     color:       'var(--green)',
     portalLabel: 'Student Portal',
@@ -102,6 +103,7 @@ window.addEventListener('pageshow', e => {
   if (!e.persisted) return;
   document.getElementById('redirect-overlay').classList.remove('show');
   setLoading(false);
+  leaveIfSignedIn();
 });
 
 // ── Extra sign-in step: emailed code (admins) or choosing a new password ──
@@ -235,13 +237,13 @@ async function handleLogin() {
   let valid = true;
   if (!sid) {
     sidEl.classList.add('error');
-    sidErr.textContent = 'Please enter your ID or email address.';
+    sidErr.textContent = selectedRole === 'student' ? 'Please enter your username.' : 'Please enter your ID or email address.';
     sidErr.classList.add('show');
     valid = false;
   } else if (Object.entries(ROLE_META).some(([role, m]) => role !== selectedRole && sid.toUpperCase().startsWith(m.prefix))) {
     // an ID that clearly belongs to another portal (emails, Reg. Nos and other IDs go through)
     sidEl.classList.add('error');
-    sidErr.textContent = `${meta.idLabel.replace(' or Email', '')}s start with "${meta.prefix}". Check your ID or go back.`;
+    sidErr.textContent = selectedRole === 'student' ? 'That is not a pupil username. Check it or go back.' : `${meta.idLabel.replace(' or Email', '')}s start with "${meta.prefix}". Check your ID or go back.`;
     sidErr.classList.add('show');
     valid = false;
   }
@@ -363,7 +365,21 @@ fetch('/api/exam/status').then(r => (r.ok ? r.json() : null)).then(status => {
   if (cards) cards.style.gridTemplateColumns = 'repeat(2, 1fr)';
 }).catch(() => {});
 
-// Clear any stale session on page load
-localStorage.removeItem('ls_user_id');
-localStorage.removeItem('ls_user_role');
-fetch('/api/logout', { method: 'POST' }).catch(() => {});
+// Already signed in (e.g. the Back button): straight back into the account —
+// only Sign Out leaves it. The offline exam server's computers are shared by
+// pupils, so there opening this page still signs the last one out.
+function leaveIfSignedIn() {
+  document.documentElement.style.visibility = 'hidden';
+  Promise.all([
+    fetch('/api/exam/status').then(r => (r.ok ? r.json() : null)).catch(() => null),
+    fetch('/api/session').then(r => (r.ok ? r.json() : null)).catch(() => null),
+  ]).then(([status, session]) => {
+    const portal = PORTALS[session?.user?.role];
+    if (portal && !status?.examMode) return window.location.replace(portal);
+    localStorage.removeItem('ls_user_id');
+    localStorage.removeItem('ls_user_role');
+    if (session?.user) fetch('/api/logout', { method: 'POST' }).catch(() => {});
+    document.documentElement.style.visibility = '';
+  });
+}
+leaveIfSignedIn();

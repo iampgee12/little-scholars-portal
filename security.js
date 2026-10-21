@@ -424,7 +424,8 @@ module.exports = function createSecurity(ctx) {
     res.setHeader('Content-Security-Policy', CSP);
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     if (IS_PROD) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) res.setHeader('Cache-Control', 'no-store');
+    // pages too: Back/Forward after signing out must not show a saved copy of an account page
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/') || !path.extname(url.pathname) || url.pathname.endsWith('.html')) res.setHeader('Cache-Control', 'no-store');
   }
 
   // ── Backups ───────────────────────────────────────────────────────────
