@@ -815,6 +815,9 @@ function createSchema() {
   for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
   ensureColumn('users', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('users', 'super_admin', 'INTEGER NOT NULL DEFAULT 0');
+  // a short sign-in name (e.g. a pupil's "2201"), besides the portal ID, Reg. No. and email
+  ensureColumn('users', 'username', 'TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(LOWER(username)) WHERE username IS NOT NULL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS staff_designations (
       id INTEGER PRIMARY KEY,
@@ -3454,6 +3457,8 @@ function findSignInAccounts(rawName) {
   if (!name) return [];
   const byId = one('SELECT * FROM users WHERE id = ?', name.toUpperCase());
   if (byId) return [byId];
+  const byUsername = one('SELECT * FROM users WHERE LOWER(username) = ?', name.toLowerCase());
+  if (byUsername) return [byUsername];
   const byRegNo = one('SELECT id FROM students WHERE reg_no = ?', name);
   if (byRegNo) return [one('SELECT * FROM users WHERE id = ?', byRegNo.id)].filter(Boolean);
   if (!name.includes('@')) return [];
