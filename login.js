@@ -93,8 +93,16 @@ function finishSignIn(data) {
   document.getElementById('redirect-role').textContent  = meta.portalLabel;
   document.getElementById('redirect-role').style.color  = meta.color;
   document.getElementById('redirect-overlay').classList.add('show');
-  setTimeout(() => { window.location.href = data.portal || PORTALS[user.role]; }, 500);
+  // replace: the browser's Back button from the portal never lands on this page mid-redirect
+  setTimeout(() => { window.location.replace(data.portal || PORTALS[user.role]); }, 500);
 }
+
+// Brought back from the browser's memory (Back button): show the form, not the spinner
+window.addEventListener('pageshow', e => {
+  if (!e.persisted) return;
+  document.getElementById('redirect-overlay').classList.remove('show');
+  setLoading(false);
+});
 
 // ── Extra sign-in step: emailed code (admins) or choosing a new password ──
 let extraState = null; // { pending, step }

@@ -2653,7 +2653,8 @@ function syncSidebarForTab(tab, trigger) {
 // Keep the open page in the address (…#tabName) so a refresh reopens it with
 // its menu item highlighted — the user always sees where they are.
 function rememberTab(tab) {
-  if (location.hash !== `#${tab}`) history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
+  // each page opened is a step the browser's Back button returns to
+  if (location.hash !== `#${tab}`) history[fromHistory ? 'replaceState' : 'pushState'](null, '', `${location.pathname}${location.search}#${tab}`);
   document.querySelector('.user-pill')?.classList.toggle('pill-active', tab === 'profile');
 }
 
@@ -2661,6 +2662,16 @@ function rememberTab(tab) {
 function visibleNavItem(tab) {
   return document.querySelector(`.sub-menu:not(.menu-hidden) .sub-nav-item[data-tab="${tab}"]`);
 }
+
+// Back / Forward: reopen the page named in the address (none: the dashboard)
+let fromHistory = false;
+window.addEventListener('popstate', () => {
+  fromHistory = true;
+  try {
+    if (location.hash) restoreTabFromUrl();
+    else switchTab('dashboard', document.querySelector(`[data-tab="dashboard"], .nav-item[onclick*="switchTab('dashboard'"]`));
+  } finally { fromHistory = false; }
+});
 
 function restoreTabFromUrl() {
   const tab = location.hash.slice(1);
