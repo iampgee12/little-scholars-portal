@@ -135,6 +135,11 @@ button { font-family: inherit; }
 .ea-setup-body h2 { margin: 0 0 6px; font-size: 18px; }
 .ea-progress { height: 6px; background: var(--black-3); border-radius: 3px; overflow: hidden; margin-top: 12px; }
 .ea-progress i { display: block; height: 100%; width: 40%; background: var(--green); animation: ea-slide 1.2s ease-in-out infinite; }
+/* real progress (update download): fills from the left instead of sliding */
+.ea-progress.ea-progress-fill i { animation: none; transition: width .6s ease; }
+#ea-dl-top { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50; background: transparent; }
+#ea-dl-top i { display: block; height: 100%; width: 0; background: var(--green); transition: width .6s ease; }
+#ea-dl-top.bad i { background: var(--red, #dc2626); }
 @keyframes ea-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
 /* modal */
 .ea-modal { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }

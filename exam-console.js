@@ -726,6 +726,8 @@ async function renderUpdates() {
     <p class="ec-muted">Current version: <b class="ec-mono">${app.version ? `v${esc(app.version)}` : 'not running as the app'}</b>${app.build ? ` <span class="ec-hint ec-mono">(${esc(app.build)})</span>` : ''}</p>
     ${state.sync.connected ? '<button class="post-btn" id="ec-check" onclick="checkUpdates()">Check for Updates</button>' : '<div class="ec-note warn">Connect to the school portal to check for updates.</div>'}
     <div id="ec-update-out"></div></div>`;
+  // came back to this page while an update is downloading: show its progress again
+  try { const d = await api('/api/exam/update-progress'); if (!d.idle && !d.error) followDownload(); } catch { /* none */ }
 }
 async function checkUpdates() {
   const out = document.getElementById('ec-update-out');
@@ -743,8 +745,53 @@ async function checkUpdates() {
 async function installUpdate() {
   const writing = state.dash?.writing || 0;
   if (!await uiConfirm(`Install the update now? The exam server closes while the new version installs${writing ? `, and ${plural(writing, 'pupil')} still writing will be disconnected` : ''}. Push results first if you can.`, { confirmLabel: 'Install', danger: !!writing })) return;
-  document.getElementById('ec-update-out').innerHTML = '<p class="ec-hint">Downloading the update… This window then closes and the installer opens. Click Finish at the end and the updated app opens.</p><div class="ea-progress"><i></i></div>';
-  try { await api('/api/exam/update-install', { method: 'POST' }); } catch (err) { document.getElementById('ec-update-out').innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
+  document.getElementById('ec-update-out').innerHTML = '<p class="ec-hint">Connecting to the school portal…</p><div class="ea-progress"><i></i></div>';
+  try {
+    await api('/api/exam/update-install', { method: 'POST' });
+    followDownload();
+  } catch (err) { document.getElementById('ec-update-out').innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
+}
+
+// Download progress: a thin bar across the top of the window (on every page) and,
+// on the Updates page, the bar with the percentage and megabytes
+function followDownload() {
+  clearInterval(state.dlTimer);
+  let lastBytes = -1;
+  let lastMove = Date.now();
+  const mb = n => (n / 1e6).toFixed(n < 1e7 ? 1 : 0);
+  const draw = d => {
+    const pct = d.total ? Math.min(100, Math.floor((d.received / d.total) * 100)) : 0;
+    let top = document.getElementById('ea-dl-top');
+    if (!top) {
+      top = document.createElement('div');
+      top.id = 'ea-dl-top';
+      top.innerHTML = '<i></i>';
+      document.body.appendChild(top);
+    }
+    top.title = `Downloading the update: ${pct}%`;
+    top.querySelector('i').style.width = `${pct}%`;
+    top.classList.toggle('bad', !!d.error);
+    const out = document.getElementById('ec-update-out');
+    if (!out) return;
+    if (d.error) { out.innerHTML = `<div class="ec-note warn">${esc(d.error)}</div><button class="post-btn" onclick="installUpdate()">Try Again</button>`; return; }
+    const stalled = !d.done && Date.now() - lastMove > 20e3;
+    out.innerHTML = `<div class="ec-flex" style="margin-top:12px;"><b>${d.done ? 'Downloaded. Opening the installer…' : `Downloading the update… ${pct}%`}</b>
+        <span class="ec-hint ec-mono">${mb(d.received)} of ${d.total ? mb(d.total) : '?'} MB</span></div>
+      <div class="ea-progress ea-progress-fill"><i style="width:${d.done ? 100 : pct}%"></i></div>
+      ${stalled ? '<div class="ec-note warn" style="margin-top:10px;">Nothing has arrived for a while. Check this computer\'s internet connection; the download carries on by itself when it comes back.</div>'
+        : '<p class="ec-hint" style="margin-top:8px;">When it finishes, this window closes and the installer opens. Click Yes if Windows asks, then Finish, and the updated app opens.</p>'}`;
+  };
+  const tick = async () => {
+    let d;
+    try { d = await api('/api/exam/update-progress'); } catch { return; }
+    if (d.idle) return;
+    if (d.received !== lastBytes) { lastBytes = d.received; lastMove = Date.now(); }
+    draw(d);
+    if (d.done || d.error) clearInterval(state.dlTimer);
+    if (d.error) setTimeout(() => document.getElementById('ea-dl-top')?.remove(), 4000);
+  };
+  tick();
+  state.dlTimer = setInterval(tick, 700);
 }
 
 async function signOut() {

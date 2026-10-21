@@ -524,19 +524,40 @@ module.exports = function createExamSync(ctx) {
     const latest = r.app || null;
     return { running: mine, latest, setupSize: r.setupSize, available: !!(latest && mine.build && latest.build !== mine.build && r.setupSize), insideApp: !!mine.build };
   }
-  // Downloads the new Setup from the portal, starts it and closes this server so it can be replaced
+  // Downloads the new Setup from the portal, starts it and closes this server so it can be replaced.
+  // The download runs in the background; the app follows it through updateProgress().
+  let download = null; // { received, total, startedAt, done, error }
+  const updateProgress = () => download || { idle: true };
   async function updateInstall() {
     if (process.platform !== 'win32' || !process.env.UCS_APP_BUILD) throw new Error('Updates install from the UCS Exam Server app on Windows');
+    if (download && !download.done && !download.error) return { started: true }; // already downloading
     // the Setup is large (it carries the app's own window engine): allow a slow line plenty of time
     const res = await callPortal('/api/exam-sync/setup.exe', { raw: true, timeout: 45 * 60e3 });
+    download = { received: 0, total: Number(res.headers.get('content-length')) || 0, startedAt: Date.now(), done: false, error: '' };
     const file = path.join(require('node:os').tmpdir(), `UCS Exam Server Setup ${Date.now()}.exe`);
-    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-    // close the app window first, so the updated app opens the only window
-    setTimeout(() => {
-      if (typeof globalThis.ucsCloseAppWindow === 'function') globalThis.ucsCloseAppWindow();
-      require('node:child_process').spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
-      setTimeout(() => process.exit(0), 1000);
-    }, 800);
+    (async () => {
+      const out = fs.createWriteStream(file);
+      try {
+        for await (const chunk of res.body) {
+          if (!out.write(chunk)) await new Promise(resolve => out.once('drain', resolve));
+          download.received += chunk.length;
+        }
+        await new Promise((resolve, reject) => out.end(err => (err ? reject(err) : resolve())));
+        if (download.total && download.received < download.total) throw new Error('The download stopped before it finished');
+        download.done = true;
+      } catch (err) {
+        out.destroy();
+        fs.rm(file, { force: true }, () => {});
+        download.error = `The download stopped: ${err.cause?.code || err.message}. Check the internet connection and try again.`;
+        return;
+      }
+      // give the app a moment to show 100%, then close its window first, so the updated app opens the only window
+      setTimeout(() => {
+        if (typeof globalThis.ucsCloseAppWindow === 'function') globalThis.ucsCloseAppWindow();
+        require('node:child_process').spawn(file, [], { detached: true, stdio: 'ignore' }).unref();
+        setTimeout(() => process.exit(0), 1000);
+      }, 1500);
+    })();
     return { started: true };
   }
 
@@ -550,7 +571,7 @@ module.exports = function createExamSync(ctx) {
       globalThis.ucsShowAppWindow();
       return sendJson(res, 200, { ok: true }), true;
     }
-    if (['/api/exam/dashboard', '/api/exam/people/students', '/api/exam/people/staff', '/api/exam/schedules', '/api/exam/update-check', '/api/exam/update-install'].includes(p)) {
+    if (['/api/exam/dashboard', '/api/exam/people/students', '/api/exam/people/staff', '/api/exam/schedules', '/api/exam/update-check', '/api/exam/update-install', '/api/exam/update-progress'].includes(p)) {
       const admin = requireUser(req, res, 'admin');
       if (!admin) return true;
       try {
@@ -564,6 +585,7 @@ module.exports = function createExamSync(ctx) {
         if (m === 'GET' && p === '/api/exam/schedules') return sendJson(res, 200, { rows: schedulesList() }), true;
         if (m === 'GET' && p === '/api/exam/update-check') return sendJson(res, 200, await updateCheck()), true;
         if (m === 'POST' && p === '/api/exam/update-install') return sendJson(res, 200, await updateInstall()), true;
+        if (m === 'GET' && p === '/api/exam/update-progress') return sendJson(res, 200, updateProgress()), true;
       } catch (err) {
         return sendJson(res, 400, { error: err.message }), true;
       }
