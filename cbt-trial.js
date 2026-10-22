@@ -152,6 +152,15 @@ function createCbtTrial(deps) {
     if (!user.trial) { sendJson(res, 403, { error: 'Only trial accounts can take trial papers' }); return null; }
     return user;
   }
+  // A tester linked to a teacher sees only that teacher's own class and subject papers (a
+  // class teacher: every subject of their class; a subject teacher: their subject in each
+  // class). Testers not linked to a teacher (IT, 9001–9010) see every trial paper.
+  function papersFor(user, ids) {
+    const papers = [...ids].map(paperRow).filter(Boolean);
+    if (!user.trial_teacher_id) return papers;
+    const allowed = new Set(all("SELECT class_code || '-' || subject_id AS k FROM teacher_assignments WHERE teacher_id = ?", user.trial_teacher_id).map(r => r.k));
+    return papers.filter(p => allowed.has(`${p.classCode}-${p.subjectId}`));
+  }
   function openAttempt(userId, paperId) {
     return one('SELECT * FROM trial_attempts WHERE user_id = ? AND paper_id = ? AND submitted_at IS NULL ORDER BY id DESC LIMIT 1', userId, paperId);
   }
@@ -258,13 +267,11 @@ function createCbtTrial(deps) {
       if (!user) return true;
       const ids = trialPaperIds();
       if (m === 'GET' && p === '/api/trial/papers') {
-        const mine = new Set(user.trial_teacher_id
-          ? all('SELECT class_code || \'-\' || subject_id AS k FROM teacher_assignments WHERE teacher_id = ?', user.trial_teacher_id).map(r => r.k) : []);
-        const exams = [...ids].map(paperRow).filter(Boolean).map(paper => {
+        const exams = papersFor(user, ids).map(paper => {
           const last = one('SELECT score, total_marks AS totalMarks FROM trial_attempts WHERE user_id = ? AND paper_id = ? AND submitted_at IS NOT NULL ORDER BY id DESC LIMIT 1', user.id, paper.id);
           const open = openAttempt(user.id, paper.id);
           return {
-            ...paper, ...paperStats(paper.classCode, paper.subjectId), status: 'live', mine: mine.has(`${paper.classCode}-${paper.subjectId}`),
+            ...paper, ...paperStats(paper.classCode, paper.subjectId), status: 'live', mine: !!user.trial_teacher_id,
             attemptStatus: open && Date.now() < deadlineOf(open, paper) ? 'in_progress' : 'not_started',
             lastScore: last ? last.score : null, lastTotal: last ? last.totalMarks : null, instructions: [],
           };
@@ -276,8 +283,8 @@ function createCbtTrial(deps) {
       const action = p.match(/^\/api\/trial\/papers\/(\d+)\/(start|answer|submit)$/);
       if (m !== 'POST' || !action) return sendJson(res, 404, { error: 'Not found' }), true;
       const paperId = Number(action[1]);
-      const paper = ids.has(paperId) ? paperRow(paperId) : null;
-      if (!paper) return sendJson(res, 404, { error: 'This paper is not open for the trial' }), true;
+      const paper = papersFor(user, ids).find(x => x.id === paperId);
+      if (!paper) return sendJson(res, 404, { error: 'This paper is not open for you in the trial' }), true;
       let attempt = openAttempt(user.id, paperId);
       if (action[2] === 'start') {
         // a fresh try each time, unless one is still running

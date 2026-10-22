@@ -113,7 +113,7 @@ async function init() {
         : 'PRACTICE · You see the questions exactly as pupils will. Nothing is saved, and there is no time limit.';
       banner.style.display = '';
       document.querySelector('#cbt-list-view .cbt-sub').innerHTML = MODE === 'trial'
-        ? 'Pick any paper to try it. Your own subjects come first. At the end you\'ll see any answer that is marked wrongly.'
+        ? 'Pick a paper to try it, as often as you like. At the end you\'ll see any answer that is marked wrongly.'
         : 'Pick a class and subject to go through its questions. At the end you\'ll see each answer you picked next to the one marked correct.';
       const portal = document.getElementById('cbt-back-portal');
       if (portal) portal.href = role === 'admin' ? '/admin' : '/teacher';

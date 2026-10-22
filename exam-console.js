@@ -453,7 +453,7 @@ async function renderTrial() {
         <li>Turn <b>Trial on</b> for the papers to test. Pupils can't see trial papers.</li>
         <li>Give each tester a username (print their slips). Every tester's password is <b>${TRIAL_PASSWORD}</b>.</li>
         <li>On each pupil computer, first open the <b>/check</b> address below to test its LAN cable or Wi-Fi, then sign in as the tester.</li>
-        <li>Testers see every trial paper, for every class, with their own subjects first. After each paper they see which answers are marked wrongly.</li>
+        <li>A tester linked to a teacher sees only that teacher's own classes and subjects (a class teacher: every subject of their class). Testers not linked to a teacher, like IT, see every trial paper. After each paper they see which answers are marked wrongly.</li>
         <li>Watch <b>Connected computers</b>: one that goes quiet turns red, so check its cable.</li>
       </ol>
       <div id="tr-addresses"></div>
@@ -526,13 +526,13 @@ function addTester() {
   modal('Add a tester', `
     <div class="ec-field"><label for="tr-teacher">Pick a teacher</label><select class="ec-select" id="tr-teacher"><option value="">Not a teacher (type a name below)</option>${state.trial.teachers.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div>
     <div class="ec-field"><label for="tr-name">Or type a name</label><input class="ec-input" id="tr-name" placeholder="e.g. Mr Ade (IT)"></div>
-    <p class="ec-hint" style="margin-top:12px;">They get the next free username (9011, 9012 …). The password is ${TRIAL_PASSWORD}.</p><div class="ec-error" id="tr-err"></div>`,
+    <p class="ec-hint" style="margin-top:12px;">A teacher sees only their own classes and subjects; someone who isn't a teacher sees every trial paper. They get the next free username (9011, 9012 …), and the password is ${TRIAL_PASSWORD}.</p><div class="ec-error" id="tr-err"></div>`,
   '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveTesters([{ teacherId: document.getElementById(\'tr-teacher\').value, name: document.getElementById(\'tr-name\').value }])">Create</button>');
 }
 function addSeveralTesters() {
   modal('Add several testers', `
     <div class="ec-field"><label for="tr-names">Names, one per line</label><textarea class="ec-input" id="tr-names" rows="8" style="max-width:none;" placeholder="Mrs Okafor&#10;Mr Bello&#10;Miss Ada"></textarea></div>
-    <p class="ec-hint" style="margin-top:12px;">A name that matches a teacher on the staff list is linked to them, so their own subjects come first.</p><div class="ec-error" id="tr-err"></div>`,
+    <p class="ec-hint" style="margin-top:12px;">A name that matches a teacher on the staff list is linked to them, so they see only their own classes and subjects.</p><div class="ec-error" id="tr-err"></div>`,
   '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveSeveralTesters()">Create</button>');
 }
 function saveSeveralTesters() {
