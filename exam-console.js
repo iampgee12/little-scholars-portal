@@ -576,7 +576,7 @@ function printSlips(list) {
   if (!box || !list?.length) return;
   box.innerHTML = list.map(t => `<div class="tr-slip"><b>Unique Children's School · CBT trial</b>
     <div>${esc(t.name)}</div><div>Username: <span class="ec-mono">${esc(t.username)}</span></div><div>Password: <span class="ec-mono">${esc(t.password || TRIAL_PASSWORD)}</span></div>
-    <div class="ec-hint">Check the connection: ${esc(url)}/check<br>Then sign in at: ${esc(url)}</div></div>`).join('');
+    <div class="ec-hint">1. Test this computer's network (wait for the green tick): ${esc(url)}/check<br>2. Then sign in at: ${esc(url)}</div></div>`).join('');
   closeModal();
   document.body.classList.add('printing-slips');
   window.addEventListener('afterprint', () => document.body.classList.remove('printing-slips'), { once: true });

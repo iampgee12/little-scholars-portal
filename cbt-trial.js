@@ -365,7 +365,7 @@ function createCbtTrial(deps) {
                            LEFT JOIN users t ON t.id = u.trial_teacher_id WHERE u.trial = 1 ORDER BY CAST(u.username AS INTEGER)`)
         .map(t => ({
           ...t, password: TRIAL_PASSWORD, secondsAgo: seen.get(t.id)?.secondsAgo ?? null,
-          teacherName: !t.teacherId ? 'IT: sees every trial paper'
+          teacherName: !t.teacherId ? 'IT'
             : t.teacherId.startsWith(PENDING) ? `${t.teacherId.slice(PENDING.length)} (after Refresh Data)` : t.teacherName,
         }));
       const results = all(`SELECT a.id, u.username, u.name, c.label AS classLabel, s.name AS subjectName, a.score, a.total_marks AS totalMarks, a.submitted_at AS submittedAt
