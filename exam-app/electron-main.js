@@ -27,7 +27,8 @@ const PARTITION = 'ucs-window'; // no "persist:" prefix: cookies live in memory 
 
 fs.mkdirSync(HOME, { recursive: true });
 app.setPath('userData', path.join(HOME, 'desktop'));
-app.setAppUserModelId('UCS.ExamServer');
+const APP_ID = 'UCS.ExamServer';
+app.setAppUserModelId(APP_ID);
 const LOG = path.join(HOME, 'server.log');
 
 let win = null;
@@ -101,6 +102,15 @@ async function endSignIn() {
   await ses.clearStorageData().catch(() => {});
 }
 
+// The taskbar button: the app has its own app ID (so its windows group together), and
+// Windows only draws the crest for that ID when each window names the icon itself
+function taskbarDetails(w) {
+  if (process.platform !== 'win32') return;
+  try {
+    w.setAppDetails({ appId: APP_ID, appIconPath: process.execPath, appIconIndex: 0, relaunchCommand: `"${process.execPath}"`, relaunchDisplayName: APP_TITLE });
+  } catch { /* an older Windows: the window icon is still set */ }
+}
+
 // ── the window ──
 function showWindow() {
   if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); return; }
@@ -109,6 +119,7 @@ function showWindow() {
     webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
   win.removeMenu();
+  taskbarDetails(win);
   win.once('ready-to-show', () => { win.maximize(); win.show(); });
   // links to other sites open in the normal browser; the app only shows this server
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -168,6 +179,7 @@ app.whenReady().then(async () => {
   if (!firstCopy) return;
   // a splash while the engine starts
   const splash = new BrowserWindow({ width: 420, height: 220, frame: false, resizable: false, show: true, icon: ICON, backgroundColor: '#ffffff', webPreferences: { sandbox: true } });
+  taskbarDetails(splash);
   splash.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html><body style="margin:0;font-family:Segoe UI,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;color:#14532d;border:1px solid #d1d5db;box-sizing:border-box"><div style="text-align:center"><b style="font-size:18px">UCS Exam Server</b><p style="color:#6b7280;font-size:13px">Starting the exam server…</p></div></body></html>`)}`);
   // always start signed out
   await session.fromPartition(PARTITION).clearStorageData().catch(() => {});
