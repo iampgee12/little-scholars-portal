@@ -382,6 +382,10 @@ function ownerAdminId() {
   return first?.id || '';
 }
 
+// Whether pupils may start CBT exams on the online portal (exam servers always may)
+const cbtOnlineAllowed = () => EXAM_MODE || valueFromMeta('cbt_online_allowed', '') === '1';
+const CBT_AT_SCHOOL = 'CBT exams are written at school, on the exam computers.';
+
 function adminLevel(userOrId) {
   const id = typeof userOrId === 'string' ? userOrId : userOrId?.id;
   const row = id ? one('SELECT id, role, super_admin AS superAdmin FROM users WHERE id = ?', id) : null;
@@ -4538,6 +4542,26 @@ async function handleApi(req, res, url) {
     });
   }
 
+  // ── CBT online or at school ──────────────────────────────────────────
+  // "Allow CBT exams online" (Offline CBT (LAN) page, super admins): off by default,
+  // so a paper set to Live online by mistake still can't be written at home. Exam
+  // servers always run exams, whatever it says.
+  if (url.pathname === '/api/admin/cbt/online-setting') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const canChange = ['owner', 'super'].includes(adminLevel(user));
+    if (req.method === 'GET') return sendJson(res, 200, { allowed: cbtOnlineAllowed(), canChange, changedAt: valueFromMeta('cbt_online_changed_at', ''), changedBy: valueFromMeta('cbt_online_changed_by', '') });
+    if (req.method === 'PUT') {
+      if (!canChange) return sendJson(res, 403, { error: 'Only a super admin can change where exams are written' });
+      const allowed = !!(await readJson(req)).allowed;
+      setMeta('cbt_online_allowed', allowed ? '1' : '');
+      setMeta('cbt_online_changed_at', new Date().toISOString());
+      setMeta('cbt_online_changed_by', user.name || user.id);
+      security.audit(req, user, allowed ? 'Allowed CBT exams online' : 'Stopped CBT exams online');
+      return sendJson(res, 200, { ok: true, allowed });
+    }
+  }
+
   // ── STUDENT: CBT (take scheduled computer-based tests) ──────────────
   // Only Multiple Choice questions are ever served here — Fill-in-the-Gap
   // and Theory questions exist in the bank for paper-based use but have no
@@ -4596,7 +4620,7 @@ async function handleApi(req, res, url) {
       score: row.submittedAt ? row.score : null,
       totalMarks: row.submittedAt ? row.totalMarks : null,
     }));
-    return sendJson(res, 200, { student: { id: student.id, name: student.name, classLabel: student.classLabel }, exams });
+    return sendJson(res, 200, { student: { id: student.id, name: student.name, classLabel: student.classLabel }, exams, onlineAllowed: cbtOnlineAllowed() });
   }
 
   const cbtStartMatch = url.pathname.match(/^\/api\/student\/cbt\/exams\/(\d+)\/start$/);
@@ -4616,6 +4640,8 @@ async function handleApi(req, res, url) {
     let attempt = one('SELECT id, started_at AS startedAt, submitted_at AS submittedAt FROM cbt_attempts WHERE schedule_subject_id = ? AND student_id = ?', scheduleSubjectId, student.id);
     if (attempt?.submittedAt) return sendJson(res, 409, { error: 'You have already submitted this exam' });
     if (!attempt) {
+      // online exams switched off: no new paper starts here (one already started can finish)
+      if (!cbtOnlineAllowed()) return sendJson(res, 403, { error: CBT_AT_SCHOOL, atSchool: true });
       if (ss.status !== 'live') return sendJson(res, 400, { error: 'This exam is not currently open' });
       const inserted = run(
         'INSERT INTO cbt_attempts (schedule_subject_id, student_id, started_at) VALUES (?, ?, ?)',
@@ -7081,7 +7107,11 @@ async function handleApi(req, res, url) {
       return sendJson(res, 404, { error: 'Exam entry not found' });
     }
     run('UPDATE cbt_schedule_subjects SET status = ? WHERE id = ?', status, id);
-    return sendJson(res, 200, { ok: true });
+    // opened online while online exams are switched off: it saves, but say pupils can't write it here
+    const warning = status === 'live' && !cbtOnlineAllowed()
+      ? 'Online exams are switched off, so pupils can\'t write this on the portal. Open it on the exam server, or switch online exams on (E-Class › CBT › Offline CBT (LAN)).'
+      : '';
+    return sendJson(res, 200, { ok: true, warning });
   }
 
   // ── E-CLASS: CBT SCORES ─────────────────────────────────────────────

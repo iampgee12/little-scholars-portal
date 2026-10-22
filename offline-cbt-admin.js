@@ -92,9 +92,47 @@ async function ocCopyKey(id) {
   showToast('Copied', 'success');
 }
 
+// "Allow CBT exams online": off means pupils can't start a CBT exam on this portal, even
+// if a paper is set to Live; the exam servers always run exams either way
+async function ocLoadWhere() {
+  const box = document.getElementById('oc-where');
+  if (!box) return;
+  try {
+    const s = await apiFetch('/api/admin/cbt/online-setting');
+    box.innerHTML = `<div class="oc-where-row">
+        <div class="oc-where-text">
+          <b>Allow CBT exams online</b>
+          <span class="oc-hint">${s.allowed
+            ? 'On: pupils can write papers set to <b>Live</b> on this portal, from anywhere, as well as at school on the exam server.'
+            : 'Off: pupils write CBT exams only at school, on the exam server. A paper set to Live here by mistake still can\'t be written online.'}</span>
+          <span class="oc-hint">Exams on the exam server work either way.${s.changedAt ? ` Last changed ${escapeHtml(new Date(s.changedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }))}${s.changedBy ? ` by ${escapeHtml(s.changedBy)}` : ''}.` : ''}</span>
+        </div>
+        <label class="oc-switch" title="${s.canChange ? '' : 'Only a super admin can change this'}">
+          <input type="checkbox" ${s.allowed ? 'checked' : ''} ${s.canChange ? '' : 'disabled'} onchange="ocSetOnline(this)">
+          <span class="oc-switch-track"></span><span class="oc-switch-label">${s.allowed ? 'On' : 'Off'}</span>
+        </label>
+      </div>`;
+  } catch (err) { box.innerHTML = `<p class="oc-hint">${escapeHtml(err.message)}</p>`; }
+}
+async function ocSetOnline(input) {
+  const allowed = input.checked;
+  const ok = await uiConfirm(allowed
+    ? 'Allow pupils to write CBT exams online? Any paper set to Live on this portal can then be written from anywhere, not only at school.'
+    : 'Stop CBT exams online? Pupils will write CBT exams only at school, on the exam server. Anyone already writing online can still finish.',
+    { confirmLabel: allowed ? 'Allow online' : 'Stop online', danger: allowed });
+  if (!ok) { input.checked = !allowed; return; }
+  input.disabled = true;
+  try {
+    await apiFetch('/api/admin/cbt/online-setting', { method: 'PUT', body: JSON.stringify({ allowed }) });
+    showToast(allowed ? 'CBT exams can now be written online' : 'CBT exams are now written at school only');
+  } catch (err) { showToast(err.message, 'warn'); }
+  ocLoadWhere();
+}
+
 async function ocInit() {
   ocAppInfo();
   ocLoadConnections();
+  ocLoadWhere();
   try {
     ocData = await apiFetch('/api/admin/cbt/offline/overview');
   } catch (err) {

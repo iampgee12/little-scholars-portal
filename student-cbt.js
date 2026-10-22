@@ -147,9 +147,12 @@ async function pingExamServer() {
   } catch { lastPing = ''; }
 }
 
+let onlineAllowed = true;
 async function loadExams() {
   const data = await apiFetch(PATHS[MODE].list);
   examsCache = data.exams || [];
+  // online exams switched off by the school: papers are written at school (scores still show)
+  onlineAllowed = data.onlineAllowed !== false;
   pupil.name = data.student?.name || pupil.name;
   pupil.classLabel = data.student?.classLabel || '';
   renderHeader();
@@ -200,12 +203,14 @@ function examCardHtml(e, group) {
     badge = e.attemptStatus === 'in_progress'
       ? '<span class="cbt-badge cbt-badge-upcoming">In progress</span>'
       : '<span class="cbt-badge cbt-badge-live">Ready</span>';
-    action = e.questionCount > 0
+    action = !onlineAllowed && e.attemptStatus !== 'in_progress'
+      ? '<span class="cbt-muted">You write this exam <strong>at school</strong>, on the exam computers.</span>'
+      : e.questionCount > 0
       ? `<button class="cbt-btn cbt-btn-block ${e.attemptStatus === 'in_progress' ? '' : 'cbt-btn-green'}" onclick="openLobby(${e.id})">${e.attemptStatus === 'in_progress' ? 'Continue Exam' : 'Start Exam'}</button>`
       : '<span class="cbt-muted">Your teacher hasn\'t added the questions yet.</span>';
   } else if (group === 'upcoming') {
     badge = '<span class="cbt-badge cbt-badge-upcoming">Upcoming</span>';
-    action = `<span class="cbt-muted">${e.examDate ? `Scheduled for <strong>${escapeHtml(examWhen(e))}</strong>. ` : ''}It will open here when your teacher starts it.</span>`;
+    action = `<span class="cbt-muted">${e.examDate ? `Scheduled for <strong>${escapeHtml(examWhen(e))}</strong>. ` : ''}${onlineAllowed ? 'It will open here when your teacher starts it.' : 'You write it <strong>at school</strong>, on the exam computers.'}</span>`;
   } else if (group === 'done') {
     const pct = e.totalMarks ? Math.round((e.score / e.totalMarks) * 100) : 0;
     badge = '<span class="cbt-badge cbt-badge-done">Completed</span>';
@@ -224,6 +229,8 @@ function examCardHtml(e, group) {
 
 function renderExamList() {
   const wrap = document.getElementById('cbt-exam-list');
+  const sub = document.querySelector('#cbt-list-view .cbt-sub');
+  if (sub && !onlineAllowed) sub.innerHTML = '<strong>CBT exams are written at school, on the exam computers.</strong> Your scores show here afterwards.';
   if (!examsCache.length) {
     wrap.innerHTML = '<div class="cbt-empty">No CBT exams have been set for your class yet.</div>';
     return;

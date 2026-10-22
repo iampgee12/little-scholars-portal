@@ -4899,7 +4899,8 @@ function csdRowOptionSelected(select, id) {
 
 async function csdSetStatus(id, status) {
   try {
-    await apiFetch(`/api/admin/cbt/schedule-subjects/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+    const data = await apiFetch(`/api/admin/cbt/schedule-subjects/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) });
+    if (data?.warning) uiNotice('Saved, but pupils can\'t write it online', data.warning);
     csdLoadSubjects();
   } catch (err) { showToast(err.message); }
 }
