@@ -2465,7 +2465,7 @@ function renderStaffProfileSubjects(staff) {
   if (staff.teacherType === 'class_teacher') {
     const mine = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'class_teacher');
     body.innerHTML = `
-      <p style="margin:0 0 10px;color:var(--text-2);font-size:12px;">A Class Teacher handles the subjects ticked for their class. To change them, open <strong>Class Teacher Assignments</strong> and click <strong>Change subjects</strong> for the class.</p>
+      <p style="margin:0 0 10px;color:var(--text-2);font-size:12px;">A Class Teacher handles the subjects ticked for their class. To change them, open <strong>Academics › Classes › Assigned Teachers</strong> and click <strong>Change subjects</strong> for the class.</p>
       <table class="data-table staff-subjects-table">
         <thead><tr><th>#</th><th>Subject</th><th>Class</th><th>Role</th></tr></thead>
         <tbody>${mine.length ? mine.map((a, index) => `<tr><td>${index + 1}.</td><td>${escapeHtml(a.subjectName)}</td><td>${escapeHtml(a.classLabel || a.classCode)}</td><td>Class Teacher</td></tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">Not assigned to a class yet.</td></tr>'}</tbody>
@@ -5598,7 +5598,7 @@ function switchClassesView(view, trigger) {
   });
   if (view === 'categories') renderClassCategoriesTable();
   if (view === 'assignClassTeacher') populateClassTeacherAssignmentForm();
-  if (view === 'assignedClassTeachers') renderClassSectionAssignments();
+  if (view === 'assignedClassTeachers') { renderClassSectionAssignments(); renderClassTeacherSubjects(); }
 }
 
 function switchSubjectsView(view, trigger) {

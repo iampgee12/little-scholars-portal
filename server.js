@@ -2295,7 +2295,7 @@ function assignSubjectTeacherAcrossClasses(teacherId, subjectId, classCodes = nu
   const chosen = Array.isArray(classCodes) ? offered.filter(({ classCode }) => classCodes.map(c => String(c).toUpperCase()).includes(classCode)) : offered;
   if (!chosen.length) return { error: 'Choose at least one class' };
   const classes = chosen.filter(({ classCode }) => !isClassTeacherSubject(classCode, subjectId));
-  if (!classes.length) return { error: 'The class teacher handles this subject in the classes chosen. Untick it for those classes under Class Teacher Subjects first.' };
+  if (!classes.length) return { error: 'The class teacher handles this subject in the classes chosen. Untick it for those classes under Academics › Classes › Assigned Teachers first.' };
 
   db.exec('BEGIN IMMEDIATE');
   try {
