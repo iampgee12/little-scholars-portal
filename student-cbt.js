@@ -56,6 +56,7 @@ function renderHeader() {
   document.getElementById('cbt-who-main').textContent = inExam ? currentExam.subjectName : (pupil.name ? `Hi, ${pupil.name}` : 'Hi there');
   document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.name, currentExam.classLabel || pupil.classLabel] : [pupil.classLabel]).filter(Boolean).join(' · ');
   document.getElementById('cbt-timer').style.display = inExam && MODE !== 'try' ? '' : 'none';
+  document.getElementById('cbt-progress').style.display = inExam ? '' : 'none';
   for (const id of ['cbt-back-portal', 'cbt-signout']) {
     const el = document.getElementById(id);
     if (el) el.style.display = inExam ? 'none' : '';
@@ -105,7 +106,7 @@ async function init() {
     pupil.name = session.user.name;
     pupil.role = role;
     renderHeader();
-    document.getElementById('cbt-hello').textContent = MODE === 'try' ? 'Try your questions as a pupil' : `Hello, ${session.user.firstName || session.user.name}!`;
+    document.getElementById('cbt-hello').textContent = MODE === 'try' ? 'Try your questions as a pupil' : `Hello, ${session.user.name || session.user.firstName}!`;
     if (MODE !== 'pupil') {
       const banner = document.getElementById('cbt-mode-banner');
       banner.textContent = MODE === 'trial'
@@ -635,7 +636,9 @@ async function finishExam(auto, btn) {
       : await apiFetch(`${paper}/submit`, { method: 'POST' });
     try { localStorage.removeItem(`cbt-flags-${currentExam.attemptId}`); } catch { /* ignore */ }
     clearPending(currentExam.attemptId);
-    if (MODE === 'pupil') showResultView(data, auto); else showReport(data);
+    if (MODE === 'pupil') showResultView(data, auto);
+    else if (MODE === 'trial') showTrialResult(data);
+    else showReport(data);
   } catch (err) {
     if (err.status === 409) { toast('This exam was already submitted.'); showListView(); return; }
     currentExam.submitting = false;
@@ -646,17 +649,34 @@ async function finishExam(auto, btn) {
 }
 
 // Name, class, subject, then the score: nothing else
-function showResultView(data) {
+function showResultView(data, auto, classLabel = pupil.classLabel) {
   closeConfirm();
   const pct = data.totalMarks ? Math.round((data.score / data.totalMarks) * 100) : 0;
   document.getElementById('cbt-result-score').innerHTML = `
-    <div class="cbt-result-name">${escapeHtml(pupil.name)}${pupil.classLabel ? `<span class="cbt-result-class">${escapeHtml(pupil.classLabel)}</span>` : ''}</div>
+    <div class="cbt-result-name">${escapeHtml(pupil.name)}${classLabel ? `<span class="cbt-result-class">${escapeHtml(classLabel)}</span>` : ''}</div>
     <div class="cbt-result-subject">${escapeHtml(currentExam.subjectName)}</div>
     <div class="cbt-result-label">Score</div>
     <div class="cbt-result-big">${data.score} / ${data.totalMarks}</div>
     <div class="cbt-result-pct">${pct}%</div>`;
+  document.getElementById('cbt-result-actions').innerHTML = '<button class="cbt-btn cbt-btn-block" style="margin-top:22px;" onclick="showListView()">Back to My Exams</button>';
   currentExam = null;
   showOnly('cbt-result-view');
+}
+
+// Testers: first the same result card a pupil sees (with the paper's class), then
+// "Check your questions" opens the report of each answer against the marked one
+let lastTrial = null;
+function showTrialResult(data) {
+  lastTrial = { data, exam: currentExam };
+  showResultView(data, false, currentExam.classLabel);
+  document.getElementById('cbt-result-actions').innerHTML = `<div class="cbt-lobby-actions" style="margin-top:22px;">
+    <button class="cbt-btn" onclick="checkTrialQuestions()">Check your questions</button>
+    <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">Back to papers</button></div>`;
+}
+function checkTrialQuestions() {
+  if (!lastTrial) return showListView();
+  currentExam = lastTrial.exam;
+  showReport(lastTrial.data);
 }
 
 // Testers and teachers: "Check your questions": each answer picked next to the one

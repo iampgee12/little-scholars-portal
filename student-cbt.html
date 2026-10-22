@@ -47,7 +47,7 @@
   .cbt-header-right { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
   .cbt-link-btn { background: none; border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; color: var(--text-2); cursor: pointer; text-decoration: none; white-space: nowrap; }
   .cbt-link-btn:hover { background: var(--black-3); }
-  main { max-width: 900px; margin: 0 auto; padding: 22px 16px 210px; }
+  main { max-width: 900px; margin: 0 auto; padding: 12px 16px 24px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   h2 { font-size: 20px; margin: 0 0 6px; }
   .cbt-sub { color: var(--text-2); font-size: 14px; margin: 0 0 18px; }
@@ -123,12 +123,15 @@
   .cbt-tool-btn { background: none; border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 9px 14px; font-size: 14px; color: var(--text-2); cursor: pointer; min-height: 42px; }
   .cbt-tool-btn.on { background: var(--amber-bg); border-color: var(--amber); color: #92400e; font-weight: 700; }
 
-  /* Bottom dock: question numbers, then Previous · progress · Next */
-  .cbt-nav-buttons { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--black); border-top: 1px solid var(--border); padding: 6px 16px calc(12px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 20px rgba(15,23,42,.05); }
-  .cbt-dock-inner { max-width: 900px; margin: 0 auto; }
-  .cbt-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+  /* Under the question: Previous (left) and Next (right), then the question numbers, centred */
+  .cbt-nav-buttons { padding: 2px 0 calc(16px + env(safe-area-inset-bottom)); }
+  .cbt-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .cbt-nav-inner .cbt-btn { min-width: 170px; min-height: 56px; font-size: 18px; border-radius: var(--radius); }
-  .cbt-dock-status { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 15px; font-weight: 600; color: var(--text-2); text-align: center; }
+  .cbt-nav-buttons .cbt-question-nav { flex-wrap: wrap; justify-content: center; overflow: visible; margin-top: 14px; }
+  /* the answered count and "Saved", beside the timer */
+  .cbt-progress { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 14px; font-weight: 700; color: var(--text-1); white-space: nowrap; }
+  /* a short question still keeps the buttons in roughly the same place */
+  .cbt-question-card { min-height: 46vh; }
   @media (max-width: 560px) {
     header.cbt-header { padding: 10px 12px; }
     .cbt-who-main { font-size: 17px; }
@@ -136,7 +139,11 @@
     .cbt-timer { font-size: 20px; padding: 5px 10px; }
     .cbt-link-btn { padding: 7px 10px; }
     .cbt-nav-inner .cbt-btn { min-width: 0; flex: 1; }
-    .cbt-dock-status .cbt-legend { display: none; }
+    /* on a phone the count and "Saved" drop to their own line under the top bar */
+    header.cbt-header { flex-wrap: wrap; row-gap: 6px; }
+    .cbt-header-right:has(.cbt-progress:not([style*="none"])) { flex-basis: 100%; }
+    .cbt-progress { flex: 1; flex-direction: row; align-items: center; gap: 12px; font-size: 13px; }
+    .cbt-header-right { justify-content: flex-end; }
   }
   @media (max-width: 640px) { .cbt-question-text { font-size: 22px; } .cbt-option { font-size: 19px; } .cbt-lobby-facts { grid-template-columns: 1fr 1fr 1fr; } .cbt-lobby { padding: 18px; } }
 
@@ -205,6 +212,10 @@
       <div class="cbt-who"><div class="cbt-who-main" id="cbt-who-main">Hi there</div><div class="cbt-who-sub" id="cbt-who-sub"></div></div>
     </div>
     <div class="cbt-header-right">
+      <div class="cbt-progress" id="cbt-progress" style="display:none;">
+        <span id="cbt-progress-text">0 of 0 answered</span>
+        <span class="cbt-save-state ok" id="cbt-save-state" aria-live="polite">&#10003; Saved</span>
+      </div>
       <div id="cbt-timer" class="cbt-timer" aria-live="off" style="display:none;">--:--</div>
       <a href="/student" class="cbt-link-btn" id="cbt-back-portal">Portal</a>
       <button class="cbt-link-btn" id="cbt-signout" onclick="signOut()">Sign Out</button>
@@ -223,18 +234,13 @@
     <div id="cbt-exam-view" style="display:none;">
       <div id="cbt-questions"></div>
       <div id="cbt-review" style="display:none;"></div>
+      <!-- under the question: Previous and Next, then the question numbers -->
       <div class="cbt-nav-buttons" id="cbt-nav-buttons">
-        <div class="cbt-dock-inner">
-          <div id="cbt-question-nav" class="cbt-question-nav" role="navigation" aria-label="Questions"></div>
-          <div class="cbt-nav-inner">
-            <span id="cbt-prev-slot"></span>
-            <div class="cbt-dock-status">
-              <div><span id="cbt-progress-text">0 of 0 answered</span> · <span class="cbt-save-state ok" id="cbt-save-state" aria-live="polite">&#10003; Saved</span></div>
-              <div class="cbt-legend"><span><i class="l-answered"></i>Answered</span><span><i></i>Not answered</span><span><i class="l-flagged"></i>Marked for review</span></div>
-            </div>
-            <span id="cbt-next-slot"></span>
-          </div>
+        <div class="cbt-nav-inner">
+          <span id="cbt-prev-slot"></span>
+          <span id="cbt-next-slot"></span>
         </div>
+        <div id="cbt-question-nav" class="cbt-question-nav" role="navigation" aria-label="Questions"></div>
       </div>
     </div>
 
@@ -243,11 +249,11 @@
     <div id="cbt-result-view" style="display:none;">
       <div class="cbt-result-card">
         <div id="cbt-result-score"></div>
-        <button class="cbt-btn cbt-btn-block" style="margin-top:22px;" onclick="showListView()">Back to My Exams</button>
+        <div id="cbt-result-actions"><button class="cbt-btn cbt-btn-block" style="margin-top:22px;" onclick="showListView()">Back to My Exams</button></div>
       </div>
     </div>
   </main>
   <script src="ui-dialog.js?v=3"></script>
-  <script src="student-cbt.js?v=8"></script>
+  <script src="student-cbt.js?v=9"></script>
 </body>
 </html>
