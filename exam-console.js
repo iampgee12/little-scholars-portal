@@ -185,7 +185,7 @@ async function loadPack() {
 // ══ APP SHELL ══
 const MENU = [
   [null, [['dashboard', 'Dashboard']]],
-  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'Computer Based Test / Exam Schedules'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']], { dropdown: 'cbt' }],
+  ['Computer-Based Tests', [['console', 'Exam Console'], ['schedules', 'Computer Based Test / Exam Schedules'], ['trial', 'Trial Run'], ['push', 'Push Results Online'], ['archive', 'Submissions Archive']], { dropdown: 'cbt' }],
   ['Data Management & Sync', [['refresh', 'Refresh Data'], ['report', 'Sync Report'], ['connection', 'Connection & Files']], { dropdown: 'sync' }],
   ['Students', [['students', 'Students Info-system']], { dropdown: 'students', search: true }],
   ['Staff / Employees', [['teachers', 'Teachers / General Staff'], ['admins', 'Administrator']], { dropdown: 'staff' }],
@@ -199,6 +199,7 @@ const TITLES = {
   students: ['Students Info-system', 'Pupils copied from the online portal'], teachers: ['Teachers / General Staff', 'Staff copied from the online portal'],
   admins: ['Administrator', 'Admins who can sign in to this exam server'],
   updates: ['Check for Updates', 'Keep the exam server up to date'],
+  trial: ['Trial Run', 'Test the questions, this exam server and the network'],
 };
 // Menu groups marked as drop-downs open and close on click, one at a time
 // (opening one closes the other); the one holding the current page starts open
@@ -269,7 +270,7 @@ async function go(page) {
     [state.dash, state.sync] = await Promise.all([api('/api/exam/dashboard'), api('/api/exam/sync-status')]);
   } catch (err) { if (err.status === 401 || err.status === 403) return start(); }
   shell();
-  const render = { dashboard: renderDashboard, console: renderConsole, schedules: renderSchedules, push: renderPush, archive: renderArchive, refresh: renderRefresh, report: renderReport, connection: renderConnection, students: renderStudents, teachers: renderTeachers, admins: renderAdmins, updates: renderUpdates }[page];
+  const render = { dashboard: renderDashboard, console: renderConsole, trial: renderTrial, schedules: renderSchedules, push: renderPush, archive: renderArchive, refresh: renderRefresh, report: renderReport, connection: renderConnection, students: renderStudents, teachers: renderTeachers, admins: renderAdmins, updates: renderUpdates }[page];
   await render();
 }
 const pageEl = () => document.getElementById('ea-page');
@@ -438,6 +439,148 @@ function hidePupils() {
 async function allowRetake(id, studentId, name) {
   if (!await uiConfirm(`Clear ${name}'s attempt so they can start this paper again? Their answers and score for it will be removed.`, { confirmLabel: 'Allow retake', danger: true })) return;
   try { await api(`/api/exam/papers/${id}/reset`, { method: 'POST', body: JSON.stringify({ studentId }) }); refreshConsole(); } catch (err) { uiNotice('Could not reset', err.message); }
+}
+
+// ── Trial Run: test the questions, this exam server and the network ──
+// Papers opened for the trial are seen only by testers (trial accounts 9001 …,
+// password 1234), never by pupils, and trial results never reach the grade book
+// or the portal. Redrawn every 5 seconds, in place, like the Exam Console.
+const TRIAL_PASSWORD = '1234';
+async function renderTrial() {
+  pageEl().innerHTML = `
+    <div class="ec-card"><h2>How a trial run works</h2>
+      <ol class="ec-steps">
+        <li>Turn <b>Trial on</b> for the papers to test. Pupils can't see trial papers.</li>
+        <li>Give each tester a username (print their slips). Every tester's password is <b>${TRIAL_PASSWORD}</b>.</li>
+        <li>On each pupil computer, first open the <b>/check</b> address below to test its LAN cable or Wi-Fi, then sign in as the tester.</li>
+        <li>Testers see every trial paper, for every class, with their own subjects first. After each paper they see which answers are marked wrongly.</li>
+        <li>Watch <b>Connected computers</b>: one that goes quiet turns red, so check its cable.</li>
+      </ol>
+      <div id="tr-addresses"></div>
+    </div>
+    <div id="tr-papers"></div>
+    <div id="tr-testers"></div>
+    <div id="tr-connections"></div>
+    <div id="tr-results"></div>
+    <div id="tr-print" class="tr-print"></div>`;
+  await refreshTrial();
+  state.timer = setInterval(refreshTrial, 5000);
+}
+const seenText = s => (s === null || s === undefined ? 'Not yet' : s < 45 ? 'Online now' : s < 120 ? 'A minute ago' : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`);
+async function refreshTrial() {
+  let d;
+  try { d = await api('/api/exam/trial'); } catch (err) { if (err.status === 401 || err.status === 403) return start(); return; }
+  if (state.page !== 'trial' || !document.getElementById('tr-papers')) return;
+  state.trial = d;
+  const nets = d.lanNetworks || [];
+  setHtml(document.getElementById('tr-addresses'), nets.length
+    ? `<div class="ec-note">${nets.map(n => `<b>${esc(n.label)}</b> — connection check: <span class="ec-mono">${esc(n.url)}/check</span> · sign in: <span class="ec-mono">${esc(n.url)}</span>`).join('<br>')}</div>`
+    : '<div class="ec-note warn">This computer is not connected to a network yet. Plug in the LAN cable or join the Wi-Fi.</div>');
+
+  const open = d.papers.filter(p => p.trial).length;
+  setHtml(document.getElementById('tr-papers'), `<div class="ec-card">
+    <div class="ec-flex"><h2>Papers for the trial</h2><div class="ec-actions"><button class="post-btn" onclick="trialPaper('all', true)">Trial on for all</button><button class="btn-outline" onclick="trialPaper('all', false)">Trial off for all</button></div></div>
+    <p class="ec-muted">${open} of ${d.papers.length} paper${d.papers.length === 1 ? '' : 's'} open for the trial.</p>
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Class</th><th>Subject</th><th>Questions</th><th>Trial</th><th></th></tr></thead><tbody>
+    ${d.papers.map(p => `<tr><td>${esc(p.classLabel)}</td><td><b>${esc(p.subjectName)}</b><div class="ec-hint">${esc(p.scheduleTitle || '')}</div></td>
+      <td>${p.questions}${p.questions ? '' : ' <span class="ec-pill bad">none</span>'}</td>
+      <td><span class="ec-pill ${p.trial ? 'live' : 'muted'}">${p.trial ? 'Trial on' : 'Off'}</span></td>
+      <td class="ec-actions">${p.trial ? `<button class="btn-outline" onclick="trialPaper(${p.id}, false)">Trial off</button>` : `<button class="post-btn" onclick="trialPaper(${p.id}, true)">Trial on</button>`}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="ec-hint">No papers yet. Refresh CBT / Exams data first.</td></tr>'}
+    </tbody></table></div></div>`);
+
+  setHtml(document.getElementById('tr-testers'), `<div class="ec-card">
+    <div class="ec-flex"><h2>Testers</h2><div class="ec-actions"><button class="post-btn" onclick="addTester()">Add tester</button><button class="btn-outline" onclick="addSeveralTesters()">Add several</button>
+      <button class="btn-outline" onclick="printSlips(state.trial.testers)" ${d.testers.length ? '' : 'disabled'}>Print all slips</button><button class="btn-danger" onclick="removeAllTesters()" ${d.testers.length ? '' : 'disabled'}>Remove all testers</button></div></div>
+    <p class="ec-muted">Trial accounts for teachers and IT. They see trial papers only, and nothing they do counts.</p>
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Username</th><th>Name</th><th>Teacher</th><th>Password</th><th>Last seen</th><th></th></tr></thead><tbody>
+    ${d.testers.map(t => `<tr><td class="ec-mono"><b>${esc(t.username)}</b></td><td>${esc(t.name)}</td><td>${t.teacherName ? esc(t.teacherName) : '<span class="ec-hint">—</span>'}</td>
+      <td class="ec-mono">${esc(t.password)}</td><td><span class="ec-pill ${t.secondsAgo !== null && t.secondsAgo < 45 ? 'ok' : 'muted'}">${seenText(t.secondsAgo)}</span></td>
+      <td class="ec-actions"><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-outline" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
+      || '<tr><td colspan="6" class="ec-hint">No testers yet. Click Add tester.</td></tr>'}
+    </tbody></table></div></div>`);
+
+  setHtml(document.getElementById('tr-connections'), `<div class="ec-card">
+    <h2>Connected computers</h2>
+    <p class="ec-muted">Every pupil computer that has reached this exam server. One quiet for over 45 seconds turns red.</p>
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Computer</th><th>Connected by</th><th>Signed in as</th><th>Speed</th><th>Last seen</th></tr></thead><tbody>
+    ${d.connections.map(c => `<tr class="${c.secondsAgo > 45 ? 'tr-quiet' : ''}"><td class="ec-mono">${esc(c.ip)}</td><td>${esc(c.via || '')}</td>
+      <td>${c.user ? `${esc(c.user.name)}${c.user.username ? ` <span class="ec-hint">${esc(c.user.username)}</span>` : ''}${c.user.trial ? ' <span class="ec-pill warn">Tester</span>' : ''}` : '<span class="ec-hint">Not signed in</span>'}</td>
+      <td class="ec-mono">${c.rtt === null ? '<span class="ec-hint">—</span>' : `${c.rtt} ms${c.rttMax > c.rtt ? ` <span class="ec-hint">(slowest ${c.rttMax})</span>` : ''}`}</td>
+      <td>${seenText(c.secondsAgo)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="ec-hint">No pupil computers have connected yet. Open the /check address on one.</td></tr>'}
+    </tbody></table></div></div>`);
+
+  setHtml(document.getElementById('tr-results'), `<div class="ec-card">
+    <div class="ec-flex"><h2>Trial results</h2><button class="btn-outline" onclick="clearTrialResults()" ${d.results.length ? '' : 'disabled'}>Clear trial results</button></div>
+    <p class="ec-muted">Trial papers handed in. These never go to the grade book or the online portal.</p>
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Handed in</th><th>Tester</th><th>Paper</th><th>Score</th></tr></thead><tbody>
+    ${d.results.map(r => `<tr><td>${esc(when(r.submittedAt))}</td><td>${esc(r.name)} <span class="ec-hint">${esc(r.username)}</span></td><td>${esc(r.classLabel)} — ${esc(r.subjectName)}</td><td class="ec-mono">${r.score} / ${r.totalMarks}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="ec-hint">No trial papers handed in yet.</td></tr>'}
+    </tbody></table></div></div>`);
+}
+async function trialPaper(id, on) {
+  try { await api(`/api/exam/trial/papers/${id}`, { method: 'POST', body: JSON.stringify({ on }) }); refreshTrial(); } catch (err) { uiNotice('Could not change the paper', err.message); }
+}
+function addTester() {
+  modal('Add a tester', `
+    <div class="ec-field"><label for="tr-teacher">Pick a teacher</label><select class="ec-select" id="tr-teacher"><option value="">Not a teacher (type a name below)</option>${state.trial.teachers.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div>
+    <div class="ec-field"><label for="tr-name">Or type a name</label><input class="ec-input" id="tr-name" placeholder="e.g. Mr Ade (IT)"></div>
+    <p class="ec-hint" style="margin-top:12px;">They get the next free username (9011, 9012 …). The password is ${TRIAL_PASSWORD}.</p><div class="ec-error" id="tr-err"></div>`,
+  '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveTesters([{ teacherId: document.getElementById(\'tr-teacher\').value, name: document.getElementById(\'tr-name\').value }])">Create</button>');
+}
+function addSeveralTesters() {
+  modal('Add several testers', `
+    <div class="ec-field"><label for="tr-names">Names, one per line</label><textarea class="ec-input" id="tr-names" rows="8" style="max-width:none;" placeholder="Mrs Okafor&#10;Mr Bello&#10;Miss Ada"></textarea></div>
+    <p class="ec-hint" style="margin-top:12px;">A name that matches a teacher on the staff list is linked to them, so their own subjects come first.</p><div class="ec-error" id="tr-err"></div>`,
+  '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveSeveralTesters()">Create</button>');
+}
+function saveSeveralTesters() {
+  const byName = new Map(state.trial.teachers.map(t => [t.name.trim().toLowerCase(), t.id]));
+  const names = document.getElementById('tr-names').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!names.length) { document.getElementById('tr-err').textContent = 'Type at least one name.'; return; }
+  saveTesters(names.map(name => ({ name, teacherId: byName.get(name.toLowerCase()) || '' })));
+}
+async function saveTesters(list) {
+  const btn = document.getElementById('tr-go');
+  if (btn) btn.disabled = true;
+  try {
+    const { created } = await api('/api/exam/trial/testers', { method: 'POST', body: JSON.stringify({ testers: list }) });
+    await refreshTrial();
+    modal(`${plural(created.length, 'tester')} created`, `<table class="ec-table"><thead><tr><th>Username</th><th>Name</th><th>Password</th></tr></thead><tbody>
+      ${created.map(t => `<tr><td class="ec-mono"><b>${esc(t.username)}</b></td><td>${esc(t.name)}</td><td class="ec-mono">${esc(t.password)}</td></tr>`).join('')}</tbody></table>`,
+    `<button class="btn-outline" onclick="closeModal()">Done</button><button class="post-btn" onclick='printSlips(${JSON.stringify(created).replace(/'/g, '&#39;')})'>Print slips</button>`);
+  } catch (err) {
+    if (btn) btn.disabled = false;
+    const box = document.getElementById('tr-err');
+    if (box) box.textContent = err.message;
+  }
+}
+async function removeTester(id) {
+  const t = state.trial.testers.find(x => x.id === id);
+  if (!t || !await uiConfirm(`Remove tester ${t.username} (${t.name})? They won't be able to sign in any more.`, { confirmLabel: 'Remove', danger: true })) return;
+  try { await api(`/api/exam/trial/testers/${encodeURIComponent(id)}/remove`, { method: 'POST' }); refreshTrial(); } catch (err) { uiNotice('Could not remove the tester', err.message); }
+}
+async function removeAllTesters() {
+  if (!await uiConfirm('Remove every tester? None of them will be able to sign in, and their trial results are cleared too.', { confirmLabel: 'Remove all', danger: true })) return;
+  try { await api('/api/exam/trial/testers/remove-all', { method: 'POST' }); refreshTrial(); } catch (err) { uiNotice('Could not remove the testers', err.message); }
+}
+async function clearTrialResults() {
+  if (!await uiConfirm('Clear every trial result? This only removes trial papers, never real exams.', { confirmLabel: 'Clear', danger: true })) return;
+  try { await api('/api/exam/trial/results/clear', { method: 'POST' }); refreshTrial(); } catch (err) { uiNotice('Could not clear the results', err.message); }
+}
+// One slip per tester, two to a row, printed on their own
+function printSlips(list) {
+  const url = (state.trial?.lanNetworks || [])[0]?.url || 'http://<exam address>';
+  const box = document.getElementById('tr-print');
+  if (!box || !list?.length) return;
+  box.innerHTML = list.map(t => `<div class="tr-slip"><b>Unique Children's School · CBT trial</b>
+    <div>${esc(t.name)}</div><div>Username: <span class="ec-mono">${esc(t.username)}</span></div><div>Password: <span class="ec-mono">${esc(t.password || TRIAL_PASSWORD)}</span></div>
+    <div class="ec-hint">Check the connection: ${esc(url)}/check<br>Then sign in at: ${esc(url)}</div></div>`).join('');
+  closeModal();
+  document.body.classList.add('printing-slips');
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing-slips'), { once: true });
+  window.print();
 }
 
 // ── CBT Schedules (read-only) ──

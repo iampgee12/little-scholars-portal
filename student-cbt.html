@@ -162,6 +162,26 @@
   .cbt-modal-actions .cbt-btn { flex: 1; min-height: 60px; font-size: 18px; border-radius: var(--radius); }
   .cbt-warn-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; margin-bottom: 14px; }
 
+  /* Trial runs and practice: the banner, and the "Check your questions" report */
+  .cbt-mode-banner { background: var(--amber); color: #fff; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .3px; padding: 7px 16px; }
+  .cbt-badge-bad { background: var(--red-bg); color: var(--red); }
+  .cbt-rq { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-top: 12px; background: var(--black); }
+  .cbt-rq.bad { border-color: #fecaca; box-shadow: 0 0 0 3px var(--red-bg); }
+  .cbt-rq.warn { border-color: #fde68a; }
+  .cbt-rq-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--text-2); margin-bottom: 8px; }
+  .cbt-rq-text { font-size: 18px; line-height: 1.5; margin-bottom: 10px; white-space: pre-line; }
+  .cbt-rq-options { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .cbt-rq-options li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 16px; }
+  .cbt-rq-options li.correct { border-color: #86efac; background: var(--green-bg); }
+  .cbt-rq-options li.picked:not(.correct) { border-color: #fecaca; background: var(--red-bg); }
+  .cbt-rq-options .cbt-option-letter { width: 30px; height: 30px; font-size: 14px; }
+  .cbt-rq-opt { flex: 1; min-width: 120px; }
+  .cbt-rq-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+  .cbt-rq-tag.ok { background: var(--green-bg); color: var(--green); }
+  .cbt-rq-tag.bad { background: var(--red-bg); color: var(--red); }
+  .cbt-rq-all { margin-top: 18px; }
+  .cbt-rq-all summary { cursor: pointer; font-weight: 700; color: var(--text-2); }
+
   /* Toasts + result */
   .cbt-toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 60; background: #0f172a; color: #fff; padding: 12px 18px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-width: calc(100% - 32px); text-align: center; }
   .cbt-toast.warn { background: var(--amber); }
@@ -190,6 +210,7 @@
       <button class="cbt-link-btn" id="cbt-signout" onclick="signOut()">Sign Out</button>
     </div>
   </header>
+  <div class="cbt-mode-banner" id="cbt-mode-banner" style="display:none;"></div>
   <main>
     <div id="cbt-list-view">
       <h1 id="cbt-hello">My CBT Exams</h1>
@@ -217,6 +238,8 @@
       </div>
     </div>
 
+    <div id="cbt-report-view" style="display:none;"></div>
+
     <div id="cbt-result-view" style="display:none;">
       <div class="cbt-result-card">
         <div id="cbt-result-score"></div>
@@ -225,6 +248,6 @@
     </div>
   </main>
   <script src="ui-dialog.js?v=3"></script>
-  <script src="student-cbt.js?v=7"></script>
+  <script src="student-cbt.js?v=8"></script>
 </body>
 </html>

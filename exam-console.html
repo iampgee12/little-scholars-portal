@@ -88,6 +88,16 @@ button { font-family: inherit; }
 .ec-actions button { padding: 6px 12px; font-size: 12px; }
 .ec-row-active td { background: var(--green-bg); }
 .ec-error { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 18px; }
+/* Trial Run */
+.ec-steps { margin: 8px 0 4px; padding-left: 20px; font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.ec-table tr.tr-quiet td { color: var(--red); }
+.tr-print { display: none; }
+.tr-slip { border: 1px dashed var(--border-2, #cbd5e1); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6; break-inside: avoid; }
+@media print {
+  body.printing-slips * { visibility: hidden; }
+  body.printing-slips .tr-print, body.printing-slips .tr-print * { visibility: visible; }
+  body.printing-slips .tr-print { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; position: absolute; left: 0; top: 0; width: 100%; }
+}
 .ec-flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .ec-check { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text-2); }
 .ec-note { background: var(--black-3); border-left: 3px solid var(--green); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: var(--text-2); line-height: 1.5; margin: 10px 0; }

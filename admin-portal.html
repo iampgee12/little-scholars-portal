@@ -4989,7 +4989,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;align-items:end;">
               <div><label class="field-label">Class *</label><select class="ctrl-select" id="qb-class"><option value="">Select Class</option></select></div>
               <div><label class="field-label">Subject *</label><select class="ctrl-select" id="qb-subject"><option value="">Select Subject</option></select></div>
-              <div><button class="post-btn" onclick="qbGoToBank()">Go to Question Bank</button></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="post-btn" onclick="qbGoToBank()">Go to Question Bank</button><button class="post-btn" onclick="window.open('/cbt?try=1', '_blank')" title="Go through any class's questions exactly as pupils will, then see any answer marked wrongly. Nothing is saved.">Try as a pupil</button></div>
             </div>
           </div>
         </div>

@@ -324,9 +324,13 @@ module.exports = function createExamSync(ctx) {
         for (const name of APPLY_ORDER) {
           if (!tables[name]) continue;
           if (name === 'staff_users') run("DELETE FROM users WHERE role IN ('admin', 'teacher', 'staff')");
-          else if (name === 'student_users') run("DELETE FROM users WHERE role = 'student'");
+          // trial accounts (testers) are made on this computer: keep them, and don't let
+          // a pupil copied from the portal take one of their usernames
+          else if (name === 'student_users') run("DELETE FROM users WHERE role = 'student' AND COALESCE(trial, 0) = 0");
           else if (cbtOffline.tableExists(name)) run(`DELETE FROM "${name}"`);
-          cbtOffline.insertRows(name.endsWith('_users') ? 'users' : name, tables[name]);
+          const taken = name === 'student_users' ? new Set(all('SELECT LOWER(username) AS u FROM users WHERE trial = 1 AND username IS NOT NULL').map(r => r.u)) : null;
+          const rows = taken ? tables[name].map(u => (u.username && taken.has(String(u.username).toLowerCase()) ? { ...u, username: null } : u)) : tables[name];
+          cbtOffline.insertRows(name.endsWith('_users') ? 'users' : name, rows);
         }
         if (localStatus) {
           for (const p of tables.cbt_schedule_subjects) {

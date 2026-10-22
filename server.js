@@ -12,6 +12,7 @@ const createTermSetup = require('./term-setup');
 const createStudents = require('./students-api');
 const createSecurity = require('./security');
 const { createCbtOffline } = require('./cbt-offline');
+const { createCbtTrial } = require('./cbt-trial');
 const createExamSync = require('./exam-sync');
 
 const ROOT = __dirname;
@@ -1832,6 +1833,13 @@ const examSync = createExamSync({
   adminLevel, schoolInfoFromMeta, ROOT, UPLOAD_DIR, EXAM_MODE, cbtOffline,
 });
 examSync.createSchema();
+// CBT trial runs: Try as a pupil online; trial papers, testers and /check on the exam computer
+const cbtTrial = createCbtTrial({
+  db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, sessionUser, hashPassword,
+  initialsFromName, firstNameFromName, valueFromMeta, setMeta, EXAM_MODE, cbtOffline,
+});
+cbtTrial.createSchema();
+cbtTrial.ensureDefaultTesters();
 assignStudentUsernames();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
@@ -1895,6 +1903,7 @@ function publicUser(row) {
     chip: row.chip,
     grade: row.grade,
     adminLevel: row.role === 'admin' ? adminLevel(row.id) : null,
+    trial: !!row.trial,
     email: row.email || '',
     signaturePath: row.signature_path || '',
     ...profileFields(row),
@@ -9918,6 +9927,8 @@ if (EXAM_MODE) {
   PAGE_ROUTES['/student'] = '/student-cbt.html';
   // pupils' address: just username and password (admins use the exam server app)
   PAGE_ROUTES['/signin'] = '/exam-signin.html';
+  // any pupil computer can test its connection to the exam server here, without signing in
+  PAGE_ROUTES['/check'] = '/exam-check.html';
   ['/teacher', '/register', '/reset-password'].forEach(route => delete PAGE_ROUTES[route]);
 }
 
@@ -10017,7 +10028,9 @@ const server = http.createServer(async (req, res) => {
     security.applyHeaders(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       security.trackRequest(req, res, url, sessionUser(req));
+      cbtTrial.track(req, url);
       if (await examSync.handle(req, res, url)) return;
+      if (await cbtTrial.handle(req, res, url)) return;
       if (await cbtOffline.handle(req, res, url)) return;
       await handleApi(req, res, url);
       // pupils added, imported or promoted by this request get a username

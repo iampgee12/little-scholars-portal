@@ -34,15 +34,28 @@ function escapeHtml(value) {
 let examsCache = [];
 let currentExam = null;
 let timerInterval = null;
-const pupil = { name: '', classLabel: '' };
+const pupil = { name: '', classLabel: '', role: 'student' };
+
+// The same page runs three ways: a pupil's real exam; a tester's trial paper on
+// the exam computer (trial accounts: nothing counts); and "Try as a pupil" for
+// teachers and admins online (?try: answers stay in the browser, nothing is
+// saved, and there's no time limit). Testers and teachers end on a report of
+// each answer they picked next to the one marked correct.
+let MODE = 'pupil';
+const PATHS = {
+  pupil: { list: '/api/student/cbt/exams', paper: id => `/api/student/cbt/exams/${id}` },
+  trial: { list: '/api/trial/papers', paper: id => `/api/trial/papers/${id}` },
+  try: { list: '/api/cbt-try/papers', paper: id => `/api/cbt-try/papers/${encodeURIComponent(id)}` },
+};
+const findExam = id => examsCache.find(x => String(x.id) === String(id));
 
 // Top bar: "Hi, name" and the class; during an exam the subject, then the name
 // and class, on the left and the timer on the right
 function renderHeader() {
   const inExam = !!currentExam && document.getElementById('cbt-exam-view').style.display !== 'none';
   document.getElementById('cbt-who-main').textContent = inExam ? currentExam.subjectName : (pupil.name ? `Hi, ${pupil.name}` : 'Hi there');
-  document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.name, pupil.classLabel] : [pupil.classLabel]).filter(Boolean).join(' · ');
-  document.getElementById('cbt-timer').style.display = inExam ? '' : 'none';
+  document.getElementById('cbt-who-sub').textContent = (inExam ? [pupil.name, currentExam.classLabel || pupil.classLabel] : [pupil.classLabel]).filter(Boolean).join(' · ');
+  document.getElementById('cbt-timer').style.display = inExam && MODE !== 'try' ? '' : 'none';
   for (const id of ['cbt-back-portal', 'cbt-signout']) {
     const el = document.getElementById(id);
     if (el) el.style.display = inExam ? 'none' : '';
@@ -63,7 +76,7 @@ function toast(message, kind = '', ms = 3500) {
 }
 
 function showOnly(viewId) {
-  ['cbt-list-view', 'cbt-lobby-view', 'cbt-exam-view', 'cbt-result-view'].forEach(id => {
+  ['cbt-list-view', 'cbt-lobby-view', 'cbt-exam-view', 'cbt-result-view', 'cbt-report-view'].forEach(id => {
     document.getElementById(id).style.display = id === viewId ? 'block' : 'none';
   });
   renderHeader();
@@ -82,26 +95,88 @@ function examWhen(e) {
 async function init() {
   try {
     const session = await apiFetch('/api/session');
-    if (session.user.role !== 'student') {
+    const role = session.user.role;
+    if (role === 'student') MODE = session.user.trial ? 'trial' : 'pupil';
+    else if (['teacher', 'admin'].includes(role) && new URLSearchParams(location.search).has('try')) MODE = 'try';
+    else {
       window.location.replace('/signin');
       return;
     }
     pupil.name = session.user.name;
+    pupil.role = role;
     renderHeader();
-    document.getElementById('cbt-hello').textContent = `Hello, ${session.user.firstName || session.user.name}!`;
+    document.getElementById('cbt-hello').textContent = MODE === 'try' ? 'Try your questions as a pupil' : `Hello, ${session.user.firstName || session.user.name}!`;
+    if (MODE !== 'pupil') {
+      const banner = document.getElementById('cbt-mode-banner');
+      banner.textContent = MODE === 'trial'
+        ? 'TRIAL RUN · Nothing here counts. Trial answers and scores are never saved as real results.'
+        : 'PRACTICE · You see the questions exactly as pupils will. Nothing is saved, and there is no time limit.';
+      banner.style.display = '';
+      document.querySelector('#cbt-list-view .cbt-sub').innerHTML = MODE === 'trial'
+        ? 'Pick any paper to try it. Your own subjects come first. At the end you\'ll see any answer that is marked wrongly.'
+        : 'Pick a class and subject to go through its questions. At the end you\'ll see each answer you picked next to the one marked correct.';
+      const portal = document.getElementById('cbt-back-portal');
+      if (portal) portal.href = role === 'admin' ? '/admin' : '/teacher';
+    }
+    // testers: keep the Trial Run page's "Connected computers" up to date
+    if (MODE === 'trial') setInterval(pingExamServer, 15000);
     await loadExams();
   } catch (err) {
     document.getElementById('cbt-exam-list').innerHTML = `<div class="cbt-empty">${escapeHtml(err.network ? 'No internet connection. Check your connection and refresh the page.' : err.message)}</div>`;
   }
 }
 
+let lastPing = '';
+async function pingExamServer() {
+  const t0 = performance.now();
+  try {
+    await fetch(`/api/check/ping?rtt=${lastPing}`, { cache: 'no-store' });
+    lastPing = Math.round(performance.now() - t0);
+  } catch { lastPing = ''; }
+}
+
 async function loadExams() {
-  const data = await apiFetch('/api/student/cbt/exams');
+  const data = await apiFetch(PATHS[MODE].list);
   examsCache = data.exams || [];
   pupil.name = data.student?.name || pupil.name;
   pupil.classLabel = data.student?.classLabel || '';
   renderHeader();
-  renderExamList();
+  if (MODE === 'pupil') renderExamList(); else renderTrialList();
+}
+
+// Testers and teachers: every paper they can try, grouped by class (a tester's
+// own subjects first), each one as often as they like
+function renderTrialList() {
+  const wrap = document.getElementById('cbt-exam-list');
+  if (!examsCache.length) {
+    wrap.innerHTML = `<div class="cbt-empty">${MODE === 'trial'
+      ? 'No papers are open for the trial yet. Ask IT to turn Trial on for some papers on the exam server.'
+      : 'You have no classes and subjects with CBT questions yet.'}</div>`;
+    return;
+  }
+  const groups = new Map();
+  examsCache.forEach(e => {
+    const key = MODE === 'trial' && e.mine ? 'Your subjects' : e.classLabel;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  });
+  wrap.innerHTML = [...groups].map(([title, list]) => `
+    <div class="cbt-group-title">${escapeHtml(title)} (${list.length})</div>
+    <div class="cbt-exam-grid">${list.map(e => {
+      const facts = [
+        MODE === 'try' ? (e.durationMinutes ? `Pupils get ${e.durationMinutes} min` : 'No time limit') : `${e.durationMinutes} min`,
+        `${e.questionCount} question${e.questionCount === 1 ? '' : 's'}`,
+      ];
+      if (e.paperMarks) facts.push(`${e.paperMarks} mark${e.paperMarks === 1 ? '' : 's'}`);
+      return `<div class="cbt-exam-card ready">
+        <div class="cbt-exam-card-head"><span>${escapeHtml(e.subjectName)}</span><span class="cbt-badge ${e.attemptStatus === 'in_progress' ? 'cbt-badge-upcoming' : 'cbt-badge-live'}">${e.attemptStatus === 'in_progress' ? 'In progress' : escapeHtml(e.classLabel)}</span></div>
+        <div class="cbt-muted">${escapeHtml(e.classLabel)}${e.scheduleTitle ? ` · ${escapeHtml(e.scheduleTitle)}` : ''}${e.lastScore !== null && e.lastScore !== undefined ? ` · Last try: ${e.lastScore} / ${e.lastTotal}` : ''}</div>
+        <div class="cbt-facts">${facts.map(f => `<span class="cbt-fact">${f}</span>`).join('')}</div>
+        <div class="cbt-exam-card-foot">${e.questionCount > 0
+          ? `<button class="cbt-btn cbt-btn-block cbt-btn-green" onclick="openLobby('${escapeHtml(String(e.id))}')">${e.attemptStatus === 'in_progress' ? 'Continue' : 'Try it'}</button>`
+          : '<span class="cbt-muted">No questions have been added yet.</span>'}</div>
+      </div>`;
+    }).join('')}</div>`).join('');
 }
 
 function examCardHtml(e, group) {
@@ -156,21 +231,26 @@ function renderExamList() {
 
 // ── Before you start ──
 function openLobby(id) {
-  const e = examsCache.find(x => x.id === id);
+  const e = findExam(id);
   if (!e) return;
   const resuming = e.attemptStatus === 'in_progress';
+  const note = MODE === 'trial'
+    ? '<div class="cbt-resume-note">This is a trial paper. Nothing counts, and you can try it as often as you like. The timer is real, so you see what pupils will.</div><br>'
+    : MODE === 'try'
+      ? `<div class="cbt-resume-note">This is a practice run of your questions. Nothing is saved, and there is no time limit${e.durationMinutes ? ` (pupils get ${e.durationMinutes} minutes)` : ''}.</div><br>`
+      : '';
   const custom = (e.instructions || []).map(set => `
     <div class="cbt-instructions"><h3>${escapeHtml(set.title)}</h3><p>${escapeHtml(set.text)}</p></div>`).join('');
   document.getElementById('cbt-lobby-view').innerHTML = `
     <div class="cbt-lobby">
-      <div class="cbt-muted">${escapeHtml(e.scheduleTitle)}</div>
+      <div class="cbt-muted">${escapeHtml([e.classLabel, e.scheduleTitle].filter(Boolean).join(' · '))}</div>
       <h2>${escapeHtml(e.subjectName)}</h2>
       <div class="cbt-lobby-facts">
-        <div class="cbt-lobby-fact"><strong>${e.durationMinutes}</strong><span>minutes</span></div>
+        <div class="cbt-lobby-fact"><strong>${e.durationMinutes || '—'}</strong><span>minutes</span></div>
         <div class="cbt-lobby-fact"><strong>${e.questionCount}</strong><span>questions</span></div>
         <div class="cbt-lobby-fact"><strong>${e.paperMarks || '—'}</strong><span>marks</span></div>
       </div>
-      ${resuming ? '<div class="cbt-resume-note">You already started this exam. Your answers are saved and the timer has kept running — continue now.</div><br>' : ''}
+      ${note || (resuming ? '<div class="cbt-resume-note">You already started this exam. Your answers are saved and the timer has kept running — continue now.</div><br>' : '')}
       ${custom}
       <div class="cbt-instructions">
         <h3>Instructions</h3>
@@ -188,21 +268,24 @@ function openLobby(id) {
       </div>
       <div class="cbt-lobby-actions">
         <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">Back</button>
-        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam(${e.id}, this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
+        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam('${escapeHtml(String(e.id))}', this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
       </div>
     </div>`;
   showOnly('cbt-lobby-view');
 }
 
 async function beginExam(id, btn) {
-  const meta = examsCache.find(x => x.id === id) || {};
+  const meta = findExam(id) || {};
   if (btn) btn.disabled = true;
   try {
-    const data = await apiFetch(`/api/student/cbt/exams/${id}/start`, { method: 'POST' });
+    const data = await apiFetch(`${PATHS[MODE].paper(id)}/start`, { method: 'POST' });
     currentExam = {
       id,
       subjectName: meta.subjectName || 'Exam',
+      classLabel: MODE === 'pupil' ? '' : meta.classLabel || '',
       ...data,
+      // trial and practice runs keep their unsent answers and flags apart from real exams
+      attemptId: MODE === 'pupil' ? data.attemptId : `${MODE}-${data.attemptId}`,
       currentIndex: 0,
       mode: 'question',
       answersMap: new Map((data.answers || []).filter(a => a.selectedOption !== null).map(a => [a.questionId, a.selectedOption])),
@@ -216,7 +299,7 @@ async function beginExam(id, btn) {
     currentExam.currentIndex = firstOpen === -1 ? 0 : firstOpen;
     showOnly('cbt-exam-view');
     renderExamView();
-    startTimer();
+    if (MODE !== 'try') startTimer();
     if (saveQueue.size) processSaveQueue();
   } catch (err) {
     toast(err.network ? 'No internet connection — check it and try again.' : err.message, 'danger');
@@ -430,10 +513,13 @@ function selectAnswer(questionId, option) {
   if (!currentExam || currentExam.submitting) return;
   if (option === null) currentExam.answersMap.delete(questionId);
   else currentExam.answersMap.set(questionId, option);
-  saveQueue.set(questionId, option);
-  persistQueue();
+  // practice runs keep answers in the browser only
+  if (MODE !== 'try') {
+    saveQueue.set(questionId, option);
+    persistQueue();
+  }
   renderExamView();
-  processSaveQueue();
+  if (MODE !== 'try') processSaveQueue();
   clearTimeout(advanceTimer);
   const i = currentExam.currentIndex;
   if (option !== null && currentExam.mode === 'question' && i < currentExam.questions.length - 1) {
@@ -458,7 +544,7 @@ async function processSaveQueue() {
   try {
     while (saveQueue.size && currentExam) {
       const [questionId, selectedOption] = saveQueue.entries().next().value;
-      await apiFetch(`/api/student/cbt/exams/${currentExam.id}/answer`, {
+      await apiFetch(`${PATHS[MODE].paper(currentExam.id)}/answer`, {
         method: 'POST',
         body: JSON.stringify({ questionId, selectedOption }),
       });
@@ -543,10 +629,13 @@ async function finishExam(auto, btn) {
   clearInterval(timerInterval);
   clearTimeout(retryTimer);
   try {
-    const data = await apiFetch(`/api/student/cbt/exams/${currentExam.id}/submit`, { method: 'POST' });
+    const paper = PATHS[MODE].paper(currentExam.id);
+    const data = MODE === 'try'
+      ? await apiFetch(`${paper}/check`, { method: 'POST', body: JSON.stringify({ answers: [...currentExam.answersMap] }) })
+      : await apiFetch(`${paper}/submit`, { method: 'POST' });
     try { localStorage.removeItem(`cbt-flags-${currentExam.attemptId}`); } catch { /* ignore */ }
     clearPending(currentExam.attemptId);
-    showResultView(data, auto);
+    if (MODE === 'pupil') showResultView(data, auto); else showReport(data);
   } catch (err) {
     if (err.status === 409) { toast('This exam was already submitted.'); showListView(); return; }
     currentExam.submitting = false;
@@ -568,6 +657,47 @@ function showResultView(data) {
     <div class="cbt-result-pct">${pct}%</div>`;
   currentExam = null;
   showOnly('cbt-result-view');
+}
+
+// Testers and teachers: "Check your questions": each answer picked next to the one
+// marked correct, with warnings for badly made questions. Problems first.
+function showReport(data) {
+  closeConfirm();
+  const items = data.review || [];
+  const count = s => items.filter(i => i.status === s).length;
+  const problems = items.filter(i => i.status === 'mismatch' || i.warnings.length);
+  const letter = i => String.fromCharCode(65 + i);
+  const card = i => `<div class="cbt-rq ${i.status === 'mismatch' ? 'bad' : i.warnings.length ? 'warn' : ''}">
+      <div class="cbt-rq-head"><strong>Question ${i.number}</strong>
+        <span class="cbt-badge ${i.status === 'match' ? 'cbt-badge-live' : i.status === 'mismatch' ? 'cbt-badge-bad' : 'cbt-badge-closed'}">${i.status === 'match' ? 'Matches the marked answer' : i.status === 'mismatch' ? 'Different from the marked answer' : 'Not answered'}</span></div>
+      <div class="cbt-rq-text">${escapeHtml(i.questionText)}</div>
+      <ul class="cbt-rq-options">${i.options.map((o, j) => `<li class="${i.correct.includes(j) ? 'correct' : ''} ${i.picked === j ? 'picked' : ''}">
+        <span class="cbt-option-letter">${letter(j)}</span><span class="cbt-rq-opt">${escapeHtml(o) || '<em>(empty)</em>'}</span>
+        ${i.correct.includes(j) ? '<span class="cbt-rq-tag ok">Marked correct</span>' : ''}${i.picked === j ? `<span class="cbt-rq-tag ${i.correct.includes(j) ? 'ok' : 'bad'}">You picked</span>` : ''}</li>`).join('')}</ul>
+      ${i.warnings.length ? `<div class="cbt-warn-box">${i.warnings.map(w => `⚠ ${escapeHtml(w)}`).join('<br>')}</div>` : ''}
+    </div>`;
+  const fixHint = MODE === 'try' && pupil.role === 'teacher'
+    ? '<p class="cbt-sub">To fix a question, open <strong>My CBT Questions</strong> in your portal, then try again.</p>'
+    : MODE === 'try' ? '<p class="cbt-sub">To fix a question, open the <strong>Question Bank</strong> for this class and subject, then try again.</p>'
+      : '<p class="cbt-sub">Tell the subject teacher about any question marked below, so they can fix it online before exam day.</p>';
+  document.getElementById('cbt-report-view').innerHTML = `
+    <div class="cbt-lobby" style="max-width:820px;">
+      <div class="cbt-muted">${escapeHtml(currentExam.classLabel)}</div>
+      <h2>Check your questions: ${escapeHtml(currentExam.subjectName)}</h2>
+      ${fixHint}
+      <div class="cbt-review-stats" style="grid-template-columns:repeat(4,1fr);">
+        <div class="cbt-review-stat answered"><strong>${count('match')}</strong>Match</div>
+        <div class="cbt-review-stat unanswered"><strong>${count('mismatch')}</strong>Different</div>
+        <div class="cbt-review-stat"><strong>${count('skipped')}</strong>Not answered</div>
+        <div class="cbt-review-stat flagged"><strong>${items.filter(i => i.warnings.length).length}</strong>With warnings</div>
+      </div>
+      <p class="cbt-muted">Score as a pupil would get it: <strong>${data.score} / ${data.totalMarks}</strong></p>
+      ${problems.length ? `<div class="cbt-group-title">Needs a look (${problems.length})</div>${problems.map(card).join('')}` : '<div class="cbt-resume-note" style="background:var(--green-bg);color:var(--green);">No problems found: every answer you picked matches the marked answer, and no question has warnings.</div>'}
+      ${items.length > problems.length ? `<details class="cbt-rq-all"><summary>All questions (${items.length})</summary>${items.map(card).join('')}</details>` : ''}
+      <div class="cbt-lobby-actions"><button class="cbt-btn cbt-btn-green" onclick="showListView()">Back to papers</button></div>
+    </div>`;
+  currentExam = null;
+  showOnly('cbt-report-view');
 }
 
 function showListView() {
