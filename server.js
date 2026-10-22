@@ -1938,6 +1938,10 @@ function profileFields(row) {
       fields.photoPath = st.photo_path || '';
     }
   }
+  // A trial tester linked to a teacher shows that teacher's photo on the exam screen
+  if (row.trial && !fields.photoPath && row.trial_teacher_id) {
+    fields.photoPath = one('SELECT photo_path FROM users WHERE id = ?', row.trial_teacher_id)?.photo_path || '';
+  }
   // The admin's profile signature *is* the Head of School signature that
   // prints on result sheets (same value as Settings → Signatures).
   if (row.role === 'admin') fields.signaturePath = valueFromMeta('head_signature_path', '');

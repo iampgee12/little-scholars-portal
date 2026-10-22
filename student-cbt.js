@@ -92,6 +92,16 @@ function examWhen(e) {
   return e.examTime ? `${day} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : day;
 }
 
+// The photo on the portal profile, if the school added one; otherwise the placeholder stays
+function showPhoto(photoPath) {
+  const box = document.getElementById('cbt-photo');
+  if (!box || !photoPath) return;
+  const img = new Image();
+  img.alt = '';
+  img.onload = () => { box.replaceChildren(img); };
+  img.src = `/${String(photoPath).replace(/^\/+/, '')}`;
+}
+
 // ── Exam list ──
 async function init() {
   try {
@@ -105,6 +115,7 @@ async function init() {
     }
     pupil.name = session.user.name;
     pupil.role = role;
+    showPhoto(session.user.photoPath);
     renderHeader();
     document.getElementById('cbt-hello').textContent = MODE === 'try' ? 'Try your questions as a pupil' : `Hello, ${session.user.name || session.user.firstName}!`;
     if (MODE !== 'pupil') {
