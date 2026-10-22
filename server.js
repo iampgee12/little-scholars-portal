@@ -3738,10 +3738,18 @@ async function handleApi(req, res, url) {
     // on the exam server only pupils and admins sign in
     const candidates = findSignInAccounts(body.id).filter(u => u.role !== 'staff' && !(EXAM_MODE && u.role === 'teacher'));
     let matches = candidates.filter(u => verifyPassword(password, u.password));
-    // one email shared by several accounts: the portal picked on the sign-in page decides
-    if (matches.length > 1 && ['admin', 'teacher', 'student'].includes(body.role)) {
+    // The portal picked on the sign-in page must match the account, checked before
+    // anything else happens (e.g. a pupil's username and password typed into the
+    // Staff login must not go on to "choose a new password" for that pupil)
+    if (matches.length && ['admin', 'teacher', 'student'].includes(body.role)) {
       const forRole = matches.filter(u => u.role === body.role);
-      if (forRole.length) matches = forRole;
+      if (!forRole.length) {
+        recordFailedLogin(id);
+        security.audit(req, { id: matches[0].id, name: matches[0].name, role: matches[0].role }, `Sign-in refused (used the ${body.role} login)`, '', 'failed');
+        const portal = { admin: 'Admin', teacher: 'Staff', student: 'Pupil' };
+        return sendJson(res, 403, { error: `These are not ${portal[body.role]} sign-in details. If this is a ${portal[matches[0].role] || 'different'} account, go back and choose ${portal[matches[0].role] || 'the right portal'}.` });
+      }
+      matches = forRole;
     }
     if (matches.length > 1) {
       return sendJson(res, 409, { error: 'This email address is used by more than one account. Please sign in with your ID instead.' });
