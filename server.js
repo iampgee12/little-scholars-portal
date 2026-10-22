@@ -734,6 +734,13 @@ function createSchema() {
       UNIQUE(teacher_id, class_code, subject_id)
     );
 
+    -- the subjects the class teacher handles in each class (set by the admin)
+    CREATE TABLE IF NOT EXISTS class_teacher_subjects (
+      class_code TEXT NOT NULL,
+      subject_id INTEGER NOT NULL,
+      PRIMARY KEY (class_code, subject_id)
+    );
+
     CREATE TABLE IF NOT EXISTS result_batches (
       id INTEGER PRIMARY KEY,
       academic_id INTEGER NOT NULL REFERENCES academic_terms(id),
@@ -2075,7 +2082,7 @@ function teacherContexts(teacherId) {
     teacherId
   );
   return rows.filter(row => teacher && row.teacherType === teacher.teacherType &&
-    (row.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(row.subjectId))).map(row => ({
+    (row.teacherType !== 'subject_teacher' || !isClassTeacherSubject(row.classCode, row.subjectId))).map(row => ({
     ...row,
     academicId: academic.id,
     sessionLabel: academic.sessionLabel,
@@ -2085,6 +2092,10 @@ function teacherContexts(teacherId) {
   }));
 }
 
+// Which subjects the class teacher handles in each class is set by the admin (the
+// Class Teacher Subjects table: a tick per subject per class), and every other subject
+// in a class can go to a subject teacher. A class starts from the school's original
+// rules below until the admin saves it, or a class teacher is first assigned to it.
 const CLASS_TEACHER_CORE_SUBJECT_RULES = [
   { label: 'English Language', aliases: ['eng lang', 'english lang', 'english language', 'english'] },
   { label: 'Maths', aliases: ['maths', 'math', 'mathematics'] },
@@ -2098,13 +2109,6 @@ const CLASS_TEACHER_CORE_SUBJECT_RULES = [
 
 function normalizedSubjectName(value) {
   return String(value || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function isClassTeacherCoreSubject(subjectId) {
-  const subject = one('SELECT name FROM subjects WHERE id = ?', Number(subjectId));
-  if (!subject) return false;
-  const name = normalizedSubjectName(subject.name);
-  return CLASS_TEACHER_CORE_SUBJECT_RULES.some(rule => rule.aliases.includes(name));
 }
 
 function classYearNumber(classCode) {
@@ -2122,7 +2126,8 @@ function classTeacherSubjectRules(classCode) {
   );
 }
 
-function classTeacherCoreSubjectIds(classCode) {
+// The original rules' subjects that this class offers
+function ruleClassTeacherSubjectIds(classCode) {
   const subjects = all('SELECT id, name FROM subjects');
   return classTeacherSubjectRules(classCode).map(rule => subjects.find(subject =>
     rule.aliases.includes(normalizedSubjectName(subject.name)) && one(
@@ -2130,7 +2135,118 @@ function classTeacherCoreSubjectIds(classCode) {
       classCode,
       subject.id
     )
-  )).filter(Boolean);
+  )).filter(Boolean).map(subject => subject.id);
+}
+
+function classTeacherSubjectsSetUp() {
+  try { return new Set(JSON.parse(valueFromMeta('class_teacher_subjects_classes', '[]'))); } catch { return new Set(); }
+}
+
+// The subject ids the class teacher handles in this class: the admin's ticks once the
+// class is set up; before that, the original rules plus whatever they already teach
+function classTeacherSubjectIds(classCode) {
+  if (classTeacherSubjectsSetUp().has(classCode)) {
+    return all('SELECT subject_id AS id FROM class_teacher_subjects WHERE class_code = ?', classCode).map(r => r.id);
+  }
+  return [...new Set([
+    ...ruleClassTeacherSubjectIds(classCode),
+    ...all("SELECT subject_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher'", classCode).map(r => r.id),
+  ])];
+}
+
+function saveClassTeacherSubjectIds(classCode, subjectIds) {
+  run('DELETE FROM class_teacher_subjects WHERE class_code = ?', classCode);
+  subjectIds.forEach(id => run('INSERT OR IGNORE INTO class_teacher_subjects (class_code, subject_id) VALUES (?, ?)', classCode, Number(id)));
+  const setUp = classTeacherSubjectsSetUp();
+  setUp.add(classCode);
+  setMeta('class_teacher_subjects_classes', JSON.stringify([...setUp]));
+}
+
+function isClassTeacherSubject(classCode, subjectId) {
+  return classTeacherSubjectIds(classCode).includes(Number(subjectId));
+}
+
+// Once, at startup: classes that already have a class teacher are set up from what
+// they have now, so nothing changes until the admin edits them
+function setUpClassTeacherSubjects() {
+  if (EXAM_MODE || valueFromMeta('class_teacher_subjects_seeded', '')) return;
+  const setUp = classTeacherSubjectsSetUp();
+  all("SELECT DISTINCT class_code AS classCode FROM teacher_assignments WHERE teacher_type = 'class_teacher'")
+    .filter(r => !setUp.has(r.classCode))
+    .forEach(r => saveClassTeacherSubjectIds(r.classCode, classTeacherSubjectIds(r.classCode)));
+  setMeta('class_teacher_subjects_seeded', '1');
+}
+
+const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
+
+// The class teacher takes over a subject in their class: their own assignment is
+// updated, or a subject teacher's is handed over (saved results go with it), or one is made
+function giveSubjectToClassTeacher(teacherId, classCode, subjectId) {
+  const mine = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode, subjectId);
+  const theirs = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, subjectId);
+  if (mine) {
+    run('UPDATE teacher_assignments SET teacher_id = ? WHERE id = ?', teacherId, mine.id);
+    if (theirs && !assignmentHasResults(theirs.id)) run('DELETE FROM teacher_assignments WHERE id = ?', theirs.id);
+  } else if (theirs) {
+    run("UPDATE teacher_assignments SET teacher_id = ?, teacher_type = 'class_teacher' WHERE id = ?", teacherId, theirs.id);
+  } else {
+    run("INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'class_teacher', ?, ?)", teacherId, classCode, subjectId);
+  }
+}
+
+// The admin's ticks for one class. A subject newly ticked moves to the class teacher;
+// one unticked moves to the subject teacher chosen in handover (saved results go with
+// it), or is left without a teacher if it has no saved results. Returns notes for the admin.
+function setClassTeacherSubjects(classCode, subjectIds, handover = {}) {
+  if (!one('SELECT code FROM classes WHERE code = ?', classCode)) return { error: 'Choose a valid class' };
+  // a subject the class offers, or one the class teacher already has (even if it's
+  // missing from the class's subject list)
+  const before = classTeacherSubjectIds(classCode);
+  const allowed = new Set([...all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode).map(r => r.id), ...before]);
+  const next = [...new Set((subjectIds || []).map(Number))].filter(id => allowed.has(id));
+  const classTeacher = one("SELECT teacher_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode)?.id || null;
+  const subjectName = id => one('SELECT name FROM subjects WHERE id = ?', id)?.name || `Subject ${id}`;
+  const removed = before.filter(id => !next.includes(id));
+  const added = next.filter(id => !before.includes(id));
+  // check every unticked subject before changing anything
+  const needsTeacher = [];
+  for (const id of removed) {
+    const row = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode, id);
+    const target = cleanText(handover[id] || '').toUpperCase();
+    if (target && !one("SELECT id FROM users WHERE id = ? AND role = 'teacher' AND teacher_type = 'subject_teacher'", target)) return { error: `Choose a Subject Teacher for ${subjectName(id)}` };
+    if (row && !target && assignmentHasResults(row.id)) needsTeacher.push(subjectName(id));
+  }
+  if (needsTeacher.length) return { error: `${needsTeacher.join(', ')} ${needsTeacher.length === 1 ? 'has' : 'have'} saved results. Choose the Subject Teacher who takes ${needsTeacher.length === 1 ? 'it' : 'them'} over, so the results go with ${needsTeacher.length === 1 ? 'it' : 'them'}.` };
+  const notes = [];
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    for (const id of removed) {
+      const row = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode, id);
+      const target = cleanText(handover[id] || '').toUpperCase();
+      const existing = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id);
+      if (target && existing) {
+        run('UPDATE teacher_assignments SET teacher_id = ? WHERE id = ?', target, existing.id);
+        if (row) run('DELETE FROM teacher_assignments WHERE id = ?', row.id);
+      } else if (target && row) {
+        run("UPDATE teacher_assignments SET teacher_id = ?, teacher_type = 'subject_teacher' WHERE id = ?", target, row.id);
+      } else if (target) {
+        run("INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'subject_teacher', ?, ?)", target, classCode, id);
+      } else {
+        if (row) run('DELETE FROM teacher_assignments WHERE id = ?', row.id);
+        if (!existing) notes.push(`${subjectName(id)} has no teacher in this class now. Assign it to a Subject Teacher.`);
+      }
+    }
+    for (const id of added) {
+      if (classTeacher) giveSubjectToClassTeacher(classTeacher, classCode, id);
+      else notes.push(`${subjectName(id)} moves to the class teacher once one is assigned to this class.`);
+    }
+    saveClassTeacherSubjectIds(classCode, next);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  return { notes };
 }
 
 function assignClassTeacherToClass(teacherId, classCode, transactionManaged = false) {
@@ -2138,40 +2254,26 @@ function assignClassTeacherToClass(teacherId, classCode, transactionManaged = fa
   const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
   if (!teacher || teacher.teacherType !== 'class_teacher') return { error: 'Choose a registered Class Teacher' };
   if (!cls) return { error: 'Choose a valid class' };
-  const expectedRules = classTeacherSubjectRules(classCode);
   if (!transactionManaged) db.exec('BEGIN IMMEDIATE');
   try {
-    expectedRules.forEach(rule => {
-      let subject = all('SELECT id, name FROM subjects').find(item => rule.aliases.includes(normalizedSubjectName(item.name)));
-      if (!subject) {
-        run('INSERT OR IGNORE INTO subjects (name) VALUES (?)', rule.label);
-        subject = one('SELECT id, name FROM subjects WHERE name = ?', rule.label);
-      }
-      const offering = one(
-        'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
-        classCode,
-        subject.id
-      );
-      if (!offering) run('INSERT INTO class_subjects (subject_id, class_code) VALUES (?, ?)', subject.id, classCode);
-    });
-    const coreSubjects = classTeacherCoreSubjectIds(classCode);
-    coreSubjects.forEach(subject => {
-      const assignment = one(
-        "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1",
-        classCode,
-        subject.id
-      );
-      if (assignment) {
-        run('UPDATE teacher_assignments SET teacher_id = ? WHERE id = ?', teacherId, assignment.id);
-      } else {
-        run(
-          "INSERT INTO teacher_assignments (teacher_id, teacher_type, class_code, subject_id) VALUES (?, 'class_teacher', ?, ?)",
-          teacherId,
+    // a class not set up yet starts from the original rules (adding any subject missing)
+    if (!classTeacherSubjectsSetUp().has(classCode)) {
+      classTeacherSubjectRules(classCode).forEach(rule => {
+        let subject = all('SELECT id, name FROM subjects').find(item => rule.aliases.includes(normalizedSubjectName(item.name)));
+        if (!subject) {
+          run('INSERT OR IGNORE INTO subjects (name) VALUES (?)', rule.label);
+          subject = one('SELECT id, name FROM subjects WHERE name = ?', rule.label);
+        }
+        const offering = one(
+          'SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1',
           classCode,
           subject.id
         );
-      }
-    });
+        if (!offering) run('INSERT INTO class_subjects (subject_id, class_code) VALUES (?, ?)', subject.id, classCode);
+      });
+      saveClassTeacherSubjectIds(classCode, classTeacherSubjectIds(classCode));
+    }
+    classTeacherSubjectIds(classCode).forEach(subjectId => giveSubjectToClassTeacher(teacherId, classCode, subjectId));
     if (!transactionManaged) db.exec('COMMIT');
   } catch (err) {
     if (!transactionManaged) db.exec('ROLLBACK');
@@ -2180,20 +2282,20 @@ function assignClassTeacherToClass(teacherId, classCode, transactionManaged = fa
   return { classesAssigned: 1 };
 }
 
-function assignSubjectTeacherAcrossClasses(teacherId, subjectId) {
+// A subject teacher takes a subject in the classes chosen (all the classes offering it if
+// none are chosen), except classes where the class teacher handles it. Taking it over
+// from another subject teacher hands their assignment on, so saved results go with it.
+function assignSubjectTeacherAcrossClasses(teacherId, subjectId, classCodes = null) {
   const teacher = one("SELECT id, teacher_type AS teacherType FROM users WHERE id = ? AND role = 'teacher'", teacherId);
   const subject = one('SELECT id FROM subjects WHERE id = ?', Number(subjectId));
   if (!teacher || teacher.teacherType !== 'subject_teacher') return { error: 'Choose a registered Subject Teacher' };
   if (!subject) return { error: 'Choose a valid subject' };
-  if (isClassTeacherCoreSubject(subjectId)) return { error: 'This is a core Class Teacher subject and is assigned through the class teacher role' };
-  const classes = all('SELECT DISTINCT class_code AS classCode FROM class_subjects WHERE subject_id = ? ORDER BY class_code', Number(subjectId));
-  if (!classes.length) return { error: 'This subject is not assigned to any class yet' };
-  const conflict = classes.find(({ classCode }) => one(
-    "SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1",
-    classCode,
-    Number(subjectId)
-  ));
-  if (conflict) return { error: 'This subject is a Class Teacher assignment for one or more classes' };
+  const offered = all('SELECT DISTINCT class_code AS classCode FROM class_subjects WHERE subject_id = ? ORDER BY class_code', Number(subjectId));
+  if (!offered.length) return { error: 'This subject is not assigned to any class yet' };
+  const chosen = Array.isArray(classCodes) ? offered.filter(({ classCode }) => classCodes.map(c => String(c).toUpperCase()).includes(classCode)) : offered;
+  if (!chosen.length) return { error: 'Choose at least one class' };
+  const classes = chosen.filter(({ classCode }) => !isClassTeacherSubject(classCode, subjectId));
+  if (!classes.length) return { error: 'The class teacher handles this subject in the classes chosen. Untick it for those classes under Class Teacher Subjects first.' };
 
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -2219,7 +2321,7 @@ function assignSubjectTeacherAcrossClasses(teacherId, subjectId) {
     db.exec('ROLLBACK');
     throw err;
   }
-  return { classesAssigned: classes.length };
+  return { classesAssigned: classes.length, skipped: chosen.length - classes.length };
 }
 
 function assignmentForTeacher(contextId, teacherId) {
@@ -2234,7 +2336,7 @@ function assignmentForTeacher(contextId, teacherId) {
   );
   const teacher = one('SELECT teacher_type AS teacherType FROM users WHERE id = ? AND role = ?', teacherId, 'teacher');
   if (!assignment || !teacher || assignment.teacher_type !== teacher.teacherType) return null;
-  if (teacher.teacherType === 'subject_teacher' && isClassTeacherCoreSubject(assignment.subject_id)) return null;
+  if (teacher.teacherType === 'subject_teacher' && isClassTeacherSubject(assignment.class_code, assignment.subject_id)) return null;
   return assignment;
 }
 
@@ -5232,7 +5334,7 @@ async function handleApi(req, res, url) {
          WHERE ta.teacher_id = ? AND ta.teacher_type = 'subject_teacher'
          ORDER BY c.label, s.name`,
         user.id
-      ).filter(row => !isClassTeacherCoreSubject(row.subjectId));
+      ).filter(row => !isClassTeacherSubject(row.classCode, row.subjectId));
     return sendJson(res, 200, { context: rows });
   }
 
@@ -5243,7 +5345,7 @@ async function handleApi(req, res, url) {
       teacherId, classCode, subjectId
     );
     return !!teacher && !!assignment && teacher.teacherType === assignment.teacherType &&
-      (teacher.teacherType !== 'subject_teacher' || !isClassTeacherCoreSubject(subjectId));
+      (teacher.teacherType !== 'subject_teacher' || !isClassTeacherSubject(classCode, subjectId));
   }
 
   if (req.method === 'GET' && url.pathname === '/api/teacher/cbt/gradebook') {
@@ -7597,21 +7699,35 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const teacherId = cleanText(body.teacherId).toUpperCase();
       const subjectId = Number(body.subjectId);
-      const result = assignSubjectTeacherAcrossClasses(teacherId, subjectId);
+      const result = assignSubjectTeacherAcrossClasses(teacherId, subjectId, Array.isArray(body.classCodes) ? body.classCodes : null);
       if (result.error) return sendJson(res, 400, { error: result.error });
-      return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+      return sendJson(res, 200, { ok: true, ...result, setup: adminSetupPayload() });
     }
+    // one class (classCode), or every class the teacher has the subject in
     const teacherId = cleanText(url.searchParams.get('teacherId')).toUpperCase();
     const subjectId = Number(url.searchParams.get('subjectId'));
+    const classCode = cleanText(url.searchParams.get('classCode')).toUpperCase();
     const hasSavedResults = one(
       `SELECT COUNT(*) AS count FROM result_batches
-       WHERE assignment_id IN (SELECT id FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher')`,
+       WHERE assignment_id IN (SELECT id FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher' AND (? = '' OR class_code = ?))`,
       teacherId,
-      subjectId
+      subjectId,
+      classCode,
+      classCode
     ).count;
     if (hasSavedResults) return sendJson(res, 409, { error: 'This subject has saved results. Reassign it to another Subject Teacher instead of removing it.' });
-    run("DELETE FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher'", teacherId, subjectId);
+    run("DELETE FROM teacher_assignments WHERE teacher_id = ? AND subject_id = ? AND teacher_type = 'subject_teacher' AND (? = '' OR class_code = ?)", teacherId, subjectId, classCode, classCode);
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
+  }
+
+  // The Class Teacher Subjects table: which subjects the class teacher handles in a class
+  if (req.method === 'POST' && url.pathname === '/api/admin/class-teacher-subjects') {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const body = await readJson(req);
+    const result = setClassTeacherSubjects(cleanText(body.classCode).toUpperCase(), body.subjectIds, body.handover || {});
+    if (result.error) return sendJson(res, 400, { error: result.error });
+    return sendJson(res, 200, { ok: true, notes: result.notes, setup: adminSetupPayload() });
   }
 
   if ((req.method === 'POST' || req.method === 'PUT') && url.pathname === '/api/admin/teacher-assignments') {
@@ -7627,7 +7743,7 @@ async function handleApi(req, res, url) {
     }
     const result = teacherType === 'class_teacher'
       ? assignClassTeacherToClass(teacherId, classCode)
-      : assignSubjectTeacherAcrossClasses(teacherId, subjectId);
+      : assignSubjectTeacherAcrossClasses(teacherId, subjectId, Array.isArray(body.classCodes) ? body.classCodes : null);
     if (result.error) return sendJson(res, 400, { error: result.error });
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
@@ -9905,7 +10021,9 @@ function adminSetupPayload() {
     ? all('SELECT DISTINCT class_code AS classCode, exam_type AS examType FROM report_publications WHERE academic_id = ?', academic.id)
     : [];
 
-  return { academic, classes, classCategories, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, staffDesignations, staffDesignationRows, staffTypes, employmentStatuses: EMPLOYMENT_STATUSES, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
+  // the subjects each class's class teacher handles (the Class Teacher Subjects table)
+  const classTeacherSubjects = classes.map(c => ({ classCode: c.code, subjectIds: classTeacherSubjectIds(c.code) }));
+  return { academic, classes, classCategories, classTeacherSubjects, classArms, subjects, subjectTypes, classSubjects, students, teachers, staff, staffDesignations, staffDesignationRows, staffTypes, employmentStatuses: EMPLOYMENT_STATUSES, assignments, resultBatches, publications, publishedResults, settings, schoolInfo, emailConfig: smtpConfigStatus(), examTypes: EXAM_TYPES };
 }
 
 // Clean page addresses (/signin, /admin …) and the files behind them.
@@ -10046,6 +10164,9 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) sendJson(res, 500, IS_PROD ? { error: 'Server error' } : { error: 'Server error', detail: err.message });
   }
 });
+
+// run here, once everything above (including the class teacher subject rules) is defined
+setUpClassTeacherSubjects();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);

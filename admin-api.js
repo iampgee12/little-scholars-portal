@@ -969,7 +969,7 @@ function staffAssignments(staff) {
     return [...new Set(assignments.filter(item => item.teacherType === 'class_teacher').map(item => item.classLabel || item.classCode))].join(', ') || 'Not assigned';
   }
   return assignments
-    .filter(assignment => assignment.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(assignment.subjectName))
+    .filter(assignment => assignment.teacherType === 'subject_teacher' && !classTeacherHandles(assignment.classCode, assignment.subjectId))
     .map(assignment => assignment.classCode + ' ' + assignment.subjectName)
     .join(', ') || (staff.role === 'admin' ? 'All' : 'Not assigned');
 }
@@ -1711,6 +1711,94 @@ function renderAssignments() {
       <td style="color:var(--text-2);">${escapeHtml(assignment.classLabel)}</td>
       <td><button class="post-btn" style="padding:6px 10px;" onclick="editClassTeacherAssignment('${escapeHtml(assignment.classCode)}')">Change Teacher</button></td>
     </tr>`).join('');
+  renderClassTeacherSubjects();
+}
+
+// ── Class Teacher Subjects: which subjects the class teacher handles in each class ──
+// The admin ticks them per class; every other subject in the class goes to a
+// subject teacher. Moving a subject either way takes its saved results with it.
+// the class's subjects, plus any the class teacher already has that aren't on its list
+const classSubjectList = classCode => {
+  const ids = new Set((state.setup.classSubjects || []).filter(row => row.classCode === classCode).map(row => Number(row.subjectId)));
+  ((state.setup.classTeacherSubjects || []).find(row => row.classCode === classCode)?.subjectIds || []).forEach(id => ids.add(Number(id)));
+  return (state.setup.subjects || []).filter(subject => ids.has(Number(subject.id)));
+};
+const classTeacherOf = classCode => (state.setup.assignments || []).find(a => a.classCode === classCode && a.teacherType === 'class_teacher');
+const subjectTeachersOf = (classCode, subjectId) => [...new Set((state.setup.assignments || [])
+  .filter(a => a.classCode === classCode && Number(a.subjectId) === Number(subjectId) && a.teacherType === 'subject_teacher').map(a => a.teacherName))];
+
+function renderClassTeacherSubjects() {
+  const tbody = document.getElementById('ct-subjects-tbody');
+  if (!tbody) return;
+  const classes = (state.setup.classes || []).filter(c => !c.archived && classSubjectList(c.code).length);
+  tbody.innerHTML = classes.map(c => {
+    const names = classSubjectList(c.code).filter(s => classTeacherHandles(c.code, s.id)).map(s => s.name);
+    return `<tr>
+      <td><strong>${escapeHtml(c.label)}</strong></td>
+      <td>${classTeacherOf(c.code) ? escapeHtml(classTeacherOf(c.code).teacherName) : '<span style="color:var(--text-3);">No class teacher yet</span>'}</td>
+      <td style="color:var(--text-2);">${names.length ? escapeHtml(names.join(', ')) : '<span style="color:var(--text-3);">None (all go to subject teachers)</span>'}</td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="openClassTeacherSubjects('${escapeHtml(c.code)}')">Change subjects</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No classes with subjects yet.</td></tr>';
+}
+
+function openClassTeacherSubjects(classCode) {
+  const cls = (state.setup.classes || []).find(c => c.code === classCode);
+  const teacher = classTeacherOf(classCode);
+  const subjectTeachers = (state.setup.teachers || []).filter(t => t.teacherType === 'subject_teacher');
+  // who would naturally take a subject back: whoever teaches it in another class
+  const usualTeacher = subjectId => (state.setup.assignments || []).find(a => Number(a.subjectId) === Number(subjectId) && a.teacherType === 'subject_teacher')?.teacherId || '';
+  const modal = document.createElement('div');
+  modal.className = 'en-modal';
+  modal.id = 'ct-subjects-modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div class="en-modal-box"><div class="en-modal-head"><span>Subjects the class teacher handles · ${escapeHtml(cls?.label || classCode)}</span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
+    <div class="en-modal-body">
+      <div class="en-hint">Class teacher: <strong>${teacher ? escapeHtml(teacher.teacherName) : 'none yet'}</strong>. Tick the subjects they handle in this class; the rest go to subject teachers. Saved results always move with the subject.</div>
+      <div class="ct-subject-list">${classSubjectList(classCode).map(s => {
+        const ticked = classTeacherHandles(classCode, s.id);
+        const others = subjectTeachersOf(classCode, s.id);
+        return `<div class="ct-subject-row" data-id="${s.id}" data-was="${ticked ? 1 : 0}">
+          <label class="en-check"><input type="checkbox" ${ticked ? 'checked' : ''} onchange="ctSubjectChanged(this)"> <strong>${escapeHtml(s.name)}</strong></label>
+          <span class="en-hint ct-now">${ticked ? 'Class teacher' : others.length ? `Now: ${escapeHtml(others.join(', '))}` : 'No teacher yet'}</span>
+          <span class="ct-handover" style="display:none;">Who teaches it now? <select class="ctrl-select" style="width:auto;min-width:180px;"><option value="">Nobody for now</option>${subjectTeachers.map(t => `<option value="${escapeHtml(t.id)}"${t.id === usualTeacher(s.id) ? ' selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}</select></span>
+          <span class="en-hint ct-moves" style="display:none;">${others.length ? `Moves from ${escapeHtml(others.join(', '))} to the class teacher` : 'Goes to the class teacher'}</span>
+        </div>`;
+      }).join('')}</div>
+      <div id="ct-subjects-error" style="color:var(--red, #dc2626);font-size:12.5px;min-height:16px;"></div>
+    </div>
+    <div class="en-modal-foot"><button class="ann-del" onclick="this.closest('.en-modal').remove()">Cancel</button><button class="post-btn" id="ct-subjects-save" onclick="saveClassTeacherSubjects('${escapeHtml(classCode)}')">Save</button></div></div>`;
+  document.body.appendChild(modal);
+}
+
+// unticking asks who takes the subject over; ticking says it moves to the class teacher
+function ctSubjectChanged(input) {
+  const row = input.closest('.ct-subject-row');
+  const was = row.dataset.was === '1';
+  row.querySelector('.ct-handover').style.display = was && !input.checked ? '' : 'none';
+  row.querySelector('.ct-moves').style.display = !was && input.checked ? '' : 'none';
+  row.querySelector('.ct-now').style.display = was === input.checked ? '' : 'none';
+}
+
+async function saveClassTeacherSubjects(classCode) {
+  const rows = [...document.querySelectorAll('#ct-subjects-modal .ct-subject-row')];
+  const subjectIds = rows.filter(r => r.querySelector('input').checked).map(r => Number(r.dataset.id));
+  const handover = {};
+  rows.filter(r => r.dataset.was === '1' && !r.querySelector('input').checked).forEach(r => { handover[r.dataset.id] = r.querySelector('select').value; });
+  const btn = document.getElementById('ct-subjects-save');
+  btn.disabled = true;
+  try {
+    const data = await apiFetch('/api/admin/class-teacher-subjects', { method: 'POST', body: JSON.stringify({ classCode, subjectIds, handover }) });
+    state.setup = data.setup;
+    document.getElementById('ct-subjects-modal')?.remove();
+    populateStaff();
+    populateAdminControls();
+    renderAssignments();
+    showToast(data.notes?.length ? `Saved. ${data.notes.join(' ')}` : 'Class teacher subjects saved', data.notes?.length ? 'warn' : '');
+  } catch (err) {
+    btn.disabled = false;
+    document.getElementById('ct-subjects-error').textContent = err.message;
+  }
 }
 
 function editClassTeacherAssignment(classCode) {
@@ -2338,30 +2426,53 @@ function renderStaffProfileTab(tab) {
   body.innerHTML = `<div class="staff-profile-details">${rows.map(([label, value]) => `<div class="staff-profile-detail"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || 'Not set')}</strong></div>`).join('')}</div>`;
 }
 
-const CLASS_TEACHER_MANAGED_SUBJECTS = [
-  'eng lang', 'english lang', 'english language', 'english',
-  'maths', 'math', 'mathematics',
-  'social studies', 'social study',
-  'vocational aptitude', 'vocational apt',
-  'health education', 'health ed',
-  'verbal reasoning',
-  'bible knowledge',
-  'creative writing',
-];
-
-function isClassTeacherManagedSubject(subjectName) {
-  const normalized = String(subjectName || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
-  return CLASS_TEACHER_MANAGED_SUBJECTS.includes(normalized);
+// Whether the class teacher handles a subject in a class: the admin's ticks in the
+// Class Teacher Subjects table (Class Teacher Assignments page)
+function classTeacherHandles(classCode, subjectId) {
+  const row = (state.setup?.classTeacherSubjects || []).find(item => item.classCode === classCode);
+  return !!row && row.subjectIds.includes(Number(subjectId));
 }
+
+// The classes offering a subject, in class order
+function subjectOfferedClasses(subjectId) {
+  const codes = new Set((state.setup.classSubjects || []).filter(row => Number(row.subjectId) === Number(subjectId)).map(row => row.classCode));
+  return (state.setup.classes || []).filter(c => codes.has(c.code) && !c.archived).map(c => ({ code: c.code, label: c.label }));
+}
+
+// Subjects that can go to a subject teacher: offered in at least one class where the
+// class teacher doesn't handle them
+function subjectTeacherSubjects() {
+  return (state.setup.subjects || []).filter(subject => subjectOfferedClasses(subject.id).some(c => !classTeacherHandles(c.code, subject.id)));
+}
+
+// Tick boxes for the classes to give a subject teacher: every class offering the
+// subject, ticked; classes where the class teacher handles it can't be picked
+function renderSubjectClassChoices(selectId, boxId) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const subjectId = Number(document.getElementById(selectId)?.value || 0);
+  if (!subjectId) { box.innerHTML = ''; return; }
+  box.innerHTML = `<label class="field-label">Classes</label><div class="subject-class-choices">${subjectOfferedClasses(subjectId).map(c => {
+    const ct = classTeacherHandles(c.code, subjectId);
+    return `<label class="en-check"${ct ? ' title="The class teacher handles this subject in this class"' : ''}><input type="checkbox" value="${escapeHtml(c.code)}" ${ct ? 'disabled' : 'checked'}> ${escapeHtml(c.label)}${ct ? ' <span class="en-hint">(class teacher)</span>' : ''}</label>`;
+  }).join('')}</div>`;
+}
+const chosenSubjectClasses = boxId => [...document.querySelectorAll(`#${boxId} input:checked`)].map(input => input.value);
 
 function renderStaffProfileSubjects(staff) {
   const body = document.getElementById('staff-profile-body');
   if (!body) return;
   if (staff.teacherType === 'class_teacher') {
-    body.innerHTML = '<div class="staff-profile-empty"><strong>Class Teacher</strong><span>Class Teachers are assigned to a class and automatically handle Eng lang, Maths, Social Studies, Verbal Reasoning, Bible Knowledge, and Creative Writing. Vocational Aptitude applies to Years 2–6; Health Education applies to Year 1. These subjects are not assigned to Subject Teachers.</span></div>';
+    const mine = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'class_teacher');
+    body.innerHTML = `
+      <p style="margin:0 0 10px;color:var(--text-2);font-size:12px;">A Class Teacher handles the subjects ticked for their class. To change them, open <strong>Class Teacher Assignments</strong> and click <strong>Change subjects</strong> for the class.</p>
+      <table class="data-table staff-subjects-table">
+        <thead><tr><th>#</th><th>Subject</th><th>Class</th><th>Role</th></tr></thead>
+        <tbody>${mine.length ? mine.map((a, index) => `<tr><td>${index + 1}.</td><td>${escapeHtml(a.subjectName)}</td><td>${escapeHtml(a.classLabel || a.classCode)}</td><td>Class Teacher</td></tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">Not assigned to a class yet.</td></tr>'}</tbody>
+      </table>`;
     return;
   }
-  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(item.subjectName));
+  const assignments = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'subject_teacher' && !classTeacherHandles(item.classCode, item.subjectId));
   body.innerHTML = `
     <div class="staff-subjects-toolbar">
       <span>Teacher: <strong>${escapeHtml(staff.name)}</strong></span>
@@ -2395,17 +2506,18 @@ function renderTeacherSubjectsManager() {
   const tbody = document.getElementById('teacher-subjects-tbody');
   if (!tbody) return;
   const bySubject = new Map();
-  (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId && item.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(item.subjectName)).forEach(item => {
+  (state.setup.assignments || []).filter(item => item.teacherId === staffProfileId && item.teacherType === 'subject_teacher' && !classTeacherHandles(item.classCode, item.subjectId)).forEach(item => {
     if (!bySubject.has(item.subjectId)) bySubject.set(item.subjectId, { ...item, classes: [] });
     const group = bySubject.get(item.subjectId);
-    if (!group.classes.includes(item.classLabel || item.classCode)) group.classes.push(item.classLabel || item.classCode);
+    if (!group.classes.some(c => c.code === item.classCode)) group.classes.push({ code: item.classCode, label: item.classLabel || item.classCode });
   });
   const assignments = [...bySubject.values()];
+  // each class can be removed on its own, or the whole subject at once
   tbody.innerHTML = assignments.length ? assignments.map((assignment, index) => `
     <tr>
       <td>${index + 1}.</td>
       <td>${escapeHtml(assignment.subjectName)}</td>
-      <td>${escapeHtml(assignment.classes.join(', '))}</td>
+      <td><div class="subject-class-chips">${assignment.classes.map(c => `<span class="subject-class-chip">${escapeHtml(c.label)}<button type="button" title="Remove ${escapeHtml(c.label)} only" onclick="removeSubjectAssignment(${assignment.subjectId}, '${escapeHtml(c.code)}')">&times;</button></span>`).join('')}</div></td>
       <td><button type="button" class="ann-del" onclick="removeSubjectAssignment(${assignment.subjectId})">Remove Subject</button></td>
     </tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No subjects assigned.</td></tr>';
 }
@@ -2413,33 +2525,35 @@ function renderTeacherSubjectsManager() {
 function populateTeacherSubjectForm() {
   const subjectSelect = document.getElementById('staff-new-subject-subject');
   if (subjectSelect) subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
-    (state.setup.subjects || []).filter(subject => !isClassTeacherManagedSubject(subject.name) && (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
-      `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
-    ).join('');
+    subjectTeacherSubjects().map(subject => `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`).join('');
+  renderSubjectClassChoices('staff-new-subject-subject', 'staff-new-subject-classes');
 }
 
-async function removeSubjectAssignment(subjectId) {
+async function removeSubjectAssignment(subjectId, classCode = '') {
   try {
-    const data = await apiFetch(`/api/admin/subject-teacher-assignments?teacherId=${encodeURIComponent(staffProfileId)}&subjectId=${encodeURIComponent(subjectId)}`, { method: 'DELETE' });
+    const data = await apiFetch(`/api/admin/subject-teacher-assignments?teacherId=${encodeURIComponent(staffProfileId)}&subjectId=${encodeURIComponent(subjectId)}&classCode=${encodeURIComponent(classCode)}`, { method: 'DELETE' });
     state.setup = data.setup;
     renderTeacherSubjectsManager();
     populateStaff();
-    showToast('Subject assignment removed across levels');
+    showToast(classCode ? 'Class removed from this subject' : 'Subject removed from every class');
   } catch (err) { showToast(err.message, 'warn'); }
 }
 
 async function assignStaffSubject() {
   const subjectId = Number(document.getElementById('staff-new-subject-subject')?.value || 0);
   if (!subjectId) return showToast('Choose a subject', 'warn');
+  const classCodes = chosenSubjectClasses('staff-new-subject-classes');
+  if (!classCodes.length) return showToast('Tick at least one class', 'warn');
   try {
     const data = await apiFetch('/api/admin/subject-teacher-assignments', {
       method: 'POST',
-      body: JSON.stringify({ teacherId: staffProfileId, subjectId }),
+      body: JSON.stringify({ teacherId: staffProfileId, subjectId, classCodes }),
     });
     state.setup = data.setup;
     renderTeacherSubjectsManager();
+    populateTeacherSubjectForm();
     populateStaff();
-    showToast('Subject assigned to teacher');
+    showToast(`Subject assigned for ${data.classesAssigned} class${data.classesAssigned === 1 ? '' : 'es'}`);
   } catch (err) { showToast(err.message, 'warn'); }
 }
 
@@ -5903,27 +6017,30 @@ function populateSubjectAssignmentForm() {
       `<option value="${escapeHtml(teacher.id)}">${escapeHtml(teacher.name)} (${escapeHtml(teacher.id)})</option>`
     ).join('');
   if ([...teacherSelect.options].some(option => option.value === selectedTeacher)) teacherSelect.value = selectedTeacher;
+  const selectedSubject = subjectSelect.value;
   subjectSelect.innerHTML = '<option value="">Select subject...</option>' +
-    (state.setup.subjects || []).filter(subject => !isClassTeacherManagedSubject(subject.name) && (state.setup.classSubjects || []).some(row => Number(row.subjectId) === Number(subject.id))).map(subject =>
-      `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`
-    ).join('');
+    subjectTeacherSubjects().map(subject => `<option value="${subject.id}">${escapeHtml(subject.name)}</option>`).join('');
+  if ([...subjectSelect.options].some(option => option.value === selectedSubject)) subjectSelect.value = selectedSubject;
+  renderSubjectClassChoices('st-assign-subject', 'st-assign-classes');
 }
 
 async function saveSubjectTeacherAssignment() {
   const subjectId = Number(document.getElementById('st-assign-subject')?.value || 0);
   const teacherId = document.getElementById('st-assign-teacher')?.value || '';
   if (!subjectId || !teacherId) return showToast('Choose a subject and Subject Teacher');
+  const classCodes = chosenSubjectClasses('st-assign-classes');
+  if (!classCodes.length) return showToast('Tick at least one class');
 
   try {
     const data = await apiFetch('/api/admin/subject-teacher-assignments', {
       method: 'POST',
-      body: JSON.stringify({ subjectId, teacherId }),
+      body: JSON.stringify({ subjectId, teacherId, classCodes }),
     });
     state.setup = data.setup;
     populateSubjects();
     renderClassSubjectsTable();
     renderSubjectTeachersTable();
-    showToast('Subject Teacher assigned across levels');
+    showToast(`Subject Teacher assigned for ${data.classesAssigned} class${data.classesAssigned === 1 ? '' : 'es'}`);
   } catch (err) {
     showToast(err.message);
   }
@@ -5970,7 +6087,7 @@ function renderSubjectTeachersTable() {
   const tbody = document.getElementById('subject-teachers-tbody');
   if (!tbody) return;
   const search = (document.getElementById('st-search')?.value || '').toLowerCase();
-  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' && !isClassTeacherManagedSubject(row.subjectName) &&
+  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' && !classTeacherHandles(row.classCode, row.subjectId) &&
     (!search || `${row.teacherName} ${row.teacherId} ${row.subjectName} ${row.classLabel}`.toLowerCase().includes(search)));
   if (!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No Subject Teachers assigned yet. Use the Assign Teacher tab to assign a subject across levels.</td></tr>';

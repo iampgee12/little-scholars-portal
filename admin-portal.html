@@ -1562,6 +1562,17 @@ button.pf-result:hover { background:var(--green-bg); }
 .teacher-subjects-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
 .teacher-subjects-actions .ctrl-select { min-width:180px; }
 .teacher-subjects-add { display:grid; grid-template-columns:minmax(220px,1fr) auto; gap:10px; align-items:end; padding:14px; margin-top:18px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:7px; }
+.teacher-subjects-add .subject-class-box { grid-column:1 / -1; }
+/* classes to give a subject teacher, and the classes they have (each removable) */
+.subject-class-choices { display:flex; flex-wrap:wrap; gap:6px 16px; }
+.subject-class-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.subject-class-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 4px 3px 9px; border:1px solid var(--border); border-radius:14px; font-size:12px; background:var(--black-3, #f1f5f9); }
+.subject-class-chip button { border:none; background:none; color:var(--text-3); cursor:pointer; font-size:15px; line-height:1; padding:0 4px; }
+.subject-class-chip button:hover { color:var(--red, #dc2626); }
+/* Class Teacher Subjects pop-up */
+.ct-subject-list { display:flex; flex-direction:column; gap:2px; }
+.ct-subject-row { display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.ct-subject-row .en-check { margin-top:0; min-width:200px; }
 .teacher-subjects-footer { display:flex; justify-content:center; padding-top:20px; }
 @media (max-width:700px) {
   .staff-profile-detail { grid-template-columns:1fr; gap:4px; }
@@ -4084,8 +4095,9 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               </table>
             </div>
             <div class="teacher-subjects-add">
-              <div><label class="field-label">Subject</label><select class="ctrl-select" id="staff-new-subject-subject"></select></div>
-              <button type="button" class="post-btn" onclick="assignStaffSubject()">Assign Subject Across Levels</button>
+              <div><label class="field-label">Subject</label><select class="ctrl-select" id="staff-new-subject-subject" onchange="renderSubjectClassChoices('staff-new-subject-subject', 'staff-new-subject-classes')"></select></div>
+              <div id="staff-new-subject-classes" class="subject-class-box"></div>
+              <button type="button" class="post-btn" onclick="assignStaffSubject()">Assign Subject</button>
             </div>
             <div class="teacher-subjects-footer"><button type="button" class="ann-del" onclick="closeTeacherSubjectsManager()">Done</button></div>
           </div>
@@ -4297,10 +4309,23 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
                 <select class="ctrl-select" id="assign-class"></select>
               </div>
             </div>
-            <p style="margin:0 0 12px;color:var(--text-2);font-size:12px;">Class Teachers handle Eng lang, Maths, Social Studies, Verbal Reasoning, Bible Knowledge, and Creative Writing. Vocational Aptitude applies to Years 2–6; Health Education applies only to Year 1. These subjects are excluded from Subject Teacher assignments.</p>
+            <p style="margin:0 0 12px;color:var(--text-2);font-size:12px;">The Class Teacher handles the subjects ticked for their class under <strong>Subjects each class teacher handles</strong> below; the other subjects go to Subject Teachers.</p>
             <div style="display:flex;gap:8px;justify-content:flex-end;">
               <button class="ann-del" onclick="clearAssignmentForm()" style="font-size:12px;">Clear</button>
               <button class="post-btn" onclick="saveAssignment()" id="assign-save-label">Save Assignment</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-head"><span class="card-title">Subjects each class teacher handles</span></div>
+          <div class="card-body" style="padding:0;">
+            <p style="margin:12px 18px 0;color:var(--text-2);font-size:12px;">Click <strong>Change subjects</strong> to tick which subjects the class teacher handles in a class. Unticked subjects go to Subject Teachers. Saved results always move with the subject.</p>
+            <div style="overflow-x:auto;padding:0 18px 14px;">
+              <table class="data-table">
+                <thead><tr><th>Class</th><th>Class Teacher</th><th>Subjects the class teacher handles</th><th></th></tr></thead>
+                <tbody id="ct-subjects-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -7178,11 +7203,12 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
               <p style="margin:0 0 16px;color:var(--text-2);font-size:13px;">Choose a class subject, a teacher, and whether they are the teacher in charge or an assisting teacher.</p>
               <div style="display:grid;grid-template-columns:repeat(2,minmax(220px,1fr));gap:14px;margin-bottom:16px;">
                 <div><label class="field-label" for="st-assign-teacher">Teacher</label><select class="ctrl-select" id="st-assign-teacher"><option value="">Select teacher...</option></select></div>
-                <div><label class="field-label" for="st-assign-subject">Subject</label><select class="ctrl-select" id="st-assign-subject"><option value="">Select subject...</option></select></div>
+                <div><label class="field-label" for="st-assign-subject">Subject</label><select class="ctrl-select" id="st-assign-subject" onchange="renderSubjectClassChoices('st-assign-subject', 'st-assign-classes')"><option value="">Select subject...</option></select></div>
               </div>
-              <p style="margin:0 0 12px;color:var(--text-2);font-size:12px;">Subject Teachers are assigned across every class where the selected subject is offered. Class Teachers are assigned from Setup and do not receive individual subject assignments.</p>
+              <div id="st-assign-classes" class="subject-class-box" style="margin-bottom:12px;"></div>
+              <p style="margin:0 0 12px;color:var(--text-2);font-size:12px;">Untick any class the Subject Teacher doesn't teach. Classes where the Class Teacher handles the subject can't be picked; change that under <strong>Class Teacher Assignments</strong>. Taking a subject over from another teacher moves its saved results too.</p>
               <div style="display:flex;justify-content:flex-end;">
-                <button type="button" class="post-btn" onclick="saveSubjectTeacherAssignment()">Assign Subject Across Levels</button>
+                <button type="button" class="post-btn" onclick="saveSubjectTeacherAssignment()">Assign Subject</button>
               </div>
             </div>
           </div>
