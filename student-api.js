@@ -276,7 +276,7 @@ async function init() {
 
 const TAB_META = {
   profile: { title: 'My Profile', sub: 'Your account' },
-  dashboard: { title: 'Dashboard', sub: "Today's summary" },
+  dashboard: { title: 'Dashboard', get sub() { return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } },
   timetable: { title: 'Timetable', sub: 'Class Schedule' },
   assignments: { title: 'Assignments', sub: 'Coming soon' },
   courses: { title: 'Courses & Grades', sub: '' },

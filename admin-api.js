@@ -2599,7 +2599,7 @@ function deleteAnnouncement(id) {
 const TAB_META = {
   pupilPhotos: { title: 'Upload Pupil Photos', sub: 'Add photos for many pupils at once' },
   profile: { title: 'My Profile', sub: 'Your account' },
-  dashboard: { title: 'Dashboard', sub: 'School Overview' },
+  dashboard: { title: 'Dashboard', get sub() { return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } },
   admissions: { title: 'Admission', sub: 'Applications Summary' },
   students: { title: 'View Students', sub: 'Students Information System' },
   staff: { title: 'People', sub: 'Teachers and Staff' },

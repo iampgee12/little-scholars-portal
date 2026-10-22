@@ -582,6 +582,9 @@ async function init() {
     document.querySelectorAll('.ct-only').forEach(el => { el.style.display = classTeacherClasses().length ? '' : 'none'; });
     loadGradeScaleFromServer();
     document.getElementById('ctx-session').textContent = `${state.academic.sessionLabel} - ${state.academic.termLabel}`;
+    // the dashboard's line: the current term and session, then today's date
+    const dashSub = document.getElementById('t-dash-sub');
+    if (dashSub) dashSub.textContent = [[state.academic.termLabel, state.academic.sessionLabel].filter(Boolean).join(', '), new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })].filter(Boolean).join(' · ');
     document.getElementById('re-examtype').value = 'Mid-Term Exam';
 
     if (!state.contexts.length) {
@@ -1714,7 +1717,7 @@ const TAB_META = {
   classComments: { title: 'Class Comments', sub: "Class teacher's comments" },
   classSheets: { title: 'Result Sheets', sub: 'Every pupil in your class' },
   profile: { title: 'My Profile', sub: 'Your account' },
-  dashboard: { title: 'Dashboard', sub: 'Wednesday, 13 May 2026' },
+  dashboard: { title: 'Dashboard', get sub() { return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } },
   students: { title: 'Students', sub: 'Class Roster' },
   results: { title: 'Results Entry', sub: 'Enter Examination Scores' },
   published: { title: 'Published Results', sub: 'Saved Exam Records' },
