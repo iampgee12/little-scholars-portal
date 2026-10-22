@@ -161,11 +161,14 @@ body {
   .mob-hamburger { display:flex; }
   #main-sidebar {
     position:fixed !important; top:0 !important; left:0 !important; bottom:0 !important;
-    width:280px !important; height:100vh !important; z-index:1150 !important;
+    width:280px !important; height:100vh !important; height:100dvh !important; z-index:1150 !important;
     transform:translateX(-100%) !important;
     transition:transform 0.25s cubic-bezier(0.4,0,0.2,1) !important;
-    overflow-y:auto !important;
+    overflow:hidden !important;
   }
+  /* the menu list scrolls on its own, so Sign Out stays visible at the bottom */
+  #main-sidebar > .nav-group { flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #main-sidebar > :not(.nav-group) { flex-shrink:0; }
   #main-sidebar.mob-open { transform:translateX(0) !important; }
   .main { margin-left:0 !important; width:100% !important; }
   .page-header { padding:12px 16px !important; }
