@@ -37,10 +37,12 @@ button { font-family: inherit; }
 .ea-nav > button { padding-left: 16px; }
 .ea-nav .ea-drop-head { margin-top: 6px; padding-left: 16px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
 .ea-nav .ea-drop-head.here { color: var(--green); }
-.ea-caret { margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .15s; margin-top: -3px; }
+.ea-caret { margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .42s cubic-bezier(0.4, 0, 0.2, 1), margin-top .42s cubic-bezier(0.4, 0, 0.2, 1); margin-top: -3px; }
 .ea-drop.open .ea-caret { transform: rotate(-135deg); margin-top: 3px; }
-.ea-drop-body { display: none; padding-bottom: 4px; }
-.ea-drop.open .ea-drop-body { display: block; }
+/* a group slides open and closed by its real height (slideGroup in exam-console.js), as in the admin portal */
+.ea-drop-body { overflow: hidden; box-sizing: border-box; padding-bottom: 4px; transition: height .42s cubic-bezier(0.4, 0, 0.2, 1), padding .42s cubic-bezier(0.4, 0, 0.2, 1), opacity .32s ease; }
+.ea-drop-body:not(.open) { height: 0; opacity: 0; padding-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { .ea-drop-body, .ea-caret { transition: none; } }
 .ea-nav .ea-drop-head .ea-head-badge { margin-left: 8px; letter-spacing: 0; }
 .ea-drop.open .ea-head-badge { display: none; }
 .ea-head-badge + .ea-caret { margin-left: auto; }

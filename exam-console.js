@@ -225,7 +225,7 @@ function navGroup([group, items, opt = {}]) {
   const here = items.some(([k]) => k === state.page);
   return `<div class="ea-drop ${open ? 'open' : ''}" id="nav-${opt.dropdown}">
     <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}${items.some(([k]) => k === 'push') && state.sync?.unpushed ? `<span class="ea-badge ea-head-badge" title="Results waiting to be pushed online">${state.sync.unpushed}</span>` : ''}<span class="ea-caret" aria-hidden="true"></span></button>
-    <div class="ea-drop-body">${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
+    <div class="ea-drop-body ${open ? 'open' : ''}"${open ? '' : ' style="display:none;"'}>${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
 }
 function toggleNav(key) {
   state.navOpen = state.navOpen === key ? '' : key;
@@ -233,7 +233,35 @@ function toggleNav(key) {
     const open = el.id === `nav-${state.navOpen}`;
     el.classList.toggle('open', open);
     el.querySelector('.ea-drop-head').setAttribute('aria-expanded', open);
+    slideGroup(el.querySelector('.ea-drop-body'), open);
   });
+}
+// Slides a menu group open or closed by its real height, so it moves at an even pace
+// the whole way (the same as the admin portal's menu)
+function slideGroup(el, open) {
+  if (!el || el.classList.contains('open') === open) return;
+  clearTimeout(el._slideDone);
+  if (open) {
+    el.style.display = 'block';
+    // measure the open height without showing it, then grow from nothing to it
+    el.style.transition = 'none';
+    el.classList.add('open');
+    el.style.height = 'auto';
+    const target = el.offsetHeight;
+    el.classList.remove('open');
+    el.style.height = '0px';
+    void el.offsetHeight;
+    el.style.transition = '';
+    el.classList.add('open');
+    el.style.height = `${target}px`;
+    el._slideDone = setTimeout(() => { if (el.classList.contains('open')) el.style.height = ''; }, 460);
+  } else {
+    el.style.height = `${el.offsetHeight}px`;
+    void el.offsetHeight;
+    el.classList.remove('open');
+    el.style.height = '0px';
+    el._slideDone = setTimeout(() => { if (!el.classList.contains('open')) { el.style.display = 'none'; el.style.height = ''; } }, 460);
+  }
 }
 function shell() {
   const t = state.dash?.term;
