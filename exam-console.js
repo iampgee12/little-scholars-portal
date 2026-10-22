@@ -505,10 +505,13 @@ async function refreshTrial() {
     <div class="ec-flex"><h2>Testers</h2><div class="ec-actions"><button class="post-btn" onclick="addTester()">Add tester</button><button class="btn-outline" onclick="addSeveralTesters()">Add several</button>
       <button class="btn-outline" onclick="printSlips(state.trial.testers)" ${d.testers.length ? '' : 'disabled'}>Print all slips</button><button class="btn-danger" onclick="removeAllTesters()" ${d.testers.length ? '' : 'disabled'}>Remove all testers</button></div></div>
     <p class="ec-muted">Trial accounts for teachers and IT. They see trial papers only, and nothing they do counts.</p>
-    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Username</th><th>Name</th><th>Teacher</th><th>Password</th><th>Last seen</th><th></th></tr></thead><tbody>
-    ${d.testers.map(t => `<tr><td class="ec-mono"><b>${esc(t.username)}</b></td><td>${esc(t.name)}</td><td>${t.teacherName ? esc(t.teacherName) : '<span class="ec-hint">—</span>'}</td>
+    ${d.testers.some(t => t.canSee.needsChoice) ? `<div class="ec-note warn">${plural(d.testers.filter(t => t.canSee.needsChoice).length, 'tester')} can't see any papers yet. Click <b>Access</b> on their row to choose what they can see.</div>` : ''}
+    <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Username</th><th>Name</th><th>Can see</th><th>Password</th><th>Last seen</th><th></th></tr></thead><tbody>
+    ${d.testers.map(t => `<tr><td class="ec-mono"><b>${esc(t.username)}</b></td><td>${esc(t.name)}</td>
+      <td class="tr-cansee">${t.canSee.needsChoice ? `<button class="tr-choose" onclick="editTesterAccess('${esc(t.id)}')">&#9888; ${esc(t.canSee.label)}</button>`
+        : `${t.scope === 'teacher' && t.teacherName ? `<b>Same as ${esc(t.teacherName)}</b><div class="ec-hint">${esc(t.canSee.label)}</div>` : t.scope === 'all' ? '<b>Every paper</b>' : esc(t.canSee.label)}`}</td>
       <td class="ec-mono">${esc(t.password)}</td><td><span class="ec-pill ${t.secondsAgo !== null && t.secondsAgo < 45 ? 'ok' : 'muted'}">${seenText(t.secondsAgo)}</span></td>
-      <td class="ec-actions"><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-outline" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
+      <td class="ec-actions"><button class="btn-outline" onclick="editTesterAccess('${esc(t.id)}')">Access</button><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-outline" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
       || '<tr><td colspan="6" class="ec-hint">No testers yet. Click Add tester.</td></tr>'}
     </tbody></table></div></div>`);
 
@@ -534,24 +537,90 @@ async function refreshTrial() {
 async function trialPaper(id, on) {
   try { await api(`/api/exam/trial/papers/${id}`, { method: 'POST', body: JSON.stringify({ on }) }); refreshTrial(); } catch (err) { uiNotice('Could not change the paper', err.message); }
 }
+// What a tester can see, chosen on purpose: the same as a teacher (following that
+// teacher's classes and subjects), chosen papers, or every paper (IT)
+function accessForm(t = {}) {
+  const scope = t.scope && t.scope !== 'none' ? t.scope : '';
+  const picked = new Set(t.access || []);
+  const byClass = new Map();
+  (state.trial.choices || []).forEach(c => {
+    if (!byClass.has(c.classCode)) byClass.set(c.classCode, { label: c.classLabel, subjects: [] });
+    byClass.get(c.classCode).subjects.push(c);
+  });
+  const option = (value, title, hint, extra = '') => `<label class="tr-scope"><input type="radio" name="tr-scope" value="${value}" ${scope === value ? 'checked' : ''} onchange="accessScopeChanged()">
+      <span><b>${title}</b><span class="ec-hint">${hint}</span>${extra}</span></label>`;
+  return `<div class="ec-field"><label>What can they see?</label>
+    ${option('teacher', 'Same as a teacher', 'Exactly the classes and subjects that teacher has. It follows their assignments.',
+      `<select class="ec-select tr-scope-extra" id="tr-teacher" data-for="teacher"><option value="">Pick the teacher…</option>${state.trial.teachers.map(x => `<option value="${esc(x.id)}" ${x.id === t.teacherId ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`)}
+    ${option('papers', 'Chosen papers', 'Tick the classes and subjects, e.g. for a head of department.',
+      `<div class="tr-scope-extra tr-papers" data-for="papers">${[...byClass.entries()].map(([code, c]) => `<div class="tr-papers-class"><b>${esc(c.label)}</b>
+        ${c.subjects.map(s => { const k = `${s.classCode}-${s.subjectId}`; return `<label class="ec-check"><input type="checkbox" value="${esc(k)}" ${picked.has(k) ? 'checked' : ''}> ${esc(s.subjectName)}</label>`; }).join('')}</div>`).join('')
+        || '<span class="ec-hint">No papers on this computer yet. Refresh CBT / Exams data first.</span>'}</div>`)}
+    ${option('all', 'Every paper', 'For IT or the exams officer only.')}
+  </div>`;
+}
+function accessScopeChanged() {
+  const scope = document.querySelector('input[name="tr-scope"]:checked')?.value || '';
+  document.querySelectorAll('.tr-scope-extra').forEach(el => { el.style.display = el.dataset.for === scope ? '' : 'none'; });
+}
+function readAccess() {
+  const scope = document.querySelector('input[name="tr-scope"]:checked')?.value || '';
+  return { scope, teacherId: document.getElementById('tr-teacher')?.value || '', access: [...document.querySelectorAll('.tr-papers input:checked')].map(i => i.value) };
+}
 function addTester() {
   modal('Add a tester', `
-    <div class="ec-field"><label for="tr-teacher">Pick a teacher</label><select class="ec-select" id="tr-teacher"><option value="">Not a teacher (type a name below)</option>${state.trial.teachers.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div>
-    <div class="ec-field"><label for="tr-name">Or type a name</label><input class="ec-input" id="tr-name" placeholder="e.g. Mr Ade (IT)"></div>
-    <p class="ec-hint" style="margin-top:12px;">A teacher sees only their own classes and subjects; someone who isn't a teacher sees every trial paper. They get the next free username (9011, 9012 …), and the password is ${TRIAL_PASSWORD}.</p><div class="ec-error" id="tr-err"></div>`,
-  '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveTesters([{ teacherId: document.getElementById(\'tr-teacher\').value, name: document.getElementById(\'tr-name\').value }])">Create</button>');
+    <div class="ec-field"><label for="tr-name">Name</label><input class="ec-input" id="tr-name" placeholder="e.g. Mrs Okafor, or Mr Ade (IT)"></div>
+    ${accessForm()}
+    <p class="ec-hint" style="margin-top:12px;">They get the next free username (9011, 9012 …), and the password is ${TRIAL_PASSWORD}.</p><div class="ec-error" id="tr-err"></div>`,
+  '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="createOneTester()">Create</button>');
+  accessScopeChanged();
+  // picking a teacher fills in the name if it's still empty
+  document.getElementById('tr-teacher').addEventListener('change', e => {
+    const name = document.getElementById('tr-name');
+    if (!name.value.trim() && e.target.value) name.value = e.target.selectedOptions[0].textContent;
+  });
+}
+function createOneTester() {
+  const a = readAccess();
+  const err = document.getElementById('tr-err');
+  if (!a.scope) { err.textContent = 'Choose what they can see.'; return; }
+  saveTesters([{ name: document.getElementById('tr-name').value, ...a }]);
+}
+function editTesterAccess(id) {
+  const t = state.trial.testers.find(x => x.id === id);
+  if (!t) return;
+  modal(`What ${esc(t.name)} can see`, `${accessForm(t)}<div class="ec-error" id="tr-err"></div>`,
+    '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveTesterAccess()">Save</button>');
+  document.getElementById('ea-modal').dataset.tester = id;
+  accessScopeChanged();
+}
+async function saveTesterAccess() {
+  const id = document.getElementById('ea-modal').dataset.tester;
+  const a = readAccess();
+  const err = document.getElementById('tr-err');
+  if (!a.scope) { err.textContent = 'Choose what they can see.'; return; }
+  const btn = document.getElementById('tr-go');
+  btn.disabled = true;
+  try {
+    await api(`/api/exam/trial/testers/${encodeURIComponent(id)}/access`, { method: 'POST', body: JSON.stringify(a) });
+    closeModal();
+    refreshTrial();
+  } catch (e) { btn.disabled = false; err.textContent = e.message; }
 }
 function addSeveralTesters() {
   modal('Add several testers', `
     <div class="ec-field"><label for="tr-names">Names, one per line</label><textarea class="ec-input" id="tr-names" rows="8" style="max-width:none;" placeholder="Mrs Okafor&#10;Mr Bello&#10;Miss Ada"></textarea></div>
-    <p class="ec-hint" style="margin-top:12px;">A name that matches a teacher on the staff list is linked to them, so they see only their own classes and subjects.</p><div class="ec-error" id="tr-err"></div>`,
+    <p class="ec-hint" style="margin-top:12px;">A name that matches a teacher on the staff list sees the same as that teacher. Any other name sees <b>no papers</b> until you click <b>Access</b> on their row and choose.</p><div class="ec-error" id="tr-err"></div>`,
   '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="tr-go" onclick="saveSeveralTesters()">Create</button>');
 }
 function saveSeveralTesters() {
   const byName = new Map(state.trial.teachers.map(t => [t.name.trim().toLowerCase(), t.id]));
   const names = document.getElementById('tr-names').value.split('\n').map(s => s.trim()).filter(Boolean);
   if (!names.length) { document.getElementById('tr-err').textContent = 'Type at least one name.'; return; }
-  saveTesters(names.map(name => ({ name, teacherId: byName.get(name.toLowerCase()) || '' })));
+  saveTesters(names.map(name => {
+    const teacherId = byName.get(name.toLowerCase()) || '';
+    return { name, teacherId, scope: teacherId ? 'teacher' : 'none' };
+  }));
 }
 async function saveTesters(list) {
   const btn = document.getElementById('tr-go');

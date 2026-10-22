@@ -97,6 +97,21 @@ button { font-family: inherit; }
 .ec-steps { margin: 8px 0 4px; padding-left: 20px; font-size: 13px; color: var(--text-2); line-height: 1.6; }
 .ec-table tr.tr-quiet td { color: var(--red); }
 .tr-print { display: none; }
+/* a tester's access: the Can see column and the three choices */
+.tr-cansee { max-width: 340px; font-size: 13px; }
+.tr-choose { border: 1px solid var(--amber, #d97706); background: var(--amber-bg, #fffbeb); color: #92400e; border-radius: 6px; padding: 5px 10px; font: inherit; font-weight: 700; cursor: pointer; }
+.ec-field label.tr-scope { display: flex; }
+.ec-field label.tr-scope, .ec-field .tr-papers label { font-family: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; color: var(--text-1); margin-bottom: 0; }
+.ec-field .tr-papers label { display: flex; color: var(--text-2); }
+.tr-scope { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.tr-scope:has(input:checked) { border-color: var(--green); background: var(--green-bg, #f0fdf4); }
+.tr-scope input { margin-top: 3px; }
+.tr-scope > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tr-scope-extra { margin-top: 8px; }
+.tr-papers { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.tr-papers-class { display: flex; flex-wrap: wrap; align-items: center; gap: 0 14px; }
+.tr-papers-class b { flex-basis: 100%; font-size: 12px; }
+.tr-papers-class .ec-check { margin-top: 4px; }
 .tr-slip { border: 1px dashed var(--border-2, #cbd5e1); border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6; break-inside: avoid; }
 @media print {
   body.printing-slips * { visibility: hidden; }
