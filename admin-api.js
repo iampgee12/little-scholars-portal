@@ -2703,6 +2703,36 @@ function showAdminSection(section, trigger) {
   }
 }
 
+// Slides a folding group open or closed by its real height, so it moves at an
+// even pace the whole way (see .result-gradebook-children in admin-portal.html)
+function slideGroup(el, open) {
+  if (el.classList.contains('open') === open) return;
+  clearTimeout(el._slideDone);
+  if (open) {
+    el.style.display = 'block';
+    // measure the open height without showing it, then grow from nothing to it
+    el.style.transition = 'none';
+    el.classList.add('open');
+    el.style.height = 'auto';
+    const target = el.offsetHeight;
+    el.classList.remove('open');
+    el.style.height = '0px';
+    void el.offsetHeight;
+    el.style.transition = '';
+    el.classList.add('open');
+    el.style.height = `${target}px`;
+    // afterwards it sizes itself again (e.g. if a menu item is hidden or shown)
+    el._slideDone = setTimeout(() => { if (el.classList.contains('open')) el.style.height = ''; }, 460);
+  } else {
+    // from its current height down to nothing
+    el.style.height = `${el.offsetHeight}px`;
+    void el.offsetHeight;
+    el.classList.remove('open');
+    el.style.height = '0px';
+    el._slideDone = setTimeout(() => { if (!el.classList.contains('open')) { el.style.display = 'none'; el.style.height = ''; } }, 460);
+  }
+}
+
 function toggleDropdown(childId, chevId, btn) {
   const children = document.getElementById(childId);
   const chev = document.getElementById(chevId);
@@ -2712,10 +2742,7 @@ function toggleDropdown(childId, chevId, btn) {
   const parent = btn.closest('.sub-menu');
   if (parent) {
     parent.querySelectorAll('.result-gradebook-children').forEach(el => {
-      if (el !== children) {
-        el.classList.remove('open');
-        el.style.display = '';
-      }
+      if (el !== children) slideGroup(el, false);
     });
     parent.querySelectorAll('.sub-chev').forEach(el => {
       if (el.id !== chevId) el.classList.remove('open');
@@ -2724,15 +2751,8 @@ function toggleDropdown(childId, chevId, btn) {
       if (el !== btn) el.classList.remove('active');
     });
   }
-  if (open) {
-    children.classList.remove('open');
-    if (chev) chev.classList.remove('open');
-  } else {
-    // must be display:block for max-height transition to work
-    children.style.display = 'block';
-    requestAnimationFrame(() => children.classList.add('open'));
-    if (chev) chev.classList.add('open');
-  }
+  slideGroup(children, !open);
+  if (chev) chev.classList.toggle('open', !open);
   btn.classList.toggle('active', !open);
 }
 

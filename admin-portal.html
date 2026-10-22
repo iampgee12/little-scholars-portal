@@ -436,21 +436,30 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 /* Dropdown chevron spin */
 .sub-chev {
   display: inline-block;
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .sub-chev.open { transform: rotate(180deg); }
 
-/* Dropdown children slide-in */
+/* Dropdown children: slide open and closed by their real height (set by
+   slideGroup in admin-api.js), with the spacing and a fade easing along */
 .result-gradebook-children {
   overflow: hidden;
-  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.2s ease;
-  max-height: 0;
-  opacity: 0;
+  box-sizing: border-box;
+  transition: height 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.32s ease,
+              border-color 0.42s ease;
 }
-.result-gradebook-children.open {
-  max-height: 600px;
-  opacity: 1;
+.result-gradebook-children:not(.open) {
+  height: 0;
+  opacity: 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom-color: transparent !important;
+}
+.result-gradebook-children.open { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .result-gradebook-children { transition: none; }
 }
 
 /* Tab panel entrance */
