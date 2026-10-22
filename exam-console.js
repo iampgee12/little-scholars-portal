@@ -1020,10 +1020,10 @@ async function checkUpdates() {
       : !r.available
         ? `<div class="ec-note">You have the latest version (<span class="ec-mono">v${esc(r.latest.version)} · ${esc(r.latest.build)}</span>).</div>`
         : r.kind === 'files'
-          ? `<div class="ec-note">Update available: <b>${plural(files.length, 'file')} changed</b> · <b>${sizeText(r.downloadSize)}</b> to download <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
+          ? `<div class="ec-note">Update available: <b>${plural(files.length, 'file')}</b> · <b>${sizeText(r.downloadSize)}</b> <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
              ${files.length ? `<details class="ec-hint" style="margin:6px 0 10px;"><summary style="cursor:pointer;">See the files</summary><div class="ec-mono" style="margin-top:6px;line-height:1.7;">${files.map(esc).join('<br>')}</div></details>` : ''}
              <button class="post-btn" onclick="installUpdate()">Download and Install</button>`
-          : `<div class="ec-note">Update available: <b>the app itself changed</b>, so this is the full installer · <b>${sizeText(r.setupSize)}</b> to download <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
+          : `<div class="ec-note">Update available: <b>full update</b> · <b>${sizeText(r.setupSize)}</b> <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
              <button class="post-btn" onclick="installUpdate()">Download and Install</button>`;
   } catch (err) { out.innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
 }
