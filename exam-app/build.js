@@ -102,7 +102,14 @@ function makeBundle() {
   // the version ID covers the portal files, the engine, the window app and Electron, so any change counts as an update
   const build = crypto.createHash('sha256').update(raw).update(fs.readFileSync(path.join(__dirname, 'launcher.js')))
     .update(fs.readFileSync(path.join(__dirname, 'electron-main.js'))).update(ELECTRON_VERSION).digest('hex').slice(0, 12);
-  return { bundle: zlib.gzipSync(raw, { level: 9 }), build, count: files.length };
+  // The app's frame: what only the full Setup can change (the engine's Node and launcher,
+  // the window, Electron, the icon). While it's the same, exam computers update by
+  // downloading just the portal files that changed, each checked by its fingerprint.
+  const shell = crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'launcher.js')))
+    .update(fs.readFileSync(path.join(__dirname, 'electron-main.js'))).update(fs.readFileSync(path.join(__dirname, 'app-icon.ico')))
+    .update(ELECTRON_VERSION).update(process.version).digest('hex').slice(0, 12);
+  const manifest = files.map(([rel, data]) => [rel, crypto.createHash('sha256').update(data).digest('hex'), data.length, zlib.gzipSync(data).length]);
+  return { bundle: zlib.gzipSync(raw, { level: 9 }), build, shell, manifest, count: files.length };
 }
 
 async function setIconAndVersion(exePath, version, { description, internalName, originalName }) {
@@ -203,9 +210,10 @@ async function main() {
   fs.mkdirSync(WORK, { recursive: true });
 
   step('packing portal files…');
-  const { bundle, build, count } = makeBundle();
+  const { bundle, build, shell, manifest, count } = makeBundle();
   fs.writeFileSync(path.join(WORK, 'app.bundle'), bundle);
   fs.writeFileSync(path.join(WORK, 'build.txt'), `${build}\n`);
+  fs.writeFileSync(path.join(WORK, 'shell.txt'), `${shell}\n`);
   fs.writeFileSync(path.join(WORK, 'version.txt'), `${version}\n`);
   fs.writeFileSync(path.join(WORK, 'portal.txt'), `${process.env.PORTAL_URL || 'https://portal.uniquechildrenschool.com'}\n`);
   step(`${count} files, ${(bundle.length / 1e6).toFixed(1)} MB packed, build ${build}`);
@@ -216,7 +224,7 @@ async function main() {
     disableExperimentalSEAWarning: true,
     useSnapshot: false,
     useCodeCache: false,
-    assets: { 'app.bundle': path.join(WORK, 'app.bundle'), 'build.txt': path.join(WORK, 'build.txt'), 'version.txt': path.join(WORK, 'version.txt'), 'portal.txt': path.join(WORK, 'portal.txt') },
+    assets: { 'app.bundle': path.join(WORK, 'app.bundle'), 'build.txt': path.join(WORK, 'build.txt'), 'shell.txt': path.join(WORK, 'shell.txt'), 'version.txt': path.join(WORK, 'version.txt'), 'portal.txt': path.join(WORK, 'portal.txt') },
   };
   fs.writeFileSync(path.join(WORK, 'sea-config.json'), JSON.stringify(config, null, 2));
   execFileSync(process.execPath, ['--experimental-sea-config', path.join(WORK, 'sea-config.json')], { stdio: 'inherit' });
@@ -268,7 +276,9 @@ async function main() {
     execFileSync('makensis', ['-V2', `-DVERSION=${version}`, `-DBUILD=${build}`, `-DDIST=${DIST}`, `-DICON=${path.join(__dirname, 'app-icon.ico')}`, `-DART=${__dirname}`, path.join(__dirname, 'installer.nsi')], { stdio: 'inherit' });
     step(`built ${path.join(DIST, `${APP_NAME} Setup.exe`)} (${(fs.statSync(path.join(DIST, `${APP_NAME} Setup.exe`)).size / 1e6).toFixed(0)} MB)`);
   }
-  fs.writeFileSync(path.join(DIST, 'exam-app.json'), JSON.stringify({ version, build, builtAt: new Date().toISOString(), node: process.version, electron: ELECTRON_VERSION, installer: flag('--installer') }, null, 2));
+  fs.writeFileSync(path.join(DIST, 'exam-app.json'), JSON.stringify({ version, build, shell, builtAt: new Date().toISOString(), node: process.version, electron: ELECTRON_VERSION, installer: flag('--installer') }, null, 2));
+  // each portal file's fingerprint and size, for updates that download only what changed
+  fs.writeFileSync(path.join(DIST, 'exam-app-files.json'), JSON.stringify(manifest));
   // only the Setup is served; the unpacked app is just its input
   if (flag('--installer') && !flag('--keep-app')) fs.rmSync(APP_DIR, { recursive: true, force: true });
   fs.rmSync(WORK, { recursive: true, force: true });

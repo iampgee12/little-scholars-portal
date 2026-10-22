@@ -931,16 +931,28 @@ async function checkUpdates() {
   try {
     const r = await api('/api/exam/update-check');
     if (!r.insideApp) { out.innerHTML = '<div class="ec-note">This exam server isn\'t running as the UCS Exam Server app, so it can\'t update itself. Download the app from the portal\'s Offline CBT (LAN) page.</div>'; return; }
+    state.updateKind = r.kind;
+    // only the files that changed, or (when the app itself changed) the full Setup
+    const files = r.kind === 'files' ? r.changed || [] : [];
     out.innerHTML = !r.latest || !r.setupSize
       ? '<div class="ec-note warn">The school portal has no exam server app to offer yet, so there is nothing to compare with.</div>'
-      : r.available
-        ? `<div class="ec-note">A new version is available: <b class="ec-mono">v${esc(r.latest.version)}</b> (${when(r.latest.builtAt)}, ${Math.round(r.setupSize / 1e6)} MB).</div><button class="post-btn" onclick="installUpdate()">Download and Install</button>`
-        : `<div class="ec-note">You have the latest version (<span class="ec-mono">v${esc(r.latest.version)} · ${esc(r.latest.build)}</span>).</div>`;
+      : !r.available
+        ? `<div class="ec-note">You have the latest version (<span class="ec-mono">v${esc(r.latest.version)} · ${esc(r.latest.build)}</span>).</div>`
+        : r.kind === 'files'
+          ? `<div class="ec-note">Update available: <b>${plural(files.length, 'file')} changed</b> · <b>${sizeText(r.downloadSize)}</b> to download <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
+             ${files.length ? `<details class="ec-hint" style="margin:6px 0 10px;"><summary style="cursor:pointer;">See the files</summary><div class="ec-mono" style="margin-top:6px;line-height:1.7;">${files.map(esc).join('<br>')}</div></details>` : ''}
+             <button class="post-btn" onclick="installUpdate()">Download and Install</button>`
+          : `<div class="ec-note">Update available: <b>the app itself changed</b>, so this is the full installer · <b>${sizeText(r.setupSize)}</b> to download <span class="ec-hint">(v${esc(r.latest.version)}, ${when(r.latest.builtAt)})</span></div>
+             <button class="post-btn" onclick="installUpdate()">Download and Install</button>`;
   } catch (err) { out.innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`; }
 }
+const sizeText = bytes => (bytes < 1e6 ? `${Math.max(1, Math.round(bytes / 1e3))} KB` : `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`);
 async function installUpdate() {
   const writing = state.dash?.writing || 0;
-  if (!await uiConfirm(`Install the update now? The exam server closes while the new version installs${writing ? `, and ${plural(writing, 'pupil')} still writing will be disconnected` : ''}. Push results first if you can.`, { confirmLabel: 'Install', danger: !!writing })) return;
+  const what = state.updateKind === 'files'
+    ? 'The exam server restarts for a few seconds when it is done'
+    : 'The exam server closes while the new version installs';
+  if (!await uiConfirm(`Install the update now? ${what}${writing ? `, and ${plural(writing, 'pupil')} still writing will be disconnected` : ''}. Push results first if you can.`, { confirmLabel: 'Install', danger: !!writing })) return;
   document.getElementById('ec-update-out').innerHTML = '<p class="ec-hint">Connecting to the school portal…</p><div class="ea-progress"><i></i></div>';
   try {
     await api('/api/exam/update-install', { method: 'POST' });
@@ -954,7 +966,6 @@ function followDownload() {
   clearInterval(state.dlTimer);
   let lastBytes = -1;
   let lastMove = Date.now();
-  const mb = n => (n / 1e6).toFixed(n < 1e7 ? 1 : 0);
   const draw = d => {
     const pct = d.total ? Math.min(100, Math.floor((d.received / d.total) * 100)) : 0;
     let top = document.getElementById('ea-dl-top');
@@ -971,11 +982,13 @@ function followDownload() {
     if (!out) return;
     if (d.error) { out.innerHTML = `<div class="ec-note warn">${esc(d.error)}</div><button class="post-btn" onclick="installUpdate()">Try Again</button>`; return; }
     const stalled = !d.done && Date.now() - lastMove > 20e3;
-    out.innerHTML = `<div class="ec-flex" style="margin-top:12px;"><b>${d.done ? 'Downloaded. Opening the installer…' : `Downloading the update… ${pct}%`}</b>
-        <span class="ec-hint ec-mono">${mb(d.received)} of ${d.total ? mb(d.total) : '?'} MB</span></div>
+    const filesOnly = d.kind === 'files';
+    out.innerHTML = `<div class="ec-flex" style="margin-top:12px;"><b>${d.done ? (filesOnly ? 'Installed. The exam server is restarting…' : 'Downloaded. Opening the installer…') : `Downloading the update… ${pct}%`}</b>
+        <span class="ec-hint ec-mono">${sizeText(d.received)} of ${d.total ? sizeText(d.total) : '?'}</span></div>
       <div class="ea-progress ea-progress-fill"><i style="width:${d.done ? 100 : pct}%"></i></div>
       ${stalled ? '<div class="ec-note warn" style="margin-top:10px;">Nothing has arrived for a while. Check this computer\'s internet connection; the download carries on by itself when it comes back.</div>'
-        : '<p class="ec-hint" style="margin-top:8px;">When it finishes, this window closes and the installer opens. Click Yes if Windows asks, then Finish, and the updated app opens.</p>'}`;
+        : filesOnly ? '<p class="ec-hint" style="margin-top:8px;">When it finishes, the exam server restarts by itself in a few seconds and this page reloads on the new version.</p>'
+          : '<p class="ec-hint" style="margin-top:8px;">When it finishes, this window closes and the installer opens. Click Yes if Windows asks, then Finish, and the updated app opens.</p>'}`;
   };
   const tick = async () => {
     let d;

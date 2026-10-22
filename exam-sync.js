@@ -174,6 +174,17 @@ module.exports = function createExamSync(ctx) {
     return res.end(json);
   }
   const appInfo = () => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'dist', 'exam-app.json'), 'utf8')); } catch { return null; } };
+  // [path, sha256, size, gzipped size] for each portal file in the app (see exam-app/build.js)
+  let fileListCache = null;
+  const appFileList = () => {
+    try {
+      const file = path.join(ROOT, 'dist', 'exam-app-files.json');
+      const stat = fs.statSync(file);
+      if (!appInfo()?.shell) return null;
+      if (!fileListCache || fileListCache.mtime !== stat.mtimeMs) fileListCache = { mtime: stat.mtimeMs, list: JSON.parse(fs.readFileSync(file, 'utf8')) };
+      return fileListCache.list;
+    } catch { return null; }
+  };
 
   async function handlePortal(req, res, url) {
     const p = url.pathname;
@@ -265,7 +276,40 @@ module.exports = function createExamSync(ctx) {
     if (m === 'GET' && p === '/api/exam-sync/update') {
       const info = appInfo();
       const size = name => { try { return fs.statSync(path.join(ROOT, 'dist', name)).size; } catch { return 0; } };
-      return sendJson(res, 200, { app: info, setupSize: size('UCS Exam Server Setup.exe') }), true;
+      return sendJson(res, 200, { app: info, setupSize: size('UCS Exam Server Setup.exe'), files: !!appFileList() }), true;
+    }
+    // Updates that download only what changed: the fingerprint and size of every portal
+    // file in the app, then just the files an exam computer asks for, each checked
+    // against its fingerprint before it is sent
+    if (m === 'GET' && p === '/api/exam-sync/update-files') {
+      const list = appFileList();
+      if (!list) return sendJson(res, 404, { error: 'No file list for this version' }), true;
+      return sendGzipJson(req, res, { build: appInfo()?.build, shell: appInfo()?.shell, files: list }), true;
+    }
+    if (m === 'POST' && p === '/api/exam-sync/update-files') {
+      const list = appFileList();
+      if (!list) return sendJson(res, 404, { error: 'No file list for this version' }), true;
+      const body = await readJson(req);
+      const wanted = new Set(Array.isArray(body.paths) ? body.paths : []);
+      const entries = list.filter(([rel]) => wanted.has(rel));
+      const parts = [];
+      for (const [rel, sha] of entries) {
+        let data;
+        try { data = fs.readFileSync(path.join(ROOT, ...rel.split('/'))); } catch { data = null; }
+        if (!data || crypto.createHash('sha256').update(data).digest('hex') !== sha) {
+          return sendJson(res, 409, { error: 'The portal is updating itself. Try again in a few minutes, or use the full download.' }), true;
+        }
+        parts.push([rel, data]);
+      }
+      // same layout as the app's own bundle: 4-byte header length, a JSON header, the files
+      let offset = 0;
+      const header = Buffer.from(JSON.stringify({ files: parts.map(([rel, data]) => { const e = [rel, offset, data.length]; offset += data.length; return e; }) }), 'utf8');
+      const len = Buffer.alloc(4);
+      len.writeUInt32LE(header.length, 0);
+      const packed = zlib.gzipSync(Buffer.concat([len, header, ...parts.map(([, data]) => data)]));
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': packed.length, 'Cache-Control': 'no-store' });
+      res.end(packed);
+      return true;
     }
     if (m === 'GET' && p === '/api/exam-sync/setup.exe') {
       const file = path.join(ROOT, 'dist', 'UCS Exam Server Setup.exe');
@@ -299,7 +343,10 @@ module.exports = function createExamSync(ctx) {
     } catch (err) {
       throw new Error(`Couldn't reach the school portal (${conn.portal}). Check this computer's internet connection. (${err.cause?.code || err.message})`);
     }
-    if (raw) { if (!res.ok) throw new Error(`The portal said ${res.status}`); return res; }
+    if (raw) {
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `The portal said ${res.status}`);
+      return res;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `The portal said ${res.status}`);
     return data;
@@ -461,7 +508,7 @@ module.exports = function createExamSync(ctx) {
   }
 
   // ── app screens: dashboard, read-only lists, updates ──
-  const appBuild = () => ({ build: cleanText(process.env.UCS_APP_BUILD), version: cleanText(process.env.UCS_APP_VERSION) });
+  const appBuild = () => ({ build: cleanText(process.env.UCS_APP_BUILD), version: cleanText(process.env.UCS_APP_VERSION), shell: cleanText(process.env.UCS_APP_SHELL) });
   function dashboard() {
     const term = one('SELECT session_label AS session, term_label AS term FROM academic_terms WHERE is_active = 1');
     const since = new Date(Date.now() - 10 * 60e3).toISOString();
@@ -522,22 +569,38 @@ module.exports = function createExamSync(ctx) {
                 JOIN classes c ON c.code = ss.class_code JOIN subjects sub ON sub.id = ss.subject_id LEFT JOIN class_arms ca ON ca.id = ss.class_arm_id
                 ORDER BY sc.id DESC, ss.exam_date, ss.exam_time, c.label, sub.name`);
   }
+  // An update is either just the portal files that changed (when the app's frame, its
+  // window and engine, is the same) or, when the frame changed, the full Setup.
+  const sha256 = data => crypto.createHash('sha256').update(data).digest('hex');
+  // the portal's files this exam server doesn't have yet (it runs from the folder it started in)
+  const changedFiles = list => list.filter(([rel, sha]) => {
+    try { return sha256(fs.readFileSync(path.join(process.cwd(), ...rel.split('/')))) !== sha; } catch { return true; }
+  });
   async function updateCheck() {
     const mine = appBuild();
     const r = await callPortal('/api/exam-sync/update');
     const latest = r.app || null;
-    return { running: mine, latest, setupSize: r.setupSize, available: !!(latest && mine.build && latest.build !== mine.build && r.setupSize), insideApp: !!mine.build };
+    const out = { running: mine, latest, setupSize: r.setupSize, available: !!(latest && mine.build && latest.build !== mine.build && r.setupSize), insideApp: !!mine.build, kind: 'full' };
+    if (out.available && r.files && mine.shell && latest.shell === mine.shell) {
+      try {
+        const changed = changedFiles((await callPortal('/api/exam-sync/update-files')).files);
+        Object.assign(out, { kind: 'files', changed: changed.map(([rel]) => rel), downloadSize: changed.reduce((n, f) => n + (f[3] || f[2]), 0) });
+      } catch { /* the full download instead */ }
+    }
+    return out;
   }
-  // Downloads the new Setup from the portal, starts it and closes this server so it can be replaced.
-  // The download runs in the background; the app follows it through updateProgress().
-  let download = null; // { received, total, startedAt, done, error }
+  // Downloads the update in the background; the app follows it through updateProgress().
+  let download = null; // { kind, received, total, startedAt, done, error }
   const updateProgress = () => download || { idle: true };
   async function updateInstall() {
     if (process.platform !== 'win32' || !process.env.UCS_APP_BUILD) throw new Error('Updates install from the UCS Exam Server app on Windows');
     if (download && !download.done && !download.error) return { started: true }; // already downloading
-    // the Setup is large (it carries the app's own window engine): allow a slow line plenty of time
+    const check = await updateCheck();
+    if (!check.available) throw new Error('This exam server already has the latest version');
+    if (check.kind === 'files') return installChangedFiles(check.latest);
+    // the full Setup is large (it carries the app's own window engine): allow a slow line plenty of time
     const res = await callPortal('/api/exam-sync/setup.exe', { raw: true, timeout: 45 * 60e3 });
-    download = { received: 0, total: Number(res.headers.get('content-length')) || 0, startedAt: Date.now(), done: false, error: '' };
+    download = { kind: 'full', received: 0, total: Number(res.headers.get('content-length')) || 0, startedAt: Date.now(), done: false, error: '' };
     const file = path.join(require('node:os').tmpdir(), `UCS Exam Server Setup ${Date.now()}.exe`);
     (async () => {
       const out = fs.createWriteStream(file);
@@ -563,6 +626,63 @@ module.exports = function createExamSync(ctx) {
       }, 1500);
     })();
     return { started: true };
+  }
+
+  // Just the changed files: the new version is put together in a folder of its own
+  // (unchanged files copied from this one, changed ones from the download, each checked
+  // against its fingerprint) and only then switched to, so a dropped connection or a
+  // bad file changes nothing. The engine then restarts on the new version in seconds.
+  async function installChangedFiles(latest) {
+    const home = process.env.UCS_APP_HOME;
+    if (!home) throw new Error('Restart the UCS Exam Server app, then check for updates again');
+    const { files } = await callPortal('/api/exam-sync/update-files');
+    const changed = changedFiles(files);
+    download = { kind: 'files', received: 0, total: changed.reduce((n, f) => n + (f[3] || f[2]), 0), startedAt: Date.now(), done: false, error: '' };
+    const target = path.join(home, 'app', latest.build);
+    const temp = `${target}.partial`;
+    (async () => {
+      try {
+        const fresh = new Map();
+        if (changed.length) {
+          const res = await callPortal('/api/exam-sync/update-files', { method: 'POST', body: { paths: changed.map(([rel]) => rel) }, raw: true, timeout: 30 * 60e3 });
+          download.total = Number(res.headers.get('content-length')) || download.total;
+          const chunks = [];
+          for await (const chunk of res.body) { chunks.push(chunk); download.received += chunk.length; }
+          const raw = zlib.gunzipSync(Buffer.concat(chunks));
+          const headerLength = raw.readUInt32LE(0);
+          const header = JSON.parse(raw.subarray(4, 4 + headerLength).toString('utf8'));
+          const base = 4 + headerLength;
+          for (const [rel, offset, length] of header.files) fresh.set(rel, raw.subarray(base + offset, base + offset + length));
+        }
+        fs.rmSync(temp, { recursive: true, force: true });
+        for (const [rel, sha] of files) {
+          const data = fresh.get(rel) || fs.readFileSync(path.join(process.cwd(), ...rel.split('/')));
+          if (sha256(data) !== sha) throw new Error(`${rel} did not arrive correctly`);
+          const file = path.join(temp, ...rel.split('/'));
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, data);
+        }
+        fs.writeFileSync(path.join(temp, '.ready'), latest.build);
+        fs.rmSync(target, { recursive: true, force: true });
+        fs.renameSync(temp, target);
+        // from its next start the engine runs from the new folder (see exam-app/launcher.js)
+        fs.writeFileSync(path.join(home, 'app', 'current.json'), JSON.stringify({
+          build: latest.build, base: process.env.UCS_APP_BASE, shell: process.env.UCS_APP_SHELL, version: latest.version,
+        }));
+        download.received = download.total;
+        download.done = true;
+      } catch (err) {
+        fs.rm(temp, { recursive: true, force: true }, () => {});
+        download.error = `The update didn't install, so nothing was changed: ${err.cause?.code || err.message}. Check the internet connection and try again.`;
+        return;
+      }
+      // the app restarts the engine (exit code 75) and reloads the window
+      setTimeout(() => {
+        if (typeof globalThis.ucsRestartEngine === 'function') globalThis.ucsRestartEngine();
+        else process.exit(75);
+      }, 1500);
+    })();
+    return { started: true, kind: 'files' };
   }
 
   async function handleExam(req, res, url) {

@@ -66,8 +66,16 @@ async function startEngine() {
   engine.on('exit', code => {
     engine = null;
     if (stopping) return;
-    // the engine closes itself with code 0 to let an update install; anything else is a fault
+    // the engine closes itself with code 0 to let the full Setup install, and with 75
+    // after an update of the changed files: start it again and reload the window
     if (code === 0) { stopping = true; app.exit(0); return; }
+    if (code === 75) {
+      startEngine().then(up => {
+        if (up) { if (win) win.webContents.reloadIgnoringCache(); return; }
+        failed(`The exam server did not start again after the update.\n\n${logTail()}`).then(() => app.exit(1));
+      });
+      return;
+    }
     failed(`The exam server stopped unexpectedly.\n\n${logTail()}`).then(() => app.exit(1));
   });
   return waitUntilUp();

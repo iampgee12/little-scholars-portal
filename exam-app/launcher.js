@@ -153,7 +153,7 @@ function unpack(bundle, dir, build) {
 // Old versions and leftovers from an interrupted unpack; never fatal
 function tidyOld(appRoot, keep) {
   for (const name of fs.readdirSync(appRoot)) {
-    if (name === keep) continue;
+    if (name === keep || name === 'current.json') continue;
     try { fs.rmSync(path.join(appRoot, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* try again next time */ }
   }
 }
@@ -182,16 +182,26 @@ async function main() {
   }
   const sea = require('node:sea');
   const asset = name => { try { return sea.getAsset(name, 'utf8').trim(); } catch { return ''; } };
-  const build = asset('build.txt');
+  const bundled = asset('build.txt');
+  const shell = asset('shell.txt');
+  const readyIn = (dir, build) => { try { return fs.readFileSync(path.join(dir, READY), 'utf8').trim() === build; } catch { return false; } };
+  // After an update that downloaded only the changed files, a newer version waits in a
+  // folder of its own (see exam-sync.js). It's used while the app's frame and the
+  // version it was made from are still these; a full Setup install starts afresh.
+  let current = null;
+  try { current = JSON.parse(fs.readFileSync(path.join(HOME, 'app', 'current.json'), 'utf8')); } catch { /* none */ }
+  const updated = current && shell && current.shell === shell && current.base === bundled && current.build
+    && readyIn(path.join(HOME, 'app', current.build), current.build) ? current : null;
+  const build = updated ? updated.build : bundled;
   const appDir = path.join(HOME, 'app', build);
   const dataDir = path.join(HOME, 'exam-data');
   fs.mkdirSync(dataDir, { recursive: true });
-  const ready = () => { try { return fs.readFileSync(path.join(appDir, READY), 'utf8').trim() === build; } catch { return false; } };
-  if (!ready()) {
+  if (!readyIn(appDir, build)) {
     say('Preparing the exam server (first run of this version)');
     fs.mkdirSync(appDir, { recursive: true });
     unpack(sea.getAsset('app.bundle'), appDir, build);
   }
+  if (updated) say(`Running the updated version ${build} (made from ${bundled})`);
   tidyOld(path.join(HOME, 'app'), build);
   if (!ENGINE && !/\\Programs\\UCS Exam Server\\/i.test(process.execPath)) desktopShortcut();
 
@@ -199,7 +209,19 @@ async function main() {
   process.env.DATA_DIR = dataDir;
   process.env.PORT = String(PORT);
   process.env.UCS_APP_BUILD = build;
-  process.env.UCS_APP_VERSION = asset('version.txt') || '1.0.0';
+  process.env.UCS_APP_BASE = bundled;
+  process.env.UCS_APP_SHELL = shell;
+  process.env.UCS_APP_HOME = HOME;
+  process.env.UCS_APP_VERSION = (updated && updated.version) || asset('version.txt') || '1.0.0';
+  // after an update of the changed files: the desktop app restarts the engine when it
+  // exits with 75; run on its own, the engine starts itself again a moment later
+  if (!ENGINE) {
+    globalThis.ucsRestartEngine = () => {
+      const exe = process.execPath.replace(/'/g, "''");
+      spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `Start-Sleep -Seconds 3; Start-Process -FilePath '${exe}'`], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      setTimeout(() => process.exit(0), 300);
+    };
+  }
   if (!process.env.UCS_PORTAL_URL && asset('portal.txt')) process.env.UCS_PORTAL_URL = asset('portal.txt');
   // the server asks for the window when a second launch wants it back
   globalThis.ucsShowAppWindow = () => { if (reopenRequest) { const r = reopenRequest; reopenRequest = null; r(); } else openWindow(); };
