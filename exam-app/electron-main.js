@@ -111,6 +111,21 @@ function taskbarDetails(w) {
   } catch { /* an older Windows: the window icon is still set */ }
 }
 
+// Windows takes a taskbar button's icon from the shortcut carrying the same app ID;
+// the installer's shortcuts don't carry one, so the app adds it to them on start
+function stampShortcuts() {
+  if (process.platform !== 'win32') return;
+  const links = [
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', APP_TITLE, `${APP_TITLE}.lnk`),
+    path.join(app.getPath('desktop'), `${APP_TITLE}.lnk`),
+  ];
+  for (const link of links) {
+    try {
+      if (fs.existsSync(link) && shell.readShortcutLink(link).appUserModelId !== APP_ID) shell.writeShortcutLink(link, 'update', { appUserModelId: APP_ID });
+    } catch { /* a shortcut we can't change: the window icon is still set */ }
+  }
+}
+
 // ── the window ──
 function showWindow() {
   if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); return; }
@@ -177,6 +192,7 @@ app.on('window-all-closed', () => { /* stays alive in the tray; stopAll quits */
 
 app.whenReady().then(async () => {
   if (!firstCopy) return;
+  stampShortcuts();
   // a splash while the engine starts
   const splash = new BrowserWindow({ width: 420, height: 220, frame: false, resizable: false, show: true, icon: ICON, backgroundColor: '#ffffff', webPreferences: { sandbox: true } });
   taskbarDetails(splash);
