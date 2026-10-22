@@ -352,6 +352,11 @@ async function renderConsole() {
   await refreshConsole();
   state.timer = setInterval(refreshConsole, 10000);
 }
+// Only what changed is redrawn, in place: rebuilding the whole page every 10 seconds
+// made it flicker, jump, empty the open pupils list and lose clicks
+function setHtml(el, html) {
+  if (el && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+}
 async function refreshConsole() {
   let overview;
   try { overview = await api('/api/exam/overview'); } catch (err) { if (err.status === 401 || err.status === 403) return start(); return; }
@@ -359,18 +364,24 @@ async function refreshConsole() {
   const papers = overview.papers || [];
   const totals = papers.reduce((t, p) => ({ started: t.started + p.started, submitted: t.submitted + p.submitted }), { started: 0, submitted: 0 });
   if (state.page !== 'console') return;
-  pageEl().innerHTML = `
-    <div class="ec-stats">
-      <div class="ec-stat blue"><small>Papers open</small><b>${papers.filter(p => p.status === 'live').length} / ${papers.length}</b></div>
-      <div class="ec-stat green"><small>Handed in</small><b>${totals.submitted}</b></div>
-      <div class="ec-stat amber"><small>Still writing</small><b>${totals.started - totals.submitted}</b></div>
-    </div>
+  if (!document.getElementById('ec-cpapers')) {
+    pageEl().innerHTML = `
+    <div class="ec-stats" id="ec-cstats"></div>
     <div class="ec-card">
       <div class="ec-flex"><h2>Papers</h2><span class="ec-hint">Updates every 10 seconds</span></div>
       <p class="ec-muted">Click <b>Open</b> when it's time to start a paper and <b>Close</b> when it ends. Closing hands in every paper still being written.</p>
       <div style="overflow-x:auto;"><table class="ec-table">
         <thead><tr><th>Class</th><th>Subject</th><th>When</th><th>Time</th><th>Questions</th><th>Pupils</th><th>Started</th><th>Handed in</th><th>Status</th><th></th></tr></thead>
-        <tbody>${papers.map(p => `
+        <tbody id="ec-cpapers"></tbody>
+      </table></div>
+    </div>
+    <div id="ec-pupils"></div>`;
+  }
+  setHtml(document.getElementById('ec-cstats'), `
+      <div class="ec-stat blue"><small>Papers open</small><b>${papers.filter(p => p.status === 'live').length} / ${papers.length}</b></div>
+      <div class="ec-stat green"><small>Handed in</small><b>${totals.submitted}</b></div>
+      <div class="ec-stat amber"><small>Still writing</small><b>${totals.started - totals.submitted}</b></div>`);
+  setHtml(document.getElementById('ec-cpapers'), `${papers.map(p => `
           <tr class="${p.id === state.openPaperId ? 'ec-row-active' : ''}">
             <td>${esc(p.classLabel)}${p.armName ? ` ${esc(p.armName)}` : ''}</td>
             <td><b>${esc(p.subjectName)}</b><div class="ec-hint">${esc(p.scheduleTitle)}</div></td>
@@ -383,10 +394,7 @@ async function refreshConsole() {
               ${p.status !== 'live' ? `<button class="post-btn" onclick="setStatus(${p.id}, 'live')">${p.status === 'closed' ? 'Reopen' : 'Open'}</button>` : `<button class="btn-danger" onclick="setStatus(${p.id}, 'closed')">Close</button>`}
               <button class="btn-outline" onclick="showPupils(${p.id})">Pupils</button>
             </td>
-          </tr>`).join('') || '<tr><td colspan="10" class="ec-hint">No papers yet. Refresh CBT / Exams data, or load an exam pack.</td></tr>'}</tbody>
-      </table></div>
-    </div>
-    <div id="ec-pupils"></div>`;
+          </tr>`).join('') || '<tr><td colspan="10" class="ec-hint">No papers yet. Refresh CBT / Exams data, or load an exam pack.</td></tr>'}`);
   if (state.openPaperId) showPupils(state.openPaperId, true);
 }
 async function setStatus(id, status) {
@@ -408,8 +416,9 @@ async function showPupils(id, quiet) {
   if (!paper || !box) return;
   try {
     const { pupils } = await api(`/api/exam/papers/${id}/pupils`);
-    box.innerHTML = `<div class="ec-card">
-      <div class="ec-flex"><h2>${esc(paper.classLabel)} — ${esc(paper.subjectName)}: pupils</h2><button class="btn-outline" onclick="state.openPaperId=null;document.getElementById('ec-pupils').innerHTML=''">Hide</button></div>
+    if (state.openPaperId !== id) return; // hidden, or another paper picked, meanwhile
+    setHtml(box, `<div class="ec-card">
+      <div class="ec-flex"><h2>${esc(paper.classLabel)} — ${esc(paper.subjectName)}: pupils</h2><button class="btn-outline" onclick="hidePupils()">Hide</button></div>
       <div style="overflow-x:auto;"><table class="ec-table">
         <thead><tr><th>#</th><th>Pupil</th><th>ID</th><th>Progress</th><th>Score</th><th></th></tr></thead>
         <tbody>${pupils.map((s, i) => `<tr>
@@ -418,9 +427,13 @@ async function showPupils(id, quiet) {
           <td>${s.submittedAt ? `${s.score} / ${s.totalMarks}` : ''}</td>
           <td>${s.startedAt ? `<button class="btn-outline" style="padding:5px 10px;font-size:11px;" onclick="allowRetake(${id}, '${esc(s.id)}', '${esc(s.name).replace(/'/g, '&#39;')}')">Allow retake</button>` : ''}</td>
         </tr>`).join('') || '<tr><td colspan="6" class="ec-hint">No pupils in this class.</td></tr>'}</tbody>
-      </table></div></div>`;
+      </table></div></div>`);
     if (!quiet) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (err) { box.innerHTML = `<div class="ec-card ec-error">${esc(err.message)}</div>`; }
+  } catch (err) { if (!quiet) setHtml(box, `<div class="ec-card ec-error">${esc(err.message)}</div>`); }
+}
+function hidePupils() {
+  state.openPaperId = null;
+  setHtml(document.getElementById('ec-pupils'), '');
 }
 async function allowRetake(id, studentId, name) {
   if (!await uiConfirm(`Clear ${name}'s attempt so they can start this paper again? Their answers and score for it will be removed.`, { confirmLabel: 'Allow retake', danger: true })) return;
