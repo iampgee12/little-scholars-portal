@@ -72,6 +72,11 @@ button { font-family: inherit; }
 .ec-field label, .ec-label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
 .ec-input, .ec-select { width: 100%; max-width: 440px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--black-3); font: inherit; color: var(--text-1); outline: none; }
 .ec-input:focus, .ec-select:focus { border-color: rgba(34,197,94,.5); }
+/* a password box with its show/hide eye button */
+.ec-pw-wrap { position: relative; max-width: 440px; }
+.ec-pw-wrap .ec-input { padding-right: 42px; }
+.ec-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; padding: 4px; border: none; background: none; color: var(--text-3); cursor: pointer; }
+.ec-eye:hover { color: var(--text-1); }
 .ec-req { color: var(--red); font-weight: 700; }
 .post-btn, .btn-outline, .btn-danger { padding: 9px 16px; font-size: 13px; border-radius: 8px; }
 .ec-address { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }

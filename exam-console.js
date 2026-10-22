@@ -65,7 +65,7 @@ function renderConnect(error = '') {
     <p class="ec-muted">Type the school's API keys. They were written down when a super admin generated them on the online portal (<b>E-Class › CBT › Offline CBT (LAN) › School API keys</b>). Every exam computer uses the same keys.</p>
     <div class="ec-field"><label for="ec-api">API Number <span class="ec-req">*</span></label><input class="ec-input" id="ec-api" placeholder="UCS12345678" autocomplete="off"></div>
     <div class="ec-field"><label for="ec-auth">API Authentication Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-auth" autocomplete="off"></div>
-    <div class="ec-field"><label for="ec-secret">API Secret Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-secret" type="password" autocomplete="off"></div>
+    <div class="ec-field"><label for="ec-secret">API Secret Key <span class="ec-req">*</span></label><div class="ec-pw-wrap"><input class="ec-input" id="ec-secret" type="password" autocomplete="off">${EYE_BUTTON('ec-secret')}</div></div>
     <details style="margin-top:12px;"><summary class="ec-hint" style="cursor:pointer;">Advanced: portal address</summary>
       <div class="ec-field"><label for="ec-portal">Online portal address</label><input class="ec-input" id="ec-portal" value="${esc(s.portal || s.defaultPortal || '')}"></div></details>
     <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;"><button class="post-btn" id="ec-connect" onclick="connectPortal()">Connect</button></div>
@@ -113,13 +113,25 @@ async function firstRefresh() {
   }
 }
 // Only administrators sign in to the app (pupils sign in on their own devices)
+// The eye button in a password box: shows the password, and hides it again
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const EYE_BUTTON = id => `<button type="button" class="ec-eye" title="Show password" aria-label="Show password" onclick="togglePassword('${id}', this)">${EYE_OPEN}</button>`;
+function togglePassword(id, btn) {
+  const input = document.getElementById(id);
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.innerHTML = show ? EYE_SHUT : EYE_OPEN;
+  btn.title = btn.ariaLabel = show ? 'Hide password' : 'Show password';
+  input.focus();
+}
 function renderSignIn(note = '') {
   setupScreen('Administrator sign in', `
     ${note ? `<div class="ec-note">${note}</div>` : ''}
     <p class="ec-muted">Sign in with your usual <b>admin ID or email</b> and password.</p>
     <form onsubmit="adminSignIn(); return false;" autocomplete="on">
       <div class="ec-field"><label for="ec-sid">Admin ID or email</label><input class="ec-input" id="ec-sid" autocomplete="username"></div>
-      <div class="ec-field"><label for="ec-pw">Password</label><input class="ec-input" id="ec-pw" type="password" autocomplete="current-password"></div>
+      <div class="ec-field"><label for="ec-pw">Password</label><div class="ec-pw-wrap"><input class="ec-input" id="ec-pw" type="password" autocomplete="current-password">${EYE_BUTTON('ec-pw')}</div></div>
       <div style="margin-top:16px;"><button class="post-btn" type="submit" id="ec-signin">Sign In</button></div>
     </form>
     <div class="ec-error" id="ec-err"></div>
@@ -153,7 +165,7 @@ function renderLoadPack(firstTime) {
   const body = `
     <p class="ec-muted">Load the exam pack downloaded from the online portal (<b>E-Class › CBT › Offline CBT (LAN) › Download Exam Pack</b>), with its passphrase.</p>
     <div class="ec-field"><label for="ec-file">Exam pack file (.ucscbt)</label><input class="ec-input" type="file" id="ec-file" accept=".ucscbt"></div>
-    <div class="ec-field"><label for="ec-pass">Passphrase</label><input class="ec-input" type="password" id="ec-pass" autocomplete="off"></div>
+    <div class="ec-field"><label for="ec-pass">Passphrase</label><div class="ec-pw-wrap"><input class="ec-input" type="password" id="ec-pass" autocomplete="off">${EYE_BUTTON('ec-pass')}</div></div>
     ${firstTime ? '' : '<label class="ec-check"><input type="checkbox" id="ec-replace"> Replace this computer\'s exams and results that haven\'t been sent</label>'}
     <div class="ec-error" id="ec-err"></div>`;
   if (firstTime) {
@@ -749,7 +761,7 @@ function openReconnect() {
   modal('Connect School Account', `
     <div class="ec-field" style="margin-top:0;"><label for="ec-api">API Number <span class="ec-req">*</span></label><input class="ec-input" id="ec-api" autocomplete="off"></div>
     <div class="ec-field"><label for="ec-auth">API Authentication Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-auth" autocomplete="off"></div>
-    <div class="ec-field"><label for="ec-secret">API Secret Key <span class="ec-req">*</span></label><input class="ec-input" id="ec-secret" type="password" autocomplete="off"></div>
+    <div class="ec-field"><label for="ec-secret">API Secret Key <span class="ec-req">*</span></label><div class="ec-pw-wrap"><input class="ec-input" id="ec-secret" type="password" autocomplete="off">${EYE_BUTTON('ec-secret')}</div></div>
     <div class="ec-field"><label for="ec-portal">Online portal address</label><input class="ec-input" id="ec-portal" value="${esc(state.sync.portal || state.sync.defaultPortal || '')}"></div>
     <div class="ec-error" id="ec-err"></div>`,
   '<button class="btn-outline" onclick="closeModal()">Cancel</button><button class="post-btn" id="ec-connect" onclick="connectPortal()">Connect</button>');
