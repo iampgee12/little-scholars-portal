@@ -11,7 +11,17 @@
 //                 pupil computer test its connection, and the Trial Run page
 //                 lists every computer that has connected.
 const TRIAL_PASSWORD = '1234';
-const DEFAULT_TESTERS = 10; // 9001–9010 are made once on each exam computer
+// Made once on each exam computer: 9001–9010 are teachers, each seeing only their own
+// classes and subjects; 9011 is Mr. Chima, the IT tester, who sees every trial paper
+const DEFAULT_TESTERS = [
+  [9001, 'MISS EDDY'], [9002, 'MERCY'], [9003, 'JOSEPH'], [9004, 'KEHINDE'], [9005, 'MR ADEYEMI'],
+  [9006, 'MR DANIEL'], [9007, 'Olaniyi Gbenga'], [9008, 'EZEJI'], [9009, 'HARUNA'], [9010, 'HELEN'],
+  [9011, 'MR. CHIMA', 'it'],
+];
+const DEFAULTS_VERSION = '2'; // 1: "Tester 1" … "Tester 10", not linked to anyone
+// A tester waiting for their teacher to be copied to this computer holds the name
+// here instead of an ID: it matches no assignments, so they see nothing until linked
+const PENDING = 'name:';
 const LETTER = i => String.fromCharCode(65 + i);
 
 function createCbtTrial(deps) {
@@ -182,17 +192,41 @@ function createCbtTrial(deps) {
     while (!usernameFree(n)) n++;
     return makeTester(n, full, teacher?.id);
   }
-  // 9001–9010 are made once on each exam computer (pupils copied from the portal
-  // with one of those usernames are left alone; the rest are made next time)
+  // The default testers are made once on each exam computer (a pupil copied from the
+  // portal with one of those usernames is left alone; that tester is made next time).
+  // Computers that already made "Tester 1" … "Tester 10" have them renamed and linked.
+  // Then, every time, testers still waiting for their teacher are linked if the
+  // teacher is now on this computer (after Refresh Data).
   function ensureDefaultTesters() {
-    if (!EXAM_MODE || valueFromMeta('trial_seeded', '')) return;
-    let made = 0;
-    for (let i = 1; i <= DEFAULT_TESTERS; i++) {
-      const n = 9000 + i;
-      if (one('SELECT id FROM users WHERE id = ?', `TRIAL-${n}`)) { made++; continue; }
-      if (usernameFree(n)) { makeTester(n, `Tester ${i}`); made++; }
+    if (!EXAM_MODE) return;
+    if (valueFromMeta('trial_seeded', '') !== DEFAULTS_VERSION) {
+      let done = 0;
+      DEFAULT_TESTERS.forEach(([n, name, it], i) => {
+        const link = it ? null : `${PENDING}${name}`;
+        const existing = one('SELECT id, name FROM users WHERE id = ?', `TRIAL-${n}`);
+        if (existing) {
+          if (existing.name === `Tester ${i + 1}`) {
+            run('UPDATE users SET name = ?, first_name = ?, initials = ?, trial_teacher_id = ? WHERE id = ?',
+              name, firstNameFromName(name), initialsFromName(name), link, existing.id);
+          }
+          done++;
+        } else if (it && !usernameFree(n)) {
+          // the IT tester's usual number is taken: next free one instead
+          let m = n;
+          while (!usernameFree(m)) m++;
+          makeTester(m, name, link);
+          done++;
+        } else if (usernameFree(n)) {
+          makeTester(n, name, link);
+          done++;
+        }
+      });
+      if (done === DEFAULT_TESTERS.length) setMeta('trial_seeded', DEFAULTS_VERSION);
     }
-    if (made === DEFAULT_TESTERS) setMeta('trial_seeded', '1');
+    for (const t of all('SELECT id, trial_teacher_id AS link FROM users WHERE trial = 1 AND trial_teacher_id LIKE ?', `${PENDING}%`)) {
+      const teacher = one("SELECT id FROM users WHERE role IN ('teacher', 'staff') AND LOWER(TRIM(name)) = LOWER(TRIM(?))", t.link.slice(PENDING.length));
+      if (teacher) run('UPDATE users SET trial_teacher_id = ? WHERE id = ?', teacher.id, t.id);
+    }
   }
   function removeTester(id) {
     run('DELETE FROM trial_attempts WHERE user_id = ?', id);
@@ -329,7 +363,11 @@ function createCbtTrial(deps) {
       const seen = new Map(connectionList().filter(c => c.user).map(c => [c.user.id, c]));
       const testers = all(`SELECT u.id, u.username, u.name, u.trial_teacher_id AS teacherId, t.name AS teacherName FROM users u
                            LEFT JOIN users t ON t.id = u.trial_teacher_id WHERE u.trial = 1 ORDER BY CAST(u.username AS INTEGER)`)
-        .map(t => ({ ...t, password: TRIAL_PASSWORD, secondsAgo: seen.get(t.id)?.secondsAgo ?? null }));
+        .map(t => ({
+          ...t, password: TRIAL_PASSWORD, secondsAgo: seen.get(t.id)?.secondsAgo ?? null,
+          teacherName: !t.teacherId ? 'IT: sees every trial paper'
+            : t.teacherId.startsWith(PENDING) ? `${t.teacherId.slice(PENDING.length)} (after Refresh Data)` : t.teacherName,
+        }));
       const results = all(`SELECT a.id, u.username, u.name, c.label AS classLabel, s.name AS subjectName, a.score, a.total_marks AS totalMarks, a.submitted_at AS submittedAt
                            FROM trial_attempts a JOIN users u ON u.id = a.user_id JOIN cbt_schedule_subjects ss ON ss.id = a.paper_id
                            JOIN classes c ON c.code = ss.class_code JOIN subjects s ON s.id = ss.subject_id
@@ -367,7 +405,7 @@ function createCbtTrial(deps) {
     }
     if (m === 'POST' && p === '/api/exam/trial/testers/remove-all') {
       all('SELECT id FROM users WHERE trial = 1').forEach(u => removeTester(u.id));
-      setMeta('trial_seeded', '1'); // don't bring 9001–9010 back
+      setMeta('trial_seeded', DEFAULTS_VERSION); // don't bring the default testers back
       return sendJson(res, 200, { ok: true }), true;
     }
     if (m === 'POST' && p === '/api/exam/trial/results/clear') {
