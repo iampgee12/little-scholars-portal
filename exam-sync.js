@@ -716,7 +716,8 @@ module.exports = function createExamSync(ctx) {
     }
     const syncPaths = ['/api/exam/sync-status', '/api/exam/connect', '/api/exam/disconnect', '/api/exam/refresh', '/api/exam/push', '/api/exam/archive', '/api/exam/sync-report'];
     if (!syncPaths.includes(p)) return false;
-    const hasUsers = !!one('SELECT id FROM users LIMIT 1');
+    // (the trial testers made on this computer don't count: they exist from the first start)
+    const hasUsers = !!one('SELECT id FROM users WHERE COALESCE(trial, 0) = 0 LIMIT 1');
     // a brand-new install connects and does its first refresh before any admin exists here
     const firstRun = !hasUsers;
     if (m === 'GET' && p === '/api/exam/sync-status') return sendJson(res, 200, { ...statusInfo(), firstRun, defaultPortal: DEFAULT_PORTAL }), true;

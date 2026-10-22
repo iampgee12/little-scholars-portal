@@ -420,7 +420,8 @@ function createCbtOffline(deps) {
       // EXAM COMPUTER
       if (!p.startsWith('/api/exam/')) return false;
       if (!EXAM_MODE) return sendJson(res, 404, { error: 'Not found' }), true;
-      const hasUsers = !!one('SELECT id FROM users LIMIT 1');
+      // (trial testers don't count: the exam computer makes them on its first start)
+      const hasUsers = !!one('SELECT id FROM users WHERE COALESCE(trial, 0) = 0 LIMIT 1');
       if (m === 'GET' && p === '/api/exam/status') {
         return sendJson(res, 200, { examMode: true, setUp: hasUsers && (!!currentPack() || !!valueFromMeta('exam_synced', '')), connected: !!valueFromMeta('sync_api_number', ''), pack: currentPack(), lanAddresses: lanAddresses(), lanNetworks: lanNetworks(), exportedAt: valueFromMeta('exam_results_exported_at', '') || null }), true;
       }
