@@ -448,7 +448,7 @@ module.exports = function createExamSync(ctx) {
                                 a.submitted_at AS submittedAt, s.score, s.total_marks AS totalMarks
                          FROM cbt_attempts a LEFT JOIN cbt_scores s ON s.schedule_subject_id = a.schedule_subject_id AND s.student_id = a.student_id
                          WHERE a.submitted_at IS NOT NULL AND a.pushed_at IS NULL ORDER BY a.id`);
-    const totals = { sent: 0, imported: 0, alreadyUploaded: 0, conflicts: [], skipped: [], scoreChanged: [], failedBatches: 0, pending: pending.length };
+    const totals = { sent: 0, imported: 0, alreadyUploaded: 0, retakes: [], conflicts: [], skipped: [], scoreChanged: [], failedBatches: 0, pending: pending.length };
     for (let i = 0; i < pending.length; i += PUSH_BATCH) {
       const batch = pending.slice(i, i + PUSH_BATCH);
       const attempts = batch.map(a => ({
@@ -470,6 +470,7 @@ module.exports = function createExamSync(ctx) {
       totals.imported += r.imported;
       totals.alreadyUploaded += r.alreadyUploaded;
       totals.conflicts.push(...r.conflicts);
+      totals.retakes.push(...(r.retakes || []));
       totals.skipped.push(...r.skipped);
       totals.scoreChanged.push(...r.scoreChanged);
     }

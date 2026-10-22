@@ -236,7 +236,7 @@ function createCbtOffline(deps) {
   // or pushed by a connected exam server) and marks them against the portal's
   // questions. `outcomes` says what happened to each, so a push knows what's done.
   function importAttempts(attempts, source, recordedBy) {
-    const report = { imported: 0, alreadyUploaded: 0, conflicts: [], skipped: [], scoreChanged: [], outcomes: [] };
+    const report = { imported: 0, alreadyUploaded: 0, retakes: [], conflicts: [], skipped: [], scoreChanged: [], outcomes: [] };
     const label = (ssId, studentId) => {
       const r = one(`SELECT st.name, sub.name AS subject, c.label AS cls FROM students st, cbt_schedule_subjects ss
                      JOIN subjects sub ON sub.id = ss.subject_id JOIN classes c ON c.code = ss.class_code
@@ -254,8 +254,18 @@ function createCbtOffline(deps) {
           outcome(a, 'skipped');
           continue;
         }
-        const existing = one('SELECT id, submitted_at AS submittedAt, source FROM cbt_attempts WHERE schedule_subject_id = ? AND student_id = ?', ssId, studentId);
-        if (existing && existing.source === source) { report.alreadyUploaded++; outcome(a, 'already'); continue; }
+        let existing = one('SELECT id, started_at AS startedAt, submitted_at AS submittedAt, source FROM cbt_attempts WHERE schedule_subject_id = ? AND student_id = ?', ssId, studentId);
+        // From the same exam computer(s): the same attempt again is already here; a
+        // different one is a retake the school allowed there (Allow retake in the Exam
+        // Console), which replaces this pupil's earlier result for this paper only
+        if (existing && existing.source === source) {
+          if (!a.startedAt || cleanText(a.startedAt) === cleanText(existing.startedAt)) { report.alreadyUploaded++; outcome(a, 'already'); continue; }
+          run('DELETE FROM cbt_attempt_answers WHERE attempt_id = ?', existing.id);
+          run('DELETE FROM cbt_attempts WHERE id = ?', existing.id);
+          run('DELETE FROM cbt_scores WHERE schedule_subject_id = ? AND student_id = ?', ssId, studentId);
+          report.retakes.push(`${label(ssId, studentId)}: retake replaced the earlier result`);
+          existing = null;
+        }
         if (existing && existing.submittedAt) { report.conflicts.push(`${label(ssId, studentId)}: already wrote this paper online — kept the online result`); outcome(a, 'conflict'); continue; }
         if (existing) run('DELETE FROM cbt_attempts WHERE id = ?', existing.id); // an unfinished online try gives way
         const inserted = run(

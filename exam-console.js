@@ -763,7 +763,7 @@ function pushSummary(r) {
   return `<p class="ec-hint">${when(r.at)}</p>
     <div class="ec-stats"><div class="ec-stat green"><small>Recorded online</small><b>${r.imported}</b></div><div class="ec-stat"><small>Already online</small><b>${r.alreadyUploaded}</b></div><div class="ec-stat ${r.left ? 'amber' : 'green'}"><small>Still to push</small><b>${r.left}</b></div></div>
     ${r.error ? `<div class="ec-note warn">${esc(r.error)}</div>` : ''}
-    ${[...(r.conflicts || []), ...(r.skipped || []), ...(r.scoreChanged || [])].map(x => `<div class="ec-note">${esc(x)}</div>`).join('')}`;
+    ${[...(r.retakes || []), ...(r.conflicts || []), ...(r.skipped || []), ...(r.scoreChanged || [])].map(x => `<div class="ec-note">${esc(x)}</div>`).join('')}`;
 }
 async function doPush() {
   const btn = document.getElementById('ec-push');
