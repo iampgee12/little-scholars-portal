@@ -161,7 +161,7 @@ module.exports = function createStudents(ctx) {
   }
 
   const BASE_SELECT = `
-    SELECT s.id, s.reg_no AS regNo, s.name, s.initials, s.surname, s.first_name AS firstName, s.other_names AS otherNames, s.gender,
+    SELECT s.id, s.reg_no AS regNo, u.username, s.name, s.initials, s.surname, s.first_name AS firstName, s.other_names AS otherNames, s.gender,
            s.class_code AS classCode, c.label AS classLabel, s.class_arm_id AS classArmId, ca.name AS classArmName,
            s.status, COALESCE(s.archived, 0) AS archived, COALESCE(u.active, 1) AS active, s.photo_path AS photoPath,
            COALESCE(NULLIF(s.student_email, ''), u.email, '') AS email, s.parent_email AS parentEmail, s.family_id AS familyId,
@@ -316,9 +316,9 @@ module.exports = function createStudents(ctx) {
         const results = all(`SELECT rp.id, rp.exam_type AS examType, rp.published_at AS publishedAt, a.session_label AS session, a.term_label AS term, c.label AS classLabel
                              FROM report_publications rp JOIN academic_terms a ON a.id = rp.academic_id LEFT JOIN classes c ON c.code = rp.class_code
                              WHERE rp.student_id = ? ORDER BY rp.published_at DESC`, id);
-        const active = one('SELECT COALESCE(active, 1) AS active FROM users WHERE id = ?', id);
+        const active = one('SELECT COALESCE(active, 1) AS active, username FROM users WHERE id = ?', id);
         return sendJson(res, 200, {
-          student: { ...rec, ...st, active: active ? !!active.active : rec.active },
+          student: { ...rec, ...st, active: active ? !!active.active : rec.active, username: active?.username || '' },
           groups, tags, tagIds, family, results, school: schoolInfoFromMeta(),
         }), true;
       }

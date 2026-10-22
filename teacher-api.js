@@ -690,11 +690,12 @@ function populateStudents() {
     const grade = scoreToGrade(student.avg);
     const tr = document.createElement('tr');
     tr.dataset.name = student.name.toLowerCase();
-    tr.dataset.id = student.id.toLowerCase();
+    tr.dataset.id = `${student.id} ${student.username || ''}`.toLowerCase();
     tr.innerHTML = `
       <td><span style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px;">${i + 1}</span></td>
       <td>${pupilAvatar(student)}<strong>${escapeHtml(student.name)}</strong></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-3);">${escapeHtml(student.id)}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.username ? escapeHtml(student.username) : '<span style="color:var(--text-3);font-weight:400;">—</span>'}</td>
       <td style="color:var(--text-2);">Class ${escapeHtml(student.cls)}</td>
       <td style="font-family:'DM Mono',monospace;font-weight:700;">${student.avg}%</td>
       <td><span class="grade-pill ${gradeClass(student.avg)}">${grade}</span></td>

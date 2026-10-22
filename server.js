@@ -168,6 +168,35 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
+// Pupils in Year 1–6 (the classes that write CBT) sign in with a short username:
+// a two-digit year-group code, then their number in that group (2201, 2202 …).
+// The code moves up the school with the group, so a pupil keeps one username for
+// good: in 2026/2027 Year 1 is 23 and Year 6 is 18, and in 2027/2028 the new
+// Year 1 is 24. Each pupil gets the next number after the highest in the group.
+// Run at startup and after every change, so pupils added or promoted in any way
+// get theirs. Not on the exam computer: it copies usernames from the portal.
+function assignStudentUsernames() {
+  if (EXAM_MODE) return 0;
+  const missing = all(
+    `SELECT u.id, st.class_code AS classCode FROM users u JOIN students st ON st.id = u.id
+     WHERE u.role = 'student' AND u.username IS NULL AND st.class_code GLOB 'Y[1-6]'
+       AND COALESCE(st.archived, 0) = 0 AND (st.status IS NULL OR st.status = 'active')
+     ORDER BY st.class_code, st.name COLLATE NOCASE`
+  );
+  if (!missing.length) return 0;
+  const yearMatch = String(activeAcademic()?.sessionLabel || '').match(/(\d{4})/);
+  const startYear = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
+  for (const st of missing) {
+    const prefix = String((startYear % 100) - 2 - Number(st.classCode.slice(1))).padStart(2, '0');
+    const used = all('SELECT username FROM users WHERE username GLOB ?', `${prefix}[0-9][0-9]`)
+      .map(r => Number(r.username.slice(2)));
+    let n = used.length ? Math.max(...used) + 1 : 1;
+    while (one('SELECT id FROM users WHERE LOWER(username) = ?', `${prefix}${String(n).padStart(2, '0')}`)) n++;
+    run('UPDATE users SET username = ? WHERE id = ?', `${prefix}${String(n).padStart(2, '0')}`, st.id);
+  }
+  return missing.length;
+}
+
 // Used by the finance/payroll routes: returns a non-negative finite number,
 // or null when the input isn't a valid non-negative amount.
 function parseMoney(value) {
@@ -1803,6 +1832,7 @@ const examSync = createExamSync({
   adminLevel, schoolInfoFromMeta, ROOT, UPLOAD_DIR, EXAM_MODE, cbtOffline,
 });
 examSync.createSchema();
+assignStudentUsernames();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -2006,9 +2036,10 @@ function computeSchoolDays(academicId) {
 function studentRowsForClass(classCode) {
   return all(
     `SELECT st.id, st.name, st.initials, st.gender, st.avg, st.att, st.class_code AS classCode,
-            st.class_arm_id AS classArmId, ca.name AS classArmName, st.photo_path AS photoPath
+            st.class_arm_id AS classArmId, ca.name AS classArmName, st.photo_path AS photoPath, u.username
      FROM students st
      LEFT JOIN class_arms ca ON ca.id = st.class_arm_id
+     LEFT JOIN users u ON u.id = st.id
      WHERE st.class_code = ?
      ORDER BY st.name`,
     classCode
@@ -9989,6 +10020,10 @@ const server = http.createServer(async (req, res) => {
       if (await examSync.handle(req, res, url)) return;
       if (await cbtOffline.handle(req, res, url)) return;
       await handleApi(req, res, url);
+      // pupils added, imported or promoted by this request get a username
+      if (req.method !== 'GET') {
+        try { assignStudentUsernames(); } catch (err) { console.error('Assigning usernames:', err); }
+      }
       return;
     }
     serveStatic(req, res, url);

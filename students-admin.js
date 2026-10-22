@@ -5,7 +5,7 @@ const VS = { rows: [], shown: [], view: 'list', page: 1, perPage: 30, search: ''
 const REG = { rows: [], counts: {}, page: 1, perPage: 25, search: '', status: 'all', gender: 'all', year: '' };
 
 const VS_FIELDS = [
-  ['regNo', 'Reg. No.'], ['id', 'Student ID'], ['name', 'Full Name'], ['surname', 'Surname'], ['firstName', 'First Name'],
+  ['regNo', 'Reg. No.'], ['username', 'Username'], ['id', 'Student ID'], ['name', 'Full Name'], ['surname', 'Surname'], ['firstName', 'First Name'],
   ['otherNames', 'Other Names'], ['gender', 'Gender'], ['dob', 'Date of Birth'], ['classLabel', 'Class'], ['classArmName', 'Class Arm'],
   ['email', 'Email'], ['phone', 'Contact Phone'], ['account', 'Account Status'], ['enrolledOn', 'Date Enrolled'], ['session', 'Enrolled Session'],
   ['rollNo', 'Roll No'], ['religion', 'Religion'], ['nationality', 'Nationality'], ['state', 'State of Origin'], ['lga', 'LGA'],
@@ -141,7 +141,7 @@ function populateStudents() {
 function vsFiltered() {
   const q = VS.search.toLowerCase();
   return VS.rows.filter(r => {
-    if (q && ![r.name, r.regNo, r.id, r.email, r.classLabel, r.classArmName].some(v => String(v || '').toLowerCase().includes(q))) return false;
+    if (q && ![r.name, r.regNo, r.username, r.id, r.email, r.classLabel, r.classArmName].some(v => String(v || '').toLowerCase().includes(q))) return false;
     return VS.rules.every(rule => {
       const v = String(vsValue(r, rule.field)).toLowerCase();
       const want = String(rule.value || '').toLowerCase();
@@ -212,7 +212,7 @@ function vsPaint() {
         <button class="vs-photo-name" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button>
         <div class="en-hint">${escapeHtml(r.regNo || r.id)}</div><div class="en-hint">${classText(r)}</div></div>`).join('')}</div>` : '<div class="sr-empty">No data available in table</div>';
   } else {
-    list.innerHTML = `<div class="sr-table-wrap"><table class="data-table"><thead><tr><th><input type="checkbox" onchange="vsSelectPage(this.checked)" ${page.length && page.every(r => VS.selected.has(r.id)) ? 'checked' : ''}></th><th>#</th><th>Photo</th><th>Name</th><th>G</th><th>Reg. No.</th><th>Class / Class Arm</th><th>Email</th><th>Account Status</th><th>Parents / Guardian</th><th></th></tr></thead>
+    list.innerHTML = `<div class="sr-table-wrap"><table class="data-table"><thead><tr><th><input type="checkbox" onchange="vsSelectPage(this.checked)" ${page.length && page.every(r => VS.selected.has(r.id)) ? 'checked' : ''}></th><th>#</th><th>Photo</th><th>Name</th><th>G</th><th>Reg. No.</th><th>Username</th><th>Class / Class Arm</th><th>Email</th><th>Account Status</th><th>Parents / Guardian</th><th></th></tr></thead>
       <tbody>${page.length ? page.map((r, i) => `<tr>
         <td><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick('${escapeHtml(r.id)}', this.checked)"></td>
         <td>${start + i + 1}</td>
@@ -220,12 +220,13 @@ function vsPaint() {
         <td><button class="stu-name-link" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button></td>
         <td>${escapeHtml(r.gender || '')}</td>
         <td class="stu-mono">${escapeHtml(r.regNo || r.id)}</td>
+        <td class="stu-mono">${r.username ? `<b>${escapeHtml(r.username)}</b>` : '<span class="en-hint">—</span>'}</td>
         <td>${classText(r)}</td>
         <td>${escapeHtml(r.email || '')}</td>
         <td><span class="sr-pill ${r.active ? 'accepted' : 'rejected'}">${r.active ? 'Active' : 'Deactivated'}</span>${r.archived ? ' <span class="sr-pill bypassed">Archived</span>' : ''}</td>
         <td class="stu-parents">${parentsText(r)}</td>
         <td><button class="btn-outline btn-sm" onclick="enrolEdit('${escapeHtml(r.id)}')">Edit</button></td>
-      </tr>`).join('') : '<tr><td colspan="11" class="sr-empty">No data available in table</td></tr>'}</tbody></table></div>`;
+      </tr>`).join('') : '<tr><td colspan="12" class="sr-empty">No data available in table</td></tr>'}</tbody></table></div>`;
   }
   document.getElementById('vs-showing').textContent = `Showing ${rows.length ? start + 1 : 0} to ${start + page.length} of ${rows.length} entries${VS.selected.size ? ` · ${VS.selected.size} selected` : ''}`;
   const btn = (label, p, disabled) => `<button class="btn-outline btn-sm" ${disabled ? 'disabled' : ''} onclick="VS.page=${p}; vsPaint()">${label}</button>`;
@@ -267,7 +268,7 @@ async function vsAction(action) {
   } catch (err) { showToast(err.message); }
 }
 
-const VS_LIST_COLS = [['#', null], ['Name', 'name'], ['Gender', 'gender'], ['Reg. No.', 'regNo'], ['Class', 'classLabel'], ['Class Arm', 'classArmName'], ['Email', 'email'], ['Account Status', 'account'], ['Parent / Guardian 1', 'parent1'], ['Parent 1 Phone', 'parent1Phone']];
+const VS_LIST_COLS = [['#', null], ['Name', 'name'], ['Gender', 'gender'], ['Reg. No.', 'regNo'], ['Username', 'username'], ['Class', 'classLabel'], ['Class Arm', 'classArmName'], ['Email', 'email'], ['Account Status', 'account'], ['Parent / Guardian 1', 'parent1'], ['Parent 1 Phone', 'parent1Phone']];
 
 function vsExportList(format) {
   document.querySelectorAll('.stu-dd-menu.open').forEach(m => m.classList.remove('open'));
@@ -281,7 +282,7 @@ function vsAdvancedExport() {
   const modal = document.createElement('div');
   modal.className = 'en-modal';
   modal.style.display = 'flex';
-  const defaults = new Set(['regNo', 'name', 'gender', 'dob', 'classLabel', 'classArmName', 'email', 'parent1', 'parent1Phone']);
+  const defaults = new Set(['regNo', 'username', 'name', 'gender', 'dob', 'classLabel', 'classArmName', 'email', 'parent1', 'parent1Phone']);
   modal.innerHTML = `<div class="en-modal-box"><div class="en-modal-head"><span>Advanced Export</span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
     <div class="en-modal-body">
       <div class="en-hint">Choose the columns to include. ${vsFiltered().length} student${vsFiltered().length === 1 ? '' : 's'} (the current list, after search and filters) will be exported.</div>
@@ -516,6 +517,7 @@ function stuInfoBody(inPage) {
     <div class="stu-sec">Academic Information</div>
     <table class="stu-info"><tbody>
       ${row('Adm. / Reg. No.', txt(s.regNo))}
+      ${row('Username (CBT sign-in)', txt(s.username))}
       ${row('Current Class Category', txt(String(s.category || '').toUpperCase()))}
       ${row('Current Class', `${txt(String(s.classLabel || '').toUpperCase())}<div>${btn('Class History', `stuClassHistory('${escapeHtml(s.id)}', '${escapeHtml(name).replace(/'/g, '&#39;')}')`)}</div>`)}
       ${row('Current Class Arm', txt(String(s.armName || '').toUpperCase()))}
