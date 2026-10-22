@@ -195,6 +195,8 @@ module.exports = function createSecurity(ctx) {
     // the exam server copies its accounts from the portal (a change made there
     // would be overwritten at the next refresh), so it never asks for one
     if (process.env.EXAM_MODE === '1') return false;
+    // pupils keep the password the school gives them (e.g. 1234): never asked to change it
+    if (user.role === 'student') return false;
     if (user.password_self_set === 1) return false;
     if (user.password_self_set === 0) return true;
     // set before these rules: fine if it already meets them
