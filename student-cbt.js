@@ -264,20 +264,11 @@ function openLobby(id) {
       </div>
       ${note || (resuming ? '<div class="cbt-resume-note">You already started this exam. Your answers are saved and the timer has kept running — continue now.</div><br>' : '')}
       ${custom}
-      <div class="cbt-instructions">
-        <h3>Instructions</h3>
-        <ul>
-          <li>Read each question carefully before you choose an answer.</li>
-          <li>Choose only <strong>one</strong> answer for each question. The next question comes up by itself.</li>
-          <li>Do not talk to anyone or copy from anyone.</li>
-          <li>Keep an eye on the timer at the top of the screen.</li>
-          <li>Not sure? Tap <strong>Mark for review</strong> and come back to it later.</li>
-          <li>The numbers at the bottom take you to any question. Green means answered.</li>
-          <li>Raise your hand if you need help. Do not close or refresh the page.</li>
-          <li>When you finish, check your answers, then tap <strong>Review &amp; Submit</strong>.</li>
-          <li>If time runs out, your exam is handed in for you.</li>
-        </ul>
-      </div>
+      <!-- for young children: two instructions, big and bold -->
+      <ol class="cbt-rules">
+        <li><span class="cbt-rule-num">1</span>Read each question carefully.</li>
+        <li><span class="cbt-rule-num">2</span>Check your answers before you submit.</li>
+      </ol>
       <div class="cbt-lobby-actions">
         <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">Back</button>
         <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam('${escapeHtml(String(e.id))}', this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
