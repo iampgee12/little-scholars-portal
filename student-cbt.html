@@ -95,6 +95,8 @@
   .cbt-instructions ul { margin: 0; padding-left: 20px; }
   .cbt-instructions p { margin: 0; white-space: pre-line; }
   /* the two instructions: large and bold for young children */
+  .cbt-rules-title { margin: 6px 0 10px; font-size: 26px; font-weight: 800; color: var(--text-1); }
+  @media (max-width: 560px) { .cbt-rules-title { font-size: 22px; } }
   .cbt-rules { list-style: none; margin: 4px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
   .cbt-rules li { display: flex; align-items: center; gap: 16px; background: var(--blue-bg); border: 1px solid #bfdbfe; border-radius: var(--radius); padding: 16px 18px; font-size: 24px; font-weight: 800; line-height: 1.3; color: var(--text-1); }
   .cbt-rule-num { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
@@ -275,6 +277,6 @@
     </div>
   </main>
   <script src="ui-dialog.js?v=3"></script>
-  <script src="student-cbt.js?v=11"></script>
+  <script src="student-cbt.js?v=12"></script>
 </body>
 </html>

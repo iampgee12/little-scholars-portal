@@ -265,6 +265,7 @@ function openLobby(id) {
       ${note || (resuming ? '<div class="cbt-resume-note">You already started this exam. Your answers are saved and the timer has kept running — continue now.</div><br>' : '')}
       ${custom}
       <!-- for young children: two instructions, big and bold -->
+      <h3 class="cbt-rules-title">Instructions</h3>
       <ol class="cbt-rules">
         <li><span class="cbt-rule-num">1</span>Read each question carefully.</li>
         <li><span class="cbt-rule-num">2</span>Check your answers before you submit.</li>
