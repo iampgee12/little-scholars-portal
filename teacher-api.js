@@ -113,7 +113,7 @@ function showToast(msg, type = '') {
   t.textContent = msg;
   const text = String(msg || '');
   const inferredError = /\b(error|failed|failure|invalid|required|choose|select|enter|please|must|cannot|can't|not found|already exists|already assigned|before assigning|missing|unavailable|unable|denied|blocked|expired|nothing to|no .* found|not enough|only .* can)\b/i.test(text);
-  const inferredSuccess = /\b(saved|added|assigned|deleted|removed|created|updated|published|sent|verified|moved|reinstated|accepted|deactivated|reactivated|posted|uploaded|restored|completed|successful|marked|cleared|enabled|disabled|recorded|generated|copied|approved|rejected|received|changed)\b/i.test(text);
+  const inferredSuccess = /\b(saved|added|switched on|switched off|turned on|turned off|now written|can now be|assigned|deleted|removed|created|updated|published|sent|verified|moved|reinstated|accepted|deactivated|reactivated|posted|uploaded|restored|completed|successful|marked|cleared|enabled|disabled|recorded|generated|copied|approved|rejected|received|changed)\b/i.test(text);
   const status = type === 'warn' ? 'error' : type || (inferredError && !(inferredSuccess && /already verified/i.test(text)) ? 'error' : inferredSuccess ? 'success' : 'error');
   t.classList.toggle('toast-error', status === 'error');
   t.classList.toggle('toast-success', status === 'success');

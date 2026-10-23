@@ -124,7 +124,7 @@ async function ocSetOnline(input) {
   input.disabled = true;
   try {
     await apiFetch('/api/admin/cbt/online-setting', { method: 'PUT', body: JSON.stringify({ allowed }) });
-    showToast(allowed ? 'CBT exams can now be written online' : 'CBT exams are now written at school only');
+    showToast(allowed ? 'CBT exams can now be written online' : 'CBT exams are now written at school only', 'success');
   } catch (err) { showToast(err.message, 'warn'); }
   ocLoadWhere();
 }
