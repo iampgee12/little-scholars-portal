@@ -76,7 +76,8 @@
 .staff-export-btn,
 .gb-offline-btn,
 .cbt-link-btn,
-.cbt-btn-secondary {
+.cbt-btn-secondary,
+.btn-close {
   background: #fff !important;
   color: var(--text-1, #0f172a) !important;
   border: 1px solid var(--border-2, #cbd5e1) !important;
@@ -106,11 +107,12 @@
   background: var(--black-3, #f1f5f9) !important;
   border-color: var(--text-3, #94a3b8) !important;
 }
+/* Close: quiet, with a soft red hint under the mouse */
+.btn-close:hover { background: #fff !important; color: var(--btn-danger) !important; border-color: #fca5a5 !important; }
 
 /* ── Danger ── */
-/* Close buttons are red too (every portal) */
-.btn-danger,
-.btn-close {
+/* filled: removes, wipes or ends many things at once, or can't be undone */
+.btn-danger {
   background: var(--btn-danger) !important;
   color: #fff !important;
   border: 1px solid var(--btn-danger) !important;
@@ -119,8 +121,10 @@
   font-weight: 700;
   cursor: pointer;
 }
-.btn-danger:hover, .btn-close:hover { background: var(--btn-danger-hover) !important; border-color: var(--btn-danger-hover) !important; color: #fff !important; }
+.btn-danger:hover { background: var(--btn-danger-hover) !important; border-color: var(--btn-danger-hover) !important; color: #fff !important; }
+/* outlined: removes or switches off one thing (row-level), or is easily undone */
 .del-btn,
+.btn-danger-outline,
 .bs-unpublish-btn,
 .gb-published-btn {
   background: #fff !important;
@@ -132,6 +136,7 @@
   cursor: pointer;
 }
 .del-btn:hover,
+.btn-danger-outline:hover,
 .bs-unpublish-btn:hover,
 .gb-published-btn:hover { background: #fef2f2 !important; border-color: var(--btn-danger) !important; }
 
