@@ -4790,7 +4790,12 @@ async function csdOpen(scheduleId) {
   try {
     const data = await apiFetch(`/api/admin/cbt/schedules/${scheduleId}`);
     const s = data.schedule;
-    document.getElementById('cs-detail-title').textContent = `Schedule for: ${s.title} | ${s.termLabel} | ${s.sessionLabel}`;
+    // one title: the schedule's name, with term and session underneath; the top bar says where you are
+    document.getElementById('cs-detail-name').textContent = s.title;
+    document.getElementById('cs-detail-meta').textContent = [s.termLabel, s.sessionLabel].filter(Boolean).join(' · ');
+    document.getElementById('cs-page-header').style.display = 'none';
+    document.getElementById('cs-detail-header').style.display = '';
+    document.getElementById('topbar-sub').textContent = s.title;
     document.getElementById('cs-list-card').style.display = 'none';
     document.getElementById('cs-list-card-2').style.display = 'none';
     document.getElementById('cs-detail-card').style.display = 'block';
@@ -4807,6 +4812,12 @@ function csdClose() {
   csCurrentScheduleId = null;
   const detail = document.getElementById('cs-detail-card');
   if (detail) detail.style.display = 'none';
+  const head = document.getElementById('cs-detail-header');
+  if (head) head.style.display = 'none';
+  const listHead = document.getElementById('cs-page-header');
+  if (listHead) listHead.style.display = '';
+  const sub = document.getElementById('topbar-sub');
+  if (sub && document.getElementById('tab-cbtSchedules')?.classList.contains('active')) sub.textContent = 'Computer-Based Test Schedules';
   const list1 = document.getElementById('cs-list-card');
   const list2 = document.getElementById('cs-list-card-2');
   if (list1) list1.style.display = 'block';
