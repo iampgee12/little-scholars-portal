@@ -44,17 +44,25 @@ body {
   position:relative;
   padding:20px;
 }
-body::before { display:none; }
+/* the school's front gate behind the sign-in card, at 70% so it stays soft */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0;
+  background:url('/report_assets/school-front.jpg') center / cover no-repeat;
+  opacity:0.7;
+  pointer-events:none;
+}
 
-/* ── CARD SHELL ── */
+/* ── CARD SHELL: see-through enough to show the photo, solid enough to read ── */
 .login-card {
   position:relative; z-index:1;
   width:100%; max-width:420px;
-  background:var(--black);
-  border:1px solid var(--border);
+  background:rgba(255,255,255,0.82);
+  -webkit-backdrop-filter:blur(10px) saturate(1.1);
+  backdrop-filter:blur(10px) saturate(1.1);
+  border:1px solid rgba(255,255,255,0.6);
   border-radius:var(--radius);
   overflow:hidden;
-  box-shadow:0 4px 24px rgba(15,23,42,0.08);
+  box-shadow:0 10px 40px rgba(15,23,42,0.22);
 }
 
 /* ── STEPS ── */
@@ -103,8 +111,8 @@ body::before { display:none; }
   width:100%;
 }
 .role-card {
-  background:var(--black-3);
-  border:1px solid var(--border);
+  background:rgba(248,250,252,0.72);
+  border:1px solid rgba(203,213,225,0.8);
   border-radius:var(--radius-sm);
   padding:20px 12px 16px;
   cursor:pointer;
