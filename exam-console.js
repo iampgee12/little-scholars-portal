@@ -519,7 +519,7 @@ async function refreshTrial() {
 
   const open = d.papers.filter(p => p.trial).length;
   setHtml(document.getElementById('tr-papers'), `<div class="ec-card">
-    <div class="ec-flex"><h2>Papers for the trial</h2><div class="ec-actions"><button class="post-btn" onclick="trialPaper('all', true)">Trial on for all</button><button class="btn-danger" onclick="trialPaper('all', false)">Trial off for all</button></div></div>
+    <div class="ec-flex"><h2>Papers for the trial</h2><div class="ec-actions"><button class="post-btn tr-all" onclick="trialPaper('all', true, this)" ${open === d.papers.length ? `disabled title="${d.papers.length ? 'Every paper is already on' : 'No papers yet'}"` : ''}>Trial on for all</button><button class="btn-danger tr-all" onclick="trialPaper('all', false, this)" ${open ? '' : 'disabled title="No paper is on"'}>Trial off for all</button></div></div>
     <p class="ec-muted">${open} of ${d.papers.length} paper${d.papers.length === 1 ? '' : 's'} open for the trial.</p>
     <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Class</th><th>Subject</th><th>Questions</th><th>Trial</th><th></th></tr></thead><tbody>
     ${d.papers.map(p => `<tr><td>${esc(p.classLabel)}</td><td><b>${esc(p.subjectName)}</b><div class="ec-hint">${esc(p.scheduleTitle || '')}</div></td>
@@ -562,8 +562,12 @@ async function refreshTrial() {
       || '<tr><td colspan="4" class="ec-hint">No trial papers handed in yet.</td></tr>'}
     </tbody></table></div></div>`);
 }
-async function trialPaper(id, on) {
-  try { await api(`/api/exam/trial/papers/${id}`, { method: 'POST', body: JSON.stringify({ on }) }); refreshTrial(); } catch (err) { uiNotice('Could not change the paper', err.message); }
+async function trialPaper(id, on, btn) {
+  // both "for all" buttons grey out while it saves, so a double click can't send it twice
+  const all = btn ? [...document.querySelectorAll('.tr-all')] : [];
+  all.forEach(b => { b.disabled = true; });
+  try { await api(`/api/exam/trial/papers/${id}`, { method: 'POST', body: JSON.stringify({ on }) }); await refreshTrial(); }
+  catch (err) { all.forEach(b => { b.disabled = false; }); uiNotice('Could not change the paper', err.message); }
 }
 // What a tester can see, chosen on purpose: the same as a teacher (following that
 // teacher's classes and subjects), chosen papers, or every paper (IT)

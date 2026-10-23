@@ -142,7 +142,7 @@
 
 /* ── Shared states & sizes ── */
 .post-btn:disabled, .bs-print-btn:disabled, .crc-act:disabled, .act-btn:disabled, .ep-save-btn:disabled,
-.btn-outline:disabled, .btn-danger:disabled, .del-btn:disabled, .cbt-btn:disabled, .bs-view-results-btn:disabled, .bs-publish-btn:disabled {
+.btn-outline:disabled, .btn-danger:disabled, .btn-danger-outline:disabled, .del-btn:disabled, .cbt-btn:disabled, .bs-view-results-btn:disabled, .bs-publish-btn:disabled {
   opacity: .5;
   cursor: not-allowed;
 }
