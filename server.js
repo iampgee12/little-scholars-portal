@@ -1841,7 +1841,7 @@ cbtOffline.createSchema();
 // Exam servers connected to the portal with keys (sync down, push results up)
 const examSync = createExamSync({
   db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, valueFromMeta, setMeta,
-  adminLevel, schoolInfoFromMeta, ROOT, UPLOAD_DIR, EXAM_MODE, cbtOffline,
+  adminLevel, schoolInfoFromMeta, ROOT, DATA_DIR, UPLOAD_DIR, EXAM_MODE, cbtOffline,
 });
 examSync.createSchema();
 // CBT trial runs: Try as a pupil online; trial papers, testers and /check on the exam computer

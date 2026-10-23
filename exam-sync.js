@@ -27,7 +27,7 @@ const PUSH_BATCH = 100;
 module.exports = function createExamSync(ctx) {
   const {
     db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, valueFromMeta, setMeta,
-    adminLevel, schoolInfoFromMeta, ROOT, UPLOAD_DIR, EXAM_MODE, cbtOffline,
+    adminLevel, schoolInfoFromMeta, ROOT, DATA_DIR, UPLOAD_DIR, EXAM_MODE, cbtOffline,
   } = ctx;
   const nowIso = () => new Date().toISOString();
   const sha = v => crypto.createHash('sha256').update(String(v)).digest('hex');
@@ -174,6 +174,40 @@ module.exports = function createExamSync(ctx) {
     return res.end(json);
   }
   const appInfo = () => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'dist', 'exam-app.json'), 'utf8')); } catch { return null; } };
+  // Installers kept for going back a version: the newest one of each app frame (shell),
+  // for the current frame and the one before (about 132 MB each), in the data folder so
+  // they outlive deploys. An exam computer going back from a full update fetches the one
+  // for the frame it had before.
+  const ARCHIVE = path.join(DATA_DIR || ROOT, 'exam-app-archive');
+  function archiveInstaller() {
+    const info = appInfo();
+    const setup = path.join(ROOT, 'dist', 'UCS Exam Server Setup.exe');
+    if (EXAM_MODE || !info?.shell || !fs.existsSync(setup)) return;
+    fs.mkdirSync(ARCHIVE, { recursive: true });
+    const meta = path.join(ARCHIVE, `${info.shell}.json`);
+    let kept = null;
+    try { kept = JSON.parse(fs.readFileSync(meta, 'utf8')); } catch { /* none yet */ }
+    if (kept?.build === info.build) return;
+    const tmp = path.join(ARCHIVE, `${info.shell}.exe.part`);
+    fs.copyFile(setup, tmp, err => {
+      if (err) return console.error('[exam-app] could not keep the installer:', err.message);
+      fs.renameSync(tmp, path.join(ARCHIVE, `${info.shell}.exe`));
+      fs.writeFileSync(meta, JSON.stringify({ ...info, keptAt: nowIso() }));
+      // only the current frame and the one before
+      const frames = fs.readdirSync(ARCHIVE).filter(f => f.endsWith('.json'))
+        .map(f => ({ shell: f.slice(0, -5), at: fs.statSync(path.join(ARCHIVE, f)).mtimeMs })).sort((a, b) => b.at - a.at);
+      for (const old of frames.slice(2)) for (const ext of ['.json', '.exe']) fs.rmSync(path.join(ARCHIVE, `${old.shell}${ext}`), { force: true });
+    });
+  }
+  const keptInstaller = shell => {
+    try {
+      const meta = JSON.parse(fs.readFileSync(path.join(ARCHIVE, `${shell}.json`), 'utf8'));
+      const file = path.join(ARCHIVE, `${shell}.exe`);
+      return { ...meta, file, size: fs.statSync(file).size };
+    } catch { return null; }
+  };
+  setTimeout(archiveInstaller, 5000); // after start-up, in the background
+
   // [path, sha256, size, gzipped size] for each portal file in the app (see exam-app/build.js)
   let fileListCache = null;
   const appFileList = () => {
@@ -276,7 +310,15 @@ module.exports = function createExamSync(ctx) {
     if (m === 'GET' && p === '/api/exam-sync/update') {
       const info = appInfo();
       const size = name => { try { return fs.statSync(path.join(ROOT, 'dist', name)).size; } catch { return 0; } };
-      return sendJson(res, 200, { app: info, setupSize: size('UCS Exam Server Setup.exe'), files: !!appFileList() }), true;
+      // the installers kept for going back: { shell: { version, build, size } }
+      const kept = {};
+      try {
+        for (const f of fs.readdirSync(ARCHIVE).filter(n => n.endsWith('.json'))) {
+          const k = keptInstaller(f.slice(0, -5));
+          if (k) kept[k.shell] = { version: k.version, build: k.build, size: k.size };
+        }
+      } catch { /* none kept yet */ }
+      return sendJson(res, 200, { app: info, setupSize: size('UCS Exam Server Setup.exe'), files: !!appFileList(), kept }), true;
     }
     // Updates that download only what changed: the fingerprint and size of every portal
     // file in the app, then just the files an exam computer asks for, each checked
@@ -312,7 +354,11 @@ module.exports = function createExamSync(ctx) {
       return true;
     }
     if (m === 'GET' && p === '/api/exam-sync/setup.exe') {
-      const file = path.join(ROOT, 'dist', 'UCS Exam Server Setup.exe');
+      // ?shell=… : the kept installer for an earlier app frame (going back a version)
+      const wantShell = cleanText(url.searchParams.get('shell'));
+      const kept = wantShell && wantShell !== appInfo()?.shell ? keptInstaller(wantShell) : null;
+      if (wantShell && wantShell !== appInfo()?.shell && !kept) return sendJson(res, 404, { error: 'The portal no longer has that version of the app, so this exam computer can\'t go back to it.' }), true;
+      const file = kept ? kept.file : path.join(ROOT, 'dist', 'UCS Exam Server Setup.exe');
       let stat;
       try { stat = fs.statSync(file); } catch { return sendJson(res, 404, { error: 'No installer on the portal yet' }), true; }
       res.writeHead(200, { 'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Length': stat.size, 'Cache-Control': 'no-store' });
@@ -577,11 +623,57 @@ module.exports = function createExamSync(ctx) {
   const changedFiles = list => list.filter(([rel, sha]) => {
     try { return sha256(fs.readFileSync(path.join(process.cwd(), ...rel.split('/')))) !== sha; } catch { return true; }
   });
+  // ── Going back to the previous version ──
+  // The app records the version it ran before (exam-app/launcher.js, app/history.json)
+  // and keeps its files. Same app frame: switch back to those files and restart, in
+  // seconds, offline. Different frame (a full update): install the portal's kept
+  // installer for that frame, then the kept files are picked up again.
+  const appHistory = () => {
+    try { return JSON.parse(fs.readFileSync(path.join(process.env.UCS_APP_HOME || '', 'app', 'history.json'), 'utf8')); } catch { return {}; }
+  };
+  const folderReady = build => {
+    try { return fs.readFileSync(path.join(process.env.UCS_APP_HOME || '', 'app', build, '.ready'), 'utf8').trim() === build; } catch { return false; }
+  };
+  // kept: the installers the portal has (null: not asked, e.g. no internet)
+  function previousVersion(kept = null) {
+    const prev = appHistory().previous;
+    if (!prev?.build || prev.build === appBuild().build) return null;
+    const sameFrame = prev.shell && prev.shell === appBuild().shell;
+    if (sameFrame && folderReady(prev.build)) return { ...prev, kind: 'instant' };
+    if (!sameFrame && (!kept || kept[prev.shell])) return { ...prev, kind: 'full', downloadSize: kept?.[prev.shell]?.size || 0 };
+    return { ...prev, kind: 'unavailable' };
+  }
+  async function rollback() {
+    if (process.platform !== 'win32' || !process.env.UCS_APP_BUILD) throw new Error('Going back works in the UCS Exam Server app on Windows');
+    if (download && !download.done && !download.error) throw new Error('An update is downloading. Wait for it to finish first.');
+    let kept = null; // no internet: an instant one still works; a full one says it can't reach the portal
+    try { kept = (await callPortal('/api/exam-sync/update')).kept || {}; } catch { /* offline: only an instant one */ }
+    const prev = previousVersion(kept);
+    if (!prev) throw new Error('There is no previous version on this computer to go back to');
+    const appRoot = path.join(process.env.UCS_APP_HOME, 'app');
+    if (prev.kind === 'instant') {
+      if (prev.build === process.env.UCS_APP_BASE) fs.rmSync(path.join(appRoot, 'current.json'), { force: true });
+      else fs.writeFileSync(path.join(appRoot, 'current.json'), JSON.stringify({ build: prev.build, base: process.env.UCS_APP_BASE, shell: prev.shell, version: prev.version }));
+      download = { kind: 'files', received: 1, total: 1, startedAt: Date.now(), done: true, error: '', rollback: true };
+      setTimeout(() => {
+        if (typeof globalThis.ucsRestartEngine === 'function') globalThis.ucsRestartEngine();
+        else process.exit(75);
+      }, 1500);
+      return { started: true, kind: 'instant' };
+    }
+    if (prev.kind === 'full') {
+      // after the earlier installer, the launcher picks the kept version back up
+      fs.writeFileSync(path.join(appRoot, 'rollback.json'), JSON.stringify({ build: prev.build, shell: prev.shell, version: prev.version }));
+      return downloadAndRunSetup(`/api/exam-sync/setup.exe?shell=${encodeURIComponent(prev.shell)}`, 'full');
+    }
+    throw new Error('The portal no longer has that version of the app, so this exam computer can\'t go back to it');
+  }
+
   async function updateCheck() {
     const mine = appBuild();
     const r = await callPortal('/api/exam-sync/update');
     const latest = r.app || null;
-    const out = { running: mine, latest, setupSize: r.setupSize, available: !!(latest && mine.build && latest.build !== mine.build && r.setupSize), insideApp: !!mine.build, kind: 'full' };
+    const out = { running: mine, latest, setupSize: r.setupSize, available: !!(latest && mine.build && latest.build !== mine.build && r.setupSize), insideApp: !!mine.build, kind: 'full', previous: previousVersion(r.kept || {}) };
     if (out.available && r.files && mine.shell && latest.shell === mine.shell) {
       try {
         const changed = changedFiles((await callPortal('/api/exam-sync/update-files')).files);
@@ -599,9 +691,13 @@ module.exports = function createExamSync(ctx) {
     const check = await updateCheck();
     if (!check.available) throw new Error('This exam server already has the latest version');
     if (check.kind === 'files') return installChangedFiles(check.latest);
+    return downloadAndRunSetup('/api/exam-sync/setup.exe', 'full');
+  }
+  // Downloads a Setup from the portal, starts it and closes this server so it can be replaced
+  async function downloadAndRunSetup(portalPath, kind) {
     // the full Setup is large (it carries the app's own window engine): allow a slow line plenty of time
-    const res = await callPortal('/api/exam-sync/setup.exe', { raw: true, timeout: 45 * 60e3 });
-    download = { kind: 'full', received: 0, total: Number(res.headers.get('content-length')) || 0, startedAt: Date.now(), done: false, error: '' };
+    const res = await callPortal(portalPath, { raw: true, timeout: 45 * 60e3 });
+    download = { kind, received: 0, total: Number(res.headers.get('content-length')) || 0, startedAt: Date.now(), done: false, error: '' };
     const file = path.join(require('node:os').tmpdir(), `UCS Exam Server Setup ${Date.now()}.exe`);
     (async () => {
       const out = fs.createWriteStream(file);
@@ -616,6 +712,8 @@ module.exports = function createExamSync(ctx) {
       } catch (err) {
         out.destroy();
         fs.rm(file, { force: true }, () => {});
+        // a failed go-back leaves nothing waiting for the next start
+        if (process.env.UCS_APP_HOME) fs.rm(path.join(process.env.UCS_APP_HOME, 'app', 'rollback.json'), { force: true }, () => {});
         download.error = `The download stopped: ${err.cause?.code || err.message}. Check the internet connection and try again.`;
         return;
       }
@@ -696,7 +794,7 @@ module.exports = function createExamSync(ctx) {
       globalThis.ucsShowAppWindow();
       return sendJson(res, 200, { ok: true }), true;
     }
-    if (['/api/exam/dashboard', '/api/exam/people/students', '/api/exam/people/staff', '/api/exam/schedules', '/api/exam/update-check', '/api/exam/update-install', '/api/exam/update-progress'].includes(p)) {
+    if (['/api/exam/dashboard', '/api/exam/people/students', '/api/exam/people/staff', '/api/exam/schedules', '/api/exam/update-check', '/api/exam/update-install', '/api/exam/update-progress', '/api/exam/rollback', '/api/exam/rollback-info'].includes(p)) {
       const admin = requireUser(req, res, 'admin');
       if (!admin) return true;
       try {
@@ -711,6 +809,8 @@ module.exports = function createExamSync(ctx) {
         if (m === 'GET' && p === '/api/exam/update-check') return sendJson(res, 200, await updateCheck()), true;
         if (m === 'POST' && p === '/api/exam/update-install') return sendJson(res, 200, await updateInstall()), true;
         if (m === 'GET' && p === '/api/exam/update-progress') return sendJson(res, 200, updateProgress()), true;
+        if (m === 'POST' && p === '/api/exam/rollback') return sendJson(res, 200, await rollback()), true;
+        if (m === 'GET' && p === '/api/exam/rollback-info') return sendJson(res, 200, { previous: previousVersion(null), running: appBuild() }), true;
       } catch (err) {
         return sendJson(res, 400, { error: err.message }), true;
       }

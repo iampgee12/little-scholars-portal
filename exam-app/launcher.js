@@ -152,8 +152,9 @@ function unpack(bundle, dir, build) {
 }
 // Old versions and leftovers from an interrupted unpack; never fatal
 function tidyOld(appRoot, keep) {
+  const keepAll = [].concat(keep).filter(Boolean);
   for (const name of fs.readdirSync(appRoot)) {
-    if (name === keep || name === 'current.json') continue;
+    if (keepAll.includes(name) || ['current.json', 'history.json', 'rollback.json'].includes(name)) continue;
     try { fs.rmSync(path.join(appRoot, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* try again next time */ }
   }
 }
@@ -188,8 +189,20 @@ async function main() {
   // After an update that downloaded only the changed files, a newer version waits in a
   // folder of its own (see exam-sync.js). It's used while the app's frame and the
   // version it was made from are still these; a full Setup install starts afresh.
-  let current = null;
-  try { current = JSON.parse(fs.readFileSync(path.join(HOME, 'app', 'current.json'), 'utf8')); } catch { /* none */ }
+  const appRoot = path.join(HOME, 'app');
+  fs.mkdirSync(appRoot, { recursive: true });
+  const readJsonFile = name => { try { return JSON.parse(fs.readFileSync(path.join(appRoot, name), 'utf8')); } catch { return null; } };
+  // Going back from a full update: the earlier installer has just been installed, and the
+  // version that was running before (kept in its own folder) is picked up again
+  const rollback = readJsonFile('rollback.json');
+  if (rollback) {
+    if (rollback.build === bundled) fs.rmSync(path.join(appRoot, 'current.json'), { force: true });
+    else if (rollback.shell === shell && readyIn(path.join(appRoot, rollback.build), rollback.build)) {
+      fs.writeFileSync(path.join(appRoot, 'current.json'), JSON.stringify({ build: rollback.build, base: bundled, shell, version: rollback.version }));
+    }
+    if (rollback.shell === shell) fs.rmSync(path.join(appRoot, 'rollback.json'), { force: true });
+  }
+  const current = readJsonFile('current.json');
   const updated = current && shell && current.shell === shell && current.base === bundled && current.build
     && readyIn(path.join(HOME, 'app', current.build), current.build) ? current : null;
   const build = updated ? updated.build : bundled;
@@ -202,7 +215,15 @@ async function main() {
     unpack(sea.getAsset('app.bundle'), appDir, build);
   }
   if (updated) say(`Running the updated version ${build} (made from ${bundled})`);
-  tidyOld(path.join(HOME, 'app'), build);
+  // the version running now and the one before it (for "Go back to the previous version")
+  const version = (updated && updated.version) || asset('version.txt') || '1.0.0';
+  const history = readJsonFile('history.json') || {};
+  if (history.running?.build !== build) {
+    if (history.running) history.previous = history.running;
+    history.running = { build, version, shell, base: bundled, since: new Date().toISOString() };
+    try { fs.writeFileSync(path.join(appRoot, 'history.json'), JSON.stringify(history)); } catch { /* next start */ }
+  }
+  tidyOld(appRoot, [build, history.previous?.build]);
   if (!ENGINE && !/\\Programs\\UCS Exam Server\\/i.test(process.execPath)) desktopShortcut();
 
   process.env.EXAM_MODE = '1';
@@ -212,7 +233,7 @@ async function main() {
   process.env.UCS_APP_BASE = bundled;
   process.env.UCS_APP_SHELL = shell;
   process.env.UCS_APP_HOME = HOME;
-  process.env.UCS_APP_VERSION = (updated && updated.version) || asset('version.txt') || '1.0.0';
+  process.env.UCS_APP_VERSION = version;
   // after an update of the changed files: the desktop app restarts the engine when it
   // exits with 75; run on its own, the engine starts itself again a moment later
   if (!ENGINE) {

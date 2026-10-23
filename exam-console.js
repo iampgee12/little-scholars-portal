@@ -1030,9 +1030,48 @@ async function renderUpdates() {
   pageEl().innerHTML = `<div class="ec-card"><h2>Software version</h2>
     <p class="ec-muted">Current version: <b class="ec-mono">${app.version ? `v${esc(app.version)}` : 'not running as the app'}</b>${app.build ? ` <span class="ec-hint ec-mono">(${esc(app.build)})</span>` : ''}</p>
     ${state.sync.connected ? '<button class="post-btn" id="ec-check" onclick="checkUpdates()">Check for Updates</button>' : '<div class="ec-note warn">Connect to the school portal to check for updates.</div>'}
-    <div id="ec-update-out"></div></div>`;
+    <div id="ec-update-out"></div></div>
+    <div class="ec-card" id="ec-rollback" style="display:none;"></div>`;
+  renderRollback();
   // came back to this page while an update is downloading: show its progress again
   try { const d = await api('/api/exam/update-progress'); if (!d.idle && !d.error) followDownload(); } catch { /* none */ }
+}
+// The version this computer ran before the last update, and a button to go back to it
+async function renderRollback() {
+  const box = document.getElementById('ec-rollback');
+  if (!box) return;
+  let r;
+  try { r = await api('/api/exam/rollback-info'); } catch { return; }
+  const p = r.previous;
+  if (!p) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const what = p.kind === 'instant'
+    ? 'Takes a few seconds and needs no internet: the exam server restarts on that version.'
+    : p.kind === 'full'
+      ? 'The app itself changed since then, so this downloads the earlier installer (about 132 MB) and installs it. Needs internet.'
+      : 'The portal no longer has that version of the app, so this computer can\'t go back to it.';
+  box.innerHTML = `<h2>Previous version</h2>
+    <p class="ec-muted">Before this version, this computer ran <b class="ec-mono">v${esc(p.version || '?')}</b>${p.since ? ` <span class="ec-hint">(from ${when(p.since)})</span>` : ''}.</p>
+    <p class="ec-hint">${what} Exam data (pupils, papers and results not yet pushed) is not touched. Afterwards, Check for Updates offers the newer version again.</p>
+    ${p.kind === 'unavailable' ? '' : '<button class="btn-outline" id="ec-rollback-btn" onclick="goBackVersion()">Go back to this version</button>'}
+    <div id="ec-rollback-out"></div>`;
+  state.rollbackKind = p.kind;
+  state.rollbackVersion = p.version;
+}
+async function goBackVersion() {
+  const writing = state.dash?.writing || 0;
+  const how = state.rollbackKind === 'instant' ? 'The exam server restarts for a few seconds' : 'The earlier installer downloads (about 132 MB), then the exam server closes while it installs';
+  if (!await uiConfirm(`Go back to v${state.rollbackVersion}? ${how}${writing ? `, and ${plural(writing, 'pupil')} still writing will be disconnected` : ''}. Push results first if you can.`, { confirmLabel: 'Go back', danger: true })) return;
+  const out = document.getElementById('ec-update-out');
+  out.innerHTML = '<p class="ec-hint">Going back to the previous version…</p><div class="ea-progress"><i></i></div>';
+  document.getElementById('ec-rollback-btn')?.setAttribute('disabled', '');
+  try {
+    await api('/api/exam/rollback', { method: 'POST' });
+    followDownload();
+  } catch (err) {
+    out.innerHTML = `<div class="ec-note warn">${esc(err.message)}</div>`;
+    document.getElementById('ec-rollback-btn')?.removeAttribute('disabled');
+  }
 }
 async function checkUpdates() {
   const out = document.getElementById('ec-update-out');
