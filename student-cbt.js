@@ -289,7 +289,11 @@ async function beginExam(id, btn) {
   const meta = findExam(id) || {};
   if (btn) btn.disabled = true;
   try {
+    const sentAt = Date.now();
     const data = await apiFetch(`${PATHS[MODE].paper(id)}/start`, { method: 'POST' });
+    // how far this device's clock is from the exam server's (a laptop set to the wrong date or
+    // time would otherwise end the paper the moment it opens)
+    const clockOffset = data.serverTime ? new Date(data.serverTime).getTime() - Math.round((sentAt + Date.now()) / 2) : 0;
     currentExam = {
       id,
       subjectName: meta.subjectName || 'Exam',
@@ -302,6 +306,7 @@ async function beginExam(id, btn) {
       answersMap: new Map((data.answers || []).filter(a => a.selectedOption !== null).map(a => [a.questionId, a.selectedOption])),
       flagged: new Set(loadFlags(data.attemptId)),
       warned: {},
+      clockOffset,
     };
     // Resume at the first unanswered question
     const restored = restorePendingAnswers();
@@ -595,7 +600,7 @@ function startTimer() {
   const deadline = new Date(currentExam.deadline).getTime();
   const timerEl = document.getElementById('cbt-timer');
   function tick() {
-    const remaining = deadline - Date.now();
+    const remaining = deadline - (Date.now() + (currentExam.clockOffset || 0));
     if (remaining <= 0) {
       timerEl.textContent = '00:00';
       clearInterval(timerInterval);

@@ -407,7 +407,7 @@ function createCbtTrial(deps) {
         const answers = Object.entries(answersOf(attempt)).map(([questionId, selectedOption]) => ({ questionId: Number(questionId), selectedOption }));
         return sendJson(res, 200, {
           attemptId: attempt.id, startedAt: attempt.started_at, durationMinutes: paper.durationMinutes,
-          deadline: new Date(deadlineOf(attempt, paper)).toISOString(), questions: forPupil(paperQuestions(paper.classCode, paper.subjectId)), answers,
+          deadline: new Date(deadlineOf(attempt, paper)).toISOString(), serverTime: new Date().toISOString(), questions: forPupil(paperQuestions(paper.classCode, paper.subjectId)), answers,
         }), true;
       }
       if (!attempt) return sendJson(res, 409, { error: 'This trial paper has already been handed in' }), true;

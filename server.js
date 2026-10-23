@@ -4669,6 +4669,7 @@ async function handleApi(req, res, url) {
       startedAt: attempt.startedAt,
       durationMinutes: ss.durationMinutes,
       deadline,
+      serverTime: new Date().toISOString(), // the exam is timed by this clock, not the device's
       questions,
       answers,
     });
