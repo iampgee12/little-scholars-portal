@@ -15,10 +15,9 @@
   style.textContent = `
     .ui-dialog-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(15,23,42,0.55); }
     .ui-dialog { width:min(440px,100%); background:var(--black-2,#f8fafc); border:1px solid var(--border,#e2e8f0); border-radius:var(--radius,10px); box-shadow:0 22px 70px rgba(15,23,42,0.35); overflow:hidden; font-family:'DM Sans',sans-serif; }
-    .ui-dialog.danger { border-color:rgba(220,38,38,0.35); }
     .ui-dialog-head { padding:16px 18px; border-bottom:1px solid var(--border,#e2e8f0); }
     .ui-dialog-title { font-size:15px; font-weight:700; color:var(--text-1,#0f172a); line-height:1.35; }
-    .ui-dialog.danger .ui-dialog-title { color:var(--red,#dc2626); }
+    /* warning pop-ups: only the confirm button is red (dark title, plain edge) */
     .ui-dialog-sub { font-size:11px; color:var(--text-3,#94a3b8); margin-top:3px; font-family:'DM Mono',monospace; }
     .ui-dialog-body { padding:16px 18px; }
     .ui-dialog-text { font-size:13px; color:var(--text-2,#475569); line-height:1.55; white-space:pre-line; max-height:55vh; overflow-y:auto; margin:0; }
