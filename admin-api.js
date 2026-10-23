@@ -4964,11 +4964,13 @@ async function csdSubmitAddSubjects() {
     return;
   }
   try {
-    await apiFetch(`/api/admin/cbt/schedules/${csCurrentScheduleId}/subjects`, {
+    const data = await apiFetch(`/api/admin/cbt/schedules/${csCurrentScheduleId}/subjects`, {
       method: 'POST',
       body: JSON.stringify({ classCode, classArmIds, subjectIds, durationMinutes, examDate, examTime, supervisorId, mode, venue, visibleToStudents }),
     });
-    showToast('Exam subject(s) added');
+    // subjects already on the schedule for this class are not added twice
+    if (data?.note) uiNotice(data.added ? `${data.added} subject${data.added === 1 ? '' : 's'} added` : 'Nothing new to add', data.note);
+    else showToast('Exam subject(s) added');
     csdCloseAddSubjects();
     csdLoadSubjects();
   } catch (err) { showToast(err.message); }

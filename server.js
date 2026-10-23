@@ -7046,17 +7046,28 @@ async function handleApi(req, res, url) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       const now = new Date().toISOString();
+      // a subject already on this schedule for this class (and arm) isn't added a second time
+      const already = db.prepare('SELECT id FROM cbt_schedule_subjects WHERE schedule_id = ? AND class_code = ? AND class_arm_id IS ? AND subject_id = ?');
+      const skipped = [];
+      let added = 0;
       armTargets.forEach(armId => {
         subjectIds.forEach(subjectId => {
+          if (already.get(scheduleId, classCode, armId, subjectId)) {
+            skipped.push(one('SELECT name FROM subjects WHERE id = ?', subjectId)?.name || `Subject ${subjectId}`);
+            return;
+          }
           insert.run(scheduleId, classCode, armId, subjectId, durationMinutes, examDate, examTime, supervisorId, mode, venue, visibleToStudents, user.id, now);
+          added++;
         });
       });
       db.exec('COMMIT');
+      const skippedNames = [...new Set(skipped)];
+      return sendJson(res, 200, { ok: true, added, skipped: skippedNames,
+        note: skippedNames.length ? `Already on this schedule for this class, so not added again: ${skippedNames.join(', ')}.` : '' });
     } catch (err) {
       db.exec('ROLLBACK');
       throw err;
     }
-    return sendJson(res, 200, { ok: true });
   }
 
   const cbtScheduleSubjectByIdMatch = url.pathname.match(/^\/api\/admin\/cbt\/schedule-subjects\/(\d+)$/);
