@@ -1,3 +1,10 @@
+
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 const state = {
   user: null,
   setup: null,
@@ -422,7 +429,7 @@ async function stOpenDetail(id) {
       <tr>
         <td>${escapeHtml(s.name)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode)}</td>
-        <td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="stUnassignStudent('${escapeHtml(s.id)}')">Remove</button></td>
+        <td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="stUnassignStudent(${jsArg(s.id)})">Remove</button></td>
       </tr>
     `).join('') : '<tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-3)">No students tagged yet</td></tr>';
   } catch (err) { showToast(err.message); }
@@ -563,7 +570,7 @@ async function caLoadStatusList() {
         <td>${escapeHtml(s.name)}</td>
         <td>${escapeHtml(s.classLabel || s.classCode || '—')}</td>
         <td style="text-transform:capitalize;">${escapeHtml(s.status)}</td>
-        <td><button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="caOpenReinstate('${escapeHtml(s.id)}')">Reinstate</button></td>
+        <td><button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="caOpenReinstate(${jsArg(s.id)})">Reinstate</button></td>
       </tr>
     `).join('') : `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-3)">No ${escapeHtml(status)} students</td></tr>`;
   } catch (err) {
@@ -764,7 +771,7 @@ async function ecgOpenDetail(id) {
       <tr>
         <td>${escapeHtml(m.name)}</td>
         <td>${escapeHtml(m.classLabel || m.classCode)}</td>
-        <td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="ecgUnassignStudent('${escapeHtml(m.id)}')">Remove</button></td>
+        <td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="ecgUnassignStudent(${jsArg(m.id)})">Remove</button></td>
       </tr>
     `).join('') : '<tr><td colspan="3" style="padding:16px;text-align:center;color:var(--text-3)">No members yet</td></tr>';
   } catch (err) { showToast(err.message); }
@@ -841,7 +848,7 @@ function renderAdmissions(data) {
         <button class="post-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'approved')">Approve</button>
         <button class="del-btn btn-sm" onclick="updateAdmissionStatus(${a.id},'rejected')">Reject</button>`;
     } else if (a.status === 'approved') {
-      actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;" onclick="openConvertModal(${a.id},'${escapeHtml(a.applicantName)}')">Convert to Student</button>`;
+      actions = `<button class="post-btn" style="padding:5px 9px;font-size:11px;" onclick="openConvertModal(${a.id},${jsArg(a.applicantName)})">Convert to Student</button>`;
     } else {
       actions = `<button class="btn-outline btn-sm" onclick="updateAdmissionStatus(${a.id},'pending')">Reopen</button>`;
     }
@@ -941,8 +948,8 @@ async function submitConvertApplication() {
 
 function accountStatusToggle(id, active) {
   return `<span class="staff-status-toggle">
-    <button type="button" class="${active ? 'on-active' : ''}" onclick="toggleAccountStatus('${escapeHtml(id)}', true)">ON</button>
-    <button type="button" class="${!active ? 'off-active' : ''}" onclick="toggleAccountStatus('${escapeHtml(id)}', false)">OFF</button>
+    <button type="button" class="${active ? 'on-active' : ''}" onclick="toggleAccountStatus(${jsArg(id)}, true)">ON</button>
+    <button type="button" class="${!active ? 'off-active' : ''}" onclick="toggleAccountStatus(${jsArg(id)}, false)">OFF</button>
   </span>`;
 }
 
@@ -1194,8 +1201,8 @@ function renderGradebookTable(selection = gradebookSelection(), gradebook = stat
         <td class="gb-grade-cell" style="display:${gradeCol ? '' : 'none'};">${grade}</td>
         <td><input class="gb-comment-input" readonly></td>
         <td><input class="gb-comment-input" readonly></td>
-        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'absent', ${isAbsent ? 'false' : 'true'}, ${subject.id})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag('${escapeHtml(student.id)}', ${subject.batchId || 0}, 'excluded', ${isExcluded ? 'false' : 'true'}, ${subject.id})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+        <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="toggleGradebookFlag(${jsArg(student.id)}, ${subject.batchId || 0}, 'absent', ${isAbsent ? 'false' : 'true'}, ${subject.id})" ${published || isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+        <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="toggleGradebookFlag(${jsArg(student.id)}, ${subject.batchId || 0}, 'excluded', ${isExcluded ? 'false' : 'true'}, ${subject.id})" ${published ? 'disabled' : ''}><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
       </tr>`;
   })).join('');
   tbody.querySelectorAll('input[data-score]').forEach(input => {
@@ -1424,8 +1431,8 @@ function renderCognitiveTable() {
       <td><strong>${escapeHtml(student.name)}</strong></td>
       <td class="cog-reg">${escapeHtml(student.regNo || student.id)}</td>
       <td>${escapeHtml(cognitiveClassLabel(selection))}</td>
-      <td><button type="button" class="cog-action-btn" title="View Student Cognitive Skills" onclick="openCognitiveSkillsModal('${escapeHtml(student.id)}', false)"><span class="cog-action-icon view"></span></button></td>
-      <td><button type="button" class="cog-action-btn edit" title="Update Student Cognitive Skills Record" onclick="openCognitiveSkillsModal('${escapeHtml(student.id)}', true)"><span class="cog-action-icon edit"></span></button></td>
+      <td><button type="button" class="cog-action-btn" title="View Student Cognitive Skills" onclick="openCognitiveSkillsModal(${jsArg(student.id)}, false)"><span class="cog-action-icon view"></span></button></td>
+      <td><button type="button" class="cog-action-btn edit" title="Update Student Cognitive Skills Record" onclick="openCognitiveSkillsModal(${jsArg(student.id)}, true)"><span class="cog-action-icon edit"></span></button></td>
     </tr>`).join('');
   filterCognitiveRows();
 }
@@ -1709,7 +1716,7 @@ function renderAssignments() {
     <tr>
       <td><strong>${escapeHtml(assignment.teacherName)}</strong><div style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;">${escapeHtml(assignment.teacherId)}</div></td>
       <td style="color:var(--text-2);">${escapeHtml(assignment.classLabel)}</td>
-      <td><button class="post-btn" style="padding:6px 10px;" onclick="editClassTeacherAssignment('${escapeHtml(assignment.classCode)}')">Change Teacher</button></td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="editClassTeacherAssignment(${jsArg(assignment.classCode)})">Change Teacher</button></td>
     </tr>`).join('');
   renderClassTeacherSubjects();
 }
@@ -1737,7 +1744,7 @@ function renderClassTeacherSubjects() {
       <td><strong>${escapeHtml(c.label)}</strong></td>
       <td>${classTeacherOf(c.code) ? escapeHtml(classTeacherOf(c.code).teacherName) : '<span style="color:var(--text-3);">No class teacher yet</span>'}</td>
       <td style="color:var(--text-2);">${names.length ? escapeHtml(names.join(', ')) : '<span style="color:var(--text-3);">None (all go to subject teachers)</span>'}</td>
-      <td><button class="post-btn" style="padding:6px 10px;" onclick="openClassTeacherSubjects('${escapeHtml(c.code)}')">Change subjects</button></td>
+      <td><button class="post-btn" style="padding:6px 10px;" onclick="openClassTeacherSubjects(${jsArg(c.code)})">Change subjects</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No classes with subjects yet.</td></tr>';
 }
@@ -1767,7 +1774,7 @@ function openClassTeacherSubjects(classCode) {
       }).join('')}</div>
       <div id="ct-subjects-error" style="color:var(--red, #dc2626);font-size:12.5px;min-height:16px;"></div>
     </div>
-    <div class="en-modal-foot"><button class="ann-del" onclick="this.closest('.en-modal').remove()">Cancel</button><button class="post-btn" id="ct-subjects-save" onclick="saveClassTeacherSubjects('${escapeHtml(classCode)}')">Save</button></div></div>`;
+    <div class="en-modal-foot"><button class="ann-del" onclick="this.closest('.en-modal').remove()">Cancel</button><button class="post-btn" id="ct-subjects-save" onclick="saveClassTeacherSubjects(${jsArg(classCode)})">Save</button></div></div>`;
   document.body.appendChild(modal);
 }
 
@@ -1997,7 +2004,7 @@ function toggleAddStaffMenu(event) {
     // Administrator sits below a divider, apart from the staff types;
     // only super admins can add administrators
     menu.innerHTML = types.filter(t => t.value !== 'admin').map(t =>
-      `<button type="button" role="menuitem" onclick="openStaffForm('${escapeHtml(t.value)}')">${escapeHtml(t.label)}</button>`).join('')
+      `<button type="button" role="menuitem" onclick="openStaffForm(${jsArg(t.value)})">${escapeHtml(t.label)}</button>`).join('')
       + (state.user?.adminLevel === 'admin' ? '' : '<div class="sf-menu-sep"></div>'
       + `<button type="button" role="menuitem" onclick="openStaffForm('admin')">Administrator</button>`);
   }
@@ -2476,7 +2483,7 @@ function renderStaffProfileSubjects(staff) {
   body.innerHTML = `
     <div class="staff-subjects-toolbar">
       <span>Teacher: <strong>${escapeHtml(staff.name)}</strong></span>
-      <button type="button" class="post-btn" onclick="openTeacherSubjectsManager('${escapeHtml(staff.id)}')">Assign / Manage Teacher's Subjects</button>
+      <button type="button" class="post-btn" onclick="openTeacherSubjectsManager(${jsArg(staff.id)})">Assign / Manage Teacher's Subjects</button>
     </div>
     <table class="data-table staff-subjects-table">
       <thead><tr><th>#</th><th>Subject</th><th>Class</th><th>Role</th></tr></thead>
@@ -2517,7 +2524,7 @@ function renderTeacherSubjectsManager() {
     <tr>
       <td>${index + 1}.</td>
       <td>${escapeHtml(assignment.subjectName)}</td>
-      <td><div class="subject-class-chips">${assignment.classes.map(c => `<span class="subject-class-chip">${escapeHtml(c.label)}<button type="button" title="Remove ${escapeHtml(c.label)} only" onclick="removeSubjectAssignment(${assignment.subjectId}, '${escapeHtml(c.code)}')">&times;</button></span>`).join('')}</div></td>
+      <td><div class="subject-class-chips">${assignment.classes.map(c => `<span class="subject-class-chip">${escapeHtml(c.label)}<button type="button" title="Remove ${escapeHtml(c.label)} only" onclick="removeSubjectAssignment(${assignment.subjectId}, ${jsArg(c.code)})">&times;</button></span>`).join('')}</div></td>
       <td><button type="button" class="ann-del" onclick="removeSubjectAssignment(${assignment.subjectId})">Remove Subject</button></td>
     </tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No subjects assigned.</td></tr>';
 }
@@ -3643,7 +3650,7 @@ function srcInit() {
   const sel = document.getElementById('src-class');
   if (!sel) return;
   sel.innerHTML = '<option value="">— Select Class —</option>' +
-    (state.setup.classes || []).map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+    (state.setup.classes || []).map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
   document.getElementById('src-arm').innerHTML = '<option value="">— Select Arm —</option>';
   document.getElementById('src-list-card').style.display = 'none';
 }
@@ -3681,7 +3688,7 @@ function srcLoadList() {
       <td style="font-weight:600">${st.name}</td>
       <td style="color:var(--text-3);font-family:'DM Mono',monospace;font-size:11px">${st.id}</td>
       <td>${classLabel}</td>
-      <td><button class="bs-preview-btn" onclick="srcViewResult('${st.id}')">View Result</button></td>
+      <td><button class="bs-preview-btn" onclick="srcViewResult(${jsArg(st.id)})">View Result</button></td>
     </tr>`).join('');
 }
 
@@ -3725,10 +3732,10 @@ function crcInit() {
 
   const exams = [...new Set((state.setup.resultBatches || []).map(b => b.examType))].filter(Boolean);
   examSel.innerHTML = '<option value="">— Select Exam —</option>' +
-    exams.map(e => `<option value="${e}">${e}</option>`).join('');
+    exams.map(e => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('');
 
   classSel.innerHTML = '<option value="">— Select Class —</option>' +
-    (state.setup.classes || []).map(c => `<option value="${c.code}">${c.label}</option>`).join('');
+    (state.setup.classes || []).map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
   document.getElementById('crc-arm').innerHTML = '<option value="">— All Arms —</option>';
 
   document.getElementById('crc-availability').style.display = 'none';
@@ -4161,7 +4168,7 @@ function crcEmailOther(id) {
     <p class="crc-modal-note">Email <strong>${escapeHtml(st?.name || id)}</strong>'s ${escapeHtml(_crc.examType)} result as a PDF attachment.</p>
     <label class="field-label">Email Address</label>
     <input type="email" class="field-input" id="crc-other-email" placeholder="parent@example.com" style="width:100%;box-sizing:border-box;">
-    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcEmail('${escapeHtml(id)}', document.getElementById('crc-other-email').value.trim())">Send Result</button>`);
+    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcEmail(${jsArg(id)}, document.getElementById('crc-other-email').value.trim())">Send Result</button>`);
   document.getElementById('crc-other-email').focus();
 }
 
@@ -4197,7 +4204,7 @@ function crcWhatsAppOther(id) {
     <p class="crc-modal-note">Send <strong>${escapeHtml(st?.name || id)}</strong>'s result to a WhatsApp number. The PDF downloads and WhatsApp opens with a message ready — attach the PDF there.</p>
     <label class="field-label">WhatsApp Number</label>
     <input type="tel" class="field-input" id="crc-wa-number" placeholder="0803 123 4567" style="width:100%;box-sizing:border-box;">
-    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcWhatsAppSend('${escapeHtml(id)}')">Open WhatsApp</button>`);
+    <button class="bs-print-btn" style="width:100%;margin-top:14px;" onclick="crcWhatsAppSend(${jsArg(id)})">Open WhatsApp</button>`);
   document.getElementById('crc-wa-number').focus();
 }
 
@@ -4300,7 +4307,7 @@ function populateScheduleExamSelects() {
   const classSel = document.getElementById('sched-exam-class');
   const subjSel  = document.getElementById('sched-exam-subject');
   if (classSel) classSel.innerHTML = '<option value="">— Select Class —</option>' +
-    (state.setup.classes||[]).map(c=>`<option value="${c.code}">${c.label}</option>`).join('');
+    (state.setup.classes||[]).map(c=>`<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
   if (subjSel) fillSubjectsForClass('sched-exam-subject', classSel?.value || '', '— Select Subject —');
 }
 
@@ -5109,8 +5116,8 @@ async function cscViewScores() {
         <td>${pct != null ? pct + '%' : '—'}</td>
         <td>${escapeHtml((r.recordedAt || '').slice(0, 10)) || '—'}</td>
         <td>
-          <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore('${r.studentId}')">Save</button>
-          ${r.submittedAt ? `<button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake('${escapeHtml(r.studentId)}')" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
+          <button class="post-btn" style="padding:4px 10px;font-size:11px;" onclick="cscSaveScore(${jsArg(r.studentId)})">Save</button>
+          ${r.submittedAt ? `<button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cscAllowRetake(${jsArg(r.studentId)})" title="Clear this student's locked attempt so they can sit this exam again">Allow Retake</button>` : ''}
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-3)">No students / match found</td></tr>';
@@ -5427,11 +5434,11 @@ function renderCalendarMonths() {
       if (!inRange) {
         html += `<div class="cal-day cal-empty"></div>`;
       } else if (holiday) {
-        html += `<div class="cal-day cal-holiday" title="${escapeHtml(holiday.label)} — click to remove" onclick="toggleCalendarDay('${iso}')">${day}<span class="cal-holiday-dot"></span></div>`;
+        html += `<div class="cal-day cal-holiday" title="${escapeHtml(holiday.label)} — click to remove" onclick="toggleCalendarDay(${jsArg(iso)})">${day}<span class="cal-holiday-dot"></span></div>`;
       } else if (isWeekend) {
         html += `<div class="cal-day cal-weekend" title="Weekend">${day}</div>`;
       } else {
-        html += `<div class="cal-day cal-schoolday" title="School day — click to mark closed" onclick="toggleCalendarDay('${iso}')">${day}</div>`;
+        html += `<div class="cal-day cal-schoolday" title="School day — click to mark closed" onclick="toggleCalendarDay(${jsArg(iso)})">${day}</div>`;
       }
     }
     html += `</div></div>`;
@@ -5736,7 +5743,7 @@ function renderClassSectionAssignments() {
   const rows = [...grouped.values()].sort((a, b) => (a.classLabel || a.classCode).localeCompare(b.classLabel || b.classCode));
   const summary = document.getElementById('class-assignment-summary');
   if (summary) summary.textContent = `${rows.length} class${rows.length === 1 ? '' : 'es'} assigned`;
-  tbody.innerHTML = rows.length ? rows.map((a, i) => `<tr><td>${i + 1}</td><td><strong>${escapeHtml(a.classLabel || a.classCode)}</strong></td><td>${escapeHtml(a.teacherName)}<div style="font-size:10px;color:var(--text-3);">${escapeHtml(a.teacherId)}</div></td><td><button class="post-btn" style="padding:6px 10px;" onclick="editClassSectionAssignment('${escapeHtml(a.classCode)}')">Change Teacher</button></td></tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No class teachers assigned yet.</td></tr>';
+  tbody.innerHTML = rows.length ? rows.map((a, i) => `<tr><td>${i + 1}</td><td><strong>${escapeHtml(a.classLabel || a.classCode)}</strong></td><td>${escapeHtml(a.teacherName)}<div style="font-size:10px;color:var(--text-3);">${escapeHtml(a.teacherId)}</div></td><td><button class="post-btn" style="padding:6px 10px;" onclick="editClassSectionAssignment(${jsArg(a.classCode)})">Change Teacher</button></td></tr>`).join('') : '<tr><td colspan="4" style="padding:18px;color:var(--text-3);">No class teachers assigned yet.</td></tr>';
 }
 function editClassSectionAssignment(classCode) {
   switchClassesView('assignClassTeacher', document.querySelector('#tab-classes .academics-subtab[data-view="assignClassTeacher"]'));
@@ -5781,9 +5788,9 @@ function renderClassesTable() {
       <td><strong>${escapeHtml(cls.label)}</strong>${cls.category ? `<div style="font-size:10px;color:var(--text-3);">(${escapeHtml(cls.category)})</div>` : ''}${cls.archived ? '<span style="margin-left:6px;background:var(--black-3);color:var(--text-2);border-radius:10px;padding:1px 8px;font-size:10px;font-weight:700;">Archived</span>' : ''}</td>
       <td>${cls.studentCount || 0}</td>
       <td>
-        <button class="post-btn" style="padding:6px 10px;" onclick="editClass('${escapeHtml(cls.code)}')">Edit</button>
-        <button class="ann-del" style="margin-left:6px;" onclick="archiveClass('${escapeHtml(cls.code)}', ${cls.archived ? 'true' : 'false'})">${cls.archived ? 'Unarchive' : 'Archive'}</button>
-        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="deleteClass('${escapeHtml(cls.code)}')">Delete</button>
+        <button class="post-btn" style="padding:6px 10px;" onclick="editClass(${jsArg(cls.code)})">Edit</button>
+        <button class="ann-del" style="margin-left:6px;" onclick="archiveClass(${jsArg(cls.code)}, ${cls.archived ? 'true' : 'false'})">${cls.archived ? 'Unarchive' : 'Archive'}</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="deleteClass(${jsArg(cls.code)})">Delete</button>
       </td>
     </tr>`).join('');
 }
@@ -5832,7 +5839,7 @@ function renderClassCategoriesTable() {
       <td>${i + 1}</td>
       <td>${escapeHtml(name)}</td>
       <td>${count}</td>
-      <td><button class="ann-del" style="color:var(--red);" onclick="deleteClassCategory('${escapeHtml(name)}')">Delete</button></td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="deleteClassCategory(${jsArg(name)})">Delete</button></td>
     </tr>`;
   }).join('');
 }
@@ -6176,7 +6183,7 @@ function renderSubjectTypesTable() {
       <td>${i + 1}</td>
       <td>${escapeHtml(name)}</td>
       <td>${count}</td>
-      <td><button class="ann-del" style="color:var(--red);" onclick="deleteSubjectType('${escapeHtml(name)}')">Delete</button></td>
+      <td><button class="ann-del" style="color:var(--red);" onclick="deleteSubjectType(${jsArg(name)})">Delete</button></td>
     </tr>`;
   }).join('');
 }
@@ -6435,7 +6442,7 @@ function sdInit() {
   const sessSel  = document.getElementById('sd-session');
   if (!classSel) return;
   classSel.innerHTML = '<option value="">— Select Class —</option>' +
-    (state.setup.classes||[]).map(c=>`<option value="${c.code}">${c.label}</option>`).join('');
+    (state.setup.classes||[]).map(c=>`<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join('');
   const academic = state.setup.academic;
   sessSel.innerHTML = academic
     ? `<option value="${escapeHtml(academic.sessionLabel)}">${escapeHtml(academic.sessionLabel)}</option>`
@@ -6879,7 +6886,7 @@ async function openFeeHistoryModal(query) {
                     <td>${fmtNaira(inv.balance)}</td>
                     <td>${feeFmtDate(inv.dueDate)}</td>
                     <td>${invoiceStatusBadge(inv)}</td>
-                    <td>${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(s.name)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', () => openFeeHistoryModal(${query.studentId ? `{studentId:'${query.studentId}'}` : `{parentEmail:'${query.parentEmail}'}`}))">Record Payment</button>` : ''}</td>
+                    <td>${inv.balance > 0 ? `<button class="bs-export-btn" style="position:static;" onclick="openRecordPaymentModal(${inv.id}, ${jsArg(`${s.name} — ${inv.feeType} (Balance: ${fmtNaira(inv.balance)})`)}, () => openFeeHistoryModal(${query.studentId ? `{studentId:'${query.studentId}'}` : `{parentEmail:'${query.parentEmail}'}`}))">Record Payment</button>` : ''}</td>
                   </tr>`).join('') : `<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--text-3);">No invoices yet</td></tr>`}
               </tbody>
             </table>
@@ -6935,8 +6942,8 @@ function ilRenderTable() {
       <td>${feeFmtDate(inv.dueDate)}</td>
       <td>${invoiceStatusBadge(inv)}</td>
       <td>
-        <button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${inv.studentId}'})">View</button>
-        ${inv.balance > 0 ? `<button class="post-btn btn-sm" style="margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, '${escapeHtml(inv.studentName)} — ${escapeHtml(inv.feeType)} (Balance: ${fmtNaira(inv.balance)})', ilViewList)">Pay</button>` : ''}
+        <button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:${jsArg(inv.studentId)}})">View</button>
+        ${inv.balance > 0 ? `<button class="post-btn btn-sm" style="margin-left:4px;" onclick="openRecordPaymentModal(${inv.id}, ${jsArg(`${inv.studentName} — ${inv.feeType} (Balance: ${fmtNaira(inv.balance)})`)}, ilViewList)">Pay</button>` : ''}
       </td>
     </tr>`).join('') : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No invoices match these filters.</td></tr>`;
   const totals = rows.reduce((acc, inv) => ({ invoiced: acc.invoiced + inv.amount, paid: acc.paid + inv.paid, balance: acc.balance + inv.balance }), { invoiced: 0, paid: 0, balance: 0 });
@@ -7010,7 +7017,7 @@ function ffhRenderTable() {
       <td>${fmtNaira(f.totals.invoiced)}</td>
       <td>${fmtNaira(f.totals.paid)}</td>
       <td style="${f.totals.balance > 0 ? 'color:var(--red);font-weight:700;' : ''}">${fmtNaira(f.totals.balance)}</td>
-      <td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({parentEmail:'${escapeHtml(f.parentEmail)}'})">Fees Records</button></td>
+      <td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({parentEmail:${jsArg(f.parentEmail)}})">Fees Records</button></td>
     </tr>`).join('') : `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3);">No families with a parent email on file yet.</td></tr>`;
 }
 
@@ -7198,7 +7205,7 @@ function fdRenderTable() {
   const rows = _fdData.filter(r => !q || r.studentName.toLowerCase().includes(q) || r.studentId.toLowerCase().includes(q));
   const tbody = document.getElementById('fd-tbody');
   tbody.innerHTML = rows.length
-    ? rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.studentName)}</td><td>${escapeHtml(r.studentId)}</td><td>${escapeHtml(r.classLabel)}</td><td>${r.invoiceCount}</td><td>${fmtNaira(r.totalInvoiced)}</td><td>${fmtNaira(r.totalPaid)}</td><td style="color:var(--red);font-weight:700;">${fmtNaira(r.balance)}</td><td>${feeFmtDate(r.dueDate)}${r.overdue ? ' <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--red);">Overdue</span>' : ''}</td><td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:'${r.studentId}'})">View</button></td></tr>`).join('')
+    ? rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.studentName)}</td><td>${escapeHtml(r.studentId)}</td><td>${escapeHtml(r.classLabel)}</td><td>${r.invoiceCount}</td><td>${fmtNaira(r.totalInvoiced)}</td><td>${fmtNaira(r.totalPaid)}</td><td style="color:var(--red);font-weight:700;">${fmtNaira(r.balance)}</td><td>${feeFmtDate(r.dueDate)}${r.overdue ? ' <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--red);">Overdue</span>' : ''}</td><td><button class="bs-export-btn" style="position:static;" onclick="openFeeHistoryModal({studentId:${jsArg(r.studentId)}})">View</button></td></tr>`).join('')
     : `<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-3);">No outstanding balances for these filters.</td></tr>`;
   document.getElementById('fd-showing').textContent = `Showing ${rows.length} of ${_fdData.length} entries`;
   const total = rows.reduce((sum, r) => sum + r.balance, 0);
@@ -7416,7 +7423,7 @@ async function financeCategoryLoad(type) {
     const data = await apiFetch(`/api/admin/finance/categories?type=${type}`);
     const rows = data.categories || [];
     tbody.innerHTML = rows.length
-      ? rows.map((c, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(c.name)}</td><td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="financeCategoryDelete(${c.id},'${type}')">Remove</button></td></tr>`).join('')
+      ? rows.map((c, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(c.name)}</td><td><button class="del-btn" style="padding:4px 10px;font-size:11px;" onclick="financeCategoryDelete(${c.id},${jsArg(type)})">Remove</button></td></tr>`).join('')
       : '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3);">No categories added yet.</td></tr>';
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--red);">${escapeHtml(err.message)}</td></tr>`;
@@ -7625,9 +7632,9 @@ function mspRenderTable(emptype, period) {
       <td>${i + 1}</td>
       <td><div style="font-weight:600;font-size:12px;">${escapeHtml(s.name)}</div><div style="font-size:10px;color:var(--text-3);">${s.staffId}</div></td>
       <td style="font-size:11px;color:var(--text-3);">${roleLabel}</td>
-      <td><input type="number" class="msp-base" value="${base}" ${locked ? 'disabled' : ''} style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
-      <td><input type="number" class="msp-allow" value="${allow}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
-      <td><input type="number" class="msp-ded" value="${ded}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="msp-base" value="${base}" ${locked ? 'disabled' : ''} style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc(${jsArg(s.staffId)})"/></td>
+      <td><input type="number" class="msp-allow" value="${allow}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc(${jsArg(s.staffId)})"/></td>
+      <td><input type="number" class="msp-ded" value="${ded}" ${locked ? 'disabled' : ''} style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="mspRecalc(${jsArg(s.staffId)})"/></td>
       <td class="msp-net" style="font-weight:700;">${finMoney(base + allow - ded)}</td>
       <td>${existing ? finStatusPill(existing.status) : finStatusPill('not processed', { 'not processed': 'var(--text-3)' })}</td>
     </tr>`;
@@ -7742,11 +7749,11 @@ function prRenderTable() {
       <td>${i + 1}</td>
       <td>${escapeHtml(s.name)}</td>
       <td style="font-size:11px;color:var(--text-3);">${roleLabel}</td>
-      <td><input type="number" class="pr-base" value="${s.baseSalary}" style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
-      <td><input type="number" class="pr-allow" value="${s.allowances}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
-      <td><input type="number" class="pr-ded" value="${s.deductions}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc('${s.staffId}')"/></td>
+      <td><input type="number" class="pr-base" value="${s.baseSalary}" style="width:100px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc(${jsArg(s.staffId)})"/></td>
+      <td><input type="number" class="pr-allow" value="${s.allowances}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc(${jsArg(s.staffId)})"/></td>
+      <td><input type="number" class="pr-ded" value="${s.deductions}" style="width:90px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;" oninput="prRecalc(${jsArg(s.staffId)})"/></td>
       <td class="pr-net" style="font-weight:700;">${finMoney(s.baseSalary + s.allowances - s.deductions)}</td>
-      <td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;" onclick="prSave('${s.staffId}')">Save</button></td>
+      <td><button class="bs-toggle-btn" style="padding:4px 10px;font-size:11px;" onclick="prSave(${jsArg(s.staffId)})">Save</button></td>
     </tr>`;
   }).join('');
 }
@@ -7821,7 +7828,7 @@ function slRenderTable() {
     tbody.innerHTML = rows.map((l, i) => {
       const nextStatus = l.repaymentStatus === 'outstanding' ? 'repaying' : (l.repaymentStatus === 'repaying' ? 'repaid' : null);
       const actionBtn = nextStatus
-        ? `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;" onclick="slAdvanceStatus(${l.id},'${nextStatus}')">Mark ${nextStatus === 'repaying' ? 'Repaying' : 'Repaid'}</button>`
+        ? `<button class="bs-toggle-btn" style="padding:4px 10px;font-size:10px;" onclick="slAdvanceStatus(${l.id},${jsArg(nextStatus)})">Mark ${nextStatus === 'repaying' ? 'Repaying' : 'Repaid'}</button>`
         : '—';
       return `<tr><td>${i + 1}</td><td>${escapeHtml(l.name)}</td><td style="text-transform:capitalize;">${escapeHtml(l.loanType)}</td><td>${finMoney(l.amount)}</td><td>${finMoney(l.monthlyDeduction)}</td><td style="max-width:200px;font-size:11px;color:var(--text-2);">${escapeHtml(l.reason || '—')}</td><td>${finStatusPill(l.repaymentStatus)}</td><td>${new Date(l.issuedAt).toLocaleDateString()}</td><td>${actionBtn}</td></tr>`;
     }).join('');
@@ -9204,8 +9211,8 @@ function sigsInit() {
           <td><strong>${escapeHtml(t.name)}</strong><div class="en-hint">${escapeHtml(t.id)}</div></td>
           <td>${t.classes.map(escapeHtml).join(', ')}</td>
           <td>${thumb(t.signaturePath)}</td>
-          <td class="sigs-row-actions"><button class="post-btn btn-sm" onclick="sigsOpen('teacher', '${escapeHtml(t.id)}')">${t.signaturePath ? 'Change' : 'Add Signature'}</button>
-            ${t.signaturePath ? `<button class="del-btn btn-sm" onclick="sigsRemove('teacher', '${escapeHtml(t.id)}')">Remove</button>` : ''}</td>
+          <td class="sigs-row-actions"><button class="post-btn btn-sm" onclick="sigsOpen('teacher', ${jsArg(t.id)})">${t.signaturePath ? 'Change' : 'Add Signature'}</button>
+            ${t.signaturePath ? `<button class="del-btn btn-sm" onclick="sigsRemove('teacher', ${jsArg(t.id)})">Remove</button>` : ''}</td>
         </tr>`).join('')}
       </tbody></table></div>` : '<div class="sr-empty">No class teachers yet. Make a teacher a class teacher under Result Settings → Setup (Assign Teachers), or set a class arm\'s form teacher.</div>'}
     </div></div>`;
@@ -9229,7 +9236,7 @@ function sigsOpen(kind, teacherId = '') {
         </div>
       </div>
     </div>
-    <div class="en-modal-foot"><button class="btn-outline" onclick="sigsClose()">Cancel</button><button class="post-btn" onclick="sigsSave(this, '${kind}', '${escapeHtml(teacherId)}')">Save Signature</button></div></div>`;
+    <div class="en-modal-foot"><button class="btn-outline" onclick="sigsClose()">Cancel</button><button class="post-btn" onclick="sigsSave(this, ${jsArg(kind)}, ${jsArg(teacherId)})">Save Signature</button></div></div>`;
   document.body.appendChild(modal);
   sigInit('sigm-pad', 'sigm-hint');
 }

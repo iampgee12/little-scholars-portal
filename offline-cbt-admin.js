@@ -1,4 +1,11 @@
 // E-Class › CBT › Offline CBT (LAN): exam-server kit, exam packs, results upload.
+
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 let ocData = { schedules: [], packs: [] };
 
 // Shows the Windows app downloads once the deploy has built them
@@ -46,7 +53,7 @@ function ocCloseConnModal() { document.getElementById('oc-conn-modal-host').inne
 // The keys are shown once: closing needs the "I've written them down" tick
 function ocShowKeys(keys, title) {
   const row = (label, value, id) => `<div class="oc-key-row"><label class="field-label" for="${id}">${label}</label>
-    <div class="ae-inline"><input class="field-input oc-key" id="${id}" value="${escapeHtml(value)}" readonly onclick="this.select()"><button type="button" class="btn-outline" onclick="ocCopyKey('${id}')">Copy</button></div></div>`;
+    <div class="ae-inline"><input class="field-input oc-key" id="${id}" value="${escapeHtml(value)}" readonly onclick="this.select()"><button type="button" class="btn-outline" onclick="ocCopyKey(${jsArg(id)})">Copy</button></div></div>`;
   ocConnModal(title, `
     <div class="ts-note"><b>Write these down now and keep them safe.</b> They are shown only this once; the portal keeps no readable copy of the Secret Key. Type them into each UCS Exam Server's “Connect School Account” screen. Anyone with these keys can pull pupil and exam data, so don't share them.</div>
     ${row('API Number', keys.apiNumber, 'oc-k1')}${row('API Authentication Key', keys.authKey, 'oc-k2')}${row('API Secret Key', keys.secret, 'oc-k3')}

@@ -3,6 +3,13 @@
 // shell: Dashboard, Exam Console, CBT Schedules, Push Results, Archive, Refresh
 // Data, Sync Report, Connection & Files, Students Info-system, Teachers / General
 // Staff, Administrator, Check for Updates.
+
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 const rootEl = document.getElementById('ea-root');
 const state = { page: 'dashboard', user: null, status: null, sync: null, dash: null, overview: null, openPaperId: null, timer: null };
 
@@ -116,7 +123,7 @@ async function firstRefresh() {
 // The eye button in a password box: shows the password, and hides it again
 const EYE_OPEN = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_SHUT = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-const EYE_BUTTON = id => `<button type="button" class="ec-eye" title="Show password" aria-label="Show password" onclick="togglePassword('${id}', this)">${EYE_OPEN}</button>`;
+const EYE_BUTTON = id => `<button type="button" class="ec-eye" title="Show password" aria-label="Show password" onclick="togglePassword(${jsArg(id)}, this)">${EYE_OPEN}</button>`;
 function togglePassword(id, btn) {
   const input = document.getElementById(id);
   const show = input.type === 'password';
@@ -217,14 +224,14 @@ const TITLES = {
 // (opening one closes the other); the one holding the current page starts open
 state.navOpen = '';
 function navItem([k, l]) {
-  return `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go('${k}')">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`;
+  return `<button type="button" data-page="${k}" class="${state.page === k ? 'active' : ''}" onclick="go(${jsArg(k)})">${l}${k === 'push' && state.sync?.unpushed ? `<span class="ea-badge">${state.sync.unpushed}</span>` : ''}</button>`;
 }
 function navGroup([group, items, opt = {}]) {
   if (!opt.dropdown) return `${group ? `<h4>${group}</h4>` : ''}${items.map(navItem).join('')}`;
   const open = state.navOpen === opt.dropdown;
   const here = items.some(([k]) => k === state.page);
   return `<div class="ea-drop ${open ? 'open' : ''}" id="nav-${opt.dropdown}">
-    <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav('${opt.dropdown}')">${group}${items.some(([k]) => k === 'push') && state.sync?.unpushed ? `<span class="ea-badge ea-head-badge" title="Results waiting to be pushed online">${state.sync.unpushed}</span>` : ''}<span class="ea-caret" aria-hidden="true"></span></button>
+    <button type="button" class="ea-drop-head ${here ? 'here' : ''}" aria-expanded="${open}" onclick="toggleNav(${jsArg(opt.dropdown)})">${group}${items.some(([k]) => k === 'push') && state.sync?.unpushed ? `<span class="ea-badge ea-head-badge" title="Results waiting to be pushed online">${state.sync.unpushed}</span>` : ''}<span class="ea-caret" aria-hidden="true"></span></button>
     <div class="ea-drop-body ${open ? 'open' : ''}"${open ? '' : ' style="display:none;"'}>${items.map(navItem).join('')}${opt.search ? studentSearchBox() : ''}</div></div>`;
 }
 function toggleNav(key) {
@@ -466,7 +473,7 @@ async function showPupils(id, quiet) {
           <td>${i + 1}</td><td>${esc(s.name)}</td><td class="ec-hint">${esc(s.id)}</td>
           <td>${s.submittedAt ? `<span class="ec-pill live">Handed in</span> <span class="ec-hint">${esc(when(s.submittedAt))}</span>` : s.startedAt ? `<span class="ec-pill upcoming">Writing</span> <span class="ec-hint">${s.answered}/${paper.questions} answered</span>` : '<span class="ec-hint">Not started</span>'}</td>
           <td>${s.submittedAt ? `${s.score} / ${s.totalMarks}` : ''}</td>
-          <td>${s.startedAt ? `<button class="btn-outline" style="padding:5px 10px;font-size:11px;" onclick="allowRetake(${id}, '${esc(s.id)}', '${esc(s.name).replace(/'/g, '&#39;')}')">Allow retake</button>` : ''}</td>
+          <td>${s.startedAt ? `<button class="btn-outline" style="padding:5px 10px;font-size:11px;" onclick="allowRetake(${id}, ${jsArg(s.id)}, ${jsArg(s.name)})">Allow retake</button>` : ''}</td>
         </tr>`).join('') || '<tr><td colspan="6" class="ec-hint">No pupils in this class.</td></tr>'}</tbody>
       </table></div></div>`);
     if (!quiet) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -536,10 +543,10 @@ async function refreshTrial() {
     ${d.testers.some(t => t.canSee.needsChoice) ? `<div class="ec-note warn">${plural(d.testers.filter(t => t.canSee.needsChoice).length, 'tester')} can't see any papers yet. Click <b>Access</b> on their row to choose what they can see.</div>` : ''}
     <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Username</th><th>Name</th><th>Can see</th><th>Password</th><th>Last seen</th><th></th></tr></thead><tbody>
     ${d.testers.map(t => `<tr><td class="ec-mono"><b>${esc(t.username)}</b></td><td>${esc(t.name)}</td>
-      <td class="tr-cansee">${t.canSee.needsChoice ? `<button class="tr-choose" onclick="editTesterAccess('${esc(t.id)}')">&#9888; ${esc(t.canSee.label)}</button>`
+      <td class="tr-cansee">${t.canSee.needsChoice ? `<button class="tr-choose" onclick="editTesterAccess(${jsArg(t.id)})">&#9888; ${esc(t.canSee.label)}</button>`
         : `${t.scope === 'teacher' && t.teacherName ? `<b>Same as ${esc(t.teacherName)}</b><div class="ec-hint">${esc(t.canSee.label)}</div>` : t.scope === 'all' ? '<b>Every paper</b>' : esc(t.canSee.label)}`}</td>
       <td class="ec-mono">${esc(t.password)}</td><td><span class="ec-pill ${t.secondsAgo !== null && t.secondsAgo < 45 ? 'ok' : 'muted'}">${seenText(t.secondsAgo)}</span></td>
-      <td class="ec-actions"><button class="btn-outline" onclick="editTesterAccess('${esc(t.id)}')">Access</button><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-danger-outline" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
+      <td class="ec-actions"><button class="btn-outline" onclick="editTesterAccess(${jsArg(t.id)})">Access</button><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === ${jsArg(t.id)}))">Slip</button><button class="btn-danger-outline" onclick="removeTester(${jsArg(t.id)})">Remove</button></td></tr>`).join('')
       || '<tr><td colspan="6" class="ec-hint">No testers yet. Click Add tester.</td></tr>'}
     </tbody></table></div></div>`);
 
@@ -804,7 +811,7 @@ async function renderRefresh() {
   const s = state.sync;
   pageEl().innerHTML = `<div class="ec-card"><h2>Refresh data from the online school portal</h2>
     <p class="ec-muted">Each refresh copies records from the portal and overwrites the matching data on this computer. Results written here are never removed by a refresh.</p>
-    ${s.connected ? `<div class="ec-refresh-grid">${GROUPS.map(([k, l, d]) => `<button type="button" class="ec-refresh ${k === 'all' ? 'all' : ''}" onclick="askRefresh('${k}')"><b>${l}</b><small>${d}</small></button>`).join('')}</div>`
+    ${s.connected ? `<div class="ec-refresh-grid">${GROUPS.map(([k, l, d]) => `<button type="button" class="ec-refresh ${k === 'all' ? 'all' : ''}" onclick="askRefresh(${jsArg(k)})"><b>${l}</b><small>${d}</small></button>`).join('')}</div>`
       : '<div class="ec-note warn">Not connected to the school portal. Connect in <b>Connection & Files</b>.</div>'}
     <p class="ec-hint" style="margin-top:12px;">Last refresh: ${s.synced ? `${when(s.synced.at)} (${esc(s.synced.scope)})` : 'never'}</p></div>`;
 }
@@ -813,7 +820,7 @@ function askRefresh(group) {
   modal(label, `<p class="ec-muted">This fetches ${group === 'all' ? 'all necessary data' : label.replace('Refresh ', '').toLowerCase() + ' records'} from your online school portal into this exam server, overwriting the corresponding data currently here.</p>
     <label class="ec-check"><input type="checkbox" id="ec-rconfirm"> I confirm that I want to proceed with this action</label>
     <div id="ec-rprogress"></div><div class="ec-error" id="ec-rerr"></div>`,
-  `<button class="btn-outline btn-close" onclick="closeModal()">Close</button><button class="post-btn" id="ec-rgo" onclick="doRefresh('${group}')">Refresh Data</button>`);
+  `<button class="btn-outline btn-close" onclick="closeModal()">Close</button><button class="post-btn" id="ec-rgo" onclick="doRefresh(${jsArg(group)})">Refresh Data</button>`);
 }
 async function doRefresh(group) {
   if (!document.getElementById('ec-rconfirm').checked) { document.getElementById('ec-rerr').textContent = 'Tick the box to confirm.'; return; }
@@ -886,7 +893,7 @@ async function exportResults() {
 
 // ── People (read-only) ──
 const photoCell = p => (p.photo
-  ? `<img class="ec-photo" src="/${esc(p.photo)}" alt="" onerror="this.outerHTML='<span class=&quot;ea-avatar&quot;>${esc(initials(p.name))}</span>'">`
+  ? `<img class="ec-photo" src="/${esc(p.photo)}" alt="" onerror="this.outerHTML=${jsArg(`<span class="ea-avatar">${esc(initials(p.name))}</span>`)}">`
   : `<span class="ea-avatar">${esc(initials(p.name))}</span>`);
 
 // A list with "records per page", a search box and page buttons
@@ -918,12 +925,12 @@ function dtDraw(id) {
   const nums = [];
   for (let n = Math.max(1, t.page - 2); n <= Math.min(pages, t.page + 2); n++) nums.push(n);
   box.innerHTML = `<div class="ec-dt-bar">
-      <label class="ec-dt-per"><select class="ec-select" onchange="dtSet('${id}', { per: Number(this.value), page: 1 })">${[10, 25, 50, 100].map(n => `<option ${n === t.per ? 'selected' : ''}>${n}</option>`).join('')}</select> records per page</label>
-      <input class="ec-input ec-dt-search" type="search" placeholder="Search" aria-label="Search" value="${esc(t.q)}" oninput="dtSearch('${id}', this)"></div>
+      <label class="ec-dt-per"><select class="ec-select" onchange="dtSet(${jsArg(id)}, { per: Number(this.value), page: 1 })">${[10, 25, 50, 100].map(n => `<option ${n === t.per ? 'selected' : ''}>${n}</option>`).join('')}</select> records per page</label>
+      <input class="ec-input ec-dt-search" type="search" placeholder="Search" aria-label="Search" value="${esc(t.q)}" oninput="dtSearch(${jsArg(id)}, this)"></div>
     <div style="overflow-x:auto;"><table class="ec-table"><thead><tr>${t.head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>
       ${shown.map((r, i) => t.row(r, from + i)).join('') || `<tr><td colspan="${t.head.length}" class="ec-hint">${q ? 'Nothing matches your search.' : t.empty}</td></tr>`}</tbody></table></div>
     <div class="ec-dt-foot"><span class="ec-hint">${list.length ? `Showing ${from + 1} to ${from + shown.length} of ${list.length} entries` : 'No entries'}</span>
-      <div class="ec-pager"><button type="button" ${t.page <= 1 ? 'disabled' : ''} onclick="dtSet('${id}', { page: ${t.page - 1} })" aria-label="Previous page">‹</button>${nums.map(n => `<button type="button" class="${n === t.page ? 'on' : ''}" onclick="dtSet('${id}', { page: ${n} })">${n}</button>`).join('')}<button type="button" ${t.page >= pages ? 'disabled' : ''} onclick="dtSet('${id}', { page: ${t.page + 1} })" aria-label="Next page">›</button></div></div>`;
+      <div class="ec-pager"><button type="button" ${t.page <= 1 ? 'disabled' : ''} onclick="dtSet(${jsArg(id)}, { page: ${t.page - 1} })" aria-label="Previous page">‹</button>${nums.map(n => `<button type="button" class="${n === t.page ? 'on' : ''}" onclick="dtSet(${jsArg(id)}, { page: ${n} })">${n}</button>`).join('')}<button type="button" ${t.page >= pages ? 'disabled' : ''} onclick="dtSet(${jsArg(id)}, { page: ${t.page + 1} })" aria-label="Next page">›</button></div></div>`;
 }
 
 // Students Info-system: choose a class and arm, then View (or search from the menu)
@@ -1001,7 +1008,7 @@ async function renderTeachers() {
     match: u => `${u.name} ${u.id} ${u.designation || ''} ${u.phone || ''} ${u.subjects.map(x => x.subject).join(' ')} ${u.formClasses.join(' ')}`,
     row: u => `<tr><td>${photoCell(u)}</td><td><b>${esc(u.name)}</b><div class="ec-hint">${esc(u.id)}</div></td><td>${esc(u.designation || (u.role === 'teacher' ? 'Teacher' : 'Staff'))}</td><td>${esc(u.phone || '')}</td>
       <td>${numbered(subjectItems(u))}</td><td>${numbered(u.formClasses.map(esc))}</td>
-      <td><button class="btn-outline" style="padding:5px 12px;font-size:12px;" onclick="staffProfile('${esc(u.id)}')">View</button></td>
+      <td><button class="btn-outline" style="padding:5px 12px;font-size:12px;" onclick="staffProfile(${jsArg(u.id)})">View</button></td>
       <td><span class="ec-pill ${u.active === 0 ? 'bad' : 'ok'}">${u.active === 0 ? 'Inactive' : 'Active'}</span></td></tr>`,
   })}</div>`;
   dtDraw('teachers');

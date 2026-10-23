@@ -1,6 +1,13 @@
 // Admin → People → View Students and Students Registry (server: students-api.js),
 // plus the pupil profile pop-up both pages open.
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const VS = { rows: [], shown: [], view: 'list', page: 1, perPage: 30, search: '', selected: new Set(), rules: [], loaded: false, sessions: null, activeSession: '' };
 const REG = { rows: [], counts: {}, page: 1, perPage: 25, search: '', status: 'all', gender: 'all', year: '' };
 
@@ -207,17 +214,17 @@ function vsPaint() {
   const classText = r => `${escapeHtml(r.classLabel || r.classCode || '—')}${r.classArmName ? ` / ${escapeHtml(r.classArmName)}` : ''}`;
   if (VS.view === 'album') {
     list.innerHTML = page.length ? `<div class="vs-album">${page.map(r => `<div class="vs-photo-card${VS.selected.has(r.id) ? ' picked' : ''}">
-        <label class="vs-photo-check"><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick('${escapeHtml(r.id)}', this.checked); this.closest('.vs-photo-card').classList.toggle('picked', this.checked)"></label>
-        <button class="vs-photo" onclick="stuProfile('${escapeHtml(r.id)}')">${r.photoPath ? `<img src="/${escapeHtml(r.photoPath)}" alt="" loading="lazy">` : `<span>${escapeHtml((r.firstName || r.name || '?')[0])}${escapeHtml((r.surname || '')[0] || '')}</span>`}</button>
-        <button class="vs-photo-name" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button>
+        <label class="vs-photo-check"><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick(${jsArg(r.id)}, this.checked); this.closest('.vs-photo-card').classList.toggle('picked', this.checked)"></label>
+        <button class="vs-photo" onclick="stuProfile(${jsArg(r.id)})">${r.photoPath ? `<img src="/${escapeHtml(r.photoPath)}" alt="" loading="lazy">` : `<span>${escapeHtml((r.firstName || r.name || '?')[0])}${escapeHtml((r.surname || '')[0] || '')}</span>`}</button>
+        <button class="vs-photo-name" onclick="stuProfile(${jsArg(r.id)})">${escapeHtml(r.name)}</button>
         <div class="en-hint">${escapeHtml(r.regNo || r.id)}</div><div class="en-hint">${classText(r)}</div></div>`).join('')}</div>` : '<div class="sr-empty">No data available in table</div>';
   } else {
     list.innerHTML = `<div class="sr-table-wrap"><table class="data-table"><thead><tr><th><input type="checkbox" onchange="vsSelectPage(this.checked)" ${page.length && page.every(r => VS.selected.has(r.id)) ? 'checked' : ''}></th><th>#</th><th>Photo</th><th>Name</th><th>G</th><th>Reg. No.</th><th>Username</th><th>Class / Class Arm</th><th>Email</th><th>Account Status</th><th>Parents / Guardian</th><th></th></tr></thead>
       <tbody>${page.length ? page.map((r, i) => `<tr>
-        <td><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick('${escapeHtml(r.id)}', this.checked)"></td>
+        <td><input type="checkbox" ${VS.selected.has(r.id) ? 'checked' : ''} onchange="vsPick(${jsArg(r.id)}, this.checked)"></td>
         <td>${start + i + 1}</td>
-        <td><button class="stu-photo-link" onclick="stuProfile('${escapeHtml(r.id)}')" title="View profile">${pupilAvatar(r)}</button></td>
-        <td><button class="stu-name-link" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button></td>
+        <td><button class="stu-photo-link" onclick="stuProfile(${jsArg(r.id)})" title="View profile">${pupilAvatar(r)}</button></td>
+        <td><button class="stu-name-link" onclick="stuProfile(${jsArg(r.id)})">${escapeHtml(r.name)}</button></td>
         <td>${escapeHtml(r.gender || '')}</td>
         <td class="stu-mono">${escapeHtml(r.regNo || r.id)}</td>
         <td class="stu-mono">${r.username ? `<b>${escapeHtml(r.username)}</b>` : '<span class="en-hint">—</span>'}</td>
@@ -225,7 +232,7 @@ function vsPaint() {
         <td>${escapeHtml(r.email || '')}</td>
         <td><span class="sr-pill ${r.active ? 'accepted' : 'rejected'}">${r.active ? 'Active' : 'Deactivated'}</span>${r.archived ? ' <span class="sr-pill bypassed">Archived</span>' : ''}</td>
         <td class="stu-parents">${parentsText(r)}</td>
-        <td><button class="btn-outline btn-sm" onclick="enrolEdit('${escapeHtml(r.id)}')">Edit</button></td>
+        <td><button class="btn-outline btn-sm" onclick="enrolEdit(${jsArg(r.id)})">Edit</button></td>
       </tr>`).join('') : '<tr><td colspan="12" class="sr-empty">No data available in table</td></tr>'}</tbody></table></div>`;
   }
   document.getElementById('vs-showing').textContent = `Showing ${rows.length ? start + 1 : 0} to ${start + page.length} of ${rows.length} entries${VS.selected.size ? ` · ${VS.selected.size} selected` : ''}`;
@@ -383,7 +390,7 @@ function regPaint() {
   const statusTone = s => ({ active: 'accepted', left: 'pending', graduated: 'bypassed' }[s] || '');
   document.getElementById('reg-tbody').innerHTML = page.length ? page.map((r, i) => `<tr>
       <td>${start + i + 1}</td>
-      <td><button class="stu-name-link" onclick="stuProfile('${escapeHtml(r.id)}')">${escapeHtml(r.name)}</button></td>
+      <td><button class="stu-name-link" onclick="stuProfile(${jsArg(r.id)})">${escapeHtml(r.name)}</button></td>
       <td class="stu-mono">${escapeHtml(r.regNo || '')}</td>
       <td class="stu-mono">${escapeHtml(r.id)}</td>
       <td><span class="sr-pill ${statusTone(r.status)}">${statusLabel(r.status)}</span></td>
@@ -391,7 +398,7 @@ function regPaint() {
       <td>${r.gender === 'M' ? 'Male' : r.gender === 'F' ? 'Female' : ''}</td>
       <td>${stuDate(r.dob)}</td>
       <td>${stuDate(r.enrolledOn)}</td>
-      <td><button class="en-link" onclick="stuClassHistory('${escapeHtml(r.id)}', '${escapeHtml(r.name).replace(/'/g, '&#39;')}')">${stuIcon('history')} Class History</button></td>
+      <td><button class="en-link" onclick="stuClassHistory(${jsArg(r.id)}, ${jsArg(r.name)})">${stuIcon('history')} Class History</button></td>
     </tr>`).join('') : '<tr><td colspan="10" class="sr-empty">No data available in table</td></tr>';
   document.getElementById('reg-showing').textContent = `Showing ${rows.length ? start + 1 : 0} to ${start + page.length} of ${rows.length} entries`;
   const btn = (label, p, disabled) => `<button class="btn-outline btn-sm" ${disabled ? 'disabled' : ''} onclick="REG.page=${p}; regPaint()">${label}</button>`;
@@ -507,7 +514,7 @@ function stuInfoBody(inPage) {
       <span class="stu-card-badge">Student</span>
       <div class="stu-card-icons">${s.studentEmail ? `<a href="mailto:${escapeHtml(s.studentEmail)}" title="Email ${escapeHtml(s.studentEmail)}">${STU_ICON_MAIL}</a>` : ''}</div>
     </div>
-    ${inPage ? '' : `<div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page</button></div>`}
+    ${inPage ? '' : `<div class="stu-card-go"><button class="post-btn" onclick="stuGoToProfile(${jsArg(s.id)})">Go to profile page</button></div>`}
     <div class="stu-sec">Student Biodata</div>
     <table class="stu-info"><tbody>
       ${row('Surname', txt(s.surname))}${row('First Name', txt(s.firstName))}${row('Other Names', txt(s.otherNames))}
@@ -519,13 +526,13 @@ function stuInfoBody(inPage) {
       ${row('Adm. / Reg. No.', txt(s.regNo))}
       ${row('Username (CBT sign-in)', txt(s.username))}
       ${row('Current Class Category', txt(String(s.category || '').toUpperCase()))}
-      ${row('Current Class', `${txt(String(s.classLabel || '').toUpperCase())}<div>${btn('Class History', `stuClassHistory('${escapeHtml(s.id)}', '${escapeHtml(name).replace(/'/g, '&#39;')}')`)}</div>`)}
+      ${row('Current Class', `${txt(String(s.classLabel || '').toUpperCase())}<div>${btn('Class History', `stuClassHistory('${escapeHtml(s.id)}', '${escapeHtml(name)}')`)}</div>`)}
       ${row('Current Class Arm', txt(String(s.armName || '').toUpperCase()))}
       ${row('Current Activity Groups', `${groups.length ? groups.map(g => escapeHtml(g.name)).join(', ') : '<span class="en-hint">—</span>'}<div>${btn('Activity Group History', 'stuGroupHistory()')}</div>`)}
       ${row('Tags', `${tagNames ? `<div class="stu-tags">${tagNames}</div>` : ''}<div>${btn('Update Student Tags', 'stuTagsModal()', 'check')}</div>`)}
       ${row('Admission Date', txt(stuDate(s.admissionDate)))}
       ${row('Date Registered in Portal', registered)}
-      ${row('Account Status', `<button type="button" class="rsp-toggle ${s.active ? 'on' : 'off'}" id="stu-acc-toggle" onclick="stuToggleAccount('${escapeHtml(s.id)}', this)"><span>${s.active ? 'ON' : 'OFF'}</span></button>`)}
+      ${row('Account Status', `<button type="button" class="rsp-toggle ${s.active ? 'on' : 'off'}" id="stu-acc-toggle" onclick="stuToggleAccount(${jsArg(s.id)}, this)"><span>${s.active ? 'ON' : 'OFF'}</span></button>`)}
       ${row('Fees', btn('Fees &amp; Payment History', inPage ? "spfTab('fees')" : `crcFees('${escapeHtml(s.id)}')`, 'users'))}
       ${row('Results', btn('Academic Results History', inPage ? "spfTab('results')" : 'stuResultsHistory()', 'check'))}
     </tbody></table>
@@ -540,7 +547,7 @@ function stuInfoBody(inPage) {
     ${inPage ? `<div class="stu-card-foot spf-prof-foot"><button class="btn-outline" onclick="stuPrintCard('#spf-profile-body')">Print</button>
         <span class="en-foot-gap"></span><button class="btn-danger" onclick="spfDelete()">Delete Account</button>
         ${s.archived ? '<button class="btn-outline" onclick="spfArchive(false)">Restore Account (Unarchive)</button>' : '<button class="btn-outline" onclick="spfArchive(true)">Archive Account</button>'}</div>`
-      : `<div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile('${escapeHtml(s.id)}')">Go to profile page</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`}`;
+      : `<div class="stu-card-foot"><button class="post-btn" onclick="stuGoToProfile(${jsArg(s.id)})">Go to profile page</button><button class="btn-outline" onclick="stuPrintCard()">Print</button></div>`}`;
 }
 
 function stuGoToProfile(id) {
@@ -613,7 +620,7 @@ function familyCard() {
       <div class="fam-ward-top"><div class="fam-ward-photo">${w.photoPath ? `<img src="/${escapeHtml(w.photoPath)}" alt="">` : `<span>${escapeHtml(w.initials || '')}</span>`}</div>
         <div class="fam-ward-name">${escapeHtml(String(w.name).toUpperCase())} <span class="en-hint">(${escapeHtml(w.gender || '')})</span></div></div>
       <div class="fam-ward-grid"><div><span>Class</span><strong>${escapeHtml(String(w.classLabel || '').toUpperCase())}</strong></div><div><span>Class Arm</span><strong>${escapeHtml(String(w.armName || '—').toUpperCase())}</strong></div><div><span>Reg. No</span><strong>${escapeHtml(w.regNo || '')}</strong></div></div>
-      <div class="fam-ward-actions"><button class="en-link" onclick="stuClassHistory('${escapeHtml(w.id)}', '${escapeHtml(w.name).replace(/'/g, '&#39;')}')">Class History</button><button class="en-link" onclick="document.getElementById('fam-modal').remove(); stuProfile('${escapeHtml(w.id)}')">View Profile</button></div>
+      <div class="fam-ward-actions"><button class="en-link" onclick="stuClassHistory(${jsArg(w.id)}, ${jsArg(w.name)})">Class History</button><button class="en-link" onclick="document.getElementById('fam-modal').remove(); stuProfile(${jsArg(w.id)})">View Profile</button></div>
     </div>`).join('');
   const parents = fam.parents.map(p => `<div class="fam-parent">
       <div class="stu-card"><div class="stu-card-banner"></div><div class="stu-card-photo"><span>${escapeHtml((p.fullName || '?').split(/\s+/).map(x => x[0]).slice(0, 2).join(''))}</span></div>

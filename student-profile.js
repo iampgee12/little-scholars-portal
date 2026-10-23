@@ -3,6 +3,13 @@
 // Results, Subjects, Documents, Update Profile, Password Update, PIN Update
 // and Hostel. Server side: students-api.js (/api/admin/view-students/…).
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const SPF = { id: null, tab: 'profile', from: 'students', month: '', fees: null, feeFilter: { session: 'all', term: 'all', type: 'all', status: 'all', page: 1, perPage: 20, search: '', picked: new Set() }, resOrder: 'newest', results: null };
 
 const SPF_TABS = [
@@ -70,7 +77,7 @@ function spfRender() {
     <div class="spf-wrap">
       <div class="spf-tabs card">
         <button class="spf-back" onclick="spfBack()">Back to Students List</button>
-        ${SPF_TABS.map(([key, label, icon]) => `<button class="spf-tab" data-spf="${key}" onclick="spfTab('${key}')">${spfSvg(icon)}<span>${label}</span></button>`).join('')}
+        ${SPF_TABS.map(([key, label, icon]) => `<button class="spf-tab" data-spf="${key}" onclick="spfTab(${jsArg(key)})">${spfSvg(icon)}<span>${label}</span></button>`).join('')}
       </div>
       <div class="spf-body card"><div class="card-body" id="spf-body"></div></div>
     </div>`;
@@ -623,7 +630,7 @@ async function spfEditSave(btn) {
 }
 
 // ── Password / PIN ──────────────────────────────────────────────────────
-const spfSecret = (id, label) => enField(label, `<div class="en-pass-wrap"><input class="field-input" id="${id}" type="password" autocomplete="new-password"><button type="button" class="en-case-btn" onclick="enrolShowHide('${id}', this)">Show</button></div>`, { required: true });
+const spfSecret = (id, label) => enField(label, `<div class="en-pass-wrap"><input class="field-input" id="${id}" type="password" autocomplete="new-password"><button type="button" class="en-case-btn" onclick="enrolShowHide(${jsArg(id)}, this)">Show</button></div>`, { required: true });
 
 function spfPassword(body) {
   body.innerHTML = `${spfTitle("Update User's Account Password")}

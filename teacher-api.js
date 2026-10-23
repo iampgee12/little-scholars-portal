@@ -1,3 +1,10 @@
+
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 const EXAM_TYPES = ['Mid-Term Exam', 'Final Exam'];
 function caMaxForExamType(examType) {
   return examType === 'Mid-Term Exam' ? 40 : 30;
@@ -445,12 +452,12 @@ function ccRender() {
       </div></div>
       <div class="cc-edit">
         <div class="cc-edit-top">
-          ${cc.bank.length ? `<select class="ctrl-select" onchange="ccUsePreset('${escapeHtml(st.id)}', this)" ${locked ? 'disabled' : ''}>
+          ${cc.bank.length ? `<select class="ctrl-select" onchange="ccUsePreset(${jsArg(st.id)}, this)" ${locked ? 'disabled' : ''}>
             <option value="">Choose a ready-made comment…</option>${presetOptions}
           </select>` : '<span class="cc-head" style="flex:1;align-self:center;">Type a comment below, or press Auto. (Ready-made comments appear here once the admin adds them to the Comments Bank.)</span>'}
-          <button type="button" class="act-btn btn-exp" onclick="ccAuto('${escapeHtml(st.id)}')" ${locked || !scored ? 'disabled' : ''} title="Pick a suitable comment from this pupil's score">&#x21bb; Auto</button>
+          <button type="button" class="act-btn btn-exp" onclick="ccAuto(${jsArg(st.id)})" ${locked || !scored ? 'disabled' : ''} title="Pick a suitable comment from this pupil's score">&#x21bb; Auto</button>
         </div>
-        <textarea id="cc-text-${escapeHtml(st.id)}" rows="2" maxlength="500" placeholder="Type the class teacher's comment for ${escapeHtml(st.name)}…" oninput="ccMarkDirty('${escapeHtml(st.id)}')" ${locked ? 'disabled' : ''}>${escapeHtml(st.savedTeacherComment || '')}</textarea>
+        <textarea id="cc-text-${escapeHtml(st.id)}" rows="2" maxlength="500" placeholder="Type the class teacher's comment for ${escapeHtml(st.name)}…" oninput="ccMarkDirty(${jsArg(st.id)})" ${locked ? 'disabled' : ''}>${escapeHtml(st.savedTeacherComment || '')}</textarea>
         <div class="cc-head"><strong>Head of School's comment:</strong> ${escapeHtml(st.headComment || '—')}</div>
       </div>
     </div>`;
@@ -779,8 +786,8 @@ function renderResultsGrid() {
     const statusChip = rec ? '<span class="chip-green">Saved</span>' : '<span class="chip-gray">Empty</span>';
     return `<tr id="row-${student.id}" class="${rec ? 'row-saved' : ''}">
       <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
-      <td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ca" class="score-input score-field${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="calcRow('${student.id}','${isCA ? 'ca' : 'both'}')"><span class="max-lbl">/${caMax}</span></div></td>
-      ${!isCA ? `<td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ex" class="score-input score-field${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="calcRow('${student.id}','both')"><span class="max-lbl">/70</span></div></td>` : ''}
+      <td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ca" class="score-input score-field${caV !== '' ? ' has-val' : ''}" id="ca-${student.id}" value="${caV}" placeholder="-" oninput="calcRow(${jsArg(student.id)},${jsArg(isCA ? 'ca' : 'both')})"><span class="max-lbl">/${caMax}</span></div></td>
+      ${!isCA ? `<td><div class="score-wrap"><input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ex" class="score-input score-field${exV !== '' ? ' has-val' : ''}" id="ex-${student.id}" value="${exV}" placeholder="-" oninput="calcRow(${jsArg(student.id)},'both')"><span class="max-lbl">/70</span></div></td>` : ''}
       <td class="tot-cell" id="tot-${student.id}" style="color:${total != null ? color : 'var(--text-3)'};">${total != null ? total : '-'}</td>
       <td class="grade-cell"><span class="grade-pill ${scorePct != null ? gradeClass(scorePct) : ''}" id="grd-${student.id}" style="${total == null ? 'background:var(--black-3);color:var(--text-3);' : ''}">${grade}</span></td>
       <td class="stat-cell" id="sta-${student.id}">${statusChip}</td>
@@ -878,12 +885,12 @@ function renderStudentPanel() {
       <div class="ep-score-row">
         <div class="ep-score-box">
           <div class="ep-score-lbl">${caLabel} <span style="opacity:0.5;">(max ${caMax})</span></div>
-          <input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ep" id="ep-ca" class="ep-input-big score-field${caVal !== '' ? ' has-val' : ''}" value="${caVal}" placeholder="-" oninput="epCalc('${student.id}','${isCA ? 'ca' : 'both'}')">
+          <input type="text" inputmode="numeric" autocomplete="off" data-max="${caMax}" data-col="ep" id="ep-ca" class="ep-input-big score-field${caVal !== '' ? ' has-val' : ''}" value="${caVal}" placeholder="-" oninput="epCalc(${jsArg(student.id)},${jsArg(isCA ? 'ca' : 'both')})">
           <div class="ep-max-lbl">out of ${caMax}</div>
         </div>
         ${!isCA ? `<div class="ep-score-box">
           <div class="ep-score-lbl">Examination Score <span style="opacity:0.5;">(max 70)</span></div>
-          <input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ep" id="ep-ex" class="ep-input-big score-field${exVal !== '' ? ' has-val' : ''}" value="${exVal}" placeholder="-" oninput="epCalc('${student.id}','both')">
+          <input type="text" inputmode="numeric" autocomplete="off" data-max="70" data-col="ep" id="ep-ex" class="ep-input-big score-field${exVal !== '' ? ' has-val' : ''}" value="${exVal}" placeholder="-" oninput="epCalc(${jsArg(student.id)},'both')">
           <div class="ep-max-lbl">out of 70</div>
         </div>` : `<div class="ep-score-box" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;"><div style="font-size:11px;color:var(--text-3);">CA-only exam</div><div style="font-size:11px;color:var(--text-3);">No exam score required</div></div>`}
       </div>
@@ -897,8 +904,8 @@ function renderStudentPanel() {
       </div>
       ${renderSkillRatingsPanel(student)}
       <div class="ep-actions">
-        <button class="ep-clear-btn" onclick="epClear('${student.id}')">Clear</button>
-        <button class="ep-save-btn" onclick="epSave('${student.id}', '${isCA ? 'ca' : 'both'}')">Save Score</button>
+        <button class="ep-clear-btn" onclick="epClear(${jsArg(student.id)})">Clear</button>
+        <button class="ep-save-btn" onclick="epSave(${jsArg(student.id)}, ${jsArg(isCA ? 'ca' : 'both')})">Save Score</button>
       </div>
     </div>`;
   applyResultLock();
@@ -934,7 +941,7 @@ function renderSkillRatingsPanel(student) {
           <div style="font-size:12px;font-weight:700;color:var(--text-1);">Class Teacher Skills Rating</div>
           <div style="font-size:10px;color:var(--text-3);font-family:'DM Mono',monospace;margin-top:2px;">These ratings print on the PDF result.</div>
         </div>
-        <button class="ep-save-btn" onclick="saveSkillRatings('${escapeHtml(student.id)}')" style="padding:8px 16px;font-size:12px;">Save Skills</button>
+        <button class="ep-save-btn" onclick="saveSkillRatings(${jsArg(student.id)})" style="padding:8px 16px;font-size:12px;">Save Skills</button>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">${groupHtml}</div>
       <div style="font-size:10px;color:${ratings.updatedAt ? 'var(--green)' : 'var(--text-3)'};font-family:'DM Mono',monospace;margin-top:8px;" id="skill-saved-at">${ratings.updatedAt ? `Skills saved - ${escapeHtml(ratings.updatedAt)}` : 'Skills not saved yet'}</div>
@@ -1500,7 +1507,7 @@ function gbRenderClassOverview(classCode, examType, contexts) {
       ${cells}
       <td class="c" style="font-weight:700;">${avgPct != null ? avgPct + '%' : '-'}</td>
       <td class="c" style="white-space:nowrap;">
-        <button class="row-open-btn" onclick="previewTeacherReport('${escapeHtml(student.id)}','${escapeHtml(classCode)}','${escapeHtml(examType)}')" title="Preview the final PDF result">Preview</button>
+        <button class="row-open-btn" onclick="previewTeacherReport(${jsArg(student.id)},${jsArg(classCode)},${jsArg(examType)})" title="Preview the final PDF result">Preview</button>
       </td>
     </tr>`;
   }).join('');
@@ -1544,8 +1551,8 @@ function gbRender(ctx, examType) {
       <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       <td class="tot-cell" style="color:${color};">${totalDisplay}</td>
       <td class="grade-cell"><span class="grade-pill" style="${(isAbsent || isExcluded) ? 'background:var(--black-3);color:var(--text-3);' : ''}">${(isAbsent || isExcluded) ? '-' : grade}</span></td>
-      <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="gbToggleFlag('${escapeHtml(student.id)}','absent',${isAbsent ? 'false' : 'true'})" ${isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
-      <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="gbToggleFlag('${escapeHtml(student.id)}','excluded',${isExcluded ? 'false' : 'true'})"><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
+      <td><button class="gb-flag absent ${isAbsent ? 'active' : ''}" type="button" onclick="gbToggleFlag(${jsArg(student.id)},'absent',${isAbsent ? 'false' : 'true'})" ${isExcluded ? 'disabled' : ''}><span></span>${isAbsent ? 'Unmark' : 'Absent'}</button></td>
+      <td><button class="gb-flag exclude ${isExcluded ? 'active' : ''}" type="button" onclick="gbToggleFlag(${jsArg(student.id)},'excluded',${isExcluded ? 'false' : 'true'})"><span></span>${isExcluded ? 'Include' : 'Exclude'}</button></td>
     </tr>`;
   }).join('');
   document.getElementById('gb-results').innerHTML = `<div class="card">
@@ -1623,7 +1630,7 @@ function cogRender(ctx, examType) {
     return `<tr>
       <td><div class="stu-cell">${pupilAvatar(student)}<div><div class="stu-full">${escapeHtml(student.name)}</div><div class="stu-id">${escapeHtml(student.id)}</div></div></div></td>
       <td>${r ? `<span class="chip-green">Rated - ${escapeHtml(r.updatedAt)}</span>` : '<span class="chip-gray">Not Rated</span>'}</td>
-      <td class="act-cell"><button class="row-open-btn" onclick="cogOpenModal('${escapeHtml(ctx.classCode)}','${escapeHtml(examType)}','${escapeHtml(student.id)}')">Rate</button></td>
+      <td class="act-cell"><button class="row-open-btn" onclick="cogOpenModal(${jsArg(ctx.classCode)},${jsArg(examType)},${jsArg(student.id)})">Rate</button></td>
     </tr>`;
   }).join('');
   document.getElementById('cog-results').innerHTML = `<div class="card">

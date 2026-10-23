@@ -2,6 +2,13 @@
 // one on, chooses its fields and shares an access code (Self Registration →
 // Settings). Every submission waits for the admin to accept it.
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const RG = { staffOnly: new URLSearchParams(location.search).get('for') === 'staff', kind: '', code: '', form: null, children: 0 };
 const rgBody = () => document.getElementById('rg-body');
 
@@ -72,7 +79,7 @@ function rgInput(key, id, f, value = '') {
   if (plain.endsWith('phone')) return enrolPhoneField(id, value, f.label).replace('</label>', `${req}</label>`);
   if (plain.endsWith('email')) return wrap(`<input class="field-input" type="email" id="${id}">`);
   if (plain === 'address' || plain.endsWith('_address')) return wrap(`<textarea class="field-input" rows="2" id="${id}"></textarea>`, true);
-  if (plain === 'class') return wrap(`<select class="ctrl-select" id="${id}" onchange="rgArms('${id}')">${enrolOptions(RG.form.classes.map(c => [c.code, c.label]), value, 'Select')}</select>`);
+  if (plain === 'class') return wrap(`<select class="ctrl-select" id="${id}" onchange="rgArms(${jsArg(id)})">${enrolOptions(RG.form.classes.map(c => [c.code, c.label]), value, 'Select')}</select>`);
   if (plain === 'class_arm') return wrap(`<select class="ctrl-select" id="${id}"><option value="">Select Class First</option></select>`);
   return wrap(`<input class="field-input" id="${id}">`);
 }

@@ -4,6 +4,13 @@
 // admin-api.js and staff-list.js (apiFetch, escapeHtml, showToast,
 // slExport, slToggleMenu, uiConfirm, stuProfile, stuClassHistory…).
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const PF_RELATIONS = ['Father', 'Mother', 'Stepfather', 'Stepmother', 'Guardian', 'Grandfather', 'Grandmother', 'Uncle', 'Aunt', 'Brother', 'Sister', 'Spouse', 'Sponsor', 'Other'];
 const PF_TITLES = ['Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Prof', 'Rev', 'Engr', 'Chief', 'Barrister', 'Alhaji', 'Alhaja'];
 let pfParents = null;
@@ -283,17 +290,17 @@ function pfValidEmail(prefix) {
 function pfSlot(slot, label, required, preset) {
   return `<div class="pf-slot" id="pf-slot-${slot}" data-mode="${preset ? 'existing' : 'new'}" ${preset ? `data-existing="${preset.id}"` : ''}>
     <div class="pf-slot-head"><h3 class="sf-section-title" style="margin:0;">${label}${required ? ' *' : ''}</h3>
-      <div class="pf-seg"><button type="button" class="${preset ? '' : 'active'}" onclick="pfSlotMode('${slot}','new')">Create New Parent</button><button type="button" class="${preset ? 'active' : ''}" onclick="pfSlotMode('${slot}','existing')">Search Existing Parent</button></div></div>
+      <div class="pf-seg"><button type="button" class="${preset ? '' : 'active'}" onclick="pfSlotMode(${jsArg(slot)},'new')">Create New Parent</button><button type="button" class="${preset ? 'active' : ''}" onclick="pfSlotMode(${jsArg(slot)},'existing')">Search Existing Parent</button></div></div>
     <div class="pf-slot-new" ${preset ? 'hidden' : ''}>${pfParentFields(`pf-${slot}`, {}, required)}</div>
     <div class="pf-slot-existing" ${preset ? '' : 'hidden'}>
       <div class="pf-picked" id="pf-${slot}-picked">${preset ? pfPickedHtml(slot, preset) : ''}</div>
-      <div class="pf-search-wrap" ${preset ? 'hidden' : ''}><input class="field-input" id="pf-${slot}-q" placeholder="Search by name, email or phone" oninput="pfSearchParents('${slot}', this.value)"><div class="pf-results" id="pf-${slot}-results"></div></div>
+      <div class="pf-search-wrap" ${preset ? 'hidden' : ''}><input class="field-input" id="pf-${slot}-q" placeholder="Search by name, email or phone" oninput="pfSearchParents(${jsArg(slot)}, this.value)"><div class="pf-results" id="pf-${slot}-results"></div></div>
     </div>
   </div>`;
 }
 function pfPickedHtml(slot, p) {
   return `<div class="pf-picked-card"><b>${escapeHtml(pfName(p))}</b> <span class="staff-table-sub">${escapeHtml([pfRelation(p), p.email, p.phone].filter(Boolean).join(' · '))}</span>
-    <button type="button" class="sf-add-new" onclick="pfUnpick('${slot}')">Change</button></div>`;
+    <button type="button" class="sf-add-new" onclick="pfUnpick(${jsArg(slot)})">Change</button></div>`;
 }
 function pfSlotMode(slot, mode) {
   const el = document.getElementById(`pf-slot-${slot}`);
@@ -382,7 +389,7 @@ function openViewFamily(id) {
     <h3 class="sf-section-title">Wards (${f.wards.length})</h3>
     ${f.wards.length ? `<div class="fam-cards">${f.wards.map(w => `<div class="fam-card">
       <div class="fam-card-top"><span class="sl-avatar sl-avatar-initials">${escapeHtml(pfInitials(w.name))}</span><div><b>${escapeHtml(w.name)}</b><div class="staff-table-sub">${escapeHtml([w.regNo || w.id, w.classLabel].filter(Boolean).join(' · '))}</div>${pfStatusPill(w)}${w.accountActive ? '' : ' <span class="pf-pill pf-pill-out">Account off</span>'}</div></div>
-      <div class="pf-links"><button type="button" class="sf-add-new" onclick="stuClassHistory('${escapeHtml(w.id)}', '${escapeHtml(w.name).replace(/'/g, '&#39;')}')">Class History</button><button type="button" class="sf-add-new" onclick="stuProfile('${escapeHtml(w.id)}')">View Profile</button><button type="button" class="sf-add-new" onclick="pfCloseModal();stuGoToProfile('${escapeHtml(w.id)}')">Go to Profile Page</button></div>
+      <div class="pf-links"><button type="button" class="sf-add-new" onclick="stuClassHistory(${jsArg(w.id)}, ${jsArg(w.name)})">Class History</button><button type="button" class="sf-add-new" onclick="stuProfile(${jsArg(w.id)})">View Profile</button><button type="button" class="sf-add-new" onclick="pfCloseModal();stuGoToProfile(${jsArg(w.id)})">Go to Profile Page</button></div>
     </div>`).join('')}</div>` : '<p class="staff-table-sub">No wards linked yet.</p>'}
     <h3 class="sf-section-title">Parents (${f.parents.length})</h3>
     <div class="fam-cards">${f.parents.map(p => `<div class="fam-card"><div class="fam-card-top"><span class="sl-avatar sl-avatar-initials">${escapeHtml(pfInitials(p.fullName))}</span><div><b>${escapeHtml(pfName(p))}</b> <span class="pf-pill pf-pill-rel">${escapeHtml(pfRelation(p) || 'Parent')}</span>
@@ -398,7 +405,7 @@ function openManageFamily(id) {
   pfModal(`Manage Family Members — ${escapeHtml(f.name)}`, `
     <table class="staff-table pf-members"><thead><tr><th>Name</th><th>Member</th><th>Action</th></tr></thead><tbody>
       ${f.parents.map(p => `<tr><td>${escapeHtml(pfName(p))}</td><td>${escapeHtml(pfRelation(p) || 'Parent')}</td><td>${f.parents.length > 1 ? `<button type="button" class="del-btn" onclick="pfRemoveParent(${f.id}, ${p.id})">Remove</button>` : '<span class="staff-table-sub">Only parent</span>'}</td></tr>`).join('')}
-      ${f.wards.map(w => `<tr><td>${escapeHtml(w.name)} <span class="staff-table-sub">${escapeHtml(w.classLabel)}</span></td><td>Ward</td><td><button type="button" class="del-btn" onclick="pfUnlinkWard(${f.id}, '${escapeHtml(w.id)}')">Unlink</button></td></tr>`).join('')}
+      ${f.wards.map(w => `<tr><td>${escapeHtml(w.name)} <span class="staff-table-sub">${escapeHtml(w.classLabel)}</span></td><td>Ward</td><td><button type="button" class="del-btn" onclick="pfUnlinkWard(${f.id}, ${jsArg(w.id)})">Unlink</button></td></tr>`).join('')}
     </tbody></table>
     <h3 class="sf-section-title">Link Ward / Student(s)</h3>
     <input class="field-input" id="pf-ward-q" placeholder="Search pupils by name, Reg. No. or class" oninput="pfSearchWards(${f.id}, this.value)">
@@ -420,7 +427,7 @@ function pfSearchWards(familyId, q) {
     const fam = famOf.get(s.id);
     const here = fam?.id === familyId;
     return `<div class="pf-result pf-result-row"><span><b>${escapeHtml(s.name)}</b> <span class="staff-table-sub">${escapeHtml([s.regNo || s.id, classLabel(s.classCode)].filter(Boolean).join(' · '))}${fam && !here ? ` · now in ${escapeHtml(fam.name)}` : ''}</span></span>
-      ${here ? '<span class="staff-table-sub">Already in this family</span>' : `<button type="button" class="post-btn" onclick="pfLinkWard(${familyId}, '${escapeHtml(s.id)}', ${fam ? `'${escapeHtml(fam.name).replace(/'/g, '&#39;')}'` : 'null'})">${fam ? 'Move here' : 'Add'}</button>`}</div>`;
+      ${here ? '<span class="staff-table-sub">Already in this family</span>' : `<button type="button" class="post-btn" onclick="pfLinkWard(${familyId}, ${jsArg(s.id)}, ${fam ? jsArg(fam.name) : 'null'})">${fam ? 'Move here' : 'Add'}</button>`}</div>`;
   }).join('') : '<div class="staff-table-sub" style="padding:8px;">No pupil found.</div>';
 }
 async function pfLinkWard(familyId, studentId, fromFamily) {
@@ -556,7 +563,7 @@ function openFamilyAdvancedExport() {
   pfModal('Advanced Families Export', `
     <p class="oc-text" style="margin:0 0 10px;">Tick the columns to export. The export follows the families showing now (filters and search apply).</p>
     <div class="ae-field-tools"><button type="button" class="btn-outline" onclick="fmExportKeys=FM_EXPORT_FIELDS.map(f=>f[0]);openFamilyAdvancedExport()">Select All</button><button type="button" class="btn-outline" onclick="fmExportKeys=[];openFamilyAdvancedExport()">Deselect All</button></div>
-    <div class="ae-group-fields" style="padding-left:0;">${FM_EXPORT_FIELDS.map(([k, l]) => `<label class="sf-check"><input type="checkbox" ${fmExportKeys.includes(k) ? 'checked' : ''} onchange="fmExportKeys=fmExportKeys.filter(x=>x!=='${k}');if(this.checked)fmExportKeys.push('${k}')"> ${escapeHtml(l)}</label>`).join('')}</div>
+    <div class="ae-group-fields" style="padding-left:0;">${FM_EXPORT_FIELDS.map(([k, l]) => `<label class="sf-check"><input type="checkbox" ${fmExportKeys.includes(k) ? 'checked' : ''} onchange="fmExportKeys=fmExportKeys.filter(x=>x!==${jsArg(k)});if(this.checked)fmExportKeys.push(${jsArg(k)})"> ${escapeHtml(l)}</label>`).join('')}</div>
     <div class="sf-grid sf-grid-2" style="margin-top:14px;">
       <div><label class="field-label" for="fm-ae-file">File name</label><input class="field-input" id="fm-ae-file" value="families-export"></div>
       <div><label class="field-label" for="fm-ae-format">Format</label><select class="ctrl-select" id="fm-ae-format"><option value="xlsx">Excel (.xlsx)</option><option value="xls">Excel 97–2003 (.xls)</option><option value="csv">CSV (.csv)</option><option value="doc">Word (.doc)</option></select></div>

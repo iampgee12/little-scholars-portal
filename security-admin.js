@@ -1,6 +1,13 @@
 // Admin → Security & Activity Log: overview, activity log, who is signed in,
 // and backups. Server side: security.js (/api/admin/security/…).
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const SEC = { view: 'overview', log: { q: '', from: '', to: '', outcome: '', page: 1 } };
 
 const secEsc = v => escapeHtml(v ?? '');
@@ -16,7 +23,7 @@ function secInit() {
   if (!root) return;
   root.innerHTML = `<div class="en-tabs">
       ${[['overview', 'Overview'], ['log', 'Activity Log'], ['sessions', 'Who Is Signed In'], ['backups', 'Backups']]
-        .map(([k, l]) => `<button class="en-tab${SEC.view === k ? ' active' : ''}" onclick="SEC.view='${k}'; secInit()">${l}</button>`).join('')}
+        .map(([k, l]) => `<button class="en-tab${SEC.view === k ? ' active' : ''}" onclick="SEC.view=${jsArg(k)}; secInit()">${l}</button>`).join('')}
     </div><div id="sec-body"><div class="sr-empty">Loading…</div></div>`;
   ({ overview: secOverview, log: secLog, sessions: secSessions, backups: secBackups }[SEC.view])();
 }
@@ -119,7 +126,7 @@ async function secSessions() {
     <div class="spf-table-wrap"><table class="data-table"><thead><tr><th>Person</th><th>Role</th><th>Signed in</th><th>Last active</th><th>IP / Device</th><th></th></tr></thead><tbody>
       ${d.sessions.length ? d.sessions.map(s => `<tr><td><strong>${secEsc(s.name)}</strong><div class="en-hint">${secEsc(s.userId)}</div></td><td style="text-transform:capitalize">${secEsc(s.role)}</td>
         <td>${secWhen(s.createdAt)}</td><td>${secWhen(s.lastSeen)}</td><td class="stu-mono">${secEsc(s.ip || '')}<div class="en-hint">${secEsc(s.device || '')}</div></td>
-        <td>${s.current ? '<span class="sr-pill accepted">This is you</span>' : `<button class="btn-outline btn-sm" onclick="secEnd({ref:'${s.ref}'}, 'End this sign-in?')">Sign out</button>`}</td></tr>`).join('') : '<tr><td colspan="6" class="sr-empty">No one is signed in</td></tr>'}
+        <td>${s.current ? '<span class="sr-pill accepted">This is you</span>' : `<button class="btn-outline btn-sm" onclick="secEnd({ref:${jsArg(s.ref)}}, 'End this sign-in?')">Sign out</button>`}</td></tr>`).join('') : '<tr><td colspan="6" class="sr-empty">No one is signed in</td></tr>'}
     </tbody></table></div>`);
 }
 

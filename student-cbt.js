@@ -1,4 +1,11 @@
 // On the exam server this page is /student itself and there is no portal to go back to
+
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
 if (location.pathname === '/student') document.getElementById('cbt-back-portal')?.remove();
 
 async function apiFetch(url, options = {}) {
@@ -188,7 +195,7 @@ function renderTrialList() {
         <div class="cbt-muted">${escapeHtml(e.classLabel)}${e.scheduleTitle ? ` · ${escapeHtml(e.scheduleTitle)}` : ''}${e.lastScore !== null && e.lastScore !== undefined ? ` · Last try: ${e.lastScore} / ${e.lastTotal}` : ''}</div>
         <div class="cbt-facts">${facts.map(f => `<span class="cbt-fact">${f}</span>`).join('')}</div>
         <div class="cbt-exam-card-foot">${e.questionCount > 0
-          ? `<button class="cbt-btn cbt-btn-block cbt-btn-green" onclick="openLobby('${escapeHtml(String(e.id))}')">${e.attemptStatus === 'in_progress' ? 'Continue' : 'Try it'}</button>`
+          ? `<button class="cbt-btn cbt-btn-block cbt-btn-green" onclick="openLobby(${jsArg(String(e.id))})">${e.attemptStatus === 'in_progress' ? 'Continue' : 'Try it'}</button>`
           : '<span class="cbt-muted">No questions have been added yet.</span>'}</div>
       </div>`;
     }).join('')}</div>`).join('');
@@ -279,7 +286,7 @@ function openLobby(id) {
       </ol>
       <div class="cbt-lobby-actions">
         <button class="cbt-btn cbt-btn-secondary" onclick="showListView()">Back</button>
-        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam('${escapeHtml(String(e.id))}', this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
+        <button class="cbt-btn cbt-btn-green" id="cbt-begin-btn" onclick="beginExam(${jsArg(String(e.id))}, this)">${resuming ? 'Continue Exam' : 'Begin Exam'}</button>
       </div>
     </div>`;
   showOnly('cbt-lobby-view');

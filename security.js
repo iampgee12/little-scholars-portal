@@ -413,8 +413,24 @@ module.exports = function createSecurity(ctx) {
   }
 
   // ── Browser security headers ──────────────────────────────────────────
+  // <script> blocks: only the site's own files and its own few inline scripts (by fingerprint),
+  // so an injected <script> can't run. Inline click handlers (onclick=…) are still allowed;
+  // browsers without script-src-elem fall back to script-src.
+  const inlineScriptHashes = (() => {
+    const hashes = new Set();
+    try {
+      for (const file of fs.readdirSync(__dirname).filter(f => f.endsWith('.html'))) {
+        const html = fs.readFileSync(path.join(__dirname, file), 'utf8');
+        for (const m of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)) {
+          hashes.add(`'sha256-${crypto.createHash('sha256').update(m[1], 'utf8').digest('base64')}'`);
+        }
+      }
+    } catch { /* none found: only script files then */ }
+    return [...hashes].join(' ');
+  })();
   const CSP = [
-    "default-src 'self'", "script-src 'self' 'unsafe-inline'", "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "default-src 'self'", "script-src 'self' 'unsafe-inline'", `script-src-elem 'self' ${inlineScriptHashes}`.trim(), "script-src-attr 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:", "img-src 'self' data: blob:", "connect-src 'self'", "frame-src 'self' blob:",
     "object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'self'",
   ].join('; ');

@@ -2,6 +2,13 @@
 // Students, Self Registration) and People → Self Registration (management).
 // Server side: enrol-api.js.
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const EN = {
   meta: null,          // families, sessions, tags, next reg no
   tab: 'enroll',
@@ -75,7 +82,7 @@ function enrolRenderShell() {
       ${[['enroll', 'Enroll a Student', '<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M2 14c0-3 2.7-5 6-5"/><line x1="12" y1="9" x2="12" y2="14"/><line x1="9.5" y1="11.5" x2="14.5" y2="11.5"/>'],
          ['bulk', 'Bulk Enroll Students', '<path d="M8 11V2"/><polyline points="4.5 5.5 8 2 11.5 5.5"/><path d="M2 11v2.5h12V11"/>'],
          ['self', 'Self Registration', '<circle cx="6.5" cy="5" r="2.5"/><path d="M2 14c0-2.5 2-4.5 4.5-4.5"/><path d="M10 12.5l1.5 1.5 3-3.5"/>']]
-        .map(([key, label, icon]) => `<button class="en-tab${EN.tab === key ? ' active' : ''}" onclick="enrolShowTab('${key}')"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>${label}</button>`).join('')}
+        .map(([key, label, icon]) => `<button class="en-tab${EN.tab === key ? ' active' : ''}" onclick="enrolShowTab(${jsArg(key)})"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>${label}</button>`).join('')}
     </div>`;
   root.innerHTML = `${tabs}<div id="en-body"></div>`;
   if (EN.tab === 'enroll') enrolRenderWizard();
@@ -91,7 +98,7 @@ function enInput(id, value = '', attrs = '') {
   return `<input class="field-input" id="${id}" value="${enrolEsc(value)}" ${attrs}>`;
 }
 function enCaseInput(id, value = '', attrs = '') {
-  return `<div class="en-case-wrap">${enInput(id, value, attrs)}<button type="button" class="en-case-btn" title="Toggle case" onclick="enrolToggleCase('${id}')">Aa</button></div>`;
+  return `<div class="en-case-wrap">${enInput(id, value, attrs)}<button type="button" class="en-case-btn" title="Toggle case" onclick="enrolToggleCase(${jsArg(id)})">Aa</button></div>`;
 }
 function enCheck(id, label, checked, onchange = '') {
   return `<label class="en-check"><input type="checkbox" id="${id}"${checked ? ' checked' : ''}${onchange ? ` onchange="${onchange}"` : ''}> ${enrolEsc(label)}</label>`;
@@ -664,7 +671,7 @@ async function sregOpen(view = 'dashboard') {
   const root = document.getElementById('sr-root');
   if (!root) return;
   const tabs = [['dashboard', 'Dashboard'], ['student', 'Students'], ['parent', 'Parents'], ['staff', 'Staff'], ['settings', 'Settings']];
-  root.innerHTML = `<div class="en-tabs">${tabs.map(([k, l]) => `<button class="en-tab${view === k ? ' active' : ''}" onclick="sregOpen('${k}')">${l}</button>`).join('')}</div><div id="sr-body"></div>`;
+  root.innerHTML = `<div class="en-tabs">${tabs.map(([k, l]) => `<button class="en-tab${view === k ? ' active' : ''}" onclick="sregOpen(${jsArg(k)})">${l}</button>`).join('')}</div><div id="sr-body"></div>`;
   const body = document.getElementById('sr-body');
   if (view === 'dashboard') return sregDashboard(body);
   if (view === 'settings') return sregSettings(body);
@@ -678,7 +685,7 @@ async function sregDashboard(body) {
     const pending = kind => counts.filter(c => c.kind === kind && c.status === 'pending').reduce((a, c) => a + c.n, 0);
     const card = (kind, title) => `<div class="card sr-dash-card"><div class="card-body">
       <div class="sr-dash-title">${title}</div><div class="sr-dash-sub">${pending(kind)} Pending Submission${pending(kind) === 1 ? '' : 's'}</div>
-      <button class="post-btn btn-sm" onclick="sregOpen('${kind}')">View Submissions</button></div></div>`;
+      <button class="post-btn btn-sm" onclick="sregOpen(${jsArg(kind)})">View Submissions</button></div></div>`;
     body.innerHTML = `<div class="sr-dash">${card('student', 'Student Registrations')}${card('parent', 'Parent Registrations')}${card('staff', 'Staff Registrations')}</div>`;
   } catch (err) { body.innerHTML = `<div class="card"><div class="card-body">${enrolEsc(err.message)}</div></div>`; }
 }
@@ -693,7 +700,7 @@ async function sregRenderList(body, kind, fromEnrol) {
   body.innerHTML = `<div class="card"><div class="card-head"><span class="card-title">Self Registration${kind === 'student' ? '' : ` — ${kind === 'parent' ? 'Parents' : 'Staff'}`}</span>
       <button class="btn-outline btn-sm" onclick="${fromEnrol ? "switchTab('selfRegistration', document.querySelector('[data-tab=selfRegistration]')); sregOpen('settings')" : "sregOpen('settings')"}">Settings</button></div>
     <div class="card-body">
-      <div class="sr-status">${statuses.map(([k, l]) => `<button class="sr-status-btn${EN.sr.status === k ? ' active' : ''}" onclick="EN.sr.status='${k}'; sregLoad()" title="${k === 'bypassed' ? 'Submissions from someone already registered with the school (same email)' : ''}">${k === 'bypassed' ? '&#9888; ' : ''}${l}</button>`).join('')}</div>
+      <div class="sr-status">${statuses.map(([k, l]) => `<button class="sr-status-btn${EN.sr.status === k ? ' active' : ''}" onclick="EN.sr.status=${jsArg(k)}; sregLoad()" title="${k === 'bypassed' ? 'Submissions from someone already registered with the school (same email)' : ''}">${k === 'bypassed' ? '&#9888; ' : ''}${l}</button>`).join('')}</div>
       <div class="sr-filters">
         <label>From <input type="date" class="field-input" id="sr-from" value="${EN.sr.from}" onchange="EN.sr.from=this.value; sregPaint()"></label>
         <label>To <input type="date" class="field-input" id="sr-to" value="${EN.sr.to}" onchange="EN.sr.to=this.value; sregPaint()"></label>
@@ -880,7 +887,7 @@ async function sregSettings(body) {
   const origin = location.origin;
   const toggle = (id, on) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" id="${id}" onclick="this.classList.toggle('on'); this.classList.toggle('off'); this.firstElementChild.textContent = this.classList.contains('on') ? 'ON' : 'OFF'"><span>${on ? 'ON' : 'OFF'}</span></button>`;
   const codeRow = (label, sub, code, which, link) => `<div class="sr-code"><div class="field-label">${label}</div><div class="en-hint">${sub}</div>
-      <div class="sr-code-row"><input class="field-input" readonly value="${enrolEsc(code || '(Not generated yet)')}"><button class="btn-outline btn-sm" onclick="sregRegenerate('${which}')">&#8635; Regenerate</button></div></div>
+      <div class="sr-code-row"><input class="field-input" readonly value="${enrolEsc(code || '(Not generated yet)')}"><button class="btn-outline btn-sm" onclick="sregRegenerate(${jsArg(which)})">&#8635; Regenerate</button></div></div>
     <div class="sr-code"><div class="field-label">${link[0]}</div><div class="en-hint">${link[1]}</div>
       <div class="sr-code-row"><input class="field-input" readonly id="sr-link-${which}" value="${enrolEsc(link[2])}"><button class="btn-outline btn-sm" onclick="sregCopy('sr-link-${which}')">Copy link</button></div></div>`;
   body.innerHTML = `<div class="sr-settings">
@@ -952,10 +959,10 @@ function sregFieldsModal(kind) {
     const f = s.fields[key] || {};
     const head = group !== lastGroup ? `<tr class="sr-group"><td colspan="3">${enrolEsc(group)}</td></tr>` : '';
     lastGroup = group;
-    const sw = (prop, on, disabled) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" ${disabled ? 'disabled title="This field cannot be hidden"' : ''} onclick="sregFieldToggle('${kind}', '${key}', '${prop}', this)"><span>${on ? 'ON' : 'OFF'}</span></button>${disabled ? ' <span class="sr-lock" title="Locked">&#128274;</span>' : ''}`;
+    const sw = (prop, on, disabled) => `<button type="button" class="rsp-toggle ${on ? 'on' : 'off'}" ${disabled ? 'disabled title="This field cannot be hidden"' : ''} onclick="sregFieldToggle(${jsArg(kind)}, ${jsArg(key)}, ${jsArg(prop)}, this)"><span>${on ? 'ON' : 'OFF'}</span></button>${disabled ? ' <span class="sr-lock" title="Locked">&#128274;</span>' : ''}`;
     return `${head}<tr><td>${enrolEsc(label)}</td><td>${sw('show', f.show, locked)}</td><td>${sw('required', f.required, locked)}</td></tr>`;
   }).join('');
-  const setting = (prop, label, sub) => `<div class="sr-set-row"><div><strong>${label}</strong><div class="en-hint">${sub}</div></div><button type="button" class="rsp-toggle ${s[prop] ? 'on' : 'off'}" onclick="sregFlagToggle('${kind}', '${prop}', this)"><span>${s[prop] ? 'ON' : 'OFF'}</span></button></div>`;
+  const setting = (prop, label, sub) => `<div class="sr-set-row"><div><strong>${label}</strong><div class="en-hint">${sub}</div></div><button type="button" class="rsp-toggle ${s[prop] ? 'on' : 'off'}" onclick="sregFlagToggle(${jsArg(kind)}, ${jsArg(prop)}, this)"><span>${s[prop] ? 'ON' : 'OFF'}</span></button></div>`;
   const modal = document.createElement('div');
   modal.className = 'en-modal';
   modal.style.display = 'flex';

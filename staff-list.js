@@ -4,6 +4,13 @@
 // site's own style. Uses helpers from admin-api.js (state, apiFetch,
 // escapeHtml, showToast, staffCategory, staffAssignments, accountStatusToggle…).
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 const SL_TYPES = [
   'Teacher', 'Accountant/Bursary Officer', 'Librarian', 'Registrar', 'Transport Manager',
   'Hostel Manager', 'Store Manager', 'General Staff / Others',
@@ -173,7 +180,7 @@ function slRenderCards() {
   const counts = { 'All Staff': pool.length };
   pool.forEach(s => { const c = staffCategory(s); counts[c] = (counts[c] || 0) + 1; });
   wrap.innerHTML = ['All Staff', ...SL_TYPES].map(type => `
-    <button type="button" class="staff-summary-card ${type === 'All Staff' ? '' : SL_CARD_STYLE[type]} ${slView.type === type ? 'active' : ''}" onclick="slSetType('${escapeHtml(type)}')" title="Show ${escapeHtml(type)}">
+    <button type="button" class="staff-summary-card ${type === 'All Staff' ? '' : SL_CARD_STYLE[type]} ${slView.type === type ? 'active' : ''}" onclick="slSetType(${jsArg(type)})" title="Show ${escapeHtml(type)}">
       <span class="staff-summary-icon">${staffFilterIcon(type)}</span>
       <div><div class="staff-summary-count">${counts[type] || 0}</div><div class="staff-summary-label">${escapeHtml(type).replace(/\//g, '/<wbr>')}</div></div>
     </button>`).join('');
@@ -202,7 +209,7 @@ function populateStaff() {
       (staff.employmentStatus || 'Active') !== 'Active' ? `<span class="sl-badge sl-badge-warn">${escapeHtml(staff.employmentStatus)}</span>` : '',
     ].join('');
     return `<tr class="${slView.selected.has(staff.id) ? 'sl-row-selected' : ''}">
-      <td class="sl-check"><input type="checkbox" aria-label="Select ${escapeHtml(staff.name)}" ${slView.selected.has(staff.id) ? 'checked' : ''} onchange="slToggleOne('${escapeHtml(staff.id)}', this.checked)"></td>
+      <td class="sl-check"><input type="checkbox" aria-label="Select ${escapeHtml(staff.name)}" ${slView.selected.has(staff.id) ? 'checked' : ''} onchange="slToggleOne(${jsArg(staff.id)}, this.checked)"></td>
       <td class="staff-index">${start + i + 1}</td>
       <td>
         <div class="sl-name-cell">${slAvatar(staff)}<div>
@@ -214,7 +221,7 @@ function populateStaff() {
       <td><span class="staff-type-pill">${escapeHtml(typeLabel)}</span></td>
       <td><div class="staff-designation">${escapeHtml(designation)}</div></td>
       <td class="staff-phone">${escapeHtml(staff.phone || '-')}</td>
-      <td><button class="staff-profile-btn" title="Open staff profile" onclick="openStaffProfile('${escapeHtml(staff.id)}')">...</button></td>
+      <td><button class="staff-profile-btn" title="Open staff profile" onclick="openStaffProfile(${jsArg(staff.id)})">...</button></td>
       <td>${staff.canSignIn === false ? '<span class="staff-table-sub">No login</span>' : staff.id === state.user.id ? '<span class="staff-status-on">ON</span>' : canManageAccount(staff) ? accountStatusToggle(staff.id, staff.active) : `<span class="${staff.active ? 'staff-status-on' : 'staff-table-sub'}" title="Only a higher admin can change this account">${staff.active ? 'ON' : 'OFF'}</span>`}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="8" class="sl-empty">No staff match these filters.</td></tr>';
@@ -501,8 +508,8 @@ function aeRenderFields() {
     const fields = SL_FIELDS.filter(f => f.group === group && (!q || f.label.toLowerCase().includes(q)));
     if (!fields.length) return '';
     const allOn = fields.every(f => ae.fields.includes(f.key));
-    return `<div class="ae-group"><label class="ae-group-title"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="aeToggleGroup('${escapeHtml(group)}', this.checked)"> ${escapeHtml(group)}</label>
-      <div class="ae-group-fields">${fields.map(f => `<label class="sf-check"><input type="checkbox" ${ae.fields.includes(f.key) ? 'checked' : ''} onchange="aeToggleField('${f.key}', this.checked)"> ${escapeHtml(f.label)}</label>`).join('')}</div></div>`;
+    return `<div class="ae-group"><label class="ae-group-title"><input type="checkbox" ${allOn ? 'checked' : ''} onchange="aeToggleGroup(${jsArg(group)}, this.checked)"> ${escapeHtml(group)}</label>
+      <div class="ae-group-fields">${fields.map(f => `<label class="sf-check"><input type="checkbox" ${ae.fields.includes(f.key) ? 'checked' : ''} onchange="aeToggleField(${jsArg(f.key)}, this.checked)"> ${escapeHtml(f.label)}</label>`).join('')}</div></div>`;
   }).join('') || '<p class="sf-hint">No fields match.</p>';
 }
 
@@ -547,7 +554,7 @@ function aeRenderOrder() {
     <div class="ae-order-row">
       <span class="ae-order-n">${i + 1}</span>
       <span class="ae-order-name">${escapeHtml(SL_FIELD[key].label)}</span>
-      <input class="field-input" value="${escapeHtml(ae.labels[key] || SL_FIELD[key].label)}" aria-label="Column heading for ${escapeHtml(SL_FIELD[key].label)}" oninput="ae.labels['${key}']=this.value">
+      <input class="field-input" value="${escapeHtml(ae.labels[key] || SL_FIELD[key].label)}" aria-label="Column heading for ${escapeHtml(SL_FIELD[key].label)}" oninput="ae.labels[${jsArg(key)}]=this.value">
       <button type="button" class="btn-outline" ${i === 0 ? 'disabled' : ''} onclick="aeMove(${i},-1)" aria-label="Move up">&uarr;</button>
       <button type="button" class="btn-outline" ${i === ae.fields.length - 1 ? 'disabled' : ''} onclick="aeMove(${i},1)" aria-label="Move down">&darr;</button>
     </div>`).join('');

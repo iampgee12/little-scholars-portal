@@ -5,6 +5,13 @@
 //   RR.classLabel(code), RR.sessionLabel(), RR.openTab(tab)
 //   RR.onBroadsheetLoaded(data)  optional hook (Publish buttons, status, lock)
 
+// A value for inline click code: a JS string literal, made safe for the HTML attribute, so names with
+// apostrophes (O'Brien) or crafted text can't end the string and run as code
+function jsArg(value) {
+  return JSON.stringify(String(value ?? '')).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+
 // Bulk result viewer: every pupil in the class, each with a live HTML copy of
 // their report sheet (same data and layout as the printed PDF, built from
 // …/reports/class-sheets) and its own actions — mirrors the
@@ -71,13 +78,13 @@ function crcRowHtml(sheet) {
     </div>
     <div class="crc-actions">
       <div class="crc-who"><strong>${escapeHtml(sheet.name)}</strong><span>${id}${sheet.hasResults && st ? ` · Position ${escapeHtml(String(st.position))}` : ''}</span></div>
-      ${isAdmin ? `<button class="crc-act" onclick="crcAnalysis('${id}')" ${off}>Result Analysis</button>` : ''}
-      <button class="crc-act" onclick="crcPrint('${id}', this)" ${off}>Print Result</button>
+      ${isAdmin ? `<button class="crc-act" onclick="crcAnalysis(${jsArg(id)})" ${off}>Result Analysis</button>` : ''}
+      <button class="crc-act" onclick="crcPrint(${jsArg(id)}, this)" ${off}>Print Result</button>
       <div class="crc-dd">
         <button class="crc-act" onclick="crcToggleDd(this)" ${off}>Get as PDF &#x25BE;</button>
         <div class="crc-dd-menu">
-          <button onclick="crcViewPdf('${id}')">View PDF</button>
-          <button onclick="crcDownloadPdf('${id}')">Download PDF</button>
+          <button onclick="crcViewPdf(${jsArg(id)})">View PDF</button>
+          <button onclick="crcDownloadPdf(${jsArg(id)})">Download PDF</button>
         </div>
       </div>
       ${isAdmin ? crcAdminActionsHtml(id, parentEmail, off) : ''}
@@ -90,19 +97,19 @@ function crcAdminActionsHtml(id, parentEmail, off) {
         <button class="crc-act" onclick="crcToggleDd(this)" ${off}>Send to Email &#x25BE;</button>
         <div class="crc-dd-menu">
           ${parentEmail
-            ? `<button onclick="crcEmail('${id}', '')">To Parent / Guardian<small>${parentEmail}</small></button>`
+            ? `<button onclick="crcEmail(${jsArg(id)}, '')">To Parent / Guardian<small>${parentEmail}</small></button>`
             : '<button disabled>To Parent / Guardian<small>No parent email on file</small></button>'}
-          <button onclick="crcEmailOther('${id}')">To Other Email</button>
+          <button onclick="crcEmailOther(${jsArg(id)})">To Other Email</button>
         </div>
       </div>
       <div class="crc-dd">
         <button class="crc-act" onclick="crcToggleDd(this)" ${off}>To WhatsApp &#x25BE;</button>
         <div class="crc-dd-menu">
-          <button onclick="crcWhatsApp('${id}', '')">Send from My Phone / Device</button>
-          <button onclick="crcWhatsAppOther('${id}')">To Other WhatsApp Number</button>
+          <button onclick="crcWhatsApp(${jsArg(id)}, '')">Send from My Phone / Device</button>
+          <button onclick="crcWhatsAppOther(${jsArg(id)})">To Other WhatsApp Number</button>
         </div>
       </div>
-      <button class="crc-act" onclick="crcFees('${id}')">Student's Fees</button>`;
+      <button class="crc-act" onclick="crcFees(${jsArg(id)})">Student's Fees</button>`;
 }
 
 // ── On-screen report sheet ──
@@ -350,7 +357,7 @@ function renderBroadsheetPills(data) {
   if (!bar) return;
   bar.innerHTML = (data.subjects||[]).map(s=>{
     const label = s.name.length>13 ? s.name.slice(0,12)+'…' : s.name;
-    return `<span class="bs-pill" title="${s.name}">${label}</span>`;
+    return `<span class="bs-pill" title="${escapeHtml(s.name)}">${escapeHtml(label)}</span>`;
   }).join('');
 }
 
@@ -395,7 +402,7 @@ function renderBroadsheetTable(data) {
       `<option value="${escapeHtml(c.text)}" ${c.text === current ? 'selected' : ''}>${escapeHtml(c.text.length > 60 ? c.text.slice(0,60)+'…' : c.text)}</option>`
     ).join('');
     const saveFn = who === 'teacher' ? 'saveTeacherRemark' : 'saveHeadComment';
-    return `<select class="bs-remark-select" id="bs-${who}-remark-${escapeHtml(studentId)}" data-student-id="${escapeHtml(studentId)}" onchange="${saveFn}('${escapeHtml(studentId)}', this)" ${who === 'teacher' && data.published ? 'disabled' : ''}>
+    return `<select class="bs-remark-select" id="bs-${who}-remark-${escapeHtml(studentId)}" data-student-id="${escapeHtml(studentId)}" onchange="${saveFn}(${jsArg(studentId)}, this)" ${who === 'teacher' && data.published ? 'disabled' : ''}>
       ${!current ? '<option value="">- Select Preset Comment -</option>' : ''}
       ${customOption}${bankOptions}
     </select>`;
@@ -538,18 +545,18 @@ function renderBroadsheetTable(data) {
       ${RR.role === 'teacher'
         ? `<td class="bs-remark-td">
         ${remarkSelectHtml(st.id, st.savedTeacherComment, 'teacher')}
-        <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested comment based on this pupil's score" onclick="autoFillTeacherRemark('${escapeHtml(st.id)}')" ${data.published ? 'disabled' : ''}>&#x21bb; Auto Remark</button>
+        <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested comment based on this pupil's score" onclick="autoFillTeacherRemark(${jsArg(st.id)})" ${data.published ? 'disabled' : ''}>&#x21bb; Auto Remark</button>
       </td>
       <td class="bs-remark-td" style="font-size:10px;color:var(--text-2);">${escapeHtml(st.headComment || '')}</td>`
         : `<td class="bs-remark-td" style="font-size:10px;color:var(--text-2);">${escapeHtml(st.teacherComment || '')}</td>
       <td class="bs-remark-td">
         ${remarkSelectHtml(st.id, st.headComment)}
-        <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested remark based on this student's score" onclick="autoFillHeadRemark('${escapeHtml(st.id)}')">&#x21bb; Auto Remark</button>
+        <button type="button" class="bs-auto-remark-btn" title="Fill with a suggested remark based on this student's score" onclick="autoFillHeadRemark(${jsArg(st.id)})">&#x21bb; Auto Remark</button>
       </td>`}
       <td style="text-align:center;"><button class="bs-preview-btn" title="Open Cognitive Skills Assessment" onclick="RR.openTab('cognitiveSkills')"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l7-3 7 3-7 3z"/><path d="M4 7.5V11c0 1 1.8 2 4 2s4-1 4-2V7.5"/></svg></button></td>
       <td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.dailyAttendance?.absent ?? 0}</td>
       <td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.total ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.present ?? 0}</td><td class="bs-att-cell" style="text-align:center;">${st.lessonAttendance?.absent ?? 0}</td>
-      <td style="text-align:center;"><button class="bs-preview-btn" title="Preview result" onclick="previewStudentReport('${escapeHtml(st.id)}')"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg></button></td>
+      <td style="text-align:center;"><button class="bs-preview-btn" title="Preview result" onclick="previewStudentReport(${jsArg(st.id)})"><svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg></button></td>
     </tr>`;
   });
 
@@ -638,7 +645,7 @@ function renderBroadsheetSummary(data) {
         <td style="text-align:center;">${item.total}</td>
         <td style="text-align:center;">${item.cnt}</td>
         <td style="text-align:center;font-weight:700;font-family:'DM Mono',monospace;">${item.avg}</td>
-        <td style="text-align:center;"><button class="bs-rank-btn" title="View ranking for ${escapeHtml(item.s.name)}" onclick="showSubjectRanking(${item.s.id}, '${escapeHtml(item.s.name)}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></td>
+        <td style="text-align:center;"><button class="bs-rank-btn" title="View ranking for ${escapeHtml(item.s.name)}" onclick="showSubjectRanking(${item.s.id}, ${jsArg(item.s.name)})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></td>
         <td style="color:#16a34a;font-size:11px;">${best ? `${escapeHtml(best.name)} (${best.score})` : '—'}</td>
         <td style="color:#dc2626;font-size:11px;">${worst && worst !== best ? `${escapeHtml(worst.name)} (${worst.score})` : '—'}</td>
         <td style="color:var(--text-3);">${teacherEntry}</td>
