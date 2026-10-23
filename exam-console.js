@@ -519,13 +519,13 @@ async function refreshTrial() {
 
   const open = d.papers.filter(p => p.trial).length;
   setHtml(document.getElementById('tr-papers'), `<div class="ec-card">
-    <div class="ec-flex"><h2>Papers for the trial</h2><div class="ec-actions"><button class="post-btn" onclick="trialPaper('all', true)">Trial on for all</button><button class="btn-outline" onclick="trialPaper('all', false)">Trial off for all</button></div></div>
+    <div class="ec-flex"><h2>Papers for the trial</h2><div class="ec-actions"><button class="post-btn" onclick="trialPaper('all', true)">Trial on for all</button><button class="btn-danger" onclick="trialPaper('all', false)">Trial off for all</button></div></div>
     <p class="ec-muted">${open} of ${d.papers.length} paper${d.papers.length === 1 ? '' : 's'} open for the trial.</p>
     <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Class</th><th>Subject</th><th>Questions</th><th>Trial</th><th></th></tr></thead><tbody>
     ${d.papers.map(p => `<tr><td>${esc(p.classLabel)}</td><td><b>${esc(p.subjectName)}</b><div class="ec-hint">${esc(p.scheduleTitle || '')}</div></td>
       <td>${p.questions}${p.questions ? '' : ' <span class="ec-pill bad">none</span>'}</td>
       <td><span class="ec-pill ${p.trial ? 'live' : 'muted'}">${p.trial ? 'Trial on' : 'Off'}</span></td>
-      <td class="ec-actions">${p.trial ? `<button class="btn-outline" onclick="trialPaper(${p.id}, false)">Trial off</button>` : `<button class="post-btn" onclick="trialPaper(${p.id}, true)">Trial on</button>`}</td></tr>`).join('')
+      <td class="ec-actions">${p.trial ? `<button class="btn-danger" onclick="trialPaper(${p.id}, false)">Trial off</button>` : `<button class="post-btn" onclick="trialPaper(${p.id}, true)">Trial on</button>`}</td></tr>`).join('')
       || '<tr><td colspan="5" class="ec-hint">No papers yet. Refresh CBT / Exams data first.</td></tr>'}
     </tbody></table></div></div>`);
 
