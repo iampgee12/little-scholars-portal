@@ -388,7 +388,7 @@ function openViewFamily(id) {
     <div class="fam-cards">${f.parents.map(p => `<div class="fam-card"><div class="fam-card-top"><span class="sl-avatar sl-avatar-initials">${escapeHtml(pfInitials(p.fullName))}</span><div><b>${escapeHtml(pfName(p))}</b> <span class="pf-pill pf-pill-rel">${escapeHtml(pfRelation(p) || 'Parent')}</span>
       <div class="staff-table-sub">${escapeHtml([p.phone, p.email].filter(Boolean).join(' · ') || 'No contact on file')}</div>${p.occupation ? `<div class="staff-table-sub">${escapeHtml(p.occupation)}</div>` : ''}${p.address ? `<div class="staff-table-sub">${escapeHtml(p.address)}</div>` : ''}</div></div>
       <div class="pf-links"><button type="button" class="sf-add-new" onclick="openParentProfile(${p.id}, true)">Edit Details</button></div></div>`).join('')}</div>`,
-    `<button type="button" class="btn-outline" onclick="pfCloseModal()">Close</button><button type="button" class="post-btn" onclick="openManageFamily(${f.id})">Manage Family Members</button>`, true);
+    `<button type="button" class="btn-outline btn-close" onclick="pfCloseModal()">Close</button><button type="button" class="post-btn" onclick="openManageFamily(${f.id})">Manage Family Members</button>`, true);
 }
 
 // ── Manage Family Members ──

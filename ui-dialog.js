@@ -93,7 +93,8 @@
       actions.className = 'ui-dialog-actions';
       const ok = document.createElement('button');
       ok.type = 'button';
-      ok.className = danger ? 'btn-danger' : 'post-btn';
+      // a notice's Close button is red, like every Close button
+      ok.className = danger ? 'btn-danger' : confirmLabel === 'Close' ? 'post-btn btn-close' : 'post-btn';
       ok.textContent = confirmLabel;
       if (kind !== 'notice') {
         const cancel = document.createElement('button');

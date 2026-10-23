@@ -155,7 +155,7 @@ function tsOpenSwitch() {
       <div><label class="field-label" for="ts-sw-end">Term End Date</label><input class="field-input" type="date" id="ts-sw-end" value="${escapeHtml(a.endDate || '')}"></div>
     </div>
     <p class="staff-table-sub" style="margin-top:6px;">Leave blank if the dates are not known yet. Switching also applies any form and subject teachers you've already carried forward to that session.</p>`,
-  '<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSwitch()">Switch Over</button>');
+  '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSwitch()">Switch Over</button>');
 }
 async function tsSwitch() {
   const body = { sessionLabel: tsVal('ts-sw-session'), termLabel: tsVal('ts-sw-term'), year: tsVal('ts-sw-year'), startDate: tsVal('ts-sw-start'), endDate: tsVal('ts-sw-end') };
@@ -180,7 +180,7 @@ function tsOpenPeriod(id) {
       <div><label class="field-label" for="ts-pd-start">Start Date <span class="sf-req">*</span></label><input class="field-input" type="date" id="ts-pd-start" value="${escapeHtml(p.startDate || '')}"></div>
       <div><label class="field-label" for="ts-pd-end">End Date <span class="sf-req">*</span></label><input class="field-input" type="date" id="ts-pd-end" value="${escapeHtml(p.endDate || '')}"></div>
     </div>`,
-  `<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSavePeriod(${id || 0})">Save Period</button>`);
+  `<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSavePeriod(${id || 0})">Save Period</button>`);
 }
 async function tsSavePeriod(id) {
   const body = { sessionLabel: tsVal('ts-pd-session'), termLabel: tsVal('ts-pd-term'), startDate: tsVal('ts-pd-start'), endDate: tsVal('ts-pd-end') };
@@ -201,7 +201,7 @@ function tsOpenSession(label) {
     <div class="ts-inline"><input class="field-input" type="number" id="ts-ss-start" value="${s ? s.startYear : next}" ${s ? 'disabled' : ''} oninput="document.getElementById('ts-ss-end').value=Number(this.value)+1"><span>–</span><input class="field-input" type="number" id="ts-ss-end" value="${s ? s.endYear : next + 1}" disabled></div>
     <label class="field-label" for="ts-ss-alias" style="margin-top:12px;">Session Name / Alias <span class="sf-hint">(if any — e.g. Summer, Batch A, Cohort 2)</span></label>
     <input class="field-input" id="ts-ss-alias" value="${escapeHtml(s?.alias || '')}">`,
-  `<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveSession(${s ? `'${escapeHtml(s.label)}'` : 'null'})">${s ? 'Save' : 'Add'}</button>`);
+  `<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveSession(${s ? `'${escapeHtml(s.label)}'` : 'null'})">${s ? 'Save' : 'Add'}</button>`);
 }
 async function tsSaveSession(label) {
   try {
@@ -216,7 +216,7 @@ async function tsDeleteSession(label) {
 }
 function tsOpenTerm() {
   tsModal('Add Term / Period', '<label class="field-label" for="ts-tm-name">Name <span class="sf-req">*</span></label><input class="field-input" id="ts-tm-name" placeholder="e.g. Summer Term">',
-    '<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveTerm()">Add</button>');
+    '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveTerm()">Add</button>');
 }
 async function tsSaveTerm() {
   try { await tsPost('/api/admin/term-setup/terms', { name: tsVal('ts-tm-name') }); tsClose(); showToast('Term added', 'success'); tsRenderSessions(); } catch (err) { showToast(err.message); }
@@ -348,7 +348,7 @@ async function tsOpenAllocHistory() {
         <td>${escapeHtml(h.fromSession || '')}<div class="staff-table-sub">${escapeHtml(h.fromClass || '')}</div></td><td>${escapeHtml(h.toSession || '')}<div class="staff-table-sub">${escapeHtml(h.toClass || '')}</div></td>
         <td>${tsWhen(h.doneAt)}</td><td>${escapeHtml(h.doneBy || '')}</td>
         <td class="pf-actions">${h.rolledBack < h.count ? `<button type="button" class="sf-add-new" onclick="tsAllocPartial(${h.id})">View Students / Partial Roll Back</button> <button type="button" class="sf-add-new ts-danger" onclick="tsRollback(${h.id})">Roll Back / Undo</button>` : '<span class="staff-table-sub">Rolled back</span>'}</td></tr>`).join('') || '<tr><td colspan="8" class="sl-empty">No allocations yet. Moves made on this page are listed here.</td></tr>'}
-    </tbody></table></div>`, '<button type="button" class="btn-outline" onclick="tsClose()">Close</button>', true);
+    </tbody></table></div>`, '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button>', true);
   } catch (err) { showToast(err.message); }
 }
 function tsAllocPartial(id) {
@@ -441,7 +441,7 @@ function tsOpenFormEdit(classCode, armId) {
     ${current ? `<h3 class="sf-section-title">Additional Options</h3>
     <label class="sf-check"><input type="checkbox" id="tsf-also"> Also assign this teacher to all subjects of this class arm <span class="sf-hint">(makes them the teacher in charge of each subject)</span></label>
     <label class="sf-check"><input type="checkbox" id="tsf-remove"> Remove the previous teacher from all subjects of this class arm <span class="sf-hint">(except subjects where they already have results saved)</span></label>` : ''}`,
-  `<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveForm('${escapeHtml(classCode)}', ${armId})">Save Allocation</button>`);
+  `<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveForm('${escapeHtml(classCode)}', ${armId})">Save Allocation</button>`);
 }
 async function tsSaveForm(classCode, armId) {
   try {
@@ -461,7 +461,7 @@ function tsHistoryModal(title, headers, rows) {
   const render = showRemoved => rows.filter(r => showRemoved || !r.removed).map(r => `<tr>${r.cells.map(c => `<td>${escapeHtml(c || '')}</td>`).join('')}<td>${r.removed ? '<span class="pf-pill pf-pill-rel">Replaced</span>' : '<span class="pf-pill pf-pill-in">Current</span>'}</td></tr>`).join('') || `<tr><td colspan="${headers.length}" class="sl-empty">No allocation history yet.</td></tr>`;
   tsModal(title, `<label class="sf-check" style="margin:0 0 10px;"><input type="checkbox" onchange="document.getElementById('ts-hist-body').innerHTML=tsHistoryModal.render(this.checked)"> Show replaced</label>
     <div style="overflow-x:auto;"><table class="staff-table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody id="ts-hist-body">${render(false)}</tbody></table></div>`,
-  '<button type="button" class="btn-outline" onclick="tsClose()">Close</button>', true);
+  '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button>', true);
   tsHistoryModal.render = render;
 }
 
@@ -500,7 +500,7 @@ function tsOpenSubjAssign(id) {
       <div style="align-self:end;"><label class="sf-check"><input type="checkbox" id="tss-incharge" ${r.teachers.length ? '' : 'checked'}> In-Charge</label></div>
     </div>
     <button type="button" class="post-btn" style="margin-top:10px;" onclick="tsSubjAdd(${id})">Add Teacher to Subject</button>`,
-  '<button type="button" class="btn-outline" onclick="tsClose()">Close</button>');
+  '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button>');
 }
 async function tsSubjAdd(id) {
   const teacherId = tsVal('tss-teacher');
@@ -548,7 +548,7 @@ function tsOpenCarry(kind) {
       <div><label class="field-label" for="ts-cf-from">Copy From (Source Session) <span class="sf-req">*</span></label><select class="ctrl-select" id="ts-cf-from">${tsSessionOpts(v.session || active, '— Select —')}</select></div>
       <div><label class="field-label" for="ts-cf-to">Copy To (Target Session) <span class="sf-req">*</span></label><select class="ctrl-select" id="ts-cf-to">${tsSessionOpts(nextS, '— Select —')}</select></div>
     </div>`,
-  `<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsCarryPreview('${kind}')">Next</button>`, true);
+  `<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsCarryPreview('${kind}')">Next</button>`, true);
 }
 async function tsCarryPreview(kind) {
   const from = tsVal('ts-cf-from');
@@ -630,7 +630,7 @@ function tsOpenHead(scope, key, label) {
     <h3 class="sf-section-title">Access Permissions <label class="sf-check" style="display:inline-flex;margin:0 0 0 10px;"><input type="checkbox" onchange="document.querySelectorAll('.tsl-perm,.tsl-group').forEach(c=>c.checked=this.checked)"> Select All</label></h3>
     <div class="ts-perm-grid">${v.permissions.map(([group, items], g) => `<div class="ts-perm-group"><label class="sf-check"><input type="checkbox" class="tsl-group" onchange="document.querySelectorAll('.tsl-perm[data-g=&quot;${g}&quot;]').forEach(c=>c.checked=this.checked)"> <b>${escapeHtml(group)}</b> <span class="sf-hint">All</span></label>
       ${items.map(([k, l]) => `<label class="sf-check"><input type="checkbox" class="tsl-perm" data-g="${g}" value="${k}" ${has.has(k) ? 'checked' : ''}> ${escapeHtml(l)}</label>`).join('')}</div>`).join('')}</div>`,
-  `${h ? `<button type="button" class="btn-outline ts-danger" onclick="tsRemoveHead('${scope}', '${escapeHtml(key)}')">Unassign</button><span class="af-spacer"></span>` : ''}<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveHead('${scope}', '${escapeHtml(key)}')">Save Head</button>`, true);
+  `${h ? `<button type="button" class="btn-outline ts-danger" onclick="tsRemoveHead('${scope}', '${escapeHtml(key)}')">Unassign</button><span class="af-spacer"></span>` : ''}<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="post-btn" onclick="tsSaveHead('${scope}', '${escapeHtml(key)}')">Save Head</button>`, true);
 }
 async function tsSaveHead(scope, key) {
   const staffId = tsVal('tsl-staff');
@@ -661,7 +661,7 @@ function tsOpenLeadCarry() {
       <div><label class="field-label" for="tsl-cf-from">From Session</label><select class="ctrl-select" id="tsl-cf-from">${tsSessionOpts(v.session)}</select></div>
       <div><label class="field-label" for="tsl-cf-to">To Session <span class="sf-req">*</span></label><select class="ctrl-select" id="tsl-cf-to">${tsSessionOpts('', '— Select target session —')}</select></div>
     </div><p id="tsl-cf-preview" class="af-preview" style="margin:10px 0 0;"></p>`,
-  '<button type="button" class="btn-outline" onclick="tsClose()">Close</button><button type="button" class="btn-outline" onclick="tsLeadCarry(true)">Preview</button><button type="button" class="post-btn" onclick="tsLeadCarry(false)">Carry Forward</button>');
+  '<button type="button" class="btn-outline btn-close" onclick="tsClose()">Close</button><button type="button" class="btn-outline" onclick="tsLeadCarry(true)">Preview</button><button type="button" class="post-btn" onclick="tsLeadCarry(false)">Carry Forward</button>');
 }
 async function tsLeadCarry(preview) {
   const from = tsVal('tsl-cf-from');

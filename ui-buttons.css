@@ -108,7 +108,9 @@
 }
 
 /* ── Danger ── */
-.btn-danger {
+/* Close buttons are red too (every portal) */
+.btn-danger,
+.btn-close {
   background: var(--btn-danger) !important;
   color: #fff !important;
   border: 1px solid var(--btn-danger) !important;
@@ -117,7 +119,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-.btn-danger:hover { background: var(--btn-danger-hover) !important; border-color: var(--btn-danger-hover) !important; }
+.btn-danger:hover, .btn-close:hover { background: var(--btn-danger-hover) !important; border-color: var(--btn-danger-hover) !important; color: #fff !important; }
 .del-btn,
 .bs-unpublish-btn,
 .gb-published-btn {

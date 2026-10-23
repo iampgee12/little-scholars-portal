@@ -831,7 +831,7 @@ async function sregView(id) {
     modal.style.display = 'flex';
     modal.innerHTML = `<div class="en-modal-box wide"><div class="en-modal-head"><span>${enrolEsc(s.name)} <span class="sr-pill ${s.status}">${enrolEsc(s.status)}</span></span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
       <div class="en-modal-body">${s.outcome ? `<div class="en-info">${enrolEsc(s.outcome)}</div>` : ''}${s.note ? `<div class="en-info">Rejection note: ${enrolEsc(s.note)}</div>` : ''}${detail}${accept}</div>
-      <div class="en-modal-foot"><button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button>
+      <div class="en-modal-foot"><button class="btn-outline btn-close" onclick="this.closest('.en-modal').remove()">Close</button>
         ${s.status !== 'accepted' ? `<button class="del-btn" onclick="sregAct([${s.id}], 'reject')">Reject</button><button class="post-btn" onclick="sregAcceptFromView(${s.id})">Accept</button>` : ''}</div></div>`;
     document.body.appendChild(modal);
     if (d.class_arm && document.getElementById('srv-arm')) document.getElementById('srv-arm').value = d.class_arm;
@@ -967,7 +967,7 @@ function sregFieldsModal(kind) {
       <div class="en-hint" style="margin-bottom:8px;">Toggle fields on or off. Changes save instantly. Locked fields &#128274; cannot be hidden — they are essential.</div>
       <table class="data-table sr-fields"><thead><tr><th>Field</th><th>Show in Form</th><th>Required <span class="en-hint">(Must be provided when filling the form)</span></th></tr></thead><tbody>${rows}</tbody></table>
     </div>
-    <div class="en-modal-foot"><button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
+    <div class="en-modal-foot"><button class="btn-outline btn-close" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
   document.body.appendChild(modal);
 }
 

@@ -432,7 +432,7 @@ async function refreshConsole() {
             <td>${p.pupils}</td><td>${p.started}</td><td>${p.submitted}</td>
             <td><span class="ec-pill ${esc(p.status)}">${p.status === 'live' ? 'Open' : p.status === 'closed' ? 'Closed' : 'Not open'}</span></td>
             <td class="ec-actions">
-              ${p.status !== 'live' ? `<button class="post-btn" onclick="setStatus(${p.id}, 'live')">${p.status === 'closed' ? 'Reopen' : 'Open'}</button>` : `<button class="btn-danger" onclick="setStatus(${p.id}, 'closed')">Close</button>`}
+              ${p.status !== 'live' ? `<button class="post-btn" onclick="setStatus(${p.id}, 'live')">${p.status === 'closed' ? 'Reopen' : 'Open'}</button>` : `<button class="btn-danger btn-close" onclick="setStatus(${p.id}, 'closed')">Close</button>`}
               <button class="btn-outline" onclick="showPupils(${p.id})">Pupils</button>
             </td>
           </tr>`).join('') || '<tr><td colspan="10" class="ec-hint">No papers yet. Refresh CBT / Exams data, or load an exam pack.</td></tr>'}`);
@@ -555,7 +555,7 @@ async function refreshTrial() {
     </tbody></table></div></div>`);
 
   setHtml(document.getElementById('tr-results'), `<div class="ec-card">
-    <div class="ec-flex"><h2>Trial results</h2><button class="btn-outline" onclick="clearTrialResults()" ${d.results.length ? '' : 'disabled'}>Clear trial results</button></div>
+    <div class="ec-flex"><h2>Trial results</h2><button class="btn-danger" onclick="clearTrialResults()" ${d.results.length ? '' : 'disabled'}>Clear trial results</button></div>
     <p class="ec-muted">Trial papers handed in. These never go to the grade book or the online portal.</p>
     <div style="overflow-x:auto;"><table class="ec-table"><thead><tr><th>Handed in</th><th>Tester</th><th>Paper</th><th>Score</th></tr></thead><tbody>
     ${d.results.map(r => `<tr><td>${esc(when(r.submittedAt))}</td><td>${esc(r.name)} <span class="ec-hint">${esc(r.username)}</span></td><td>${esc(r.classLabel)} — ${esc(r.subjectName)}</td><td class="ec-mono">${r.score} / ${r.totalMarks}</td></tr>`).join('')
@@ -809,7 +809,7 @@ function askRefresh(group) {
   modal(label, `<p class="ec-muted">This fetches ${group === 'all' ? 'all necessary data' : label.replace('Refresh ', '').toLowerCase() + ' records'} from your online school portal into this exam server, overwriting the corresponding data currently here.</p>
     <label class="ec-check"><input type="checkbox" id="ec-rconfirm"> I confirm that I want to proceed with this action</label>
     <div id="ec-rprogress"></div><div class="ec-error" id="ec-rerr"></div>`,
-  `<button class="btn-outline" onclick="closeModal()">Close</button><button class="post-btn" id="ec-rgo" onclick="doRefresh('${group}')">Refresh Data</button>`);
+  `<button class="btn-outline btn-close" onclick="closeModal()">Close</button><button class="post-btn" id="ec-rgo" onclick="doRefresh('${group}')">Refresh Data</button>`);
 }
 async function doRefresh(group) {
   if (!document.getElementById('ec-rconfirm').checked) { document.getElementById('ec-rerr').textContent = 'Tick the box to confirm.'; return; }
@@ -1021,7 +1021,7 @@ function staffProfile(id) {
     <table class="ec-table"><tbody>${line('Designation', esc(u.designation || ''))}${line('Department', esc(u.department || ''))}${line('Phone', esc(u.phone || ''))}${line('Email', esc(u.email || ''))}
     ${line('Gender', esc(u.gender || ''))}${line('Qualifications', esc(u.qualifications || ''))}${line('Date of appointment', esc(u.dateOfAppointment || ''))}
     ${line('Subject(s) in charge', u.subjects.length ? numbered(subjectItems(u)) : '')}${line('Form class(es)', u.formClasses.length ? numbered(u.formClasses.map(esc)) : '')}
-    ${line('User status', u.active === 0 ? 'Inactive' : 'Active')}</tbody></table>`, '<button class="btn-outline" onclick="closeModal()">Close</button>');
+    ${line('User status', u.active === 0 ? 'Inactive' : 'Active')}</tbody></table>`, '<button class="btn-outline btn-close" onclick="closeModal()">Close</button>');
 }
 
 // ── Updates ──

@@ -417,7 +417,7 @@ async function stuClassHistory(id, name) {
       <div class="en-modal-body"><table class="data-table"><thead><tr><th>Session</th><th>Class Arm</th><th>Form Teacher</th></tr></thead><tbody>
         ${history.length ? history.map(h => `<tr><td>${escapeHtml(String(h.session).replace('/', '-'))}</td><td>${escapeHtml(h.classText)}</td><td>${escapeHtml(h.formTeacher || '')}</td></tr>`).join('') : '<tr><td colspan="3" class="sr-empty">No class history recorded yet</td></tr>'}
       </tbody></table></div>
-      <div class="en-modal-foot"><button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
+      <div class="en-modal-foot"><button class="btn-outline btn-close" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
     document.body.appendChild(modal);
   } catch (err) { showToast(err.message); }
 }
@@ -453,7 +453,7 @@ function stuModal(id, title, body, foot = '', wide = true) {
   modal.style.display = 'flex';
   modal.innerHTML = `<div class="en-modal-box${wide ? ' wide' : ''}"><div class="en-modal-head"><span>${title}</span><button class="en-x" onclick="this.closest('.en-modal').remove()">&times;</button></div>
     <div class="en-modal-body">${body}</div>
-    <div class="en-modal-foot">${foot}<button class="btn-outline" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
+    <div class="en-modal-foot">${foot}<button class="btn-outline btn-close" onclick="this.closest('.en-modal').remove()">Close</button></div></div>`;
   document.body.appendChild(modal);
   return modal;
 }
