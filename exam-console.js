@@ -539,7 +539,7 @@ async function refreshTrial() {
       <td class="tr-cansee">${t.canSee.needsChoice ? `<button class="tr-choose" onclick="editTesterAccess('${esc(t.id)}')">&#9888; ${esc(t.canSee.label)}</button>`
         : `${t.scope === 'teacher' && t.teacherName ? `<b>Same as ${esc(t.teacherName)}</b><div class="ec-hint">${esc(t.canSee.label)}</div>` : t.scope === 'all' ? '<b>Every paper</b>' : esc(t.canSee.label)}`}</td>
       <td class="ec-mono">${esc(t.password)}</td><td><span class="ec-pill ${t.secondsAgo !== null && t.secondsAgo < 45 ? 'ok' : 'muted'}">${seenText(t.secondsAgo)}</span></td>
-      <td class="ec-actions"><button class="btn-outline" onclick="editTesterAccess('${esc(t.id)}')">Access</button><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-outline" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
+      <td class="ec-actions"><button class="btn-outline" onclick="editTesterAccess('${esc(t.id)}')">Access</button><button class="btn-outline" onclick="printSlips(state.trial.testers.filter(x => x.id === '${esc(t.id)}'))">Slip</button><button class="btn-danger" onclick="removeTester('${esc(t.id)}')">Remove</button></td></tr>`).join('')
       || '<tr><td colspan="6" class="ec-hint">No testers yet. Click Add tester.</td></tr>'}
     </tbody></table></div></div>`);
 
