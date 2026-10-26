@@ -7475,6 +7475,37 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, id: newStaffId, generatedPassword, setup: adminSetupPayload() });
   }
 
+  // Staff Profile › Password Update: a temporary password the staff member must change
+  const staffPasswordMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)\/password$/);
+  if (req.method === 'POST' && staffPasswordMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const staffId = decodeURIComponent(staffPasswordMatch[1]).trim().toUpperCase();
+    const staff = one("SELECT * FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", staffId);
+    if (!staff) return sendJson(res, 404, { error: 'Staff member not found' });
+    if (staff.role === 'staff') return sendJson(res, 400, { error: 'This staff member has no portal login' });
+    if (staffId === user.id) return sendJson(res, 400, { error: 'Change your own password from your Profile page' });
+    const guard = adminGuard(user, staffId);
+    if (guard) return sendJson(res, 403, { error: guard });
+    const body = await readJson(req);
+    let password = String(body.value ?? '');
+    let generatedPassword = null;
+    if (body.generate) {
+      do password = crypto.randomBytes(6).toString('base64').replace(/[^A-Za-z]/g, '').slice(0, 5) + crypto.randomInt(100, 1000);
+      while (security.passwordProblem(password, staff));
+      generatedPassword = password;
+    } else {
+      if (password !== String(body.confirm ?? '')) return sendJson(res, 400, { error: 'The two entries do not match' });
+      const problem = security.passwordProblem(password, staff);
+      if (problem) return sendJson(res, 400, { error: problem });
+    }
+    // (the password_reset trigger marks it as set by an admin: changed at next sign-in)
+    run('UPDATE users SET password = ?, password_unset = 0 WHERE id = ?', hashPassword(password), staffId);
+    run('DELETE FROM sessions WHERE user_id = ?', staffId);
+    security.audit(req, user, 'Set a staff password', `${staff.name} (${staffId})`);
+    return sendJson(res, 200, { ok: true, generatedPassword, setup: adminSetupPayload() });
+  }
+
   // Make / remove super admin: only the main super admin may do this
   const superAdminMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)\/super-admin$/);
   if (req.method === 'PUT' && superAdminMatch) {

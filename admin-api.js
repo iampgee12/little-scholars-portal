@@ -962,6 +962,7 @@ async function toggleAccountStatus(id, makeActive) {
     showToast(makeActive ? `${id} reactivated` : `${id} deactivated`);
     await loadResultSetup();
     populateStaff();
+    if (typeof sfpRefresh === 'function') sfpRefresh();
     populateStudents();
   } catch (err) {
     showToast(err.message);
@@ -2250,6 +2251,7 @@ async function saveStaffForm() {
     populateAdminControls();
     renderAssignments();
     closeStaffForm();
+    if (editingId && typeof sfpRefresh === 'function') sfpRefresh(data.id);
     showToast(editingId ? 'Staff details updated' : `${sfTypeLabel(sfType)} added`);
     // a generated password is shown once, so the admin can pass it on
     if (data.generatedPassword) {
@@ -2386,7 +2388,7 @@ async function toggleSuperAdmin(id) {
     const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(id)}/super-admin`, { method: 'PUT', body: JSON.stringify({ on }) });
     state.setup = data.setup;
     populateStaff();
-    openStaffProfile(id);
+    if (!(typeof sfpShowing === 'function' && sfpShowing())) openStaffProfile(id);
     showToast(on ? `${staff.name} is now a super admin` : `${staff.name} is no longer a super admin`, 'success');
   } catch (err) { showToast(err.message); }
 }
@@ -2473,8 +2475,8 @@ function renderSubjectClassChoices(selectId, boxId) {
 }
 const chosenSubjectClasses = boxId => [...document.querySelectorAll(`#${boxId} input:checked`)].map(input => input.value);
 
-function renderStaffProfileSubjects(staff) {
-  const body = document.getElementById('staff-profile-body');
+// into the staff profile pop-up, or the Staff Profile page's Classes & Subjects
+function renderStaffProfileSubjects(staff, body = document.getElementById('staff-profile-body')) {
   if (!body) return;
   if (staff.teacherType === 'class_teacher') {
     const mine = (state.setup.assignments || []).filter(item => item.teacherId === staff.id && item.teacherType === 'class_teacher');
@@ -2514,6 +2516,7 @@ function closeTeacherSubjectsManager() {
   const manager = document.getElementById('teacher-subjects-modal');
   if (manager) manager.style.display = 'none';
   renderStaffProfileTab('subjects');
+  if (typeof sfpRefresh === 'function') sfpRefresh();
 }
 
 function renderTeacherSubjectsManager() {
@@ -2623,6 +2626,7 @@ const TAB_META = {
   selfRegistration: { title: 'Self Registration', sub: 'Registration Requests' },
   addStudent: { title: 'Enroll Students', sub: 'Enroll a Student' },
   studentProfile: { title: 'Student Profile', sub: '' },
+  staffProfile: { title: 'Staff Profile', sub: '' },
   security: { title: 'Security & Activity Log', sub: 'Sign-ins, activity, sessions and backups' },
   announcements: { title: 'Admin', sub: 'Post and Manage Notices' },
   resultChecker: { title: 'Result Checker', sub: 'Published Reports and Downloads' },
@@ -2912,6 +2916,7 @@ function switchTab(tab, trigger, titleOverride, subOverride) {
   if (tab === 'enrollmentHistory') ehInit();
   if (tab === 'studentsRegistry') regInit();
   if (tab === 'studentProfile' && typeof spfInit === 'function') spfInit();
+  if (tab === 'staffProfile' && typeof sfpInit === 'function') sfpInit();
   if (tab === 'security' && typeof secInit === 'function') secInit();
   if (tab === 'students' && !document.getElementById('vs-results') && typeof vsInit === 'function') vsInit();
   if (tab === 'communicationBook') cbkInit();

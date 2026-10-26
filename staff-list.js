@@ -212,8 +212,8 @@ function populateStaff() {
       <td class="sl-check"><input type="checkbox" aria-label="Select ${escapeHtml(staff.name)}" ${slView.selected.has(staff.id) ? 'checked' : ''} onchange="slToggleOne(${jsArg(staff.id)}, this.checked)"></td>
       <td class="staff-index">${start + i + 1}</td>
       <td>
-        <div class="sl-name-cell"><button type="button" class="sl-open-profile" title="View profile" aria-label="View ${escapeHtml(staff.name)}'s profile" onclick="openStaffProfile(${jsArg(staff.id)})">${slAvatar(staff)}</button><div>
-          <button type="button" class="sl-open-profile staff-table-name" title="View profile" onclick="openStaffProfile(${jsArg(staff.id)})">${escapeHtml(staff.name)}</button>
+        <div class="sl-name-cell"><button type="button" class="sl-open-profile" title="View profile" aria-label="View ${escapeHtml(staff.name)}'s profile" onclick="staffCard(${jsArg(staff.id)})">${slAvatar(staff)}</button><div>
+          <button type="button" class="sl-open-profile staff-table-name" title="View profile" onclick="staffCard(${jsArg(staff.id)})">${escapeHtml(staff.name)}</button>
           <div class="staff-table-sub">${escapeHtml(staff.email || staff.id)}</div>
           ${badges}
         </div></div>
