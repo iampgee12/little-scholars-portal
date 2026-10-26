@@ -205,7 +205,7 @@ async function spfFees(body) {
   try {
     const [inv, terms] = await Promise.all([apiFetch(`/api/admin/fees/invoices?studentId=${encodeURIComponent(SPF.id)}`), feesTermsList()]);
     const termOf = new Map(terms.map(t => [t.id, t]));
-    SPF.fees = inv.invoices.map(i => ({ ...i, session: termOf.get(i.academicId)?.sessionLabel || '', term: termOf.get(i.academicId)?.termLabel || '' }));
+    SPF.fees = inv.invoices.map(i => ({ ...i, feeType: i.title || i.feeType, session: i.sessionLabel || termOf.get(i.academicId)?.sessionLabel || '', term: i.termLabel || termOf.get(i.academicId)?.termLabel || '' }));
     SPF.feeTerms = terms;
   } catch (err) { body.innerHTML = `<div class="sr-empty">${spfEsc(err.message)}</div>`; return; }
   const f = SPF.feeFilter;
@@ -242,7 +242,7 @@ function spfFeesRows() {
   const q = f.search.toLowerCase();
   return (SPF.fees || []).filter(i => (f.session === 'all' || i.session === f.session) && (f.term === 'all' || i.term === f.term)
     && (f.type === 'all' || i.feeType === f.type) && (f.status === 'all' || i.status === f.status)
-    && (!q || [i.feeType, i.description, i.classLabel, `INV-${i.id}`].some(v => String(v || '').toLowerCase().includes(q))));
+    && (!q || [i.feeType, i.description, i.classLabel, (i.invoiceNo || `INV-${i.id}`)].some(v => String(v || '').toLowerCase().includes(q))));
 }
 
 function spfFeesPaint() {
@@ -284,7 +284,7 @@ function spfFeesPaint() {
       ${page.length ? page.map((i, n) => `<tr>
         <td><input type="checkbox" ${f.picked.has(i.id) ? 'checked' : ''} onchange="spfFeesPick(${i.id}, this.checked)"></td>
         <td>${start + n + 1}</td><td>${spfEsc(spfName())}</td><td>${spfEsc(i.feeType)}</td><td>${spfEsc(i.classLabel)}</td>
-        <td class="stu-mono">INV-${i.id}</td><td>${spfEsc(i.description || i.feeType)}<div class="en-hint">${spfEsc([i.session, i.term].filter(Boolean).join(' · '))}</div></td>
+        <td class="stu-mono">${spfEsc(i.invoiceNo || `INV-${i.id}`)}</td><td>${spfEsc(i.fullTitle || i.description || i.feeType)}<div class="en-hint">${spfEsc([i.session, i.term].filter(Boolean).join(' · '))}</div></td>
         <td>${fmtNaira(i.amount)}</td><td>${fmtNaira(i.paid)}</td><td>${fmtNaira(i.balance)}</td><td>${invoiceStatusBadge(i)}${i.overdue ? ' <span class="en-hint">overdue</span>' : ''}</td>
         <td>${feeFmtDate(i.createdAt)}</td>
         <td>${i.balance > 0 ? `<button class="post-btn btn-sm" onclick="spfFeesPay(${i.id})" title="Record Offline Or Direct Bank Payment">Record Payment</button>` : '<span class="en-hint">Fully paid</span>'}</td>
@@ -310,7 +310,7 @@ function spfFeesPay(id) {
 
 function spfFeesTable(rows) {
   const headers = ['#', 'Fee', 'Class', 'Invoice ID', 'Invoice Title', 'Session', 'Term', 'Total', 'Paid', 'Due', 'Status', 'Created'];
-  const data = rows.map((i, n) => [n + 1, i.feeType, i.classLabel, `INV-${i.id}`, i.description || i.feeType, i.session, i.term, fmtNaira(i.amount), fmtNaira(i.paid), fmtNaira(i.balance),
+  const data = rows.map((i, n) => [n + 1, i.feeType, i.classLabel, (i.invoiceNo || `INV-${i.id}`), i.fullTitle || i.description || i.feeType, i.session, i.term, fmtNaira(i.amount), fmtNaira(i.paid), fmtNaira(i.balance),
     { paid: 'Paid', partial: 'Part Paid', unpaid: 'Unpaid' }[i.status] || i.status, feeFmtDate(i.createdAt)]);
   return { headers, data };
 }
@@ -356,24 +356,8 @@ function spfFeesPrint(withSummary, onlyPicked = false) {
 }
 
 async function spfInvoice(id) {
-  let inv;
-  try { inv = (await apiFetch(`/api/admin/fees/invoices/${id}`)).invoice; } catch (err) { return showToast(err.message); }
-  const row = (l, v) => `<tr><td>${l}</td><td>${v}</td></tr>`;
-  const body = `<div id="spf-invoice-print">
-    <table class="stu-info"><tbody>
-      ${row('Invoice ID', `INV-${inv.id}`)}${row('Student', spfEsc(inv.studentName))}${row('Class', spfEsc(inv.classLabel))}
-      ${row('Fee', spfEsc(inv.feeType))}${row('Description', spfEsc(inv.description || '—'))}
-      ${row('Amount', fmtNaira(inv.amount))}${row('Paid', fmtNaira(inv.paid))}${row('Balance', fmtNaira(inv.balance))}
-      ${row('Due Date', feeFmtDate(inv.dueDate))}${row('Status', invoiceStatusBadge(inv))}${row('Created', feeFmtDate(inv.createdAt))}
-    </tbody></table>
-    <div class="spf-sub-head">Payment History</div>
-    <table class="data-table"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Note</th></tr></thead><tbody>
-      ${inv.payments.length ? inv.payments.map(p => `<tr><td>${feeFmtDate(p.recordedAt)}</td><td>${fmtNaira(p.amount)}</td><td>${spfEsc(p.method)}</td><td>${spfEsc(p.reference || '—')}</td><td style="text-transform:capitalize">${spfEsc(p.status)}</td><td>${spfEsc(p.note || '')}</td></tr>`).join('') : '<tr><td colspan="6" class="sr-empty">No payments yet</td></tr>'}
-    </tbody></table></div>`;
-  const modal = stuModal('spf-invoice-modal', `Invoice INV-${inv.id}`, body,
-    `<button class="btn-outline" id="spf-inv-print">Print</button>${inv.balance > 0 ? '<button class="post-btn" id="spf-inv-pay">Record Payment</button>' : ''}`);
-  modal.querySelector('#spf-inv-print').onclick = () => spfPrintHtml(`Invoice INV-${inv.id}`, `${spfLetterhead(`Invoice INV-${inv.id}`)}${document.getElementById('spf-invoice-print').innerHTML}`);
-  modal.querySelector('#spf-inv-pay')?.addEventListener('click', () => { modal.remove(); spfFeesPay(inv.id); });
+  if (window.FIN && FIN.viewInvoice) return FIN.viewInvoice(id, () => spfTab('fees'));
+  showToast('The invoice viewer is still loading — try again');
 }
 
 // ── Results ─────────────────────────────────────────────────────────────

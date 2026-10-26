@@ -699,24 +699,13 @@ function tsRenderFees() {
     <p class="staff-table-sub" style="text-align:center;">“Go to Class Fees” opens the class's invoices for that session and term. New invoices are created for the active term.</p>
   </div>`);
 }
-async function tsGoFees() {
+function tsGoFees() {
   const classCode = tsVal('tsfee-class');
   if (!classCode) return showToast('Choose the class');
-  const period = tsView.data.periods.find(p => p.sessionLabel === tsVal('tsfee-session') && p.termLabel === tsVal('tsfee-term'));
-  switchTab('classInvoiceHistory', document.querySelector('.sub-nav-item[data-tab="classInvoiceHistory"]'));
-  await new Promise(r => setTimeout(r, 400));
-  const term = document.getElementById('cih-term');
-  if (term && period && [...term.options].some(o => o.value === String(period.id))) term.value = String(period.id);
-  const cls = document.getElementById('cih-class');
-  if (cls) cls.value = classCode;
-  if (typeof cihLoadList === 'function') cihLoadList();
-  if (!period) showToast('That session and term has no invoices yet, so all terms are shown');
+  if (!window.FIN || !FIN.goClassHistory) return showToast('The Finance pages are still loading — try again');
+  FIN.goClassHistory({ session: tsVal('tsfee-session'), term: tsVal('tsfee-term'), classCode });
 }
 function tsNewClassInvoice() {
-  const classCode = tsVal('tsfee-class');
-  if (typeof openNewInvoiceModal !== 'function') return;
-  openNewInvoiceModal();
-  document.getElementById('ni-mode').value = 'class';
-  niToggleMode();
-  if (classCode) document.getElementById('ni-class').value = classCode;
+  if (!window.FIN || !FIN.quickInvoice) return showToast('The Finance pages are still loading — try again');
+  FIN.quickInvoice({ classCode: tsVal('tsfee-class') });
 }
