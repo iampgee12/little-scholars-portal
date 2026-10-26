@@ -267,10 +267,26 @@ module.exports = function createSecurity(ctx) {
     return { required: true, reason: '' };
   }
 
+  // The device cookie holds one token per account remembered on this browser
+  // (dot-separated), so remembering a second account doesn't forget the first.
+  // A list rather than a cookie per account, so it survives an account's ID changing.
+  const DEVICE_TOKENS_MAX = 10;
+  function deviceTokens(req) {
+    return String(parseCookies(req)[DEVICE_COOKIE] || '').split('.').filter(t => /^[0-9a-f]{64}$/.test(t));
+  }
+  function deviceCookie(tokens) {
+    return tokens.length
+      ? `${DEVICE_COOKIE}=${tokens.join('.')}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${DEVICE_DAYS * 86400}${IS_PROD ? '; Secure' : ''}`
+      : `${DEVICE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${IS_PROD ? '; Secure' : ''}`;
+  }
+  // this browser's tokens that are still remembered for some account
+  function liveDeviceTokens(req) {
+    return deviceTokens(req).filter(t => one('SELECT 1 AS ok FROM trusted_devices WHERE token_hash = ? AND expires_at > ?', sha(t), nowIso()));
+  }
+
   function trustedDevice(req, userId) {
-    const token = parseCookies(req)[DEVICE_COOKIE];
-    if (!token) return false;
-    return !!one('SELECT token_hash FROM trusted_devices WHERE token_hash = ? AND user_id = ? AND expires_at > ?', sha(token), userId, nowIso());
+    return deviceTokens(req).some(token =>
+      one('SELECT token_hash FROM trusted_devices WHERE token_hash = ? AND user_id = ? AND expires_at > ?', sha(token), userId, nowIso()));
   }
 
   const maskEmail = e => String(e).replace(/^(.)(.*)(.@.*)$/, (_, a, mid, b) => a + '*'.repeat(Math.min(mid.length, 6)) + b);
@@ -374,7 +390,8 @@ module.exports = function createSecurity(ctx) {
         const devToken = crypto.randomBytes(32).toString('hex');
         run('INSERT INTO trusted_devices (token_hash, user_id, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
           sha(devToken), user.id, deviceLabel(req), nowIso(), new Date(Date.now() + DEVICE_DAYS * 864e5).toISOString());
-        cookies.push(`${DEVICE_COOKIE}=${devToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${DEVICE_DAYS * 86400}${IS_PROD ? '; Secure' : ''}`);
+        // kept beside the other accounts remembered on this browser (newest last)
+        cookies.push(deviceCookie([...liveDeviceTokens(req), devToken].slice(-DEVICE_TOKENS_MAX)));
         audit(req, user, 'Remembered this device for 30 days');
       }
       const next = await nextStep(req, user, entry);
@@ -554,7 +571,8 @@ module.exports = function createSecurity(ctx) {
     }
     if (m === 'POST' && p === '/api/admin/security/devices/forget') {
       run('DELETE FROM trusted_devices WHERE user_id = ?', admin.id);
-      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': `${DEVICE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${IS_PROD ? '; Secure' : ''}` }), true;
+      // other accounts remembered on this browser stay remembered
+      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': deviceCookie(liveDeviceTokens(req)) }), true;
     }
     if (m === 'POST' && p === '/api/admin/security/force-change') {
       const body = await readJson(req);

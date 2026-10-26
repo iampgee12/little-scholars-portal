@@ -365,17 +365,24 @@ function moveUserReferences(oldId, newId) {
   }
 }
 
-// Accountants added before they had STF- IDs move off their ADM- ones.
-function moveAccountantsToStaffIds() {
-  for (const { id } of all("SELECT id FROM users WHERE role = 'admin' AND staff_type = 'accountant' AND id LIKE 'ADM-%'")) {
+// Non-teaching staff (accountants / bursary officers and records-only staff) are
+// staff, not admins or teachers: their IDs are STF-. Any given an ADM- or TCH- ID
+// (before this rule, or typed by hand) move to the next STF- one.
+const NOT_STAFF_ID = /^(ADM|TCH)-/;
+function isNonTeachingStaff(role, staffType) {
+  return role === 'staff' || staffType === 'accountant';
+}
+function moveNonTeachingStaffToStaffIds() {
+  const rows = all("SELECT id FROM users WHERE ((role = 'admin' AND staff_type = 'accountant') OR role = 'staff') AND (id LIKE 'ADM-%' OR id LIKE 'TCH-%')");
+  for (const { id } of rows) {
     if (id === ownerAdminId()) continue;
-    const newId = nextStaffUserId('admin', 'accountant');
+    const newId = nextStaffUserId('staff');
     db.exec('BEGIN IMMEDIATE');
     try {
       moveUserReferences(id, newId);
       run('UPDATE users SET id = ? WHERE id = ?', newId, id);
       db.exec('COMMIT');
-      console.log(`Accountant ${id} is now ${newId}`);
+      console.log(`Staff ${id} is now ${newId}`);
     } catch (err) {
       db.exec('ROLLBACK');
       throw err;
@@ -1932,7 +1939,7 @@ cbtTrial.createSchema();
 cbtTrial.ensureDefaultTesters();
 assignStudentUsernames();
 // after every module's tables exist, so all their references move too
-moveAccountantsToStaffIds();
+moveNonTeachingStaffToStaffIds();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -7388,8 +7395,8 @@ async function handleApi(req, res, url) {
     if (form.error) return sendJson(res, 400, { error: form.error });
     const { role, teacherType, name, firstName, initials, profile } = form;
     let newStaffId = form.id || staffId;
-    // an Accountant / Bursary Officer is non-teaching staff, not an admin: STF- ID
-    if (form.staffType === 'accountant' && newStaffId.startsWith('ADM-')) newStaffId = nextStaffUserId(role, 'accountant');
+    // non-teaching staff (e.g. an Accountant / Bursary Officer) are staff, not admins or teachers: STF- ID
+    if (isNonTeachingStaff(role, form.staffType) && NOT_STAFF_ID.test(newStaffId)) newStaffId = nextStaffUserId('staff');
     // only a new ID is checked, so older records with other IDs can still be saved
     if (newStaffId !== staffId && !/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(newStaffId)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
     if (newStaffId !== staffId && one('SELECT id FROM users WHERE id = ?', newStaffId)) {
@@ -7525,7 +7532,7 @@ async function handleApi(req, res, url) {
     }
     const id = form.id || nextStaffUserId(role, form.staffType);
     if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
-    if (form.staffType === 'accountant' && id.startsWith('ADM-')) return sendJson(res, 400, { error: 'Accountants / Bursary Officers are staff, not admins: leave Staff ID blank for an STF- ID' });
+    if (isNonTeachingStaff(role, form.staffType) && NOT_STAFF_ID.test(id)) return sendJson(res, 400, { error: 'Non-teaching staff (e.g. Accountants / Bursary Officers) get STF- IDs: leave Staff ID blank for the next one' });
     if (one('SELECT id FROM users WHERE id = ?', id)) return sendJson(res, 409, { error: 'A staff member with that ID already exists' });
     // Records-only staff never sign in, so they get an unguessable password nobody sees.
     let generatedPassword = null;
@@ -7713,7 +7720,7 @@ async function handleApi(req, res, url) {
       if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });
       const id = form.id || nextStaffUserId(role, form.staffType);
       if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return errors.push({ row: rowNo, message: `Staff ID "${id}" may only use letters, numbers and dashes` });
-      if (form.staffType === 'accountant' && id.startsWith('ADM-')) return errors.push({ row: rowNo, message: `Accountants / Bursary Officers get STF- IDs, not ${id}` });
+      if (isNonTeachingStaff(role, form.staffType) && NOT_STAFF_ID.test(id)) return errors.push({ row: rowNo, message: `Non-teaching staff get STF- IDs, not ${id}` });
       if (one('SELECT id FROM users WHERE id = ?', id)) return errors.push({ row: rowNo, message: `Staff ID ${id} already exists` });
       // records-only staff never sign in; sign-in staff get the default password, or a generated one shown once
       const generated = role !== 'staff' && !defaultPassword ? String(crypto.randomInt(100000, 1000000)) : null;
