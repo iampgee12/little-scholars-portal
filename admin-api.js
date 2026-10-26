@@ -1990,7 +1990,8 @@ function sfTypeLabel(type) {
   return sfStaffTypes().find(item => item.value === type)?.label || 'Staff';
 }
 function sfSignsIn(type) {
-  return type === 'teacher' || type === 'admin';
+  // accountants / bursary officers sign in to a Finance-only view of the admin portal
+  return type === 'teacher' || type === 'admin' || type === 'accountant';
 }
 
 function toggleAddStaffMenu(event) {

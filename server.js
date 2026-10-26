@@ -8331,7 +8331,7 @@ function adminSetupPayload() {
   const profileSelect = Object.entries(STAFF_PROFILE_FIELDS).map(([key, col]) => `${col} AS ${key}`).join(', ');
   const staff = all(
     `SELECT id, name, first_name AS firstName, initials, role, teacher_type AS teacherType, active, archived,
-            photo_path AS photoPath, ${profileSelect}
+            photo_path AS photoPath, COALESCE(password_unset, 0) AS passwordUnset, ${profileSelect}
      FROM users
      WHERE role IN ('teacher', 'admin', 'staff')
      ORDER BY role DESC, name`
@@ -8342,7 +8342,8 @@ function adminSetupPayload() {
       adminLevel: row.role === 'admin' ? adminLevel(row.id) : null,
       staffType,
       staffTypeLabel: STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff',
-      canSignIn: row.role !== 'staff',
+      // an accountant converted from a records-only entry has no password yet
+      canSignIn: row.role !== 'staff' && !row.passwordUnset,
       roleLabel: row.designation || (row.role === 'admin'
         ? 'Administrator'
         : row.role === 'teacher'
