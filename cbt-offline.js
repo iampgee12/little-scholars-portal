@@ -93,12 +93,16 @@ function createCbtOffline(deps) {
   function lanNetworks() {
     const VIRTUAL = /\*|vethernet|virtualbox|vmware|hyper-v|loopback|bluetooth|tailscale|zerotier|vpn|wsl|docker|npcap|miniport/i;
     const kind = name => (/wi-?fi|wlan|wireless/i.test(name) ? 'Wi-Fi' : /ethernet|^eth|^en|local area/i.test(name) ? 'LAN cable' : name);
+    // except this computer's own Windows Mobile Hotspot: a hidden adapter, always 192.168.137.x.
+    // Pupils on it need its address, and the Exam Console warns that it takes only 8 devices.
+    const HOTSPOT = /^192\.168\.137\./;
     const list = Object.entries(os.networkInterfaces())
-      .filter(([name]) => !VIRTUAL.test(name))
       .flatMap(([name, addrs]) => (addrs || []).filter(a => a.family === 'IPv4' && !a.internal)
-        .map(a => ({ label: kind(name), url: `http://${a.address}${PORT && Number(PORT) !== 80 ? `:${PORT}` : ''}`, selfAssigned: a.address.startsWith('169.254.') })));
-    // cable first: it's the connection made on purpose for the exam
-    return list.sort((a, b) => (a.label === 'LAN cable' ? 0 : 1) - (b.label === 'LAN cable' ? 0 : 1));
+        .filter(a => HOTSPOT.test(a.address) || !VIRTUAL.test(name))
+        .map(a => ({ label: HOTSPOT.test(a.address) ? "This computer's hotspot" : kind(name), url: `http://${a.address}${PORT && Number(PORT) !== 80 ? `:${PORT}` : ''}`, selfAssigned: a.address.startsWith('169.254.'), hotspot: HOTSPOT.test(a.address) })));
+    // cable first: it's the connection made on purpose for the exam; the hotspot last
+    const rank = n => (n.label === 'LAN cable' ? 0 : n.hotspot ? 2 : 1);
+    return list.sort((a, b) => rank(a) - rank(b));
   }
   const lanAddresses = () => lanNetworks().map(n => n.url);
 
@@ -522,6 +526,21 @@ WHAT YOU NEED
 - One computer to be the exam server (a normal laptop is fine).
 - A Wi-Fi router or network switch. It does NOT need internet.
 - Devices for pupils (computer lab, tablets or phones) with a web browser.
+
+HOW MANY PUPILS AT ONCE
+- The exam server itself copes with a full hall (tested with 300 pupils
+  signing in and writing at the same time).
+- The limit is usually the Wi-Fi, not the exam server:
+  * Do NOT use a hotspot for a class. Windows Mobile Hotspot (the laptop
+    sharing its own Wi-Fi) lets only 8 devices join, and most phones 5-10.
+    Pupils beyond that can't connect until someone leaves.
+  * A home Wi-Fi router manages about 20-30 devices well. For a bigger hall
+    use school/business Wi-Fi access points (each rated for 50 or more
+    devices), or connect the computers to network switches with cables.
+  * Connect the exam computer itself to the router or switch with a cable
+    if you can.
+- With more than about 200 pupils, let them sign in a class at a time
+  rather than all in the same few seconds.
 
 ONE-TIME SETUP (on the exam computer)
 1. Install Node.js 24 LTS from https://nodejs.org (accept the defaults).

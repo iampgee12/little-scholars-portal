@@ -327,7 +327,8 @@ function addressBlock(networks) {
   const list = (networks || []).map(n => (typeof n === 'string' ? { url: n } : n));
   return `<div class="ec-field"><label>Pupils open this address (Wi-Fi or LAN cable, whichever they're connected to)</label>
     <div class="ec-address">${list.map(n => `<code>${n.label ? `<span class="ec-hint">${esc(n.label)}:</span> ` : ''}${esc(n.url)}</code>`).join('') || '<span class="ec-error">This computer is not connected to a network yet. Connect it to the school Wi-Fi or plug in the LAN cable.</span>'}</div>
-    ${list.some(n => n.selfAssigned) ? '<p class="ec-hint" style="margin-top:6px;">A 169.254… address means the cable network has no router handing out addresses. It still works if the pupils\' computers are on the same switch, but a fixed address (e.g. 192.168.10.1) is easier to type.</p>' : ''}</div>`;
+    ${list.some(n => n.selfAssigned) ? '<p class="ec-hint" style="margin-top:6px;">A 169.254… address means the cable network has no router handing out addresses. It still works if the pupils\' computers are on the same switch, but a fixed address (e.g. 192.168.10.1) is easier to type.</p>' : ''}
+    ${list.some(n => n.hotspot) ? '<div class="ec-note warn" style="margin-top:8px;">This computer is sharing its own Wi-Fi hotspot. Windows lets only <b>8 devices</b> join it: any more pupils can\'t connect until someone leaves. For a class, use a Wi-Fi router or access point, or a network switch with cables.</div>' : ''}</div>`;
 }
 
 // ── Dashboard ──
@@ -335,7 +336,7 @@ async function renderDashboard() {
   const d = state.dash;
   const p = d.papers || {};
   pageEl().innerHTML = `
-    <div class="ec-card">${addressBlock(d.lanNetworks || d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils sign in with their username and password.</p></div>
+    <div class="ec-card">${addressBlock(d.lanNetworks || d.lanAddresses)}<p class="ec-hint" style="margin-top:8px;">Access from client / pupil computers on the same network. Pupils sign in with their username and password.</p><p class="ec-hint">A phone or laptop hotspot only lets a few devices join (Windows: 8, most phones: 5–10). For more pupils, use a Wi-Fi router or access point, or a network switch with cables.</p></div>
     <div id="ec-lan"></div>
     <div class="ec-stats">
       <div class="ec-stat green"><small>Active pupils</small><b>${d.activeStudents}</b><em>signed in, last 10 minutes</em></div>

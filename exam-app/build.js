@@ -150,6 +150,21 @@ WHAT YOU NEED
 - A Wi-Fi router or network switch. It does NOT need internet.
 - Devices for pupils (computer lab, tablets or phones) with a web browser.
 
+HOW MANY PUPILS AT ONCE
+- The exam server itself copes with a full hall (tested with 300 pupils
+  signing in and writing at the same time).
+- The limit is usually the Wi-Fi, not the exam server:
+  * Do NOT use a hotspot for a class. Windows Mobile Hotspot (the laptop
+    sharing its own Wi-Fi) lets only 8 devices join, and most phones 5-10.
+    Pupils beyond that can't connect until someone leaves.
+  * A home Wi-Fi router manages about 20-30 devices well. For a bigger hall
+    use school/business Wi-Fi access points (each rated for 50 or more
+    devices), or connect the computers to network switches with cables.
+  * Connect the exam computer itself to the router or switch with a cable
+    if you can.
+- With more than about 200 pupils, let them sign in a class at a time
+  rather than all in the same few seconds.
+
 FIRST TIME: CONNECT TO THE SCHOOL PORTAL (needs internet)
 1. Use the school's API keys. A super admin generated them once on the online
    portal (E-Class > CBT > Offline CBT (LAN) > School API keys) and wrote them
