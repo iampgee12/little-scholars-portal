@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const financeAccess = require('./finance-access');
 
 module.exports = function createStudents(ctx) {
   const { db, one, all, run, ensureColumn, cleanText, readJson, sendJson, requireUser, activeAcademic, adminSetupPayload, zipFiles, pupilRecord, schoolInfoFromMeta,
@@ -317,10 +318,11 @@ module.exports = function createStudents(ctx) {
                              FROM report_publications rp JOIN academic_terms a ON a.id = rp.academic_id LEFT JOIN classes c ON c.code = rp.class_code
                              WHERE rp.student_id = ? ORDER BY rp.published_at DESC`, id);
         const active = one('SELECT COALESCE(active, 1) AS active, username FROM users WHERE id = ?', id);
-        return sendJson(res, 200, {
+        const card = {
           student: { ...rec, ...st, active: active ? !!active.active : rec.active, username: active?.username || '' },
           groups, tags, tagIds, family, results, school: schoolInfoFromMeta(),
-        }), true;
+        };
+        return sendJson(res, 200, financeAccess.isFinanceUser(user) ? financeAccess.trimPupilProfileForFinance(card) : card), true;
       }
       if (m === 'POST' && p === '/api/admin/view-students/tags') {
         const body = await readJson(req);

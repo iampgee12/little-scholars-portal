@@ -88,8 +88,8 @@ module.exports = function createFinance(ctx) {
         if (body.length > 8_000_000) { req.destroy(); reject(new Error('Request body too large')); }
       });
       req.on('end', () => {
-        if (!body) return resolve({});
-        try { resolve(JSON.parse(body)); } catch { reject(new Error('Invalid JSON body')); }
+        if (!body) return resolve((req.finBody = {}));
+        try { resolve((req.finBody = JSON.parse(body))); } catch { reject(new Error('Invalid JSON body')); }
       });
       req.on('error', reject);
     });
@@ -1019,19 +1019,93 @@ module.exports = function createFinance(ctx) {
     addIncome, addExpense, removeLinked, syncFeePaymentIncome, createSchema,
   };
 
+  // the route files read request bodies through this, so the activity log can see what was sent
+  const routeCtx = { ...ctx, readJson: async req => (req.finBody = await ctx.readJson(req)) };
   const modules = [
-    require('./finance-fees')(ctx, api),
-    require('./finance-books')(ctx, api),
-    require('./finance-payroll')(ctx, api),
-    require('./finance-store')(ctx, api),
-    require('./finance-acct')(ctx, api),
+    require('./finance-fees')(routeCtx, api),
+    require('./finance-books')(routeCtx, api),
+    require('./finance-payroll')(routeCtx, api),
+    require('./finance-store')(routeCtx, api),
+    require('./finance-acct')(routeCtx, api),
   ];
   api.movementRows = modules[1].movementRows;
+
+  // ── Activity log ───────────────────────────────────────────────────────
+  // Every change made on a Finance page goes into the admin's Security &
+  // Activity Log (who, what, how much); accountants can't open that page.
+  const AREAS = [
+    [/^fees\/invoices\/\d+\/payments/, 'Fee payment recorded'], [/^fees\/payments\/\d+\/status/, 'Fee payment status changed'],
+    [/^fees\/invoices/, 'Fee invoice'], [/^fees\/templates/, 'Class fees template'], [/^fees\/wallets/, 'Fees wallet'],
+    [/^fees\/families/, 'Family fees'], [/^fees\/reminders/, 'Fee reminder sent'], [/^fees\//, 'Fees'],
+    [/^finance\/expense-requests/, 'Expense request'], [/^finance\/expenses/, 'Expense'], [/^finance\/income/, 'Income'],
+    [/^finance\/(transfers|adjustments)/, 'Bank / cash transfer or adjustment'], [/^finance\/accounts/, 'Bank / cash account'],
+    [/^finance\/heads/, 'Income / expense head'], [/^finance\//, 'Income & Expenses'],
+    [/^payroll\/salaries/, 'Salaries'], [/^payroll\/loans/, 'Staff loan'], [/^payroll\//, 'Payroll settings'],
+    [/^store\/orders/, 'Store sale / order'], [/^store\/(grns|purchase-orders)/, 'Store purchasing'], [/^store\/products/, 'Store product'], [/^store\//, 'Store'],
+    [/^acct\/journal-entries/, 'Journal entry'], [/^acct\/bills/, 'Bill / customer invoice'], [/^acct\/periods/, 'Accounting period'], [/^acct\//, 'Accounting'],
+  ];
+  const VERB = { POST: 'added / actioned', PUT: 'edited', DELETE: 'deleted' };
+  function logChange(req, res, url) {
+    if (req.method === 'GET' || res.statusCode >= 400 || !ctx.audit || !ctx.currentUser) return;
+    const user = ctx.currentUser(req);
+    if (!user) return;
+    const p = url.pathname.replace(/^\/api\/admin\//, '');
+    const area = (AREAS.find(([re]) => re.test(p)) || [null, 'Finance'])[1];
+    const b = req.finBody || {};
+    const amount = b.amount ?? b.total ?? b.openingCash ?? b.closingCash;
+    const detail = [
+      amount != null && amount !== '' ? `₦${Number(amount).toLocaleString('en-NG')}` : '',
+      ...['action', 'status', 'title', 'name', 'description', 'studentId', 'period', 'reference']
+        .filter(k => b[k] != null && b[k] !== '' && typeof b[k] !== 'object').map(k => `${k}: ${String(b[k]).slice(0, 60)}`),
+      Array.isArray(b.ids) ? `${b.ids.length} item(s)` : '',
+      `(${req.method} /${p})`,
+    ].filter(Boolean).join(' · ');
+    const action = /recorded|changed|sent/.test(area) ? area : `${area} ${VERB[req.method] || ''}`.trim();
+    ctx.audit(req, user, `Finance: ${action}`, detail);
+  }
+
+  // ── Finance home (the accountant's dashboard) and the payment-proof badge ─
+  function homeData() {
+    const t = today();
+    const month = t.slice(0, 7);
+    const academic = one('SELECT id, session_label AS sessionLabel, term_label AS termLabel FROM academic_terms WHERE is_active = 1');
+    const count = sql => (one(sql) || {}).n || 0;
+    const sum = (sql, ...p) => round2((one(sql, ...p) || {}).s);
+    const paidToday = one(`SELECT COALESCE(SUM(amount), 0) AS s, COUNT(*) AS n FROM fee_payments
+                           WHERE status = 'successful' AND COALESCE(payment_date, substr(recorded_at, 1, 10)) = ?`, t);
+    const term = academic ? one(`SELECT COALESCE(SUM(fi.amount), 0) AS billed, COUNT(*) AS n,
+                                        COALESCE(SUM((SELECT COALESCE(SUM(fp.amount), 0) FROM fee_payments fp WHERE fp.invoice_id = fi.id AND fp.status = 'successful')), 0) AS paid
+                                 FROM fee_invoices fi WHERE fi.academic_id = ? AND fi.hidden = 0`, academic.id) : { billed: 0, paid: 0, n: 0 };
+    return {
+      today: t, academic,
+      collectedToday: round2(paidToday.s), paymentsToday: paidToday.n,
+      termBilled: round2(term.billed), termPaid: round2(term.paid), termOutstanding: round2(term.billed - term.paid), termInvoices: term.n,
+      pendingProofs: count("SELECT COUNT(*) AS n FROM fee_payments WHERE status = 'pending'"),
+      pendingExpenseRequests: count("SELECT COUNT(*) AS n FROM expense_requests WHERE status = 'pending'"),
+      approvedToDispense: count("SELECT COUNT(*) AS n FROM expense_requests WHERE status = 'approved'"),
+      lowStock: count(`SELECT COUNT(*) AS n FROM store_products WHERE COALESCE(product_type, 'physical') <> 'digital'
+                       AND COALESCE(status, 'published') <> 'archived' AND stock_qty <= reorder_level`),
+      incomeThisMonth: sum('SELECT COALESCE(SUM(amount), 0) AS s FROM income_entries WHERE substr(income_date, 1, 7) = ?', month),
+      expensesThisMonth: sum('SELECT COALESCE(SUM(amount), 0) AS s FROM expenses WHERE substr(expense_date, 1, 7) = ?', month),
+      recentPayments: all(`SELECT fp.id, fp.amount, fp.method, COALESCE(fp.payment_date, substr(fp.recorded_at, 1, 10)) AS date,
+                                  st.id AS studentId, st.name AS studentName, COALESCE(fi.title, fi.fee_type) AS title, fi.id AS invoiceId
+                           FROM fee_payments fp JOIN fee_invoices fi ON fi.id = fp.invoice_id JOIN students st ON st.id = fi.student_id
+                           WHERE fp.status = 'successful' ORDER BY fp.recorded_at DESC, fp.id DESC LIMIT 8`).map(r => ({ ...r, amount: round2(r.amount) })),
+    };
+  }
+
   api.handle = async function handle(req, res, url) {
     if (!/^\/api\/(admin|student)\/(fees|finance|payroll|store|acct)(\/|$)/.test(url.pathname)) return false;
     try {
+      if (req.method === 'GET' && url.pathname === '/api/admin/finance/home') {
+        if (ctx.requireUser(req, res, 'admin')) ctx.sendJson(res, 200, homeData());
+        return true;
+      }
       for (const m of modules) {
-        if (await m.handle(req, res, url)) return true;
+        if (await m.handle(req, res, url)) {
+          if (url.pathname.startsWith('/api/admin/')) logChange(req, res, url);
+          return true;
+        }
       }
     } catch (err) {
       if (err && err.status) { ctx.sendJson(res, err.status, { error: err.message }); return true; }

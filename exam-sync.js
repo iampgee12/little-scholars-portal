@@ -130,7 +130,7 @@ module.exports = function createExamSync(ctx) {
     if (want.has('staff')) {
       // admins sign in to the exam server; other staff are listed only, so they get no usable password
       tables.staff_users = all("SELECT * FROM users WHERE role IN ('admin', 'teacher', 'staff') AND COALESCE(archived, 0) = 0 AND active = 1")
-        .map(u => scrub(u.role === 'admin' ? u : { ...u, password: '!' }));
+        .map(u => scrub(u.role === 'admin' && u.staff_type !== 'accountant' ? u : { ...u, password: '!' }));
       // for the staff lists: subjects in charge and form classes
       tables.subjects = all('SELECT * FROM subjects');
       tables.teacher_assignments = all('SELECT * FROM teacher_assignments');

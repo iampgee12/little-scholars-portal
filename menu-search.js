@@ -211,7 +211,9 @@
     function close() { list.hidden = true; results = []; }
 
     function render() {
-      results = search(sidebar, input.value);
+      // a page may add its own matches first (the admin portal adds pupils)
+      const extra = typeof window.menuSearch?.extra === 'function' ? window.menuSearch.extra(input.value) : [];
+      results = [...extra, ...search(sidebar, input.value)];
       active = 0;
       if (!input.value.trim()) return close();
       list.style.background = backgroundOf(box);
@@ -238,7 +240,7 @@
       input.value = '';
       close();
       input.blur();
-      entry.el.click();
+      if (entry.run) entry.run(); else entry.el.click();
     }
 
     // Browsers may autofill a saved login ID (e.g. "TCH-097") into the box.
@@ -284,5 +286,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  window.menuSearch = { search };
+  window.menuSearch = Object.assign(window.menuSearch || {}, { search });
 })();

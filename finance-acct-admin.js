@@ -141,7 +141,7 @@
       { key: '#', label: '#', sortable: false }, { key: 'sessionLabel', label: 'Session' }, { key: 'termLabel', label: 'Term' }, { key: 'datesOnFile', label: 'Dates on File', render: r => esc(r.datesOnFile || '—') },
       { key: 'fromDate', label: 'Locked Range', render: r => (r.fromDate ? `${date(r.fromDate)} – ${date(r.toDate)}` : '—') },
       { key: 'status', label: 'Status', render: r => (r.status === 'locked' ? badge('Locked', 'red') : badge('Open', 'green')) },
-      { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'locked' ? `<button class="fin-btn plain sm" onclick='FIN.acct.pmUnlock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-unlock></i> Unlock</button>` : `<button class="fin-btn plain sm" onclick='FIN.acct.pmLock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-lock></i> Lock</button>`) }] });
+      { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'locked' ? (state.user && state.user.scope === 'finance' ? '<span class="muted">Only an admin can unlock</span>' : `<button class="fin-btn plain sm" onclick='FIN.acct.pmUnlock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-unlock></i> Unlock</button>`) : `<button class="fin-btn plain sm" onclick='FIN.acct.pmLock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-lock></i> Lock</button>`) }] });
   }
   function pmLock(sess, term) {
     const list = S.periods;

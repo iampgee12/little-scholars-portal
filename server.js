@@ -15,6 +15,7 @@ const { createCbtOffline } = require('./cbt-offline');
 const { createCbtTrial } = require('./cbt-trial');
 const createExamSync = require('./exam-sync');
 const createFinance = require('./finance-core');
+const financeAccess = require('./finance-access');
 
 const ROOT = __dirname;
 
@@ -246,8 +247,9 @@ function ensureColumn(table, column, definition) {
 }
 
 // ── Staff types ──
-// Teachers and admins sign in; every other staff type is a record only
-// (users.role = 'staff', which can never sign in).
+// Teachers and admins sign in, and so do accountants / bursary officers (role 'admin'
+// limited to Finance and a read-only People view by finance-access.js); every other
+// staff type is a record only (users.role = 'staff', which can never sign in).
 const STAFF_TYPES = [
   ['teacher', 'Teacher'], ['accountant', 'Accountant/Bursary Officer'], ['librarian', 'Librarian'],
   ['registrar', 'Registrar'], ['transport_manager', 'Transport Manager'], ['hostel_manager', 'Hostel Manager'],
@@ -311,7 +313,7 @@ function readStaffForm(body) {
 }
 
 function staffRoleForType(staffType) {
-  return staffType === 'teacher' ? 'teacher' : staffType === 'admin' ? 'admin' : 'staff';
+  return staffType === 'teacher' ? 'teacher' : staffType === 'admin' || staffType === 'accountant' ? 'admin' : 'staff';
 }
 
 function nextStaffUserId(role) {
@@ -382,8 +384,8 @@ const CBT_AT_SCHOOL = 'CBT exams are written at school, on the exam computers.';
 
 function adminLevel(userOrId) {
   const id = typeof userOrId === 'string' ? userOrId : userOrId?.id;
-  const row = id ? one('SELECT id, role, super_admin AS superAdmin FROM users WHERE id = ?', id) : null;
-  if (!row || row.role !== 'admin') return null;
+  const row = id ? one('SELECT id, role, staff_type, super_admin AS superAdmin FROM users WHERE id = ?', id) : null;
+  if (!row || row.role !== 'admin' || financeAccess.isFinanceUser(row)) return null;
   if (row.id === ownerAdminId()) return 'owner';
   return row.superAdmin ? 'super' : 'admin';
 }
@@ -846,6 +848,10 @@ function createSchema() {
     ensureColumn('users', col, 'TEXT');
   }
   allowStaffRole();
+  // Accountants / bursary officers used to be records only; they now sign in (limited to Finance).
+  // They get a password when an admin edits them (Staff > Edit) or through Forgot Password.
+  ensureColumn('users', 'password_unset', 'INTEGER NOT NULL DEFAULT 0');
+  all("SELECT id FROM users WHERE role = 'staff' AND staff_type = 'accountant'").forEach(u => run("UPDATE users SET role = 'admin', super_admin = 0, password = ?, password_unset = 1 WHERE id = ?", hashPassword(crypto.randomBytes(24).toString('hex')), u.id));
   // Add Staff form: staff type plus Bio Data / More Info / Work Details / Next of Kin
   for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
   ensureColumn('users', 'archived', 'INTEGER NOT NULL DEFAULT 0');
@@ -1823,6 +1829,9 @@ termSetup.createSchema();
 const finance = createFinance({
   db, one, all, run, ensureColumn, valueFromMeta, setMeta, cleanText, readJson, sendJson, requireUser, saveDataUrl,
   parseXlsxFirstSheet, activeAcademic, schoolInfoFromMeta, smtpConfigStatus, smtpSend, STAFF_TYPES, UPLOAD_DIR, DATA_DIR,
+  // finance changes go into the Security & Activity Log
+  audit: (req, user, action, detail) => security.audit(req, user, action, detail),
+  currentUser: req => sessionUser(req),
 });
 finance.createSchema();
 // Password rules, two-step admin login, activity log, idle sign-out, backups
@@ -1914,6 +1923,7 @@ function publicUser(row) {
     chip: row.chip,
     grade: row.grade,
     adminLevel: row.role === 'admin' ? adminLevel(row.id) : null,
+    scope: financeAccess.isFinanceUser(row) ? 'finance' : null,
     trial: !!row.trial,
     email: row.email || '',
     signaturePath: row.signature_path || '',
@@ -3661,6 +3671,7 @@ function resetLoginAttempts(identifier) {
 }
 
 async function handleApi(req, res, url) {
+  if (financeAccess.refuseIfOutOfScope(sessionUser(req), req, res, url, sendJson)) return;
   if (await enrolment.handle(req, res, url)) return;
   if (await studentsMod.handle(req, res, url)) return;
   if (await termSetup.handle(req, res, url)) return;
@@ -3688,7 +3699,7 @@ async function handleApi(req, res, url) {
     // anything else happens (e.g. a pupil's username and password typed into the
     // Staff login must not go on to "choose a new password" for that pupil)
     if (matches.length && ['admin', 'teacher', 'student'].includes(body.role)) {
-      const forRole = matches.filter(u => u.role === body.role);
+      const forRole = matches.filter(u => u.role === body.role || (body.role === 'teacher' && financeAccess.isFinanceUser(u)));
       if (!forRole.length) {
         recordFailedLogin(id);
         security.audit(req, { id: matches[0].id, name: matches[0].name, role: matches[0].role }, `Sign-in refused (used the ${body.role} login)`, '', 'failed');
@@ -3812,7 +3823,7 @@ async function handleApi(req, res, url) {
         dob, doa, cleanText(body.religion), bloodGroup, cleanText(body.address), phone, email, user.id
       );
       if (signaturePath) run('UPDATE users SET signature_path = ? WHERE id = ?', signaturePath, user.id);
-      if (signaturePath && user.role === 'admin') setMeta('head_signature_path', signaturePath);
+      if (signaturePath && user.role === 'admin' && !financeAccess.isFinanceUser(user)) setMeta('head_signature_path', signaturePath);
       if (isStudent) {
         // Name stays admin-controlled for pupils (it prints on official results).
         if (gender) run('UPDATE students SET gender = ? WHERE id = ?', gender === 'Female' ? 'F' : 'M', user.id);
@@ -3868,7 +3879,7 @@ async function handleApi(req, res, url) {
     }
     run('UPDATE users SET signature_path = ? WHERE id = ?', stored, user.id);
     // The admin's signature is the Head of School signature on result sheets.
-    if (user.role === 'admin') setMeta('head_signature_path', stored);
+    if (user.role === 'admin' && !financeAccess.isFinanceUser(user)) setMeta('head_signature_path', stored);
     return sendJson(res, 200, { ok: true, signaturePath: stored });
   }
 
@@ -4742,7 +4753,8 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/admin/result-setup') {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
-    return sendJson(res, 200, adminSetupPayload());
+    const payload = adminSetupPayload();
+    return sendJson(res, 200, financeAccess.isFinanceUser(user) ? financeAccess.trimSetupForFinance(payload) : payload);
   }
 
   if (req.method === 'GET' && url.pathname === '/api/admin/skills') {
@@ -7249,7 +7261,7 @@ async function handleApi(req, res, url) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
     const staffId = decodeURIComponent(staffUpdateMatch[1]).trim().toUpperCase();
-    const existing = one("SELECT id, role, teacher_type AS teacherType, photo_path AS photoPath FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", staffId);
+    const existing = one("SELECT id, role, teacher_type AS teacherType, photo_path AS photoPath, COALESCE(password_unset, 0) AS noPassword FROM users WHERE id = ? AND role IN ('teacher', 'admin', 'staff')", staffId);
     if (!existing) return sendJson(res, 404, { error: 'Staff member not found' });
     const form = readStaffForm(await readJson(req));
     if (form.error) return sendJson(res, 400, { error: form.error });
@@ -7263,11 +7275,15 @@ async function handleApi(req, res, url) {
     if (staffId === user.id && role !== 'admin') {
       return sendJson(res, 400, { error: 'You cannot remove admin access from your own account' });
     }
+    // an Accountant / Bursary account is limited to Finance, so it can't be the owner's or your own
+    if (form.staffType === 'accountant' && (staffId === user.id || staffId === ownerAdminId())) {
+      return sendJson(res, 400, { error: staffId === user.id ? 'You cannot change your own account to Accountant / Bursary Officer' : 'The school owner account cannot be an Accountant / Bursary Officer' });
+    }
     if (staffId !== user.id) {
       const guard = adminGuard(user, staffId);
       if (guard) return sendJson(res, 403, { error: guard });
     }
-    if (role === 'admin' && existing.role !== 'admin' && adminLevel(user) === 'admin') {
+    if (role === 'admin' && form.staffType !== 'accountant' && existing.role !== 'admin' && adminLevel(user) === 'admin') {
       return sendJson(res, 403, { error: 'Only a super admin can make someone an administrator' });
     }
     const wasOwner = staffId === ownerAdminId();
@@ -7276,7 +7292,7 @@ async function handleApi(req, res, url) {
     let generatedPassword = null;
     if (role === 'staff') password = '';
     else if (form.autoPassword) password = generatedPassword = String(crypto.randomInt(100000, 1000000));
-    else if (existing.role === 'staff' && !password) {
+    else if ((existing.role === 'staff' || existing.noPassword) && !password) {
       return sendJson(res, 400, { error: 'Enter a password or tick Auto Generate Password so they can sign in' });
     }
     const assignmentCount = one('SELECT COUNT(*) AS count FROM teacher_assignments WHERE teacher_id = ?', staffId).count;
@@ -7331,7 +7347,7 @@ async function handleApi(req, res, url) {
         `UPDATE users
          SET id = ?, role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?, photo_path = ?,
              ${cols.map(col => `${col} = ?`).join(', ')}
-             ${password ? ', password = ?' : ''}
+             ${password ? ', password = ?, password_unset = 0' : ''}
          WHERE id = ?`,
         newStaffId, role, name, firstName, initials,
         role === 'teacher' ? teacherType : null, role === 'teacher' ? name.toUpperCase() : null, photoPath,
@@ -7398,7 +7414,7 @@ async function handleApi(req, res, url) {
     const form = readStaffForm(await readJson(req));
     if (form.error) return sendJson(res, 400, { error: form.error });
     const { role, teacherType, name, firstName, initials, profile, classCode } = form;
-    if (role === 'admin' && adminLevel(user) === 'admin') {
+    if (role === 'admin' && form.staffType !== 'accountant' && adminLevel(user) === 'admin') {
       return sendJson(res, 403, { error: 'Only a super admin can add an administrator' });
     }
     if (!profile.email) return sendJson(res, 400, { error: 'Email is required' });
@@ -7588,7 +7604,7 @@ async function handleApi(req, res, url) {
       });
       if (form.error) return errors.push({ row: rowNo, message: form.error });
       const { role, teacherType, name, firstName, initials, profile } = form;
-      if (role === 'admin' && adminLevel(user) === 'admin') return errors.push({ row: rowNo, message: 'Only a super admin can add an administrator' });
+      if (role === 'admin' && form.staffType !== 'accountant' && adminLevel(user) === 'admin') return errors.push({ row: rowNo, message: 'Only a super admin can add an administrator' });
       if (!profile.email) return errors.push({ row: rowNo, message: 'Email is required' });
       const classCode = cleanText(value('classCode')).toUpperCase();
       if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });

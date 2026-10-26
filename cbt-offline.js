@@ -159,7 +159,7 @@ function createCbtOffline(deps) {
     const studentIds = new Set(students.map(s => s.id));
     const scrub = u => ({ ...u, reset_token: null, reset_token_expires: null });
     const users = all("SELECT * FROM users WHERE role IN ('student', 'admin')")
-      .filter(u => (u.role === 'student' && studentIds.has(u.id)) || (u.role === 'admin' && u.active))
+      .filter(u => (u.role === 'student' && studentIds.has(u.id)) || (u.role === 'admin' && u.active && u.staff_type !== 'accountant'))
       .map(scrub);
     const packId = crypto.randomUUID();
     return {

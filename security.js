@@ -217,7 +217,7 @@ module.exports = function createSecurity(ctx) {
   function alertAdmins(subject, text) {
     const config = smtpConfigStatus();
     if (!config.configured) return;
-    for (const a of all("SELECT email, first_name, name FROM users WHERE role = 'admin' AND active = 1 AND COALESCE(email, '') <> ''")) {
+    for (const a of all("SELECT email, first_name, name FROM users WHERE role = 'admin' AND COALESCE(staff_type, '') <> 'accountant' AND active = 1 AND COALESCE(email, '') <> ''")) {
       const message = [`From: ${config.from}`, `To: ${a.email}`, `Subject: ${subject}`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '',
         `Hello ${a.first_name || a.name},\r\n\r\n${text}\r\n\r\nUnique Children School portal`].join('\r\n');
       smtpSend({ host: config.host, port: config.port, user: process.env.SMTP_USER || '', pass: process.env.SMTP_PASS || '', from: config.from, to: a.email, message }).catch(() => {});

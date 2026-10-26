@@ -306,7 +306,7 @@ module.exports = function createBooks(ctx, F) {
       const { from, to } = range(url);
       let sql = `SELECT r.id, r.voucher_no AS voucherNo, r.title, r.category, r.item, r.description, r.amount, r.reason, r.method,
                         COALESCE(r.transaction_date, substr(r.requested_at,1,10)) AS transactionDate, r.requested_at AS requestedAt,
-                        COALESCE(r.requested_by_name, u.name) AS requestedByName, r.status, r.approved_by AS approvedBy, au.name AS approvedByName,
+                        COALESCE(r.requested_by_name, u.name) AS requestedByName, r.requested_by AS raisedBy, r.status, r.approved_by AS approvedBy, au.name AS approvedByName,
                         r.approved_at AS approvedAt, r.dispensed_at AS dispensedAt, r.account_id AS accountId, fa.name AS accountName
                  FROM expense_requests r JOIN users u ON u.id = r.requested_by LEFT JOIN users au ON au.id = r.approved_by
                  LEFT JOIN fin_accounts fa ON fa.id = r.account_id WHERE 1=1`;
@@ -364,6 +364,8 @@ module.exports = function createBooks(ctx, F) {
         const action = cleanText(b.action);
         if (action === 'approve' || action === 'reject') {
           if (request.status !== 'pending') return sendJson(res, 400, { error: 'Only pending requests can be approved or declined' }), true;
+          // whoever raised a request can't approve it: a second person must
+          if (action === 'approve' && request.requested_by === user.id) return sendJson(res, 403, { error: 'You raised this request, so someone else must approve it' }), true;
           run('UPDATE expense_requests SET status = ?, approved_by = ?, approved_at = ? WHERE id = ?', action === 'approve' ? 'approved' : 'rejected', user.id, nowIso(), request.id);
         } else if (action === 'dispense') {
           F.tx(() => dispense(request, Number(b.accountId) || null));
