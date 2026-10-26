@@ -20,8 +20,9 @@ const ROLE_META = {
     badge:       'STAFF',
     badgeClass:  'teacher',
     idLabel:     'Staff ID or Email',
-    placeholder: 'e.g. TCH-001 or name@example.com',
+    placeholder: 'e.g. TCH-001, STF-001 or name@example.com',
     prefix:      'TCH-',
+    prefixText:  '"TCH-" or "STF-"',
     color:       'var(--amber)',
     portalLabel: 'Teacher Portal',
   },
@@ -84,14 +85,16 @@ function goBack() {
 function finishSignIn(data) {
   const user = data.user;
   const meta = ROLE_META[selectedRole] || ROLE_META[user.role];
-  // Server-side role mismatch guard (belt-and-suspenders)
-  if (selectedRole && user.role !== selectedRole) {
+  // Server-side role mismatch guard (belt-and-suspenders); accountants / bursary
+  // officers are staff who use the Finance part of the admin portal
+  const portalRole = user.scope === 'finance' ? 'teacher' : user.role;
+  if (selectedRole && portalRole !== selectedRole) {
     fetch('/api/logout', { method: 'POST' }).catch(() => {});
     throw new Error(`This account does not have ${meta.badge.toLowerCase()} access. Please go back and choose the correct portal.`);
   }
   localStorage.setItem('ls_user_id',   user.id);
   localStorage.setItem('ls_user_role', user.role);
-  document.getElementById('redirect-role').textContent  = meta.portalLabel;
+  document.getElementById('redirect-role').textContent  = user.scope === 'finance' ? 'Finance Portal' : meta.portalLabel;
   document.getElementById('redirect-role').style.color  = meta.color;
   document.getElementById('redirect-overlay').classList.add('show');
   // replace: the browser's Back button from the portal never lands on this page mid-redirect
@@ -243,7 +246,7 @@ async function handleLogin() {
   } else if (Object.entries(ROLE_META).some(([role, m]) => role !== selectedRole && sid.toUpperCase().startsWith(m.prefix))) {
     // an ID that clearly belongs to another portal (emails, Reg. Nos and other IDs go through)
     sidEl.classList.add('error');
-    sidErr.textContent = selectedRole === 'student' ? 'That is not a pupil username. Check it or go back.' : `${meta.idLabel.replace(' or Email', '')}s start with "${meta.prefix}". Check your ID or go back.`;
+    sidErr.textContent = selectedRole === 'student' ? 'That is not a pupil username. Check it or go back.' : `${meta.idLabel.replace(' or Email', '')}s start with ${meta.prefixText || `"${meta.prefix}"`}. Check your ID or go back.`;
     sidErr.classList.add('show');
     valid = false;
   }

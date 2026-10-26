@@ -85,6 +85,13 @@ const REPORT_DIR = path.join(DATA_DIR, 'published_reports');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA foreign_keys = ON');
+// On the exam computer every pupil's answer is its own save. The default journal
+// writes, syncs and deletes a separate file for each one (~9 ms, longer on a slow
+// laptop disk or with antivirus scanning it), and the whole server waits meanwhile,
+// so a full exam hall queued up. WAL appends to one file instead (~0.6 ms) and,
+// with synchronous FULL, still puts every answer safely on disk before replying.
+// (Backups use VACUUM INTO, which reads WAL databases correctly.)
+if (EXAM_MODE) db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(REPORT_DIR, { recursive: true });
 
@@ -124,6 +131,22 @@ function verifyPassword(password, stored) {
   try {
     const hashBuffer = Buffer.from(hash, 'hex');
     const candidateBuffer = crypto.scryptSync(String(password), salt, SCRYPT_KEYLEN);
+    if (candidateBuffer.length !== hashBuffer.length) return false;
+    return crypto.timingSafeEqual(candidateBuffer, hashBuffer);
+  } catch {
+    return false;
+  }
+}
+
+// The same check without holding up the server: scrypt takes ~70 ms of CPU, and at
+// sign-in a whole class arrives at once, so it runs on Node's worker threads while
+// other pupils' requests carry on.
+async function verifyPasswordAsync(password, stored) {
+  if (!isHashedPassword(stored)) return false;
+  const [salt, hash] = stored.split(':');
+  try {
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const candidateBuffer = await new Promise((resolve, reject) => crypto.scrypt(String(password), salt, SCRYPT_KEYLEN, (err, key) => (err ? reject(err) : resolve(key))));
     if (candidateBuffer.length !== hashBuffer.length) return false;
     return crypto.timingSafeEqual(candidateBuffer, hashBuffer);
   } catch {
@@ -316,8 +339,54 @@ function staffRoleForType(staffType) {
   return staffType === 'teacher' ? 'teacher' : staffType === 'admin' || staffType === 'accountant' ? 'admin' : 'staff';
 }
 
-function nextStaffUserId(role) {
-  const prefix = STAFF_ID_PREFIX[role] || 'STF-';
+// Points every record that refers to a user (foreign keys, plus the
+// assisting-teacher lists) at their new ID. Call inside a transaction, then
+// change users.id itself.
+function moveUserReferences(oldId, newId) {
+  db.exec('PRAGMA defer_foreign_keys = ON');
+  const tables = all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
+  for (const { name: tableName } of tables) {
+    const escapedTable = tableName.replace(/"/g, '""');
+    const refs = all(`PRAGMA foreign_key_list("${escapedTable}")`)
+      .filter(ref => ref.table === 'users' && ref.to === 'id');
+    for (const ref of refs) {
+      const escapedColumn = ref.from.replace(/"/g, '""');
+      run(`UPDATE "${escapedTable}" SET "${escapedColumn}" = ? WHERE "${escapedColumn}" = ?`, newId, oldId);
+    }
+    if (tableName === 'class_subjects') {
+      const rows = all('SELECT rowid, assisting_teacher_ids FROM class_subjects WHERE assisting_teacher_ids IS NOT NULL');
+      for (const row of rows) {
+        const ids = String(row.assisting_teacher_ids).split(',').map(id => id.trim());
+        if (ids.includes(oldId)) {
+          run('UPDATE class_subjects SET assisting_teacher_ids = ? WHERE rowid = ?', ids.map(id => id === oldId ? newId : id).join(','), row.rowid);
+        }
+      }
+    }
+  }
+}
+
+// Accountants added before they had STF- IDs move off their ADM- ones.
+function moveAccountantsToStaffIds() {
+  for (const { id } of all("SELECT id FROM users WHERE role = 'admin' AND staff_type = 'accountant' AND id LIKE 'ADM-%'")) {
+    if (id === ownerAdminId()) continue;
+    const newId = nextStaffUserId('admin', 'accountant');
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      moveUserReferences(id, newId);
+      run('UPDATE users SET id = ? WHERE id = ?', newId, id);
+      db.exec('COMMIT');
+      console.log(`Accountant ${id} is now ${newId}`);
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+}
+
+// Accountants / bursary officers sign in to (part of) the admin portal but are
+// non-teaching staff, so their IDs are STF- like the rest of the non-teaching staff.
+function nextStaffUserId(role, staffType) {
+  const prefix = (staffType !== 'accountant' && STAFF_ID_PREFIX[role]) || 'STF-';
   const max = all('SELECT id FROM users WHERE id LIKE ?', `${prefix}%`)
     .reduce((m, r) => Math.max(m, Number(r.id.slice(prefix.length)) || 0), 0);
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
@@ -851,11 +920,12 @@ function createSchema() {
   // Accountants / bursary officers used to be records only; they now sign in (limited to Finance).
   // They get a password when an admin edits them (Staff > Edit) or through Forgot Password.
   ensureColumn('users', 'password_unset', 'INTEGER NOT NULL DEFAULT 0');
-  all("SELECT id FROM users WHERE role = 'staff' AND staff_type = 'accountant'").forEach(u => run("UPDATE users SET role = 'admin', super_admin = 0, password = ?, password_unset = 1 WHERE id = ?", hashPassword(crypto.randomBytes(24).toString('hex')), u.id));
   // Add Staff form: staff type plus Bio Data / More Info / Work Details / Next of Kin
   for (const col of STAFF_PROFILE_COLUMNS) ensureColumn('users', col, 'TEXT');
   ensureColumn('users', 'archived', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('users', 'super_admin', 'INTEGER NOT NULL DEFAULT 0');
+  // (after staff_type and super_admin exist, or a new database can't start)
+  all("SELECT id FROM users WHERE role = 'staff' AND staff_type = 'accountant'").forEach(u => run("UPDATE users SET role = 'admin', super_admin = 0, password = ?, password_unset = 1 WHERE id = ?", hashPassword(crypto.randomBytes(24).toString('hex')), u.id));
   // a short sign-in name (e.g. a pupil's "2201"), besides the portal ID, Reg. No. and email
   ensureColumn('users', 'username', 'TEXT');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(LOWER(username)) WHERE username IS NOT NULL');
@@ -1861,6 +1931,8 @@ const cbtTrial = createCbtTrial({
 cbtTrial.createSchema();
 cbtTrial.ensureDefaultTesters();
 assignStudentUsernames();
+// after every module's tables exist, so all their references move too
+moveAccountantsToStaffIds();
 enrolment.onClassChange(id => studentsMod.recordHistory(id));
 // One-time cleanup: CBT questions used to need a manual admin "vet" step
 // before they were usable. That approval step was removed — any question
@@ -3562,6 +3634,50 @@ function smtpSend({ host, port, user, pass, from, to, message }) {
   });
 }
 
+// Pupils' answers are written to disk together. Each save to disk costs several ms
+// however little it holds, and the server can't answer anyone else meanwhile, so
+// with a full hall answering one save each queued everyone up. Answers arriving
+// within a few ms of each other now share one save; each pupil is told "saved"
+// only once theirs is on disk.
+const answerQueue = [];
+let answerFlushTimer = null;
+function saveAnswer(attemptId, questionId, selectedOption) {
+  return new Promise((resolve, reject) => {
+    answerQueue.push({ attemptId, questionId, selectedOption, resolve, reject });
+    answerFlushTimer ||= setTimeout(flushAnswers, 10);
+  });
+}
+function flushAnswers() {
+  answerFlushTimer = null;
+  // another change is part-way through its own transaction: come back in a moment
+  if (db.isTransaction) { answerFlushTimer = setTimeout(flushAnswers, 10); return; }
+  const batch = answerQueue.splice(0);
+  const done = [];
+  try {
+    db.exec('BEGIN');
+    const submitted = db.prepare('SELECT submitted_at AS submittedAt FROM cbt_attempts WHERE id = ?');
+    const upsert = db.prepare(
+      `INSERT INTO cbt_attempt_answers (attempt_id, question_id, selected_option) VALUES (?, ?, ?)
+       ON CONFLICT(attempt_id, question_id) DO UPDATE SET selected_option = excluded.selected_option`
+    );
+    for (const a of batch) {
+      try {
+        // handed in (e.g. the paper was closed) since this answer arrived
+        if (submitted.get(a.attemptId)?.submittedAt) { a.reject(Object.assign(new Error('Already submitted'), { submitted: true })); continue; }
+        upsert.run(a.attemptId, a.questionId, a.selectedOption);
+        done.push(a);
+      } catch (err) {
+        a.reject(err);
+      }
+    }
+    db.exec('COMMIT');
+    done.forEach(a => a.resolve());
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* nothing to undo */ }
+    batch.forEach(a => a.reject(err)); // (no effect on ones already turned away above)
+  }
+}
+
 // Marks a CBT attempt against the paper's current questions, stamps it
 // submitted and records the score. Shared by the student Submit button, the
 // exam computer closing a paper, and uploading offline (LAN) results.
@@ -3694,17 +3810,21 @@ async function handleApi(req, res, url) {
     // ID, pupil Reg. No. or email address; records-only staff (role 'staff') never sign in
     // on the exam server only pupils and admins sign in
     const candidates = findSignInAccounts(body.id).filter(u => u.role !== 'staff' && !(EXAM_MODE && u.role === 'teacher'));
-    let matches = candidates.filter(u => verifyPassword(password, u.password));
+    const passwordOk = await Promise.all(candidates.map(u => verifyPasswordAsync(password, u.password)));
+    let matches = candidates.filter((u, i) => passwordOk[i]);
     // The portal picked on the sign-in page must match the account, checked before
     // anything else happens (e.g. a pupil's username and password typed into the
     // Staff login must not go on to "choose a new password" for that pupil)
     if (matches.length && ['admin', 'teacher', 'student'].includes(body.role)) {
-      const forRole = matches.filter(u => u.role === body.role || (body.role === 'teacher' && financeAccess.isFinanceUser(u)));
+      // accountants / bursary officers are staff, not admins: Staff login only
+      const portalOf = u => (financeAccess.isFinanceUser(u) ? 'teacher' : u.role);
+      const forRole = matches.filter(u => portalOf(u) === body.role);
       if (!forRole.length) {
         recordFailedLogin(id);
         security.audit(req, { id: matches[0].id, name: matches[0].name, role: matches[0].role }, `Sign-in refused (used the ${body.role} login)`, '', 'failed');
         const portal = { admin: 'Admin', teacher: 'Staff', student: 'Pupil' };
-        return sendJson(res, 403, { error: `These are not ${portal[body.role]} sign-in details. If this is a ${portal[matches[0].role] || 'different'} account, go back and choose ${portal[matches[0].role] || 'the right portal'}.` });
+        const right = portal[portalOf(matches[0])];
+        return sendJson(res, 403, { error: `These are not ${portal[body.role]} sign-in details. If this is ${right ? (right === 'Admin' ? 'an ' : 'a ') + right : 'a different'} account, go back and choose ${right || 'the right portal'}.` });
       }
       matches = forRole;
     }
@@ -4650,11 +4770,12 @@ async function handleApi(req, res, url) {
     if (!one('SELECT id FROM cbt_questions WHERE id = ?', questionId)) {
       return sendJson(res, 400, { error: 'Question not found' });
     }
-    run(
-      `INSERT INTO cbt_attempt_answers (attempt_id, question_id, selected_option) VALUES (?, ?, ?)
-       ON CONFLICT(attempt_id, question_id) DO UPDATE SET selected_option = excluded.selected_option`,
-      attempt.id, questionId, selectedOption
-    );
+    try {
+      await saveAnswer(attempt.id, questionId, selectedOption);
+    } catch (err) {
+      if (err.submitted) return sendJson(res, 409, { error: 'This exam has already been submitted' });
+      throw err;
+    }
     return sendJson(res, 200, { ok: true });
   }
 
@@ -7266,7 +7387,9 @@ async function handleApi(req, res, url) {
     const form = readStaffForm(await readJson(req));
     if (form.error) return sendJson(res, 400, { error: form.error });
     const { role, teacherType, name, firstName, initials, profile } = form;
-    const newStaffId = form.id || staffId;
+    let newStaffId = form.id || staffId;
+    // an Accountant / Bursary Officer is non-teaching staff, not an admin: STF- ID
+    if (form.staffType === 'accountant' && newStaffId.startsWith('ADM-')) newStaffId = nextStaffUserId(role, 'accountant');
     // only a new ID is checked, so older records with other IDs can still be saved
     if (newStaffId !== staffId && !/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(newStaffId)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
     if (newStaffId !== staffId && one('SELECT id FROM users WHERE id = ?', newStaffId)) {
@@ -7321,28 +7444,7 @@ async function handleApi(req, res, url) {
 
     db.exec('BEGIN IMMEDIATE');
     try {
-      if (newStaffId !== staffId) {
-        db.exec('PRAGMA defer_foreign_keys = ON');
-        const tables = all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'");
-        for (const { name: tableName } of tables) {
-          const escapedTable = tableName.replace(/"/g, '""');
-          const refs = all(`PRAGMA foreign_key_list("${escapedTable}")`)
-            .filter(ref => ref.table === 'users' && ref.to === 'id');
-          for (const ref of refs) {
-            const escapedColumn = ref.from.replace(/"/g, '""');
-            run(`UPDATE "${escapedTable}" SET "${escapedColumn}" = ? WHERE "${escapedColumn}" = ?`, newStaffId, staffId);
-          }
-          if (tableName === 'class_subjects') {
-            const rows = all('SELECT rowid, assisting_teacher_ids FROM class_subjects WHERE assisting_teacher_ids IS NOT NULL');
-            for (const row of rows) {
-              const ids = String(row.assisting_teacher_ids).split(',').map(id => id.trim());
-              if (ids.includes(staffId)) {
-                run('UPDATE class_subjects SET assisting_teacher_ids = ? WHERE rowid = ?', ids.map(id => id === staffId ? newStaffId : id).join(','), row.rowid);
-              }
-            }
-          }
-        }
-      }
+      if (newStaffId !== staffId) moveUserReferences(staffId, newStaffId);
       run(
         `UPDATE users
          SET id = ?, role = ?, name = ?, first_name = ?, initials = ?, teacher_type = ?, chip = ?, photo_path = ?,
@@ -7421,8 +7523,9 @@ async function handleApi(req, res, url) {
     if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) {
       return sendJson(res, 400, { error: 'Choose a class for this Class Teacher' });
     }
-    const id = form.id || nextStaffUserId(role);
+    const id = form.id || nextStaffUserId(role, form.staffType);
     if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return sendJson(res, 400, { error: 'Staff ID may only use letters, numbers and dashes' });
+    if (form.staffType === 'accountant' && id.startsWith('ADM-')) return sendJson(res, 400, { error: 'Accountants / Bursary Officers are staff, not admins: leave Staff ID blank for an STF- ID' });
     if (one('SELECT id FROM users WHERE id = ?', id)) return sendJson(res, 409, { error: 'A staff member with that ID already exists' });
     // Records-only staff never sign in, so they get an unguessable password nobody sees.
     let generatedPassword = null;
@@ -7608,8 +7711,9 @@ async function handleApi(req, res, url) {
       if (!profile.email) return errors.push({ row: rowNo, message: 'Email is required' });
       const classCode = cleanText(value('classCode')).toUpperCase();
       if (role === 'teacher' && teacherType === 'class_teacher' && !classCode) return errors.push({ row: rowNo, message: 'Class Teacher needs a Class' });
-      const id = form.id || nextStaffUserId(role);
+      const id = form.id || nextStaffUserId(role, form.staffType);
       if (!/^[A-Z0-9][A-Z0-9-]{1,29}$/.test(id)) return errors.push({ row: rowNo, message: `Staff ID "${id}" may only use letters, numbers and dashes` });
+      if (form.staffType === 'accountant' && id.startsWith('ADM-')) return errors.push({ row: rowNo, message: `Accountants / Bursary Officers get STF- IDs, not ${id}` });
       if (one('SELECT id FROM users WHERE id = ?', id)) return errors.push({ row: rowNo, message: `Staff ID ${id} already exists` });
       // records-only staff never sign in; sign-in staff get the default password, or a generated one shown once
       const generated = role !== 'staff' && !defaultPassword ? String(crypto.randomInt(100000, 1000000)) : null;
@@ -8473,6 +8577,7 @@ function redirectTo(res, location) {
   res.end();
 }
 
+const staticCache = new Map(); // exam computer only: file path → contents
 function serveStatic(req, res, url) {
   let pathname;
   try {
@@ -8535,12 +8640,16 @@ function serveStatic(req, res, url) {
     res.end('Not found');
     return;
   }
-  fs.readFile(filePath, (err, data) => {
+  // On the exam computer the page files are kept in memory: when a whole class signs
+  // in at once, reading them from disk waits behind everyone's password checks.
+  const cached = EXAM_MODE && staticCache.get(filePath);
+  (cached ? done => done(null, cached) : done => fs.readFile(filePath, done))((err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Not found');
       return;
     }
+    if (EXAM_MODE) staticCache.set(filePath, data);
     const ext = path.extname(filePath).toLowerCase();
     const types = {
       '.html': 'text/html; charset=utf-8',
@@ -8582,6 +8691,13 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) sendJson(res, 500, IS_PROD ? { error: 'Server error' } : { error: 'Server error', detail: err.message });
   }
 });
+
+// On the exam computer each pupil's browser keeps its connections open between answers.
+// Node's default drops them after 5 s idle, so a pupil thinking over a question opened a
+// new connection for every answer. Windows (Home/Pro) only lets about 230 new connections
+// wait while the server is busy and refuses the rest outright ("can't connect"), so
+// fewer new connections in a full hall means none turned away.
+if (EXAM_MODE) server.keepAliveTimeout = 120e3;
 
 // run here, once everything above (including the class teacher subject rules) is defined
 setUpClassTeacherSubjects();
