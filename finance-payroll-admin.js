@@ -15,7 +15,7 @@
     const m = await meta(true);
     const st = S.msp;
     el.innerHTML = `${FIN.header('Payroll: Monthly Salary Processing')}
-      ${card('⛃ Select Month for Salary Processing', `<div class="fin-grid">
+      ${card('<i class=fi-filter></i> Select Month for Salary Processing', `<div class="fin-grid">
         ${field('Employee Type', select('msp-type', [['all', 'All Staff'], ...m.staffTypes.map(t => [t.key, t.label])], st.type || '', 'Select'), { required: true })}
         ${field('Month', select('msp-month', monthOpts, st.month || String(now.getMonth() + 1), 'Select Salary Month'), { required: true })}
         ${field('Year', FIN.input('msp-year', { type: 'number', value: st.year || now.getFullYear() }), { required: true })}
@@ -39,7 +39,7 @@
     return `<div id="msp-${kind}-${i}">${lines.map((l, j) => `<div style="display:flex;gap:4px;margin-bottom:4px">
         <input class="field-input" style="padding:5px 7px;font-size:11px" value="${esc(l.name)}" ${locked || l.statutory || l.loanId ? 'disabled' : ''} oninput="FIN.payroll.setLine(${i},'${kind}',${j},'name',this.value)">
         <input class="field-input" type="number" style="padding:5px 7px;font-size:11px;width:95px" value="${l.amount}" ${locked || l.statutory ? 'disabled' : ''} oninput="FIN.payroll.setLine(${i},'${kind}',${j},'amount',this.value)">
-        ${locked || l.statutory ? '' : `<button class="fin-btn red sm" onclick="FIN.payroll.dropLine(${i},'${kind}',${j})">✕</button>`}</div>`).join('')}
+        ${locked || l.statutory ? '' : `<button class="fin-btn red sm" onclick="FIN.payroll.dropLine(${i},'${kind}',${j})"><i class=fi-x></i></button>`}</div>`).join('')}
       ${locked ? '' : `<button class="fin-btn plain sm" onclick="FIN.payroll.addLine(${i},'${kind}')">+Add</button>`}</div>`;
   }
   function mspDraw() {
@@ -48,7 +48,7 @@
     st.rows.forEach(tot);
     const typeLabel = st.type === 'all' ? 'All Staff' : (FIN.cache.payMeta.staffTypes.find(t => t.key === st.type) || {}).label;
     const included = st.rows.filter(r => !r.excluded);
-    document.getElementById('msp-out').innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">▦ Computing ${FIN.monthLabel(st.period)} Salary | Employee Type : ${esc(typeLabel)}</div>
+    document.getElementById('msp-out').innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-grid></i> Computing ${FIN.monthLabel(st.period)} Salary | Employee Type : ${esc(typeLabel)}</div>
         <div class="fin-actions"><span class="muted">Gross ${money(included.reduce((s, r) => s + r.basic + r.totalAllowances, 0))} · Net ${money(included.reduce((s, r) => s + r.net, 0))}</span></div></div>
       <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>#</th><th>Employee</th><th>Grade Level &amp; Step</th><th>Salary Bank</th><th>Basic Salary</th><th>Allowances</th><th>Deductions</th><th class="num">Total Allowances</th><th class="num">Total Deductions</th><th class="num">Net Salary</th><th>Exclude</th></tr></thead>
       <tbody>${st.rows.map((r, i) => {
@@ -92,12 +92,12 @@
     const m = await meta();
     const st = S.sps;
     el.innerHTML = `${FIN.header('Payroll: Salary Payment Schedule')}
-      ${card('⛃ Select Salary Payment Schedule to View', `<div class="fin-grid">
+      ${card('<i class=fi-filter></i> Select Salary Payment Schedule to View', `<div class="fin-grid">
         ${field('Employee Type', select('sps-type', [['all', 'All'], ...m.staffTypes.map(t => [t.key, t.label])], st.type || 'all'), { required: true })}
         ${field('Salary Month', select('sps-month', monthOpts, st.month || String(now.getMonth() + 1), 'Select'), { required: true })}
         ${field('Salary Year', FIN.input('sps-year', { type: 'number', value: st.year || now.getFullYear() }), { required: true })}
         ${field('Payment Channel', select('sps-channel', [['all', 'All'], ...m.banks], st.channel || 'all'), { required: true })}
-      </div><div style="text-align:center;margin-top:14px"><button class="fin-btn" onclick="FIN.payroll.spsLoad()">🔍 View Salary Payment Schedule</button></div>`)}
+      </div><div style="text-align:center;margin-top:14px"><button class="fin-btn" onclick="FIN.payroll.spsLoad()"><i class=fi-search></i> View Salary Payment Schedule</button></div>`)}
       <div id="sps-out"></div>`;
     if (st.loaded) spsLoad();
   });
@@ -145,7 +145,7 @@
 
   // ══ Payroll Settings ══════════════════════════════════════════════════
   FIN.page('payrollSettings', async el => {
-    el.innerHTML = `${FIN.header('Payroll Settings')}<div class="fin-card">${FIN.tabs('ps', [['scale', '▁▃▅ Salary Scale'], ['positions', '💼 Salary Positions'], ['contracts', '🗎 Staff Contracts'], ['paye', '▦ PAYE Config'], ['profiles', '👤 Staff Pay Profiles']], S.ps.tab, k => { S.ps.tab = k; psDraw(); })}<div class="fin-card-body" id="ps-body"></div></div>`;
+    el.innerHTML = `${FIN.header('Payroll Settings')}<div class="fin-card">${FIN.tabs('ps', [['scale', '<i class=fi-chart></i> Salary Scale'], ['positions', '<i class=fi-briefcase></i> Salary Positions'], ['contracts', '<i class=fi-doc></i> Staff Contracts'], ['paye', '<i class=fi-grid></i> PAYE Config'], ['profiles', '<i class=fi-user></i> Staff Pay Profiles']], S.ps.tab, k => { S.ps.tab = k; psDraw(); })}<div class="fin-card-body" id="ps-body"></div></div>`;
     psDraw();
   });
   async function psDraw() {
@@ -153,9 +153,9 @@
     const body = document.getElementById('ps-body');
     const tab = S.ps.tab;
     if (tab === 'scale') {
-      body.innerHTML = `<div class="fin-grid two" style="align-items:start"><div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">☰ Grade Levels</div><button class="fin-btn sm" onclick="FIN.payroll.gradeEdit()">⊞ Add Grade Level</button></div><div id="ps-levels"></div></div>
-        <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">☰ Grade Level Steps</div><button class="fin-btn sm" onclick="FIN.payroll.stepEdit()">⊞ Add Grade Level Step</button></div>
-          <div class="fin-card-body" style="padding-bottom:0"><div class="fin-grid">${field('', select('ps-step-filter', [['', 'All Grade Levels'], ...m.levels.map(l => [l.id, l.name])], S.ps.level || ''))}<div><button class="fin-btn outline sm" onclick="FIN.payroll.stepFilter()">⛃ Apply</button> <button class="fin-btn plain sm" onclick="FIN.payroll.stepFilter(true)">✕ Clear</button></div></div></div><div id="ps-steps"></div></div></div>`;
+      body.innerHTML = `<div class="fin-grid two" style="align-items:start"><div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-list></i> Grade Levels</div><button class="fin-btn sm" onclick="FIN.payroll.gradeEdit()"><i class=fi-plus-square></i> Add Grade Level</button></div><div id="ps-levels"></div></div>
+        <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-list></i> Grade Level Steps</div><button class="fin-btn sm" onclick="FIN.payroll.stepEdit()"><i class=fi-plus-square></i> Add Grade Level Step</button></div>
+          <div class="fin-card-body" style="padding-bottom:0"><div class="fin-grid">${field('', select('ps-step-filter', [['', 'All Grade Levels'], ...m.levels.map(l => [l.id, l.name])], S.ps.level || ''))}<div><button class="fin-btn outline sm" onclick="FIN.payroll.stepFilter()"><i class=fi-filter></i> Apply</button> <button class="fin-btn plain sm" onclick="FIN.payroll.stepFilter(true)"><i class=fi-x></i> Clear</button></div></div></div><div id="ps-steps"></div></div></div>`;
       table(document.getElementById('ps-levels'), { title: 'Grade Levels', rows: m.levels, perPage: 25, columns: [
         { key: '#', label: '#', sortable: false }, { key: 'name', label: 'Grade Level Name' }, { key: 'numeric', label: 'Grade Level Numeric', num: true },
         { key: 'a', label: '', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'Edit',onClick:()=>FIN.payroll.gradeEdit(${r.id})},{label:'Delete',danger:true,onClick:()=>FIN.payroll.remove('grade-levels',${r.id})}])">Actions ▾</button>` }] });
@@ -169,7 +169,7 @@
       table(document.getElementById('ps-pos'), { title: 'Salary Positions', rows: m.positions.filter(p => !S.ps.posStatus || p.status === S.ps.posStatus), perPage: 25, columns: [
         { key: '#', label: '#', sortable: false }, { key: 'name', label: 'Position Name' }, { key: 'department', label: 'Department', render: r => esc(r.department || '—') },
         { key: 'defaultGradeName', label: 'Default Grade Level', render: r => esc(r.defaultGradeName || '—') }, { key: 'status', label: 'Status', render: r => badge(FIN.cap(r.status), r.status === 'active' ? 'green' : 'grey') },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.payroll.positionEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.payroll.remove('positions',${r.id})">✕</button>` }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.payroll.positionEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.payroll.remove('positions',${r.id})"><i class=fi-x></i></button>` }] });
     } else if (tab === 'contracts') {
       const d = await FIN.get('/api/admin/payroll/contracts');
       S.ps.contracts = d.contracts;
@@ -178,15 +178,15 @@
         { key: 'name', label: 'Staff Member' }, { key: 'positionName', label: 'Position', render: r => esc(r.positionName || '—') }, { key: 'contractType', label: 'Contract Type', render: r => esc(FIN.cap(r.contractType)) },
         { key: 'startDate', label: 'Start Date', render: r => date(r.startDate) }, { key: 'endDate', label: 'End Date', render: r => date(r.endDate) },
         { key: 'status', label: 'Status', render: r => badge(FIN.cap(r.status), r.status === 'active' ? 'green' : r.status === 'expired' ? 'red' : 'grey') },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.payroll.contractEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.payroll.remove('contracts',${r.id})">✕</button>` }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.payroll.contractEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.payroll.remove('contracts',${r.id})"><i class=fi-x></i></button>` }] });
     } else if (tab === 'paye') {
       const d = await FIN.get('/api/admin/payroll/paye-configs');
       S.ps.paye = d.configs;
-      body.innerHTML = `<b>⚙ PAYE Settings</b><div class="fin-grid two" style="margin-top:12px">
+      body.innerHTML = `<b><i class=fi-settings></i> PAYE Settings</b><div class="fin-grid two" style="margin-top:12px">
           ${field('PAYE Engine', select('pp-engine', [['0', 'Disabled — manage deductions manually'], ['1', 'Enabled — calculate statutory deductions automatically']], m.paye.engine ? '1' : '0'), { hint: 'Enabling the PAYE Engine will automatically calculate statutory deductions (PAYE Tax, Pension, NHIS, and NHF) on each salary based on the active PAYE configuration. You can still add non-statutory deductions (and benefits) via recurring payroll items, but statutory deductions will be auto-managed by the system.' })}
           ${field('Minimum Net Pay (%)', FIN.input('pp-min', { type: 'number', value: m.paye.minNetPct }), { hint: 'Non-statutory deductions are capped so that net pay never falls below this percentage of gross pay. Default: 46.67% (Nigerian Labour Act - one-third rule). Set to 0 to disable the limit.' })}
           ${field('Payroll Bank Account', select('pp-acct', m.accounts.map(a => [a.id, a.label]), m.paye.payrollAccountId || '', '— Not configured —'), { hint: 'The account used as the payroll wallet / salary bank when posting disbursements to the expense ledger and General Ledger.' })}
-          <div><button class="fin-btn" style="width:100%;justify-content:center" onclick="FIN.payroll.payeSave()">💾 Save Settings</button></div></div>
+          <div><button class="fin-btn" style="width:100%;justify-content:center" onclick="FIN.payroll.payeSave()"><i class=fi-save></i> Save Settings</button></div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 10px"><b>PAYE Tax Band Configurations <span class="muted">— PITA Tax Bands &amp; Statutory Rates</span></b><button class="fin-btn" onclick="FIN.payroll.payeEdit()">+ Add Configuration</button></div>
         <div class="fin-table-wrap"><table class="fin-table"><thead><tr><th>Effective From</th><th>Pension (Emp)</th><th>Pension (Er)</th><th>NHIS</th><th>NHF</th><th>CRA Fixed</th><th>Tax Bands</th><th>Notes</th><th></th></tr></thead>
         <tbody>${d.configs.map(c => `<tr><td>${date(c.effective_from)}</td><td>${c.pension_emp}%</td><td>${c.pension_er}%</td><td>${c.nhis}%</td><td>${c.nhf}%</td><td>${money(c.cra_fixed)}</td><td>${c.bands.length} bands<div class="muted">${c.bands.map(b => `${b.limit == null ? 'Rest' : FIN.whole(b.limit)} @ ${b.rate}%`).join(', ')}</div></td><td class="muted">${esc(c.notes || '')}</td>
@@ -241,7 +241,7 @@
   }
   function payeEdit(id) {
     const c = id ? S.ps.paye.find(x => x.id === id) : { effective_from: FIN.today(), pension_emp: 8, pension_er: 10, nhis: 1.75, nhf: 2.5, cra_fixed: 200000, bands: [{ limit: 300000, rate: 7 }, { limit: 300000, rate: 11 }, { limit: 500000, rate: 15 }, { limit: 500000, rate: 19 }, { limit: 1600000, rate: 21 }, { limit: null, rate: 24 }] };
-    const band = b => `<tr><td><input class="field-input" type="number" data-k="limit" value="${b.limit == null ? '' : b.limit}" placeholder="Rest of income"></td><td><input class="field-input" type="number" step="0.01" data-k="rate" value="${b.rate}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+    const band = b => `<tr><td><input class="field-input" type="number" data-k="limit" value="${b.limit == null ? '' : b.limit}" placeholder="Rest of income"></td><td><input class="field-input" type="number" step="0.01" data-k="rate" value="${b.rate}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`;
     P._band = band;
     modal({ title: `${id ? 'Edit' : 'Add'} PAYE Configuration`, size: 'wide', body: `<div class="fin-grid">${field('Effective From', FIN.input('pc-from', { type: 'date', value: c.effective_from }), { required: true })}
       ${field('Pension (Employee) %', FIN.input('pc-pe', { type: 'number', value: c.pension_emp }))}${field('Pension (Employer) %', FIN.input('pc-pr', { type: 'number', value: c.pension_er }))}
@@ -259,7 +259,7 @@
   async function profileEdit(staffId) {
     const m = await meta();
     const s = S.ps.staff.find(x => x.id === staffId);
-    const line = i => `<tr><td><select class="ctrl-select" data-k="kind">${options([['allowance', 'Allowance'], ['deduction', 'Deduction']], i.kind || 'allowance')}</select></td><td><input class="field-input" data-k="name" value="${esc(i.name || '')}" placeholder="e.g. Housing"></td><td><input class="field-input" type="number" data-k="amount" value="${i.amount || ''}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+    const line = i => `<tr><td><select class="ctrl-select" data-k="kind">${options([['allowance', 'Allowance'], ['deduction', 'Deduction']], i.kind || 'allowance')}</select></td><td><input class="field-input" data-k="name" value="${esc(i.name || '')}" placeholder="e.g. Housing"></td><td><input class="field-input" type="number" data-k="amount" value="${i.amount || ''}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`;
     P._payLine = line;
     modal({ title: `Pay Profile — ${esc(s.name)}`, size: 'wide', body: `<div class="fin-grid two">
         ${field('Grade Level & Step', select('pf-step', m.steps.map(x => [x.id, `${x.gradeName} / ${x.name} — ${FIN.plain(money(x.basicSalary))}`]), s.gradeStepId || '', 'None'))}
@@ -285,16 +285,16 @@
   const LOAN_TYPE = { loan: 'Loan', advance: 'Salary Advance', grant: 'Grant' };
   const loanBadge = s => badge(FIN.cap(s), { pending: 'amber', reviewed: 'cyan', approved: 'blue', active: 'green', settled: 'grey', rejected: 'red' }[s] || 'grey');
   FIN.page('staffLoansAdvances', async el => {
-    el.innerHTML = `${FIN.header('Staff Loans & Advances')}<div class="fin-card">${FIN.tabs('sl', [['loans', '☰ All Loans'], ['settings', '⚙ Loan Settings']], S.sl.tab, k => { S.sl.tab = k; slDraw(); })}<div class="fin-card-body" id="sl-body"></div></div>`;
+    el.innerHTML = `${FIN.header('Staff Loans & Advances')}<div class="fin-card">${FIN.tabs('sl', [['loans', '<i class=fi-list></i> All Loans'], ['settings', '<i class=fi-settings></i> Loan Settings']], S.sl.tab, k => { S.sl.tab = k; slDraw(); })}<div class="fin-card-body" id="sl-body"></div></div>`;
     slDraw();
   });
   async function slDraw() {
     const body = document.getElementById('sl-body');
     if (S.sl.tab === 'settings') return loanSettings(body);
-    body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b>↘ Staff Loans & Advances</b><button class="fin-btn" onclick="FIN.payroll.loanApply()">+ Apply for Loan</button></div>
+    body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b><i class=fi-trend-down></i> Staff Loans & Advances</b><button class="fin-btn" onclick="FIN.payroll.loanApply()">+ Apply for Loan</button></div>
       <div class="fin-grid">${field('Status', select('sl-status', [['', 'All Statuses'], ['pending', 'Pending'], ['reviewed', 'Reviewed'], ['approved', 'Approved'], ['active', 'Active'], ['settled', 'Settled'], ['rejected', 'Rejected']], S.sl.status || ''))}
         ${field('Loan Type', select('sl-type', [['', 'All Types'], ['loan', 'Loan'], ['advance', 'Advance'], ['grant', 'Grant']], S.sl.type || ''))}
-        <div><button class="fin-btn outline" onclick="FIN.payroll.slLoad()">⛃ Apply</button> <button class="fin-btn plain" onclick="document.getElementById('sl-status').value='';document.getElementById('sl-type').value='';FIN.payroll.slLoad()">✕ Clear</button></div></div>
+        <div><button class="fin-btn outline" onclick="FIN.payroll.slLoad()"><i class=fi-filter></i> Apply</button> <button class="fin-btn plain" onclick="document.getElementById('sl-status').value='';document.getElementById('sl-type').value='';FIN.payroll.slLoad()"><i class=fi-x></i> Clear</button></div></div>
       <div id="sl-table" style="margin-top:12px"></div>`;
     slLoad();
   }
@@ -362,7 +362,7 @@
     const prof = (await FIN.get('/api/admin/payroll/profiles')).staff;
     const s = m.loanSettings;
     P._staff = prof;
-    modal({ title: '🗎 New Loan Application', size: 'wide', body: `<div class="fin-grid two">
+    modal({ title: '<i class=fi-doc></i> New Loan Application', size: 'wide', body: `<div class="fin-grid two">
         ${field('Staff Type', select('ln-stype', m.staffTypes.map(t => [t.key, t.label]), '', '— Select —', 'onchange="FIN.payroll.loanStaff()"'), { required: true })}
         ${field('Staff Member', select('ln-staff', [], '', '— Select staff type first —', 'onchange="FIN.payroll.loanLimit()"'), { required: true })}
         ${field('Loan Type', select('ln-type', [['loan', 'Loan'], ['advance', 'Salary Advance'], ['grant', 'Grant (non-repayable)']].filter(([k]) => s.enabledTypes.includes(k)), '', '— Select —', 'onchange="FIN.payroll.loanLimit()"'), { required: true })}
@@ -370,12 +370,12 @@
         ${field('Purpose', '<textarea class="field-input" id="ln-purpose" rows="2" placeholder="Briefly describe the reason for this loan request"></textarea>', { required: true, span: 2 })}
         ${field('Bank Account for Disbursement', '<div class="field-input" id="ln-bank" style="background:var(--black-3)">— Select staff member first —</div>', { required: true, span: 2, hint: 'Loaded after selecting a staff member above.' })}
       </div>
-      <div class="fin-section-label">▤ Repayment Preference</div><div class="fin-grid">
+      <div class="fin-section-label"><i class=fi-table></i> Repayment Preference</div><div class="fin-grid">
         ${field('Preferred Repayment Months (optional)', FIN.input('ln-months', { type: 'number' }), { required: s.requireRepaymentPreference })}
         ${field('Preferred Start Month (optional)', select('ln-smonth', FIN.MONTHS.map((x, i) => [i + 1, x]), '', '— Month —'))}
         ${field('Preferred Start Year (optional)', FIN.input('ln-syear', { type: 'number', value: now.getFullYear() }))}
         <div><button class="fin-btn plain sm" onclick="FIN.payroll.loanCheck()">Run Payroll Checks</button><div id="ln-check" class="muted" style="margin-top:4px"></div></div></div>
-      <div class="fin-section-label">⚇ Guarantor Information ${s.requireGuarantor ? '(required)' : '(optional)'}</div><div class="fin-grid two">
+      <div class="fin-section-label"><i class=fi-users></i> Guarantor Information ${s.requireGuarantor ? '(required)' : '(optional)'}</div><div class="fin-grid two">
         ${field('Guarantor Name', FIN.input('ln-gname'))}${field('Relationship', FIN.input('ln-grel', { placeholder: 'e.g. Colleague, Supervisor' }))}${field('Phone', FIN.input('ln-gphone'))}${field('Email', FIN.input('ln-gemail'))}</div>
       <div style="margin-top:12px">${field(`Supporting Document ${s.requireDocument ? '' : '(optional)'}`, '<input type="file" class="field-input" id="ln-doc" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">', { hint: 'Accepted: PDF, DOC, DOCX, JPG, PNG. Max: 5MB.' })}</div>`,
       buttons: [{ label: 'Close', cls: 'plain' }, { label: 'Submit Application', onClick: async (o, close) => {
@@ -405,25 +405,25 @@
     const s = P._staff.find(x => x.id === id);
     const monthly = amt / months;
     const ok = !s.basic || monthly <= s.basic * 0.5;
-    document.getElementById('ln-check').innerHTML = `${FIN.plain(money(monthly))}/month = ${s.basic ? `${(monthly / s.basic * 100).toFixed(1)}% of basic salary` : 'no basic salary set'} ${ok ? '<span style="color:var(--green)">✓ OK</span>' : '<span style="color:var(--red)">✕ more than half of basic salary</span>'}`;
+    document.getElementById('ln-check').innerHTML = `${FIN.plain(money(monthly))}/month = ${s.basic ? `${(monthly / s.basic * 100).toFixed(1)}% of basic salary` : 'no basic salary set'} ${ok ? '<span style="color:var(--green)"><i class=fi-check></i> OK</span>' : '<span style="color:var(--red)"><i class=fi-x></i> more than half of basic salary</span>'}`;
   }
   async function loanSettings(body) {
     const { settings: s } = await FIN.get('/api/admin/payroll/loan-settings');
     const m = await meta();
     const chk = (id, on, label, hint = '') => `<label class="fin-check" style="display:flex;align-items:flex-start;margin:6px 0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> <span><b>${label}</b>${hint ? `<div class="muted">${hint}</div>` : ''}</span></label>`;
-    body.innerHTML = `<b>⚙ Loan Application Settings</b>
-      ${card('⊙ Enabled Loan Types', `<div class="muted" style="margin-bottom:6px">Select which loan types staff may apply for. Only enabled types will appear on the application form. Disable a type at any time to close that window — existing loans are not affected. At least one type must be enabled, otherwise applications cannot be submitted.</div>
+    body.innerHTML = `<b><i class=fi-settings></i> Loan Application Settings</b>
+      ${card('<i class=fi-target></i> Enabled Loan Types', `<div class="muted" style="margin-bottom:6px">Select which loan types staff may apply for. Only enabled types will appear on the application form. Disable a type at any time to close that window — existing loans are not affected. At least one type must be enabled, otherwise applications cannot be submitted.</div>
         <div class="fin-grid">${chk('ls-loan', s.enabledTypes.includes('loan'), 'Loan', 'Standard repayable loan — governed by salary multiple & interest rate policy')}${chk('ls-advance', s.enabledTypes.includes('advance'), 'Salary Advance', 'Advance against salary — governed by max advance months setting')}${chk('ls-grant', s.enabledTypes.includes('grant'), 'Grant', 'Non-repayable grant — no interest, no repayment schedule')}</div>`)}
-      ${card('⚇ Allowed Staff Types', `<div class="muted">Which staff types can submit loan applications.</div>${chk('ls-all', s.allowedStaffTypes.includes('all'), 'All Staff Types')}<div class="fin-grid">${m.staffTypes.map(t => chk(`ls-st-${t.key}`, s.allowedStaffTypes.includes(t.key), t.label)).join('')}</div>`)}
-      ${card('▤ Contract Eligibility for Loans', `<div class="muted">By default, only permanent staff who have completed probation may apply. Tick below to extend eligibility.</div><div class="fin-grid">${chk('ls-prob', s.allowProbation, 'Allow staff on probation', 'Staff whose probation period has not yet ended can apply.')}${chk('ls-temp', s.allowTemporary, 'Allow temporary contract staff', 'Staff on temporary contracts can apply.')}</div>`)}
+      ${card('<i class=fi-users></i> Allowed Staff Types', `<div class="muted">Which staff types can submit loan applications.</div>${chk('ls-all', s.allowedStaffTypes.includes('all'), 'All Staff Types')}<div class="fin-grid">${m.staffTypes.map(t => chk(`ls-st-${t.key}`, s.allowedStaffTypes.includes(t.key), t.label)).join('')}</div>`)}
+      ${card('<i class=fi-table></i> Contract Eligibility for Loans', `<div class="muted">By default, only permanent staff who have completed probation may apply. Tick below to extend eligibility.</div><div class="fin-grid">${chk('ls-prob', s.allowProbation, 'Allow staff on probation', 'Staff whose probation period has not yet ended can apply.')}${chk('ls-temp', s.allowTemporary, 'Allow temporary contract staff', 'Staff on temporary contracts can apply.')}</div>`)}
       ${card('₦ Limits & Interest', `<div class="fin-grid">${field('Salary Multiple (0 = disabled)', FIN.input('ls-mult', { type: 'number', value: s.salaryMultiple }))}${field('Hard Ceiling / Cap (0 = no cap)', FIN.input('ls-cap', { type: 'number', value: s.hardCap }))}${field('Max Salary Advance Months (0 = no cap)', FIN.input('ls-adv', { type: 'number', value: s.maxAdvanceMonths }))}
         ${field('Interest Rate Mode', select('ls-mode', [['per_type', 'Per type — different rates for Loan vs Salary Advance'], ['flat', 'Single flat rate — one rate for all loan types and amounts'], ['bands', 'Amount bands — tiered rates by loan amount for Loan type']], s.interestMode))}
         ${field('Loan Rate % (0 = interest-free)', FIN.input('ls-lr', { type: 'number', value: s.loanRate }))}${field('Salary Advance Rate %', FIN.input('ls-ar', { type: 'number', value: s.advanceRate }))}${field('Flat Rate %', FIN.input('ls-fr', { type: 'number', value: s.flatRate }))}${field('Loan fallback rate % (if no band matches)', FIN.input('ls-fb', { type: 'number', value: s.fallbackRate }))}</div>
-        <div class="fin-section-label">Amount Bands (for "Amount bands" mode)</div><table class="fin-table fin-lines"><thead><tr><th>From (₦)</th><th>To (₦)</th><th>Rate %</th><th></th></tr></thead><tbody id="ls-bands">${(s.bands || []).map(b => `<tr><td><input class="field-input" type="number" data-k="min" value="${b.min}"></td><td><input class="field-input" type="number" data-k="max" value="${b.max || ''}"></td><td><input class="field-input" type="number" data-k="rate" value="${b.rate}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`).join('')}</tbody></table>
+        <div class="fin-section-label">Amount Bands (for "Amount bands" mode)</div><table class="fin-table fin-lines"><thead><tr><th>From (₦)</th><th>To (₦)</th><th>Rate %</th><th></th></tr></thead><tbody id="ls-bands">${(s.bands || []).map(b => `<tr><td><input class="field-input" type="number" data-k="min" value="${b.min}"></td><td><input class="field-input" type="number" data-k="max" value="${b.max || ''}"></td><td><input class="field-input" type="number" data-k="rate" value="${b.rate}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`).join('')}</tbody></table>
         <button class="fin-btn plain sm" style="margin-top:8px" onclick="document.getElementById('ls-bands').insertAdjacentHTML('beforeend','<tr><td><input class=&quot;field-input&quot; type=&quot;number&quot; data-k=&quot;min&quot;></td><td><input class=&quot;field-input&quot; type=&quot;number&quot; data-k=&quot;max&quot;></td><td><input class=&quot;field-input&quot; type=&quot;number&quot; data-k=&quot;rate&quot;></td><td></td></tr>')">+ Add Band</button>
         <div class="fin-grid" style="margin-top:12px">${chk('ls-override', s.allowRateOverride, 'Allow approver to change the interest rate')}${chk('ls-reason', s.requireOverrideReason, 'Require a reason when rate is overridden')}</div>`)}
-      ${card('▤ Application Form', `<div class="fin-grid">${chk('ls-doc', s.requireDocument, 'Supporting Document Upload', 'Make a supporting document required')}${chk('ls-guar', s.requireGuarantor, 'Guarantor Information', 'Make guarantor information required')}${chk('ls-rp', s.requireRepaymentPreference, 'Repayment Preference', 'Make repayment months required')}</div>`)}
-      <button class="fin-btn" onclick="FIN.payroll.loanSettingsSave()">💾 Save Settings</button>`;
+      ${card('<i class=fi-table></i> Application Form', `<div class="fin-grid">${chk('ls-doc', s.requireDocument, 'Supporting Document Upload', 'Make a supporting document required')}${chk('ls-guar', s.requireGuarantor, 'Guarantor Information', 'Make guarantor information required')}${chk('ls-rp', s.requireRepaymentPreference, 'Repayment Preference', 'Make repayment months required')}</div>`)}
+      <button class="fin-btn" onclick="FIN.payroll.loanSettingsSave()"><i class=fi-save></i> Save Settings</button>`;
   }
   async function loanSettingsSave() {
     const m = await meta();

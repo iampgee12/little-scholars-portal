@@ -21,59 +21,63 @@
   .fin-field label .req { color:var(--red); }
   .fin-field .hint { font-size:11px; color:var(--text-3); margin-top:4px; }
   .fin-field .hint.warn { color:var(--amber); }
-  .fin-btn { display:inline-flex; align-items:center; gap:6px; background:#0d6efd; color:#fff; border:1px solid #0d6efd; border-radius:var(--radius-sm); padding:8px 16px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all var(--transition); }
-  .fin-btn:hover { background:#0b5ed7; }
-  .fin-btn.outline { background:var(--black); color:#0d6efd; }
-  .fin-btn.outline:hover { background:var(--blue-bg); }
-  .fin-btn.plain { background:var(--black); color:var(--text-1); border-color:var(--border-2); }
-  .fin-btn.plain:hover { background:var(--black-3); }
+  .fin-btn { display:inline-flex; align-items:center; gap:6px; background:var(--green); color:#fff; border:1px solid var(--green); border-radius:var(--radius-sm); padding:9px 18px; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all var(--transition); }
+  .fin-btn:hover { background:#15803d; border-color:#15803d; box-shadow:0 4px 14px rgba(22,163,74,.25); transform:translateY(-1px); }
+  .fin-btn:active { transform:scale(.96); box-shadow:none; }
+  .fin-btn.outline, .fin-btn.plain { background:var(--black-2); color:var(--text-1); border-color:var(--border-2); }
+  .fin-btn.outline:hover, .fin-btn.plain:hover { background:var(--black-3); border-color:var(--text-3); box-shadow:none; transform:none; }
   .fin-btn.green { background:var(--green); border-color:var(--green); }
-  .fin-btn.red { background:var(--black); color:var(--red); border-color:rgba(220,38,38,.35); }
-  .fin-btn.red:hover { background:var(--red-bg); }
-  .fin-btn.warn { background:var(--black); color:var(--amber); border-color:rgba(217,119,6,.45); }
+  .fin-btn.red { background:var(--black-2); color:var(--red); border-color:rgba(220,38,38,.35); }
+  .fin-btn.red:hover { background:var(--red-bg); border-color:var(--red); box-shadow:none; transform:none; }
+  .fin-btn.warn { background:var(--black-2); color:var(--amber); border-color:rgba(217,119,6,.45); }
+  .fin-btn.warn:hover { background:var(--amber-bg); box-shadow:none; transform:none; }
   .fin-btn.sm { padding:5px 10px; font-size:11px; }
-  .fin-btn:disabled { opacity:.55; cursor:not-allowed; }
+  .fin-btn:disabled { opacity:.55; cursor:not-allowed; box-shadow:none; transform:none; }
   .fin-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .fin-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px; }
-  .fin-stat { background:var(--black); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; display:flex; gap:12px; align-items:center; }
-  .fin-stat .ic { width:38px; height:38px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:16px; font-weight:700; }
-  .fin-stat .v { font-size:16px; font-weight:800; color:var(--text-1); }
+  .fin-stat { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; display:flex; gap:12px; align-items:center; }
+  .fin-stat .ic { width:34px; height:34px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:16px; font-weight:700; }
+  .fin-stat .v { font-size:16px; font-weight:700; color:var(--text-1); font-family:'DM Mono',monospace; letter-spacing:-.3px; }
   .fin-stat .l { font-size:11px; color:var(--text-2); }
   .fin-stat .s { font-size:10px; color:var(--text-3); margin-top:1px; }
   .fin-stat .p { margin-left:auto; font-size:11px; font-weight:700; align-self:flex-end; }
   .fin-badge { display:inline-block; font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; text-transform:none; }
   .fin-badge.green { background:var(--green-bg); color:var(--green); } .fin-badge.red { background:var(--red-bg); color:var(--red); }
-  .fin-badge.amber { background:var(--amber-bg); color:var(--amber); } .fin-badge.blue { background:var(--blue-bg); color:var(--blue); }
+  .fin-badge.amber { background:var(--amber-bg); color:var(--amber); } .fin-badge.blue { background:var(--black); color:var(--green); box-shadow:inset 0 0 0 1px rgba(22,163,74,.4); }
   .fin-badge.grey { background:var(--black-3); color:var(--text-2); } .fin-badge.cyan { background:var(--cyan-bg); color:var(--cyan); }
   .fin-tabs { display:flex; border-bottom:1px solid var(--border); flex-wrap:wrap; background:var(--black); border-radius:var(--radius) var(--radius) 0 0; }
   .fin-tab { flex:1; min-width:140px; padding:12px 14px; background:none; border:0; border-bottom:2px solid transparent; color:var(--text-2); font-weight:600; font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif; }
-  .fin-tab.active { color:#0d6efd; border-bottom-color:#0d6efd; }
+  .fin-tab { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  .fin-tab:hover { color:var(--text-1); }
+  .fin-tab.active { color:var(--green); border-bottom-color:var(--green); }
   .fin-side { display:grid; grid-template-columns:210px 1fr; gap:14px; align-items:start; }
   .fin-side-nav { background:var(--black); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-  .fin-side-nav button { display:block; width:100%; text-align:left; padding:11px 14px; background:none; border:0; border-left:3px solid transparent; font-size:12px; color:#0d6efd; cursor:pointer; font-family:'DM Sans',sans-serif; }
-  .fin-side-nav button.active { border-left-color:#0d6efd; background:var(--blue-bg); font-weight:700; }
+  .fin-side-nav button { display:block; width:100%; text-align:left; padding:11px 14px; background:none; border:0; border-left:3px solid transparent; font-size:12px; color:var(--text-2); cursor:pointer; font-family:'DM Sans',sans-serif; display:flex; align-items:center; gap:8px; }
+  .fin-side-nav button:hover { background:var(--black-3); color:var(--text-1); }
+  .fin-side-nav button.active { border-left-color:var(--green); background:var(--green-bg); color:var(--green); font-weight:700; }
   @media (max-width:760px) { .fin-side { grid-template-columns:1fr; } }
   .fin-tools { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 18px; }
   .fin-tools .left, .fin-tools .right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--text-2); }
   .fin-table-wrap { overflow-x:auto; }
   .fin-table { width:100%; border-collapse:collapse; font-size:12px; }
-  .fin-table th { text-align:left; padding:10px 10px; font-size:11px; font-weight:700; color:var(--text-2); border-bottom:1px solid var(--border); background:var(--black-2); white-space:nowrap; }
+  .fin-table th { text-align:left; padding:10px 10px; font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.8px; font-family:'DM Mono',monospace; border-bottom:1px solid var(--border); background:var(--black-2); white-space:nowrap; }
   .fin-table th.sortable { cursor:pointer; }
   .fin-table th .sub { display:block; font-weight:400; font-size:9px; color:var(--text-3); white-space:normal; max-width:200px; }
   .fin-table td { padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text-1); }
-  .fin-table tr:hover td { background:var(--black-2); }
+  .fin-table tbody tr:hover td { background:var(--black-3); }
   .fin-table td.num, .fin-table th.num { text-align:right; white-space:nowrap; }
   .fin-table tfoot td { font-weight:700; background:var(--black-2); }
   .fin-table .muted { color:var(--text-3); font-size:11px; }
   .fin-empty { padding:28px; text-align:center; color:var(--text-3); }
   .fin-foot { display:flex; justify-content:space-between; align-items:center; padding:10px 18px; font-size:11px; color:var(--text-3); flex-wrap:wrap; gap:8px; }
   .fin-pager { display:flex; gap:3px; }
-  .fin-pager button { min-width:30px; padding:5px 8px; border:1px solid var(--border); background:var(--black); border-radius:5px; cursor:pointer; font-size:11px; color:#0d6efd; }
-  .fin-pager button.active { background:#0d6efd; color:#fff; border-color:#0d6efd; }
+  .fin-pager button { min-width:30px; padding:5px 8px; border:1px solid var(--border); background:var(--black); border-radius:5px; cursor:pointer; font-size:11px; color:var(--text-2); }
+  .fin-pager button:hover:not(:disabled) { background:var(--black-3); }
+  .fin-pager button.active { background:var(--green); color:#fff; border-color:var(--green); }
   .fin-pager button:disabled { opacity:.45; cursor:default; }
   .fin-dd { position:relative; display:inline-block; }
   .fin-menu { position:fixed; z-index:3000; min-width:170px; background:var(--black); border:1px solid var(--border); border-radius:8px; box-shadow:0 12px 30px rgba(15,23,42,.16); padding:5px 0; }
-  .fin-menu button { display:block; width:100%; text-align:left; background:none; border:0; padding:8px 14px; font-size:12px; color:var(--text-1); cursor:pointer; font-family:'DM Sans',sans-serif; }
+  .fin-menu button { display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:0; padding:8px 14px; font-size:12px; color:var(--text-1); cursor:pointer; font-family:'DM Sans',sans-serif; }
   .fin-menu button:hover { background:var(--black-3); }
   .fin-menu button.danger { color:var(--red); }
   .fin-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:2000; display:flex; align-items:flex-start; justify-content:center; padding:28px 14px; overflow-y:auto; }
@@ -81,23 +85,24 @@
   .fin-modal.wide { width:min(900px,100%); } .fin-modal.xwide { width:min(1180px,100%); }
   .fin-modal-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
   .fin-modal-head h3 { font-size:14px; font-weight:700; }
-  .fin-modal-x { background:none; border:0; font-size:18px; cursor:pointer; color:var(--text-3); line-height:1; }
+  .fin-modal-x { background:none; border:0; cursor:pointer; color:var(--text-3); line-height:1; padding:4px; display:inline-flex; }
+  .fin-modal-x:hover { color:var(--text-1); }
   .fin-modal-body { padding:18px; }
   .fin-modal-foot { padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-  .fin-note { font-size:12px; color:var(--text-2); background:var(--blue-bg); border:1px solid rgba(37,99,235,.18); border-radius:8px; padding:10px 12px; line-height:1.6; }
+  .fin-note { font-size:12px; color:var(--text-2); background:var(--green-bg); border:1px solid rgba(22,163,74,.18); border-radius:8px; padding:10px 12px; line-height:1.6; }
   .fin-note.warn { background:var(--amber-bg); border-color:rgba(217,119,6,.25); }
   .fin-note.red { background:var(--red-bg); border-color:rgba(220,38,38,.2); color:var(--red); }
   .fin-check { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-1); cursor:pointer; }
   .fin-switch { position:relative; display:inline-flex; align-items:center; border:1px solid var(--border-2); border-radius:6px; overflow:hidden; font-size:10px; font-weight:700; cursor:pointer; }
-  .fin-switch span { padding:4px 9px; color:var(--text-3); } .fin-switch.on span.on { background:#0d6efd; color:#fff; } .fin-switch.off span.off { background:var(--black-3); color:var(--text-2); }
+  .fin-switch span { padding:4px 9px; color:var(--text-3); } .fin-switch.on span.on { background:var(--green); color:#fff; } .fin-switch.off span.off { background:var(--black-3); color:var(--text-2); }
   .fin-lines td { padding:6px 6px; } .fin-lines input, .fin-lines select { width:100%; }
   .fin-kv { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:12px; } .fin-kv dt { color:var(--text-2); } .fin-kv dd { font-weight:600; }
   .fin-big { font-size:24px; font-weight:800; }
-  .fin-hero { background:linear-gradient(135deg,#0d6efd,#1e40af); color:#fff; border-radius:var(--radius); padding:24px; }
+  .fin-hero { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border-radius:var(--radius); padding:24px; }
   .fin-hero .chip { display:inline-block; border:1px solid rgba(255,255,255,.4); border-radius:20px; padding:5px 12px; font-size:11px; margin:4px 4px 0 0; font-style:italic; }
   .fin-tile { border:1px solid var(--border); border-radius:var(--radius); padding:14px; background:var(--black); }
   .fin-tile h4 { font-size:13px; margin:8px 0 4px; } .fin-tile p { font-size:11px; color:var(--text-2); line-height:1.5; }
-  .fin-report-card { border:1px solid var(--border); border-left:3px solid #0d6efd; border-radius:var(--radius); padding:14px; background:var(--black); cursor:pointer; display:flex; gap:12px; align-items:flex-start; text-align:left; font-family:'DM Sans',sans-serif; }
+  .fin-report-card { border:1px solid var(--border); border-left:3px solid var(--green); border-radius:var(--radius); padding:14px; background:var(--black); cursor:pointer; display:flex; gap:12px; align-items:flex-start; text-align:left; font-family:'DM Sans',sans-serif; }
   .fin-report-card:hover { box-shadow:0 6px 18px rgba(15,23,42,.08); }
   .fin-report-card h4 { font-size:13px; margin-bottom:3px; color:var(--text-1); } .fin-report-card p { font-size:11px; color:var(--text-2); line-height:1.5; }
   .fin-section-label { font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--text-3); margin:18px 0 10px; }
@@ -106,6 +111,80 @@
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
+
+  // ── Line icons ─────────────────────────────────────────────────────────
+  // Same drawing style as the portal's sidebar icons (16px grid, thin round
+  // strokes). Used as <i class="fi fi-name"></i>; the icon takes the text colour.
+  const ICONS = {
+    x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+    filter: '<path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z"/>',
+    doc: '<path d="M4 1.5h5l3.5 3.5v9.5h-8.5z"/><path d="M9 1.5V5h3.5M6 8.5h4M6 11h4"/>',
+    search: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>',
+    list: '<path d="M2.5 4h11M2.5 8h11M2.5 12h11"/>',
+    check: '<path d="M3 8.5l3.2 3L13 4.5"/>',
+    dots: '<circle cx="3.5" cy="8" r=".6"/><circle cx="8" cy="8" r=".6"/><circle cx="12.5" cy="8" r=".6"/>',
+    print: '<path d="M4 6V1.5h8V6M4 12H2.5V6.5h11V12H12M4 9.5h8v5H4z"/>',
+    plus: '<path d="M8 3v10M3 8h10"/>',
+    'plus-square': '<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M8 5v6M5 8h6"/>',
+    'minus-square': '<rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8h6"/>',
+    'plus-circle': '<circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/>',
+    'minus-circle': '<circle cx="8" cy="8" r="6"/><path d="M5 8h6"/>',
+    table: '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M2 9.5h12M6.5 6v7.5"/>',
+    chart: '<path d="M3 13.5V9M8 13.5V4M13 13.5V7M2 13.5h12"/>',
+    grid: '<rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>',
+    lock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/>',
+    unlock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 5.8-1"/>',
+    download: '<path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13.5h11"/>',
+    upload: '<path d="M8 11V3M4.5 6.5L8 3l3.5 3.5M2.5 13.5h11"/>',
+    refresh: '<path d="M13.5 8A5.5 5.5 0 1 1 11.8 4"/><path d="M13.5 2v3.5H10"/>',
+    history: '<path d="M2.5 8A5.5 5.5 0 1 0 4.2 4"/><path d="M2.5 2v3.5H6M8 5v3l2 1.5"/>',
+    settings: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+    save: '<path d="M3 2h8l3 3v9H3z"/><path d="M5.5 2v3.5h4.5V2M5.5 14V9.5h5V14"/>',
+    user: '<circle cx="8" cy="5.5" r="2.8"/><path d="M2.5 14c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/>',
+    users: '<circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13.5c.5-2.6 2.2-4 4.5-4s4 1.4 4.5 4M10.5 3.2a2.5 2.5 0 0 1 0 4.8M12 9.7c1.4.5 2.2 1.8 2.5 3.8"/>',
+    briefcase: '<rect x="2" y="5" width="12" height="8.5" rx="1.5"/><path d="M5.5 5V3.5h5V5M2 9h12"/>',
+    bank: '<path d="M2 6.5L8 3l6 3.5M3 6.5v6M6.3 6.5v6M9.7 6.5v6M13 6.5v6M2 13.5h12"/>',
+    eye: '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>',
+    'eye-off': '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><path d="M2.5 2.5l11 11"/>',
+    info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5h.01"/>',
+    edit: '<path d="M10.5 2.5l3 3L6 13H3v-3z"/><path d="M9 4l3 3"/>',
+    bell: '<path d="M4 11V7a4 4 0 0 1 8 0v4l1.5 1.5h-11z"/><path d="M6.5 14h3"/>',
+    warn: '<path d="M8 2l6.5 11.5h-13z"/><path d="M8 6.5v3M8 11.5h.01"/>',
+    'trend-up': '<path d="M2 12l4.5-4.5 3 3L14 6M10.5 6H14v3.5"/>',
+    'trend-down': '<path d="M2 4.5L6.5 9l3-3L14 10.5M10.5 10.5H14V7"/>',
+    swap: '<path d="M2.5 5.5h11M10.5 2.5l3 3-3 3M13.5 10.5h-11M5.5 7.5l-3 3 3 3"/>',
+    target: '<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2.5"/>',
+    stop: '<rect x="4" y="4" width="8" height="8" rx="1.5"/>',
+    play: '<path d="M5 3.5v9l7-4.5z"/>',
+    star: '<path d="M8 2l1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3l-3.7 2 .8-4.1L2 6.3l4.2-.5z"/>',
+    home: '<path d="M2.5 7.5L8 3l5.5 4.5v6h-11z"/><path d="M6.5 13.5V10h3v3.5"/>',
+    clock: '<circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/>',
+    activity: '<path d="M1.5 8h3l2-4.5 3 9 2-4.5h3"/>',
+    tag: '<path d="M2 2.5h5.5L14 9l-5 5-6.5-6.5z"/><circle cx="5" cy="5.2" r=".5"/>',
+    wallet: '<rect x="2" y="4" width="12" height="9" rx="1.5"/><path d="M2 6.5h10.5M10.5 9.5H12"/>',
+    sliders: '<path d="M2.5 4.5h11M2.5 11.5h11M5.5 3v3M10.5 10v3"/>',
+    bag: '<path d="M3 5h10l-.8 9H3.8z"/><path d="M5.5 5V4a2.5 2.5 0 0 1 5 0v1"/>',
+    ban: '<circle cx="8" cy="8" r="6"/><path d="M3.8 3.8l8.4 8.4"/>',
+    cart: '<path d="M1.5 2.5h2L5 10.5h7.5L14 5H4.3"/><circle cx="6" cy="13.5" r=".8"/><circle cx="12" cy="13.5" r=".8"/>',
+    book: '<path d="M3 2.5h8.5v11H3z"/><path d="M5.5 5.5H9M5.5 8H9M11.5 4.5H13M11.5 7.5H13M11.5 10.5H13"/>',
+    scale: '<path d="M8 2.5v11M5 13.5h6M3 4.5h10M3 4.5L1.5 9h3zM13 4.5L11.5 9h3z"/>',
+    'arrow-left': '<path d="M13 8H3M7 4L3 8l4 4"/>',
+    'arrow-up': '<path d="M8 13V3M4 7l4-4 4 4"/>',
+    'arrow-down': '<path d="M8 3v10M4 9l4 4 4-4"/>',
+    'chevron-up': '<path d="M4 10l4-4 4 4"/>',
+    'chevron-down': '<path d="M4 6l4 4 4-4"/>',
+    folder: '<path d="M2 4h4.5L8 5.5h6V13H2z"/>',
+    hash: '<path d="M6 2L4.5 14M11.5 2L10 14M2.5 5.5h11M2 10.5h11"/>',
+  };
+  const iconCss = Object.entries(ICONS).map(([k, body]) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+    return `.fi-${k}{--fi:url("data:image/svg+xml,${encodeURIComponent(svg)}")}`;
+  }).join('\n');
+  const iconStyle = document.createElement('style');
+  iconStyle.textContent = `.fi,i[class^="fi-"]{display:inline-block;width:14px;height:14px;flex-shrink:0;vertical-align:-2px;background-color:currentColor;-webkit-mask:var(--fi) center/contain no-repeat;mask:var(--fi) center/contain no-repeat}
+  .fin-stat .ic .fi,.fin-stat .ic i[class^="fi-"]{width:17px;height:17px}\n${iconCss}`;
+  document.head.appendChild(iconStyle);
+  const icon = name => `<i class="fi fi-${name}" aria-hidden="true"></i>`;
 
   // ── Formatting ─────────────────────────────────────────────────────────
   const money = n => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -175,7 +254,7 @@
   function stats(list) {
     return `<div class="fin-stats">${list.map(s => `
       <div class="fin-stat">
-        <div class="ic" style="background:${s.bg || 'var(--blue-bg)'};color:${s.color || 'var(--blue)'};">${s.icon || '₦'}</div>
+        <div class="ic" style="background:${s.bg || 'var(--green-bg)'};color:${s.color || 'var(--green)'};">${s.icon || '₦'}</div>
         <div><div class="v" style="color:${s.valueColor || 'var(--text-1)'}">${s.value}</div><div class="l">${esc(s.label)}</div>${s.sub ? `<div class="s">${esc(s.sub)}</div>` : ''}</div>
         ${s.pct ? `<div class="p" style="color:${s.valueColor || 'var(--text-2)'}">${esc(s.pct)}</div>` : ''}
       </div>`).join('')}</div>`;
@@ -192,7 +271,7 @@
     return `<div class="fin-side-nav">${list.map(([k, l]) => `<button type="button" class="${k === active ? 'active' : ''}" onclick="FIN._pickTab('${id}','${k}',this)">${l}</button>`).join('')}</div>`;
   }
   function onOffSwitch(on, onclick, locked) {
-    return `<span class="fin-switch ${on ? 'on' : 'off'}" ${onclick ? `onclick="${onclick}"` : ''} title="${on ? 'On' : 'Off'}">${locked ? '<span>🔒</span>' : ''}<span class="on">ON</span><span class="off">OFF</span></span>`;
+    return `<span class="fin-switch ${on ? 'on' : 'off'}" ${onclick ? `onclick="${onclick}"` : ''} title="${on ? 'On' : 'Off'}">${locked ? icon('lock') : ''}<span class="on">ON</span><span class="off">OFF</span></span>`;
   }
   function fileToDataUrl(inputEl) {
     const f = inputEl && inputEl.files && inputEl.files[0];
@@ -211,7 +290,7 @@
     const ov = document.createElement('div');
     ov.className = 'fin-overlay';
     ov.innerHTML = `<div class="fin-modal ${size}" role="dialog" aria-modal="true">
-      <div class="fin-modal-head"><h3>${title}</h3><button class="fin-modal-x" aria-label="Close">✕</button></div>
+      <div class="fin-modal-head"><h3>${title}</h3><button class="fin-modal-x" aria-label="Close">${icon('x')}</button></div>
       <div class="fin-modal-body">${body}</div>
       ${buttons.length ? '<div class="fin-modal-foot"></div>' : ''}</div>`;
     const close = () => { ov.remove(); if (onClose) onClose(); };
@@ -433,7 +512,7 @@
   }
 
   const FIN = window.FIN = {
-    pages, esc, money, whole, date, dateTime, iso, today, monthLabel, pct, cap, MONTHS, MONTHS_LONG, QUICK, quickRange, quickLabel,
+    pages, icon, esc, money, whole, date, dateTime, iso, today, monthLabel, pct, cap, MONTHS, MONTHS_LONG, QUICK, quickRange, quickLabel,
     options, field, input, select, val, badge, stats, card, tabs, sideNav, onOffSwitch, fileToDataUrl, docLink,
     modal, confirm: confirmBox, menu, menus, menuButton, exportRows, print, schoolHeader, table, plain, htmlTable,
     _tabPick: {},

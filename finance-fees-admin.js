@@ -60,7 +60,7 @@
     const meta = await FIN.feesMeta();
     const s = F.il;
     el.innerHTML = `${FIN.header('Payment Collection : Invoice List')}
-      ${card('<span>⛃</span> Filter Invoices to View', `<div class="fin-grid">
+      ${card('<span><i class=fi-filter></i></span> Filter Invoices to View', `<div class="fin-grid">
         ${periodFields('il', s, { requireClass: false, allClasses: true }, meta)}
         ${field('View Invoices', `<span id="il-titles-box">${multi('il-titles', meta.titles.map(t => [t, t]), s.titles)}</span>`, { required: true })}
         ${field('Filter By Invoice Type', multi('il-types', TYPES, s.types))}
@@ -87,7 +87,7 @@
     box.innerHTML = card(heading, `
         ${stats([
           { label: 'Total in list', value: money(sm.total), icon: '₦', bg: 'var(--black-3)', color: 'var(--text-2)' },
-          { label: 'Total Paid', value: money(sm.paid), pct: pct(sm.paid, sm.total), icon: '✓', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
+          { label: 'Total Paid', value: money(sm.paid), pct: pct(sm.paid, sm.total), icon: '<i class=fi-check></i>', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
           { label: 'Total Due', value: money(sm.due), pct: pct(sm.due, sm.total), icon: '!', bg: 'var(--red-bg)', color: 'var(--red)', valueColor: 'var(--red)' },
         ])}`, { bodyStyle: 'padding-bottom:0' }) +
       `<div class="fin-card"><div id="il-table"></div></div>
@@ -99,7 +99,7 @@
           { actions: `<button class="fin-btn plain sm" onclick="FIN.print('Summary by fee items', FIN.schoolHeader() + '<h3>${esc(FIN.plain(heading)).replace(/'/g, '')}</h3>' + document.getElementById('il-items').innerHTML)">Print Summary</button>` })}
        </div>`;
     F.ilTable = table(document.getElementById('il-table'), {
-      title: `Student Fees Invoice List | ${clsLabel} | ${s.session} | ${s.term}`, caption: `🗎 Student Fees Invoice List | ${esc(clsLabel)} | ${esc(s.session)} | ${s.term === 'all' ? 'All Terms' : esc(s.term)}`,
+      title: `Student Fees Invoice List | ${clsLabel} | ${s.session} | ${s.term}`, caption: `<i class=fi-doc></i> Student Fees Invoice List | ${esc(clsLabel)} | ${esc(s.session)} | ${s.term === 'all' ? 'All Terms' : esc(s.term)}`,
       rows: data.invoices, selectable: true, perPage: 20,
       toolbar: () => FIN.menuButton('With Selected', [
         { label: 'Show to Parents / Pupils', onClick: () => ilVisibility(false) }, { label: 'Hide from Parents / Pupils', onClick: () => ilVisibility(true) },
@@ -115,10 +115,10 @@
         { key: 'amount', label: 'Total', num: true, render: r => money(r.amount), exportValue: r => r.amount, total: true },
         { key: 'paid', label: 'Paid', num: true, render: r => `<span style="color:var(--green)">${money(r.paid)}</span>`, exportValue: r => r.paid, total: true },
         { key: 'balance', label: 'Due', num: true, render: r => `<span style="color:var(--red)">${money(r.balance)}</span>`, exportValue: r => r.balance, total: true },
-        { key: 'status', label: 'Status', render: r => `${FIN.statusBadge(r.status)}${r.overdue ? `<div>${badge('Overdue', 'red')}</div>` : ''}<div title="${r.hidden ? 'Hidden from parent / pupil' : 'Visible to parent / pupil'}" style="cursor:pointer;margin-top:3px;font-size:13px;color:var(--text-3)" onclick="FIN.fees.toggleHidden(${r.id}, ${!r.hidden})">${r.hidden ? '🚫👁' : '👁'}</div>`, exportValue: r => FIN.cap({ partial: 'Partly Paid', paid: 'Total Paid' }[r.status] || r.status) },
+        { key: 'status', label: 'Status', render: r => `${FIN.statusBadge(r.status)}${r.overdue ? `<div>${badge('Overdue', 'red')}</div>` : ''}<div title="${r.hidden ? 'Hidden from parent / pupil' : 'Visible to parent / pupil'}" style="cursor:pointer;margin-top:3px;font-size:13px;color:var(--text-3)" onclick="FIN.fees.toggleHidden(${r.id}, ${!r.hidden})">${r.hidden ? '<i class=fi-eye-off></i>' : '<i class=fi-eye></i>'}</div>`, exportValue: r => FIN.cap({ partial: 'Partly Paid', paid: 'Total Paid' }[r.status] || r.status) },
         { key: 'createdAt', label: 'Created', render: r => `<span class="muted">${dateTime(r.createdAt)}</span>`, exportValue: r => FIN.plain(dateTime(r.createdAt)) },
         { key: 'collect', label: 'Collection', sub: '(Record Offline Or Direct Bank Payment)', sortable: false, noExport: true, render: r => (r.balance > 0 ? `<button class="fin-btn green sm" onclick="FIN.recordPayment(${r.id}, FIN.fees.ilView)">Record Payment</button>` : '') },
-        { key: 'action', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.invoiceMenu(this, ${r.id})">⋯</button>` },
+        { key: 'action', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.invoiceMenu(this, ${r.id})"><i class=fi-dots></i></button>` },
       ],
     });
   }
@@ -199,8 +199,8 @@
       buttons: [
         ...(inv.balance > 0 ? [{ label: 'Pay Now', cls: 'green', onClick: (o, close) => { close(); FIN.recordPayment(inv.id, after || (() => viewInvoice(id))); } },
           { label: 'Upload Payment Proof', cls: 'outline', onClick: (o, close) => { close(); FIN.recordPayment(inv.id, after || (() => viewInvoice(id)), true); } }] : []),
-        { label: '⤓ Download / Share', cls: 'outline', onClick: () => { printInvoices([inv.id]); return false; } },
-        { label: '🖶 Print', cls: 'outline', onClick: () => { FIN.print(`Invoice ${inv.invoiceNo}`, invoiceHtml(inv, data.school, data.banks)); return false; } },
+        { label: '<i class=fi-download></i> Download / Share', cls: 'outline', onClick: () => { printInvoices([inv.id]); return false; } },
+        { label: '<i class=fi-print></i> Print', cls: 'outline', onClick: () => { FIN.print(`Invoice ${inv.invoiceNo}`, invoiceHtml(inv, data.school, data.banks)); return false; } },
         { label: 'Print (POS)', cls: 'plain', onClick: () => { FIN.print(`Invoice ${inv.invoiceNo}`, invoiceHtml(inv, data.school, data.banks, { pos: true }), { pos: true }); return false; } },
         { label: 'Close', cls: 'plain' },
       ],
@@ -285,7 +285,7 @@
       <td><input class="field-input" type="number" min="0" step="0.01" data-k="amount" value="${esc(it.amount || '')}" oninput="FIN.fees.itemsTotal('${prefix}')"></td>
       <td><input class="field-input" data-k="description" value="${esc(it.description || '')}" placeholder="Optional"></td>
       <td><select class="ctrl-select" data-k="accountId">${options(meta.accounts.map(a => [a.id, a.name]), it.accountId || (meta.accounts.find(a => a.isDefault) || {}).id)}</select></td>
-      <td><button type="button" class="fin-btn red sm" onclick="this.closest('tr').remove(); FIN.fees.itemsTotal('${prefix}')">✕</button></td></tr>`).join('');
+      <td><button type="button" class="fin-btn red sm" onclick="this.closest('tr').remove(); FIN.fees.itemsTotal('${prefix}')"><i class=fi-x></i></button></td></tr>`).join('');
   }
   function itemsEditor(prefix, items, meta) {
     return `<datalist id="${prefix}-names">${meta.itemNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
@@ -367,7 +367,7 @@
     const meta = await FIN.feesMeta();
     const s = F.tpl;
     el.innerHTML = `${FIN.header('Fees Invoice Templates')}
-      ${card('<span>⛃</span> Select Options to Manage Fees', `<div class="fin-grid">
+      ${card('<span><i class=fi-filter></i></span> Select Options to Manage Fees', `<div class="fin-grid">
           ${field('Class', `<select class="ctrl-select" id="tp-class" onchange="document.getElementById('tp-arm').innerHTML=FIN.armOptions(this.value,'','All')">${options([['ALL', 'All Classes'], ...FIN.classes().map(c => [c.code, c.label])], s.classCode || 'ALL')}</select>`, { required: true })}
           ${field('Class Arm', `<select class="ctrl-select" id="tp-arm">${FIN.armOptions(s.classCode && s.classCode !== 'ALL' ? s.classCode : '', s.armId || '', 'All')}</select>`, { required: true })}
           ${field('Fees Session', select('tp-session', FIN.sessionList(meta), s.session || FIN.activeTerm().sessionLabel), { required: true })}
@@ -383,7 +383,7 @@
     const data = await FIN.get(`/api/admin/fees/templates${FIN.qs({ classCode: s.classCode, armId: s.armId, session: s.session, term: s.term })}`);
     const clsLabel = s.classCode === 'ALL' ? 'All Classes' : (FIN.classes().find(c => c.code === s.classCode) || {}).label || '';
     const rowsOf = type => data.templates.filter(t => (type === 'mandatory' ? t.invoiceType === 'mandatory' : t.invoiceType !== 'mandatory'));
-    const section = (type, title, note) => `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">🗎 ${title}</div></div>
+    const section = (type, title, note) => `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-doc></i> ${title}</div></div>
         <div class="fin-card-body"><div class="fin-note" style="margin-bottom:12px">${note}</div>
         <div style="font-weight:700;font-size:12px;margin-bottom:6px">${title} For: | ${esc(s.session)} ${esc(s.term === 'all' ? '' : s.term)} | ${esc(clsLabel)}</div></div>
         <div id="tp-table-${type}"></div></div>`;
@@ -394,13 +394,13 @@
       columns: [
         { key: '#', label: '#', sortable: false },
         { key: 'for', label: 'For', sort: r => r.classes.map(c => c.classLabel).join(), render: r => `${r.classes.slice(0, 3).map(c => `${esc(c.classLabel)}${c.armName ? ` - ${esc(c.armName)}` : ''}`).join('<br>')}${r.classes.length > 3 ? `<br><a href="javascript:void(0)" onclick="FIN.fees.tplView(${r.id})">+${r.classes.length - 3} more</a>` : ''}`, exportValue: r => r.classes.map(c => c.classLabel + (c.armName ? ` - ${c.armName}` : '')).join('; ') },
-        { key: 'title', label: 'Invoice Title', render: r => `${esc(r.title)} <button class="fin-btn plain sm" title="View" onclick="FIN.fees.tplView(${r.id})">🔍</button>` },
+        { key: 'title', label: 'Invoice Title', render: r => `${esc(r.title)} <button class="fin-btn plain sm" title="View" onclick="FIN.fees.tplView(${r.id})"><i class=fi-search></i></button>` },
         { key: 'total', label: 'Total Amount', num: true, render: r => money(r.total), exportValue: r => r.total },
         { key: 'sessionLabel', label: 'Fee Session' }, { key: 'termLabel', label: 'Fee Term' },
         { key: 'autoGenerate', label: 'Auto-generate Status', sub: '(Automaticaly generate this invoice for all eligible students of the class(es))', render: r => `${FIN.onOffSwitch(r.autoGenerate, `FIN.fees.tplToggle(${r.id},'autoGenerate',${!r.autoGenerate})`)}<div style="margin-top:6px"><button class="fin-btn plain sm" onclick="FIN.fees.tplGenerate(${r.id})">Generate Now</button></div>`, exportValue: r => (r.autoGenerate ? 'ON' : 'OFF') },
         { key: 'selfGenerate', label: 'Self-generate Status', sub: '(Allow parents/students of the class(es) to generate invoice from this template)', render: r => FIN.onOffSwitch(r.selfGenerate, `FIN.fees.tplToggle(${r.id},'selfGenerate',${!r.selfGenerate})`), exportValue: r => (r.selfGenerate ? 'ON' : 'OFF') },
         { key: 'generatedCount', label: 'Generated Invoices', render: r => `<div style="text-align:center"><b>${r.generatedCount}</b><br><button class="fin-btn plain sm" onclick="FIN.fees.tplInvoices(${r.id})">View Invoices</button></div>`, exportValue: r => r.generatedCount },
-        { key: 'act', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'View Invoice Template',onClick:()=>FIN.fees.tplView(${r.id})},{label:'Edit Template',onClick:()=>FIN.fees.tplEdit(${r.id})},{label:'Delete Template',danger:true,onClick:()=>FIN.fees.tplDelete(${r.id})}])">⋯</button>` },
+        { key: 'act', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'View Invoice Template',onClick:()=>FIN.fees.tplView(${r.id})},{label:'Edit Template',onClick:()=>FIN.fees.tplEdit(${r.id})},{label:'Delete Template',danger:true,onClick:()=>FIN.fees.tplDelete(${r.id})}])"><i class=fi-dots></i></button>` },
       ],
     }));
   }
@@ -427,19 +427,19 @@
   function templateHtml(t, school) {
     return `<div style="text-align:center"><b style="font-size:16px">${esc(school.name)}</b><br><span style="font-size:11px">${esc(school.address || '')}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:11px;margin:8px 0"><div>Email: ${esc(school.email || '')}<br>Tel: ${esc(school.phone || '')}</div><img src="/report_assets/school-logo.png" onerror="this.remove()" style="height:46px"><div>Our Ref.: ____________<br>Your Ref.: ____________</div></div>
-      <div style="border-top:3px double #1e40af;margin:6px 0 10px"></div>
+      <div style="border-top:3px double #15803d;margin:6px 0 10px"></div>
       <h3 style="text-align:center">Fee Schedule</h3><div style="font-size:12px">Title : ${esc(t.title)}<br>For Session : ${esc(t.sessionLabel)} › ${esc(t.termLabel)}</div>
       <h4 style="margin:12px 0 6px">Fees Breakdown</h4><div style="font-weight:700;font-size:12px;border-bottom:1px solid #e2e8f0;padding:6px 0">${esc(t.title)}</div>
       <table class="fin-table"><thead><tr><th>#</th><th>Fee Item</th><th class="num">Amount</th><th>Description</th><th>Destination</th></tr></thead>
       <tbody>${t.items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.name)}</td><td class="num">${money(i.amount)}</td><td>${esc(i.description || '')}</td><td class="muted" style="font-size:10px">→ ${esc(i.accountName || 'DEFAULT FEES ACCOUNT')}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2" class="num">Total</td><td class="num">${money(t.subtotal)}</td><td colspan="2"></td></tr></tfoot></table>
       <table class="fin-table" style="max-width:460px;margin-top:12px"><tr><td>Discount :</td><td>-₦ ${money(t.discount).slice(1)}</td></tr><tr><td>Payable :</td><td><b>${money(t.total)}</b></td></tr>
-      <tr><td>Part Payment :</td><td>${t.partPayment ? 'Allowed' : 'Disabled'}</td></tr><tr><td>Show Invoice Breakdown to Students / Parents :</td><td>${t.showBreakdown ? '✓' : '✕'}</td></tr>
+      <tr><td>Part Payment :</td><td>${t.partPayment ? 'Allowed' : 'Disabled'}</td></tr><tr><td>Show Invoice Breakdown to Students / Parents :</td><td>${t.showBreakdown ? 'Yes' : 'No'}</td></tr>
       <tr><td>For Class(es) :</td><td>${t.classes.map(c => `${esc(c.classLabel)}${c.armName ? ` - ${esc(c.armName)}` : ''}`).join('<br>')}</td></tr></table>`;
   }
   async function tplView(id) {
     const { template: t, school } = await FIN.get(`/api/admin/fees/templates/${id}`);
-    modal({ title: 'Fees Invoice Template', size: 'wide', body: templateHtml(t, school), buttons: [{ label: '🖶 Print', cls: 'outline', onClick: () => { FIN.print(t.title, templateHtml(t, school)); return false; } }, { label: 'Close', cls: 'plain' }] });
+    modal({ title: 'Fees Invoice Template', size: 'wide', body: templateHtml(t, school), buttons: [{ label: '<i class=fi-print></i> Print', cls: 'outline', onClick: () => { FIN.print(t.title, templateHtml(t, school)); return false; } }, { label: 'Close', cls: 'plain' }] });
   }
   async function tplEdit(id) {
     const meta = await FIN.feesMeta();
@@ -487,7 +487,7 @@
     const meta = await FIN.feesMeta();
     const s = F.cih;
     el.innerHTML = `${FIN.header('Class Invoice History')}
-      ${card('<span>⛃</span> Select Options to View List', `<div class="fin-grid">
+      ${card('<span><i class=fi-filter></i></span> Select Options to View List', `<div class="fin-grid">
         ${field('Fees Session', select('cih-session', FIN.sessionList(meta), s.session || FIN.activeTerm().sessionLabel), { required: true })}
         ${field('Fees Term', select('cih-term', [...FIN.termList(meta), ['all', 'All']], s.term || FIN.activeTerm().termLabel, 'Select Term'), { required: true })}
         ${field('Class', `<select class="ctrl-select" id="cih-class" onchange="document.getElementById('cih-arm').innerHTML=FIN.armOptions(this.value,'')">${options([['', 'Select Class'], ...FIN.classes().map(c => [c.code, c.label])], s.classCode || '')}</select>`, { required: true })}
@@ -507,9 +507,9 @@
     s.loaded = true;
     const data = await FIN.get(`/api/admin/fees/class-history${FIN.qs({ classCode: s.classCode, armId: s.armId, session: s.session, term: s.term, types: s.type ? [s.type] : [], titles: s.titles, studentStatus: s.studentStatus })}`);
     const box = document.getElementById('cih-results');
-    box.innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">☰ Fees Invoice History</div></div>
+    box.innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-list></i> Fees Invoice History</div></div>
       <div class="fin-card-body" style="padding-bottom:0"><div class="fin-section-label" style="margin-top:0">Quick Links</div>
-        <div class="fin-actions"><button class="fin-btn plain" onclick="FIN.goTab('studentTags')">👤+ Assign / Manage Student Tags</button><button class="fin-btn plain" onclick="FIN.goTab('feeTemplates')">🗎 Manage & Publish Fees</button></div></div>
+        <div class="fin-actions"><button class="fin-btn plain" onclick="FIN.goTab('studentTags')"><i class=fi-user></i> Assign / Manage Student Tags</button><button class="fin-btn plain" onclick="FIN.goTab('feeTemplates')"><i class=fi-doc></i> Manage & Publish Fees</button></div></div>
       <div id="cih-table"></div></div>`;
     table(document.getElementById('cih-table'), {
       title: `Class Invoice History | ${s.session} | ${s.term}`, rows: data.students, rowKey: 'studentId', perPage: 100,
@@ -526,7 +526,7 @@
         { key: 'netTotal', label: 'Net Total Amount', num: true, render: r => money(r.netTotal), exportValue: r => r.netTotal, total: true },
         { key: 'paid', label: 'Paid Amount', num: true, render: r => `<span style="color:var(--green)">${money(r.paid)}</span>`, exportValue: r => r.paid, total: true },
         { key: 'due', label: 'Due Amount', num: true, render: r => `<span style="color:var(--red)">${money(r.due)}</span>`, exportValue: r => r.due, total: true },
-        { key: 'v', label: 'View Invoices', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.studentInvoices(${jsArg(r.studentId)}, ${jsArg(r.name)})">🔍 View Invoices</button>` },
+        { key: 'v', label: 'View Invoices', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.studentInvoices(${jsArg(r.studentId)}, ${jsArg(r.name)})"><i class=fi-search></i> View Invoices</button>` },
       ],
     });
   }
@@ -539,13 +539,13 @@
   async function studentInvoices(studentId, name, familyKey) {
     const meta = await FIN.feesMeta();
     const m = modal({
-      title: `🗎 ${familyKey ? 'Family Fees Invoice List' : `Fees Invoice List — ${esc(name)}`}`, size: 'xwide',
+      title: `<i class=fi-doc></i> ${familyKey ? 'Family Fees Invoice List' : `Fees Invoice List — ${esc(name)}`}`, size: 'xwide',
       body: `<div class="fin-grid">
           ${field('Fees Session', select('fr-session', [['all', 'All'], ...FIN.sessionList(meta)], 'all'), { required: true })}
           ${field('Fees Term', select('fr-term', [['all', 'All'], ...FIN.termList(meta)], 'all'), { required: true })}
           ${field('Filter By Invoice Type', multi('fr-types', TYPES))}
           ${field('Filter By Payment Status', multi('fr-status', STATUSES))}
-          <div><button class="fin-btn" onclick="FIN.fees.frLoad()">⛃ Apply Filter</button></div></div>
+          <div><button class="fin-btn" onclick="FIN.fees.frLoad()"><i class=fi-filter></i> Apply Filter</button></div></div>
         <div id="fr-adm" style="text-align:right;margin:10px 0"></div><div id="fr-body"></div>`,
     });
     F.fr = { studentId, familyKey, close: m.close, name };
@@ -554,15 +554,15 @@
   async function frLoad() {
     const f = F.fr;
     const d = await FIN.get(`/api/admin/fees/history${FIN.qs({ studentId: f.studentId, familyKey: f.familyKey, session: val('fr-session') === 'all' ? '' : val('fr-session'), term: val('fr-term') === 'all' ? '' : val('fr-term'), types: multiVal('fr-types'), statuses: multiVal('fr-status') })}`);
-    document.getElementById('fr-adm').innerHTML = FIN.menuButton('🗎 Admission Fees', d.admissions.map(a => ({ label: a.found ? `${a.name}: admission application ${a.status} (${FIN.plain(date(a.submittedAt))})` : `No admission application record found for ${a.name}`, onClick: () => {} })), 'outline sm');
+    document.getElementById('fr-adm').innerHTML = FIN.menuButton('<i class=fi-doc></i> Admission Fees', d.admissions.map(a => ({ label: a.found ? `${a.name}: admission application ${a.status} (${FIN.plain(date(a.submittedAt))})` : `No admission application record found for ${a.name}`, onClick: () => {} })), 'outline sm');
     const sm = d.summary;
     document.getElementById('fr-body').innerHTML = stats([
       { label: 'Total in list', value: money(sm.total), icon: '₦', bg: 'var(--black-3)', color: 'var(--text-2)' },
-      { label: 'Total Paid', value: money(sm.paid), pct: pct(sm.paid, sm.total), icon: '✓', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
+      { label: 'Total Paid', value: money(sm.paid), pct: pct(sm.paid, sm.total), icon: '<i class=fi-check></i>', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
       { label: 'Total Due', value: money(sm.due), pct: pct(sm.due, sm.total), icon: '!', bg: 'var(--red-bg)', color: 'var(--red)', valueColor: 'var(--red)' },
     ]) + '<div id="fr-table" class="fin-card"></div>';
     table(document.getElementById('fr-table'), {
-      title: f.familyKey ? 'Family Fees Invoice List' : `Fees Invoice List — ${f.name}`, caption: f.familyKey ? '🗎 Family Fees Invoice List' : '', rows: d.invoices, perPage: 20,
+      title: f.familyKey ? 'Family Fees Invoice List' : `Fees Invoice List — ${f.name}`, caption: f.familyKey ? '<i class=fi-doc></i> Family Fees Invoice List' : '', rows: d.invoices, perPage: 20,
       columns: [
         { key: '#', label: '#', sortable: false }, { key: 'studentName', label: 'Student' },
         { key: 'classLabel', label: 'Fee Class', render: r => `${esc(r.classLabel)}${r.armName ? ` - ${esc(r.armName)}` : ''}<div class="muted">(${esc(r.sessionLabel)} | ${esc(r.termLabel)})</div>` },
@@ -573,7 +573,7 @@
         { key: 'status', label: 'Status', render: r => FIN.statusBadge(r.status) },
         { key: 'createdAt', label: 'Created', render: r => dateTime(r.createdAt), exportValue: r => FIN.plain(dateTime(r.createdAt)) },
         { key: 'c', label: 'Collection', noExport: true, sortable: false, render: r => (r.balance > 0 ? `<button class="fin-btn green sm" onclick="FIN.recordPayment(${r.id}, FIN.fees.frLoad)">Record Payment</button>` : '') },
-        { key: 'a', label: 'Action', noExport: true, sortable: false, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.invoiceMenu(this, ${r.id}, FIN.fees.frLoad)">⋯</button>` },
+        { key: 'a', label: 'Action', noExport: true, sortable: false, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.invoiceMenu(this, ${r.id}, FIN.fees.frLoad)"><i class=fi-dots></i></button>` },
       ],
     });
   }
@@ -581,7 +581,7 @@
   // ══ Family Fees History ════════════════════════════════════════════════
   FIN.page('familyFeesHistory', async el => {
     el.innerHTML = `${FIN.header('Dedicated Fees Wallets & Accounts')}
-      <div class="fin-card">${FIN.tabs('ffh', [['families', '👥 Family Fees & Wallets'], ['wallets', '💼 Fees Wallet List & Balances'], ['about', 'ⓘ About Fees Wallets']], F.ffh.tab || 'families', k => { F.ffh.tab = k; ffhDraw(); })}
+      <div class="fin-card">${FIN.tabs('ffh', [['families', '<i class=fi-users></i> Family Fees & Wallets'], ['wallets', '<i class=fi-briefcase></i> Fees Wallet List & Balances'], ['about', '<i class=fi-info></i> About Fees Wallets']], F.ffh.tab || 'families', k => { F.ffh.tab = k; ffhDraw(); })}
       <div class="fin-card-body" id="ffh-body"></div></div>`;
     ffhDraw();
   });
@@ -589,11 +589,11 @@
     const body = document.getElementById('ffh-body');
     const tab = F.ffh.tab || 'families';
     if (tab === 'about') {
-      body.innerHTML = `<div class="fin-hero"><h3 style="font-size:18px;margin-bottom:8px">🏛 Family Fees Wallet & Account</h3>
+      body.innerHTML = `<div class="fin-hero"><h3 style="font-size:18px;margin-bottom:8px"><i class=fi-bank></i> Family Fees Wallet & Account</h3>
           <p>Still dealing with the bursary nightmare of dozens of daily bank transfers — and struggling to answer:</p>
           <div style="margin:8px 0"><span class="chip">Who made which payment?</span><span class="chip">For which student?</span><span class="chip">For what purpose?</span><span class="chip">Is this bank statement entry a fee payment or something else?</span></div>
           <div style="border-left:3px solid #fff;padding:10px 14px;background:rgba(255,255,255,.1);margin-top:10px"><b>There's a better way.</b> Each family has its own fees wallet here. Money a family sends ahead of time (or overpays) is kept in its wallet, and you use it to pay any of the family's invoices in one click — every naira stays tied to the right family and child.</div></div>
-        <div class="fin-section-label">★ What you get</div>
+        <div class="fin-section-label"><i class=fi-star></i> What you get</div>
         <div class="fin-grid">${[['One Wallet Per Family', 'Every family has its own wallet, so deposits are always attributed to the right family.'], ['Instant Invoice Settlement', 'Apply wallet money to any child\'s outstanding invoice — it is recorded as a fee payment straight away.'],
           ['Seamless Reconciliation', 'Wallet payments flow into Income and the payments log just like cash or bank payments.'], ['Full Payment History & Reports', 'Every deposit and every use of wallet money is logged with who, when and for which invoice.']]
           .map(([h, p]) => `<div class="fin-tile"><h4>${h}</h4><p>${p}</p></div>`).join('')}</div>
@@ -620,10 +620,10 @@
     }
     const d = await FIN.get(`/api/admin/fees/families?type=${F.ffh.type || 'active'}`);
     F.ffh.list = d.families;
-    body.innerHTML = `<div style="font-weight:700;margin-bottom:12px">👥 Families</div>
+    body.innerHTML = `<div style="font-weight:700;margin-bottom:12px"><i class=fi-users></i> Families</div>
       <div class="fin-grid" style="max-width:480px;margin:0 auto 16px">${field('Filter : Family List Type', select('ffh-type', [['all', 'All families'], ['active', 'Families with active wards (at least one ward still active)'], ['some_left', 'Families with wards who have graduated or left (at least one ward graduated or left)'], ['all_left', 'Families with wards who have all graduated or left (No ward still active)'], ['none_left', 'Families with no wards graduated yet or left (All wards still active)']], F.ffh.type || 'active', null, 'onchange="FIN.fees.ffhType(this.value)"'))}</div>
-      ${stats([{ label: 'Families', value: d.stats.families, icon: '⌂', bg: 'var(--black-3)', color: 'var(--text-2)' }, { label: 'With 1 Parent', value: d.stats.oneParent, icon: '👤', bg: 'var(--amber-bg)', color: 'var(--amber)' },
-        { label: 'With 2 Parents', value: d.stats.twoParents, icon: '👥', bg: 'var(--green-bg)', color: 'var(--green)' }, { label: 'Total Parents', value: d.stats.parents, icon: '👪', bg: 'var(--blue-bg)', color: 'var(--blue)' }])}
+      ${stats([{ label: 'Families', value: d.stats.families, icon: '<i class=fi-home></i>', bg: 'var(--black-3)', color: 'var(--text-2)' }, { label: 'With 1 Parent', value: d.stats.oneParent, icon: '<i class=fi-user></i>', bg: 'var(--amber-bg)', color: 'var(--amber)' },
+        { label: 'With 2 Parents', value: d.stats.twoParents, icon: '<i class=fi-users></i>', bg: 'var(--green-bg)', color: 'var(--green)' }, { label: 'Total Parents', value: d.stats.parents, icon: '<i class=fi-users></i>', bg: 'var(--green-bg)', color: 'var(--green)' }])}
       <div id="ffh-table"></div>`;
     F.ffhTable = table(document.getElementById('ffh-table'), {
       title: 'Families', rows: d.families, rowKey: 'key', selectable: true, perPage: 10,
@@ -658,10 +658,10 @@
   function ffhWallet(key) {
     const f = F.ffh.list.find(x => x.key === key);
     modal({
-      title: '💼 Family Fees Wallet & Account', size: 'wide',
+      title: '<i class=fi-briefcase></i> Family Fees Wallet & Account', size: 'wide',
       body: `<div class="fin-grid two"><div class="fin-tile"><i class="muted">Parents:</i>${f.parents.map(p => `<div style="margin-top:6px">${esc(p.name)} <i class="muted">(${esc(p.relationship || '')})</i><div class="muted">${esc(p.phone || '')}<br>${esc(p.email || '')}</div></div>`).join('')}</div>
         <div class="fin-tile"><div class="muted">Wallet balance</div><div class="fin-big">${money(f.walletBalance)}</div><div class="muted" style="margin-top:6px">Family fees due: <b style="color:var(--red)">${money(f.totals.balance)}</b></div></div></div>
-        <div class="fin-tile" style="margin-top:12px"><i class="muted">Wards:</i> <button class="fin-btn plain sm" onclick="FIN.goTab('families')">✎ Manage Wards</button>${f.wards.map((w, i) => `<div style="padding:6px 0;border-bottom:1px solid var(--border)">${i + 1}. <b>${esc(w.name)}</b> <span class="muted">(${w.graduated ? 'Graduated' : `In ${esc(w.classLabel)}`})</span></div>`).join('')}</div>`,
+        <div class="fin-tile" style="margin-top:12px"><i class="muted">Wards:</i> <button class="fin-btn plain sm" onclick="FIN.goTab('families')"><i class=fi-edit></i> Manage Wards</button>${f.wards.map((w, i) => `<div style="padding:6px 0;border-bottom:1px solid var(--border)">${i + 1}. <b>${esc(w.name)}</b> <span class="muted">(${w.graduated ? 'Graduated' : `In ${esc(w.classLabel)}`})</span></div>`).join('')}</div>`,
       buttons: [{ label: 'Add Money to Wallet', cls: 'green', onClick: (o, close) => { close(); walletDeposit(key); } }, { label: 'Pay an Invoice from Wallet', cls: 'outline', onClick: (o, close) => { close(); walletApply(key); } }, { label: 'Close', cls: 'plain' }],
     });
   }
@@ -702,11 +702,11 @@
         ${tab === 'reviewPaymentProofs' ? card('Log a Reported Payment', `<div class="fin-note" style="margin-bottom:10px">Parents upload proofs themselves from the pupil portal (Fees page). Use this when a parent brings or sends the proof to the school instead.</div>
             <div class="fin-grid">${field('Student', select('lp-student', FIN.students().map(s => [s.id, `${s.name} (${s.regNo || s.id})`]), '', 'Select Student', 'onchange="FIN.fees.lpInvoices()"'), { required: true })}
             ${field('Invoice', select('lp-invoice', [], '', 'Select Student First'), { required: true })}<div><button class="fin-btn outline" onclick="FIN.fees.lpOpen()">Upload Payment Proof</button></div></div>`) : ''}
-        ${card(`⛃ ${successful ? 'Select Date Range of Report to View' : 'Select Date Range to View Online Payment Transactions Log'}`, `<div class="fin-grid">
+        ${card(`<i class=fi-filter></i> ${successful ? 'Select Date Range of Report to View' : 'Select Date Range to View Online Payment Transactions Log'}`, `<div class="fin-grid">
           ${field(successful ? 'Fees Received Between' : 'Transactions Initiated Between', `<div style="display:flex;gap:6px;align-items:center"><input type="date" class="field-input" id="pl-from" value="${st.from}"> <span class="muted">TO</span> <input type="date" class="field-input" id="pl-to" value="${st.to}"></div>`, { required: true, span: 2 })}
           ${successful ? '' : field('Transaction Status', select('pl-status', [['all', 'All'], ['pending', 'Pending Payment Completion'], ['successful', 'Transaction Successful'], ['failed', 'Transaction Unsuccessful'], ['proof_review', 'Payment Proof Under Review'], ['proof_rejected', 'Payment Proof Rejected']], st.status))}
           ${field('Payment Channel', `<span>${multi('pl-method', meta.methods.map(x => [x, x]), st.method ? st.method.split(',') : null)}</span>`, { hint: successful ? '' : '(Leave as All for all Channels)' })}
-          <div><button class="fin-btn" onclick="FIN.fees.plLoad('${tab}')">🔍 ${successful ? 'View Report' : 'View Log'}</button></div></div>`)}
+          <div><button class="fin-btn" onclick="FIN.fees.plLoad('${tab}')"><i class=fi-search></i> ${successful ? 'View Report' : 'View Log'}</button></div></div>`)}
         <div id="pl-results"></div>`;
       if (tab === 'verifyPaymentStatus') verifyModal();
       plLoad(tab);
@@ -719,7 +719,7 @@
     const d = await FIN.get(`/api/admin/fees/payments${FIN.qs({ from: st.from, to: st.to, status: st.status, method: st.method })}`);
     const successful = tab === 'successfulPayments';
     const box = document.getElementById('pl-results');
-    box.innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">⟲ ${successful ? 'Received Fees Report' : 'Online Payment Transactions Log'} | ${date(st.from)} - ${date(st.to)}</div></div><div id="pl-table"></div>
+    box.innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-history></i> ${successful ? 'Received Fees Report' : 'Online Payment Transactions Log'} | ${date(st.from)} - ${date(st.to)}</div></div><div id="pl-table"></div>
       <div style="text-align:right;padding:0 18px 14px;font-weight:700">Total Successful : ${money(d.total)}</div></div>`;
     const cols = successful ? [
       { key: '#', label: '#', sortable: false },
@@ -781,7 +781,7 @@
     const meta = await FIN.feesMeta();
     const s = F.deb;
     el.innerHTML = `${FIN.header('Fees Debtors')}
-      ${card('☰ Debtors List', `<div class="fin-section-label" style="margin-top:0">⛃ Select Options to View Debtors List</div><div class="fin-grid">
+      ${card('<i class=fi-list></i> Debtors List', `<div class="fin-section-label" style="margin-top:0"><i class=fi-filter></i> Select Options to View Debtors List</div><div class="fin-grid">
         ${field('Fees Session', select('fd-session', [['all', 'All'], ...FIN.sessionList(meta)], s.session || FIN.activeTerm().sessionLabel), { required: true })}
         ${field('Fees Term', select('fd-term', [...FIN.termList(meta), ['all', 'All']], s.term || FIN.activeTerm().termLabel, 'Select Term'), { required: true })}
         ${field('Class', `<select class="ctrl-select" id="fd-class" onchange="document.getElementById('fd-arm').innerHTML=FIN.armOptions(this.value,'')">${options([['', 'All Classes'], ...FIN.classes().map(c => [c.code, c.label])], s.classCode || '')}</select>`, { required: true })}
@@ -789,7 +789,7 @@
         ${field('For Invoice Type', multi('fd-types', TYPES.map(([v, l]) => [v, l.split(' (')[0]]), s.types), { required: true })}
         ${field('For Invoice(s)', multi('fd-titles', meta.titles.map(t => [t, t]), s.titles), { required: true })}
         ${field('Student Account Status', select('fd-status', [['', 'All'], ['active', 'Active'], ['deactivated', 'Deactivated']], s.studentStatus || ''), { required: true })}
-        <div><button class="fin-btn" onclick="FIN.fees.fdLoad()">🔍 Load Debtors List</button></div></div>`)}
+        <div><button class="fin-btn" onclick="FIN.fees.fdLoad()"><i class=fi-search></i> Load Debtors List</button></div></div>`)}
       <div id="fd-results"></div>`;
     if (s.loaded) fdLoad();
   });
@@ -799,8 +799,8 @@
     if (!s.term) return showToast('Select the term');
     const d = await FIN.get(`/api/admin/fees/debtors${FIN.qs({ session: s.session === 'all' ? '' : s.session, term: s.term === 'all' ? '' : s.term, classCode: s.classCode, armId: s.armId, types: s.types, titles: s.titles, studentStatus: s.studentStatus })}`);
     const meta = await FIN.feesMeta();
-    document.getElementById('fd-results').innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">☰ Students Unpaid Fees List</div>
-      <div class="fin-actions">${meta.smtp ? '' : '<span class="fin-badge amber">E-mail is not set up — reminders cannot be sent</span>'}<button class="fin-btn outline sm" onclick="FIN.fees.remind(FIN.tablePicked('fd-table'))">🔔 Send Reminder to Selected</button></div></div><div id="fd-table"></div></div>`;
+    document.getElementById('fd-results').innerHTML = `<div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-list></i> Students Unpaid Fees List</div>
+      <div class="fin-actions">${meta.smtp ? '' : '<span class="fin-badge amber">E-mail is not set up — reminders cannot be sent</span>'}<button class="fin-btn outline sm" onclick="FIN.fees.remind(FIN.tablePicked('fd-table'))"><i class=fi-bell></i> Send Reminder to Selected</button></div></div><div id="fd-table"></div></div>`;
     table(document.getElementById('fd-table'), {
       title: 'Students Unpaid Fees List', rows: d.debtors, rowKey: 'studentId', selectable: true, perPage: 100,
       columns: [
@@ -808,8 +808,8 @@
         { key: 'classLabel', label: 'Current Class' },
         { key: 'unpaid', label: 'Total Unpaid Amount', num: true, render: r => money(r.unpaid), exportValue: r => r.unpaid, total: true },
         { key: 'overdue', label: 'Overdue', num: true, render: r => `<b style="color:var(--red)">${money(r.overdue)}</b>`, exportValue: r => r.overdue, total: true },
-        { key: 'v', label: 'View Invoices', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.studentInvoices(${jsArg(r.studentId)}, ${jsArg(r.name)})">🗎 Fees Invoice History</button>` },
-        { key: 'reminder', label: 'Reminder', sortable: false, render: r => `<button class="fin-btn plain sm" ${r.parentEmail ? '' : 'disabled title="No parent e-mail on file"'} onclick="FIN.fees.remind([${jsArg(r.studentId)}])">🔔 Send</button>${r.lastReminder ? `<div class="muted">${r.lastReminder.status === 'sent' ? 'Sent' : FIN.cap(r.lastReminder.status)} ${date(r.lastReminder.sentAt)}</div>` : ''}`, exportValue: r => (r.lastReminder ? `${r.lastReminder.status} ${r.lastReminder.sentAt}` : '') },
+        { key: 'v', label: 'View Invoices', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.fees.studentInvoices(${jsArg(r.studentId)}, ${jsArg(r.name)})"><i class=fi-doc></i> Fees Invoice History</button>` },
+        { key: 'reminder', label: 'Reminder', sortable: false, render: r => `<button class="fin-btn plain sm" ${r.parentEmail ? '' : 'disabled title="No parent e-mail on file"'} onclick="FIN.fees.remind([${jsArg(r.studentId)}])"><i class=fi-bell></i> Send</button>${r.lastReminder ? `<div class="muted">${r.lastReminder.status === 'sent' ? 'Sent' : FIN.cap(r.lastReminder.status)} ${date(r.lastReminder.sentAt)}</div>` : ''}`, exportValue: r => (r.lastReminder ? `${r.lastReminder.status} ${r.lastReminder.sentAt}` : '') },
       ],
     });
   }

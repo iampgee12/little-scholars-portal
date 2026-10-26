@@ -31,10 +31,10 @@
     document.getElementById(`${prefix}-items`).innerHTML = (h ? h.items : []).map(i => `<option value="${esc(i.name)}">`).join('');
   }
   async function newVoucher(id) { const r = await FIN.get('/api/admin/finance/voucher-no'); document.getElementById(id).value = r.voucherNo; }
-  const voucherField = (id, value) => `<div style="display:flex;gap:6px"><input class="field-input" id="${id}" value="${esc(value || '')}" placeholder="E.G. #EXP-20260219-AB7X"><button type="button" class="fin-btn plain sm" onclick="FIN.books.newVoucher('${id}')">⤮ Generate</button></div>`;
+  const voucherField = (id, value) => `<div style="display:flex;gap:6px"><input class="field-input" id="${id}" value="${esc(value || '')}" placeholder="E.G. #EXP-20260219-AB7X"><button type="button" class="fin-btn plain sm" onclick="FIN.books.newVoucher('${id}')"><i class=fi-hash></i> Generate</button></div>`;
   const coaWarn = (m, accountId) => {
     const a = m.accounts.find(x => String(x.id) === String(accountId));
-    return a && !a.coaAccountId ? '⚠ This account has no Chart of Accounts mapping. GL posting will use the default Cash/Bank account until it is mapped. <a href="javascript:void(0)" onclick="FIN.goTab(\'chartOfAccounts\')">Configure in Accounting Settings.</a>' : '';
+    return a && !a.coaAccountId ? '<i class=fi-warn></i> This account has no Chart of Accounts mapping. GL posting will use the default Cash/Bank account until it is mapped. <a href="javascript:void(0)" onclick="FIN.goTab(\'chartOfAccounts\')">Configure in Accounting Settings.</a>' : '';
   };
 
   // ══ Expense Requests ══════════════════════════════════════════════════
@@ -42,7 +42,7 @@
     const m = await meta(true);
     const st = S.er;
     el.innerHTML = `${FIN.header('Expense Requests')}
-      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">⊟ Cash Requests <span class="muted">(${esc(FIN.quickLabel(st.quick))})</span></div>
+      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-minus-square></i> Cash Requests <span class="muted">(${esc(FIN.quickLabel(st.quick))})</span></div>
         <button class="fin-btn" onclick="FIN.books.erNew()">+ New Expenses Request</button></div>
         <div class="fin-card-body"><div id="er-stats"></div>
         <div class="fin-grid">${dateFilter('er', st)}
@@ -50,7 +50,7 @@
           ${field('Expense Head / Category', select('er-head', [['', 'All Expense Heads / Categories'], ...m.expenseHeads.map(h => [h.name, h.name])], st.head || ''))}
           ${field('Status', select('er-status', [['active', 'Active Requests'], ['pending', 'Pending'], ['approved', 'Approved — Awaiting Disbursement'], ['dispensed', 'Dispensed (History)'], ['rejected', 'Declined'], ['all', 'All Statuses']], st.status))}
           ${field('Method', select('er-method', [['', 'All Methods'], ...m.methods.slice(0, 5)], st.method || ''))}
-          <div><button class="fin-btn" onclick="FIN.books.erLoad()">⛃ Apply</button></div></div></div>
+          <div><button class="fin-btn" onclick="FIN.books.erLoad()"><i class=fi-filter></i> Apply</button></div></div></div>
         <div id="er-table"></div></div>`;
     erLoad();
   });
@@ -62,14 +62,14 @@
     const s = d.stats;
     document.getElementById('er-stats').innerHTML = stats([
       { label: 'Total Requests', value: money(s.total), sub: `${s.totalCount} Entries`, icon: '₦', bg: 'var(--red-bg)', color: 'var(--red)', valueColor: 'var(--red)' },
-      { label: 'Pending Approval', value: money(s.pending), sub: `${s.pendingCount} Requests`, icon: '⧗', bg: 'var(--amber-bg)', color: 'var(--amber)', valueColor: 'var(--amber)' },
-      { label: 'Approved Awaiting Disbursement', value: money(s.approved), sub: `${s.approvedCount} Requests`, icon: '✓', bg: 'var(--cyan-bg)', color: 'var(--cyan)', valueColor: 'var(--cyan)' },
+      { label: 'Pending Approval', value: money(s.pending), sub: `${s.pendingCount} Requests`, icon: '<i class=fi-clock></i>', bg: 'var(--amber-bg)', color: 'var(--amber)', valueColor: 'var(--amber)' },
+      { label: 'Approved Awaiting Disbursement', value: money(s.approved), sub: `${s.approvedCount} Requests`, icon: '<i class=fi-check></i>', bg: 'var(--cyan-bg)', color: 'var(--cyan)', valueColor: 'var(--cyan)' },
       { label: 'Dispensed', value: money(s.dispensed), sub: `${s.dispensedCount} Requests`, icon: '$', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
     ]);
     const m = await meta();
     S.erTable = table(document.getElementById('er-table'), {
       title: 'Cash Requests', rows: d.requests, selectable: true, perPage: 25,
-      toolbar: () => `<span class="muted">With Selected :</span> <select class="ctrl-select" style="width:auto" id="er-pay-from">${accountOptions(m, '', '— Select Account —')}</select> <button class="fin-btn green sm" onclick="FIN.books.erBulkDispense()">Mark Dispensed</button> <button class="fin-btn plain sm" onclick="FIN.books.erLoad()">⟳ Refresh</button>`,
+      toolbar: () => `<span class="muted">With Selected :</span> <select class="ctrl-select" style="width:auto" id="er-pay-from">${accountOptions(m, '', '— Select Account —')}</select> <button class="fin-btn green sm" onclick="FIN.books.erBulkDispense()">Mark Dispensed</button> <button class="fin-btn plain sm" onclick="FIN.books.erLoad()"><i class=fi-refresh></i> Refresh</button>`,
       columns: [
         { key: '#', label: '#', sortable: false },
         { key: 'title', label: 'Title', render: r => `${esc(r.item || r.title)}<div class="muted">${esc(r.voucherNo || '')}</div><div class="muted">${esc(r.description || r.reason || '')}</div>` },
@@ -82,14 +82,14 @@
         { key: 'approvedByName', label: 'Approved By', render: r => esc(r.approvedByName || '—') },
         { key: 'approved', label: 'Approved', render: r => ({ pending: badge('Pending', 'amber'), rejected: badge('Declined', 'red') }[r.status] || badge('Approved', 'green')), exportValue: r => r.status },
         { key: 'dispensed', label: 'Dispensed', render: r => (r.status === 'dispensed' ? `${badge('Dispensed', 'green')}<div class="muted">${date(r.dispensedAt)}${r.accountName ? ` · ${esc(r.accountName)}` : ''}</div>` : '—'), exportValue: r => (r.status === 'dispensed' ? 'Yes' : 'No') },
-        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => (r.status === 'pending' ? `<button class="fin-btn green sm" onclick="FIN.books.erDecide(${r.id},'approve')">Approve</button> <button class="fin-btn red sm" onclick="FIN.books.erDecide(${r.id},'reject')">Decline</button> <button class="fin-btn plain sm" onclick="FIN.books.erDelete(${r.id})">✕</button>` : r.status === 'approved' ? `<button class="fin-btn green sm" onclick="FIN.books.erDispense(${r.id})">Mark Dispensed</button>` : '—') },
+        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => (r.status === 'pending' ? `<button class="fin-btn green sm" onclick="FIN.books.erDecide(${r.id},'approve')">Approve</button> <button class="fin-btn red sm" onclick="FIN.books.erDecide(${r.id},'reject')">Decline</button> <button class="fin-btn plain sm" onclick="FIN.books.erDelete(${r.id})"><i class=fi-x></i></button>` : r.status === 'approved' ? `<button class="fin-btn green sm" onclick="FIN.books.erDispense(${r.id})">Mark Dispensed</button>` : '—') },
       ],
     });
   }
   async function erNew() {
     const m = await meta();
     modal({
-      title: '⊞ Make Cash Request',
+      title: '<i class=fi-plus-square></i> Make Cash Request',
       body: `<div class="fin-grid two">
         ${field('Voucher ID', voucherField('er-voucher', m.voucherNo), { span: 2 })}
         ${field('Expense Head / Category', select('er-f-head', m.expenseHeads.map(h => [h.name, h.name]), '', 'Select Expense Head / Category', `onchange="FIN.books.refreshItems('er-f','expense')"`), { required: true, span: 2 })}
@@ -129,14 +129,14 @@
       const m = await meta(true);
       const st = S[tab];
       el.innerHTML = `${FIN.header(isExp ? 'Expenses' : 'Financials : Income')}
-        <div class="fin-card">${FIN.tabs(`${tab}-tabs`, [['main', isExp ? '▥ Expenditure' : '▥ Income'], ['heads', `☰ ${isExp ? 'Expense' : 'Income'} Heads / Categories`]], st.tab, k => { st.tab = k; draw(); })}<div id="${tab}-body"></div></div>`;
+        <div class="fin-card">${FIN.tabs(`${tab}-tabs`, [['main', isExp ? '<i class=fi-chart></i> Expenditure' : '<i class=fi-chart></i> Income'], ['heads', `<i class=fi-list></i> ${isExp ? 'Expense' : 'Income'} Heads / Categories`]], st.tab, k => { st.tab = k; draw(); })}<div id="${tab}-body"></div></div>`;
       const draw = () => (st.tab === 'heads' ? headsView(tab, type) : mainView(tab, type, m));
       draw();
     });
     async function mainView(t, typ, m) {
       const st = S[t];
       const body = document.getElementById(`${t}-body`);
-      body.innerHTML = `<div class="fin-card-body"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px"><b>⊟ ${isExp ? 'Expenditures' : 'Income List'} <span class="muted">(${esc(FIN.quickLabel(st.quick))})</span></b>
+      body.innerHTML = `<div class="fin-card-body"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px"><b><i class=fi-minus-square></i> ${isExp ? 'Expenditures' : 'Income List'} <span class="muted">(${esc(FIN.quickLabel(st.quick))})</span></b>
           ${FIN.menuButton(`+ Post ${isExp ? 'Expenses' : 'Income'}`, [{ label: 'Single Posting', onClick: () => single(t, typ) }, ...(isExp ? [{ label: 'Multi Posting', onClick: () => multiPost(t, typ) }] : []), { label: 'Import from Excel', onClick: () => importXlsx(t, typ) }], '')}</div>
         <div id="${t}-stats"></div>
         <div class="fin-grid">${dateFilter(t, st)}
@@ -144,7 +144,7 @@
           ${field(`${isExp ? 'Expense' : 'Income'} Head / Category`, select(`${t}-head`, [['', `All ${isExp ? 'Expense' : 'Income'} Heads / Categories`], ...(isExp ? m.expenseHeads : m.incomeHeads).map(h => [h.name, h.name])], st.head || ''))}
           ${field(isExp ? 'Paid From' : 'Account', select(`${t}-acct`, [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}
           ${field('Method', select(`${t}-method`, [['', 'All Methods'], ...m.methods], st.method || ''))}
-          <div><button class="fin-btn" onclick="FIN.books.load('${t}')">⛃ Apply</button></div></div></div>
+          <div><button class="fin-btn" onclick="FIN.books.load('${t}')"><i class=fi-filter></i> Apply</button></div></div></div>
         <div id="${t}-table"></div>
         <div class="fin-card-body"><div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">${isExp ? 'Expenses' : 'Income'} Summary</div><button class="fin-btn plain sm" onclick="FIN.print('${isExp ? 'Expenses' : 'Income'} Summary', FIN.schoolHeader() + document.getElementById('${t}-summary').innerHTML)">Print Summary</button></div>
           ${FIN.tabs(`${t}-sum`, [['cat', `${isExp ? 'Expenses' : 'Income'} By Categories`], ['acct', `${isExp ? 'Expenses' : 'Income'} By Account`], ['month', `Monthly ${isExp ? 'Expenses' : 'Income'} Trend`]], st.sum || 'cat', k => { st.sum = k; summary(t); })}
@@ -163,9 +163,9 @@
     const c = isExp ? ['var(--red)', 'var(--red-bg)'] : ['var(--green)', 'var(--green-bg)'];
     document.getElementById(`${t}-stats`).innerHTML = stats([
       { label: `Total ${isExp ? 'Expenditure' : 'Income'}`, value: money(s.total), sub: `${s.count} Entries`, icon: '₦', bg: c[1], color: c[0], valueColor: c[0] },
-      { label: 'Avg Per Entry', value: money(s.avg), icon: '∿', bg: 'var(--amber-bg)', color: 'var(--amber)', valueColor: 'var(--amber)' },
-      { label: 'Today', value: money(s.today), sub: `${s.todayCount} Entries`, icon: '▦', bg: 'var(--cyan-bg)', color: 'var(--cyan)', valueColor: 'var(--cyan)' },
-      { label: 'This Month', value: money(s.month), sub: `${s.monthCount} Entries`, icon: '▦', bg: 'var(--blue-bg)', color: 'var(--blue)', valueColor: 'var(--blue)' },
+      { label: 'Avg Per Entry', value: money(s.avg), icon: '<i class=fi-activity></i>', bg: 'var(--amber-bg)', color: 'var(--amber)', valueColor: 'var(--amber)' },
+      { label: 'Today', value: money(s.today), sub: `${s.todayCount} Entries`, icon: '<i class=fi-grid></i>', bg: 'var(--cyan-bg)', color: 'var(--cyan)', valueColor: 'var(--cyan)' },
+      { label: 'This Month', value: money(s.month), sub: `${s.monthCount} Entries`, icon: '<i class=fi-grid></i>', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
     ]);
     let rows = d.rows;
     if (isExp && st.view === 'voucher') {
@@ -176,7 +176,7 @@
     const sourceLabel = r => ({ manual: '', fee_payment: 'Fee payment', salary: 'Payroll', request: 'Expense request', store_sale: 'Store sale', loan_disbursement: 'Loan disbursed', loan_repayment: 'Loan repayment', vendor_payment: 'Vendor bill', customer_receipt: 'Customer invoice', payroll_remittance: 'Statutory remittance' }[r.source] || '');
     table(document.getElementById(`${t}-table`), {
       title: isExp ? 'Expenditures' : 'Income List', rows, perPage: 25,
-      toolbar: () => `<button class="fin-btn plain sm" onclick="FIN.books.load('${t}')">⟳ Refresh</button>${isExp ? ` <span class="fin-actions" style="margin-left:6px"><button class="fin-btn ${st.view === 'voucher' ? 'plain' : ''} sm" onclick="FIN.books.view('item')">☰ By Item</button><button class="fin-btn ${st.view === 'voucher' ? '' : 'plain'} sm" onclick="FIN.books.view('voucher')">🗎 By Voucher</button></span>` : ''}`,
+      toolbar: () => `<button class="fin-btn plain sm" onclick="FIN.books.load('${t}')"><i class=fi-refresh></i> Refresh</button>${isExp ? ` <span class="fin-actions" style="margin-left:6px"><button class="fin-btn ${st.view === 'voucher' ? 'plain' : ''} sm" onclick="FIN.books.view('item')"><i class=fi-list></i> By Item</button><button class="fin-btn ${st.view === 'voucher' ? '' : 'plain'} sm" onclick="FIN.books.view('voucher')"><i class=fi-doc></i> By Voucher</button></span>` : ''}`,
       columns: [
         { key: '#', label: '#', sortable: false },
         ...(isExp ? [{ key: 'voucherNo', label: 'Reference', render: r => esc(r.voucherNo || '—') }] : []),
@@ -189,7 +189,7 @@
         { key: 'createdAt', label: 'Date Added', render: r => dateTime(r.createdAt) },
         { key: isExp ? 'approvedByName' : 'recordedByName', label: isExp ? 'Approved By' : 'Added By', render: r => esc((isExp ? r.approvedByName : r.recordedByName) || '—') },
         { key: 'glStatus', label: 'GL Status', render: r => glBadge(r.glStatus) },
-        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => (st.view === 'voucher' ? '' : `<button class="fin-btn plain sm" onclick="FIN.books.rowMenu(this,'${t}',${r.id})">⋯</button>`) },
+        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => (st.view === 'voucher' ? '' : `<button class="fin-btn plain sm" onclick="FIN.books.rowMenu(this,'${t}',${r.id})"><i class=fi-dots></i></button>`) },
       ],
     });
     summary(t);
@@ -228,7 +228,7 @@
     const r = row || {};
     const p = `${t}-f`;
     modal({
-      title: `⊞ ${row ? 'Edit' : 'Add'} ${isExp ? 'Expenses' : 'Income'} Record`,
+      title: `<i class=fi-plus-square></i> ${row ? 'Edit' : 'Add'} ${isExp ? 'Expenses' : 'Income'} Record`,
       body: `<div class="fin-grid two">
         ${field('Voucher ID', voucherField(`${p}-voucher`, r.voucherNo || (row ? '' : m.voucherNo)), { span: 2 })}
         ${field(`${isExp ? 'Expense' : 'Income'} Head / Category`, select(`${p}-head`, (isExp ? m.expenseHeads : m.incomeHeads).map(h => [h.name, h.name]), r.category || '', `Select ${isExp ? 'Expense' : 'Income'} Head / Category`, `onchange="FIN.books.refreshItems('${p}','${type}')"`), { required: true, span: 2 })}
@@ -244,7 +244,7 @@
         ${isExp ? field('Approved By', select(`${p}-approver`, m.approvers.map(a => [a.id, a.name]), r.approvedBy || '', 'Select Approver'), { span: 2 }) : ''}
       </div>`,
       buttons: [
-        ...(row ? [] : [{ label: '⤒ Save & Post to Ledger', cls: 'warn', onClick: (o, close) => save(true, close) }]),
+        ...(row ? [] : [{ label: '<i class=fi-upload></i> Save & Post to Ledger', cls: 'warn', onClick: (o, close) => save(true, close) }]),
         { label: 'Save', onClick: (o, close) => save(false, close) }, { label: 'Cancel', cls: 'plain' },
       ],
     });
@@ -258,10 +258,10 @@
   }
   async function multiPost(t, type) {
     const m = await meta();
-    const line = () => `<tr><td><select class="ctrl-select" data-k="category">${headOptions(m, type, '', 'Head')}</select></td><td><input class="field-input" data-k="item" placeholder="Item"></td><td><input class="field-input" data-k="description" placeholder="Description"></td><td><input class="field-input" type="number" data-k="amount" min="1"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+    const line = () => `<tr><td><select class="ctrl-select" data-k="category">${headOptions(m, type, '', 'Head')}</select></td><td><input class="field-input" data-k="item" placeholder="Item"></td><td><input class="field-input" data-k="description" placeholder="Description"></td><td><input class="field-input" type="number" data-k="amount" min="1"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`;
     FIN.books._line = line;
     modal({
-      title: '⊞ Multi Posting', size: 'xwide',
+      title: '<i class=fi-plus-square></i> Multi Posting', size: 'xwide',
       body: `<div class="fin-grid">${field('Voucher ID', voucherField('mp-voucher', m.voucherNo))}${field('Transaction Date', FIN.input('mp-date', { type: 'date', value: FIN.today() }), { required: true })}
           ${field('Method', select('mp-method', m.methods, 'Cash'), { required: true })}${field('Paid To', FIN.input('mp-party', { placeholder: 'Person / organization' }), { required: true })}
           ${field('Paid From', select('mp-acct', m.accounts.filter(a => a.isActive).map(a => [a.id, a.label]), (m.accounts.find(a => a.isDefault) || {}).id))}${field('Approved By', select('mp-approver', m.approvers.map(a => [a.id, a.name]), '', 'Select Approver'))}</div>
@@ -300,16 +300,16 @@
     const body = document.getElementById(`${t}-body`);
     const items = h.heads.flatMap(x => x.items.map(i => ({ ...i, head: x.name, headId: x.id })));
     body.innerHTML = `<div class="fin-card-body"><div class="fin-grid two" style="align-items:start">
-      <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">▰ ${isExp ? 'Expense' : 'Income'} Heads / Categories</div><div class="fin-actions"><button class="fin-btn plain sm" onclick="FIN.books.headImport('${t}','${type}')">⤒ Bulk Import</button><button class="fin-btn outline sm" onclick="FIN.books.headEdit('${t}','${type}')">+ New ${isExp ? 'Expense' : 'Income'} Head / Category</button></div></div><div id="${t}-heads"></div></div>
-      <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">🏷 Sub Heads (Items) — <span id="${t}-items-of">All</span></div><button class="fin-btn outline sm" onclick="FIN.books.headEdit('${t}','${type}',null,true)">+ Add Sub Head (Item)</button></div><div id="${t}-items"></div></div></div></div>`;
+      <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-folder></i> ${isExp ? 'Expense' : 'Income'} Heads / Categories</div><div class="fin-actions"><button class="fin-btn plain sm" onclick="FIN.books.headImport('${t}','${type}')"><i class=fi-upload></i> Bulk Import</button><button class="fin-btn outline sm" onclick="FIN.books.headEdit('${t}','${type}')">+ New ${isExp ? 'Expense' : 'Income'} Head / Category</button></div></div><div id="${t}-heads"></div></div>
+      <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title"><i class=fi-tag></i> Sub Heads (Items) — <span id="${t}-items-of">All</span></div><button class="fin-btn outline sm" onclick="FIN.books.headEdit('${t}','${type}',null,true)">+ Add Sub Head (Item)</button></div><div id="${t}-items"></div></div></div></div>`;
     table(document.getElementById(`${t}-heads`), {
       title: `${isExp ? 'Expense' : 'Income'} Heads`, rows: h.heads, perPage: 25,
       columns: [
         { key: 'name', label: `${isExp ? 'Expense' : 'Income'} Head / Category Name`, render: r => `${esc(r.name)}${r.isSystem ? `<div>${badge('System', 'grey')}</div>` : ''}` },
         { key: 'code', label: 'Code', render: r => (r.code ? `<span class="fin-badge grey" style="font-family:'DM Mono',monospace">${esc(r.code)}</span>` : '-') },
         { key: 'coaCode', label: 'Ledger / CoA Account', render: r => (r.coaCode ? `${badge(r.coaCode, 'amber')} ${esc(r.coaName)}` : '<span class="muted">Global default</span>') },
-        { key: 'items', label: 'Sub Heads (Items)', sort: r => r.items.length, render: r => (r.items.length ? `<a href="javascript:void(0)" onclick="FIN.books.showItems('${t}',${r.id})">${r.items.length} item(s)</a>` : `<a href="javascript:void(0)" onclick="FIN.books.headEdit('${t}','${type}',null,true,${r.id})">⊕ Add</a>`), exportValue: r => r.items.map(i => i.name).join('; ') },
-        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'Manage Sub Items',onClick:()=>FIN.books.showItems('${t}',${r.id})},{label:'Add Sub Item',onClick:()=>FIN.books.headEdit('${t}','${type}',null,true,${r.id})},{label:'Edit',onClick:()=>FIN.books.headEdit('${t}','${type}',${r.id})}${r.isSystem ? '' : `,{label:'Delete',danger:true,onClick:()=>FIN.books.headDelete('${t}','${type}',${r.id})}`}])">⋯</button>` },
+        { key: 'items', label: 'Sub Heads (Items)', sort: r => r.items.length, render: r => (r.items.length ? `<a href="javascript:void(0)" onclick="FIN.books.showItems('${t}',${r.id})">${r.items.length} item(s)</a>` : `<a href="javascript:void(0)" onclick="FIN.books.headEdit('${t}','${type}',null,true,${r.id})"><i class=fi-plus-circle></i> Add</a>`), exportValue: r => r.items.map(i => i.name).join('; ') },
+        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'Manage Sub Items',onClick:()=>FIN.books.showItems('${t}',${r.id})},{label:'Add Sub Item',onClick:()=>FIN.books.headEdit('${t}','${type}',null,true,${r.id})},{label:'Edit',onClick:()=>FIN.books.headEdit('${t}','${type}',${r.id})}${r.isSystem ? '' : `,{label:'Delete',danger:true,onClick:()=>FIN.books.headDelete('${t}','${type}',${r.id})}`}])"><i class=fi-dots></i></button>` },
       ],
     });
     showItems(t, null, items);
@@ -326,7 +326,7 @@
         { key: 'name', label: 'Sub Head (Item) Name' }, { key: 'code', label: 'Code', render: r => esc(r.code || '-') },
         { key: 'coaCode', label: 'Ledger / CoA Account', render: r => (r.coaCode ? `${badge(r.coaCode, 'amber')} ${esc(r.coaName)}` : '-') },
         { key: 'head', label: `${type === 'expense' ? 'Expense' : 'Income'} Head / Category`, render: r => esc(r.head || (heads.find(h => h.id === r.parentId) || {}).name || '') },
-        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.books.headEdit('${t}','${type}',${r.id},true,${r.parentId})">Edit</button> <button class="fin-btn red sm" onclick="FIN.books.headDelete('${t}','${type}',${r.id})">✕</button>` },
+        { key: 'a', label: 'Action', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.books.headEdit('${t}','${type}',${r.id},true,${r.parentId})">Edit</button> <button class="fin-btn red sm" onclick="FIN.books.headDelete('${t}','${type}',${r.id})"><i class=fi-x></i></button>` },
       ],
     });
   }
@@ -364,10 +364,10 @@
     const m = await meta();
     const st = S.iea;
     el.innerHTML = `${FIN.header('Income & Expense Analytics')}
-      ${card('▥ Income & Expense Analytics', `<div class="fin-grid">${field('Period', select('iea-period', FIN.QUICK.filter(q => q[0] !== 'all'), st.period, null, `onchange="document.getElementById('iea-custom').style.display=this.value==='custom'?'':'none'"`))}
+      ${card('<i class=fi-chart></i> Income & Expense Analytics', `<div class="fin-grid">${field('Period', select('iea-period', FIN.QUICK.filter(q => q[0] !== 'all'), st.period, null, `onchange="document.getElementById('iea-custom').style.display=this.value==='custom'?'':'none'"`))}
         <div id="iea-custom" style="${st.period === 'custom' ? '' : 'display:none'}">${field('From — To', `<div style="display:flex;gap:6px"><input type="date" class="field-input" id="iea-from" value="${st.from || ''}"><input type="date" class="field-input" id="iea-to" value="${st.to || ''}"></div>`)}</div>
         ${field('Account', select('iea-acct', [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}
-        <div><button class="fin-btn" onclick="FIN.books.ieaLoad()">⛃ View Analytics</button></div></div>`)}
+        <div><button class="fin-btn" onclick="FIN.books.ieaLoad()"><i class=fi-filter></i> View Analytics</button></div></div>`)}
       <div id="iea-out"></div>`;
     ieaLoad();
   });
@@ -392,8 +392,8 @@
     document.getElementById('iea-out').innerHTML = card(`Period : ${esc(FIN.quickLabel(st.period))} (${date(r.from)} - ${date(r.to)})`, `<div class="fin-grid">
         <div><div class="muted">Total Income</div><div class="fin-big" style="color:var(--green)">${money(d.totalIncome)}</div><div class="muted">${d.incomeCount} Transactions</div></div>
         <div><div class="muted">Total Expenses</div><div class="fin-big" style="color:var(--red)">${money(d.totalExpenses)}</div><div class="muted">${d.expenseCount} Transactions</div></div>
-        <div><div class="muted">Net Balance</div><div class="fin-big" style="color:var(--blue)">${money(d.net)}</div><div style="color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'};font-size:11px">${d.net >= 0 ? '↑ Surplus' : '↓ Deficit'}</div></div></div>`)
-      + `<div class="fin-card">${FIN.tabs('iea-t', [['exp', '⊖ Expense Heads / Categories'], ['inc', '⊕ Income Heads / Categories'], ['acct', '🏛 By Account'], ['trend', '↗ Monthly Trend']], st.view || 'exp', k => { st.view = k; document.getElementById('iea-view').innerHTML = S.iea.views[k]; })}<div class="fin-card-body" id="iea-view">${views[st.view || 'exp']}</div></div>`;
+        <div><div class="muted">Net Balance</div><div class="fin-big" style="color:var(--green)">${money(d.net)}</div><div style="color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'};font-size:11px">${d.net >= 0 ? '<i class=fi-trend-up></i> Surplus' : '<i class=fi-trend-down></i> Deficit'}</div></div></div>`)
+      + `<div class="fin-card">${FIN.tabs('iea-t', [['exp', '<i class=fi-minus-circle></i> Expense Heads / Categories'], ['inc', '<i class=fi-plus-circle></i> Income Heads / Categories'], ['acct', '<i class=fi-bank></i> By Account'], ['trend', '<i class=fi-trend-up></i> Monthly Trend']], st.view || 'exp', k => { st.view = k; document.getElementById('iea-view').innerHTML = S.iea.views[k]; })}<div class="fin-card-body" id="iea-view">${views[st.view || 'exp']}</div></div>`;
   }
 
   // ══ Bank Balance Report ═══════════════════════════════════════════════
@@ -401,9 +401,9 @@
     const m = await meta(true);
     const st = S.bb;
     el.innerHTML = `${FIN.header('Bank Balance Report')}
-      ${card('🏛 Bank Balance Report', `<div class="fin-grid">${field('Account', select('bb-acct', [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}
+      ${card('<i class=fi-bank></i> Bank Balance Report', `<div class="fin-grid">${field('Account', select('bb-acct', [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}
         ${field('Session', select('bb-session', [['', 'All Time'], ...[...new Set(m.sessions.map(s => s.sessionLabel))]], st.session || ''))}
-        <div><button class="fin-btn" onclick="FIN.books.bbLoad()">⛃ Filter</button> <button class="fin-btn plain" onclick="FIN.books.transfer()">⇄ Transfer</button> <button class="fin-btn plain" onclick="FIN.books.adjust()">± Adjustment</button></div></div>`)}
+        <div><button class="fin-btn" onclick="FIN.books.bbLoad()"><i class=fi-filter></i> Filter</button> <button class="fin-btn plain" onclick="FIN.books.transfer()"><i class=fi-swap></i> Transfer</button> <button class="fin-btn plain" onclick="FIN.books.adjust()"><i class=fi-sliders></i> Adjustment</button></div></div>`)}
       <div id="bb-out"></div>`;
     bbLoad();
   });
@@ -412,7 +412,7 @@
     st.accountId = val('bb-acct'); st.session = val('bb-session');
     const d = await FIN.get(`/api/admin/finance/bank-balance${FIN.qs({ accountId: st.accountId, session: st.session })}`);
     document.getElementById('bb-out').innerHTML = `<div class="fin-card"><div class="fin-card-body"><div class="fin-grid">
-        <div><div class="muted">Total Balance</div><div class="fin-big" style="color:var(--blue)">${money(d.totals.all)}</div></div>
+        <div><div class="muted">Total Balance</div><div class="fin-big" style="color:var(--green)">${money(d.totals.all)}</div></div>
         <div><div class="muted">Bank Accounts</div><div class="fin-big" style="color:var(--green)">${money(d.totals.bank)}</div></div>
         <div><div class="muted">Cash Accounts</div><div class="fin-big" style="color:var(--amber)">${money(d.totals.cash)}</div></div></div></div><div id="bb-table"></div></div>`;
     table(document.getElementById('bb-table'), {
@@ -449,8 +449,8 @@
     const st = S.cf;
     const r = FIN.quickRange('this_month');
     el.innerHTML = `${FIN.header('Cash Flow Statement')}
-      ${card('↗ Cash Flow Statement', `<div class="fin-grid">${field('From', FIN.input('cf-from', { type: 'date', value: st.from || r.from }))}${field('To', FIN.input('cf-to', { type: 'date', value: st.to || r.to }))}
-        ${field('Account', select('cf-acct', [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}<div><button class="fin-btn" onclick="FIN.books.cfLoad()">⛃ View Report</button></div></div>`)}
+      ${card('<i class=fi-trend-up></i> Cash Flow Statement', `<div class="fin-grid">${field('From', FIN.input('cf-from', { type: 'date', value: st.from || r.from }))}${field('To', FIN.input('cf-to', { type: 'date', value: st.to || r.to }))}
+        ${field('Account', select('cf-acct', [['', 'All Accounts'], ...m.accounts.map(a => [a.id, a.label])], st.accountId || ''))}<div><button class="fin-btn" onclick="FIN.books.cfLoad()"><i class=fi-filter></i> View Report</button></div></div>`)}
       <div id="cf-out"></div>`;
     cfLoad();
   });
@@ -461,10 +461,10 @@
     const box = (title, color, rows, total, totalLabel) => `<div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title" style="color:${color}">${title}</div></div><div class="fin-card-body"><table class="fin-table">${rows.map(([l, v]) => `<tr><td>${l}</td><td class="num" style="color:${color}">${money(v)}</td></tr>`).join('')}
       <tr><td style="background:${color};color:#fff;font-weight:700">${totalLabel}</td><td class="num" style="background:${color};color:#fff;font-weight:700">${money(total)}</td></tr></table></div></div>`;
     const html = `<div class="fin-card"><div class="fin-card-body"><b>Period : ${date(d.from)} - ${date(d.to)}</b></div></div>
-      <div class="fin-grid two" style="align-items:start">${box('↓ Cash Inflows', 'var(--green)', [['Income', d.inflows.income], ['Transfer in', d.inflows.transferIn], ['Adjustments (credit)', d.inflows.adjCredit]], d.totalIn, 'Total Inflows')}
-        ${box('↑ Cash Outflows', 'var(--red)', [['Expenses', d.outflows.expenses], ['Transfer Out', d.outflows.transferOut], ['Adjustments (debit)', d.outflows.adjDebit]], d.totalOut, 'Total Outflows')}</div>
-      <div class="fin-card" style="margin-top:16px"><div class="fin-card-body" style="text-align:center"><div class="muted">Net Cash Flow</div><div class="fin-big" style="color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'}">${money(d.net)}</div><div style="font-size:11px;color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'}">${d.net >= 0 ? '↑ Positive Cash Flow' : '↓ Negative Cash Flow'}</div>
-        <button class="fin-btn plain sm fin-no-print" style="margin-top:10px" onclick="FIN.print('Cash Flow Statement', FIN.schoolHeader() + document.getElementById('cf-out').innerHTML)">🖶 Print</button></div></div>`;
+      <div class="fin-grid two" style="align-items:start">${box('<i class=fi-arrow-down></i> Cash Inflows', 'var(--green)', [['Income', d.inflows.income], ['Transfer in', d.inflows.transferIn], ['Adjustments (credit)', d.inflows.adjCredit]], d.totalIn, 'Total Inflows')}
+        ${box('<i class=fi-arrow-up></i> Cash Outflows', 'var(--red)', [['Expenses', d.outflows.expenses], ['Transfer Out', d.outflows.transferOut], ['Adjustments (debit)', d.outflows.adjDebit]], d.totalOut, 'Total Outflows')}</div>
+      <div class="fin-card" style="margin-top:16px"><div class="fin-card-body" style="text-align:center"><div class="muted">Net Cash Flow</div><div class="fin-big" style="color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'}">${money(d.net)}</div><div style="font-size:11px;color:${d.net >= 0 ? 'var(--green)' : 'var(--red)'}">${d.net >= 0 ? '<i class=fi-trend-up></i> Positive Cash Flow' : '<i class=fi-trend-down></i> Negative Cash Flow'}</div>
+        <button class="fin-btn plain sm fin-no-print" style="margin-top:10px" onclick="FIN.print('Cash Flow Statement', FIN.schoolHeader() + document.getElementById('cf-out').innerHTML)"><i class=fi-print></i> Print</button></div></div>`;
     document.getElementById('cf-out').innerHTML = html;
   }
 
@@ -473,11 +473,11 @@
     const m = await meta();
     const st = S.al;
     el.innerHTML = `${FIN.header('Account Ledger')}
-      ${card('▤ Account Ledger', `<div class="fin-grid">${field('Account', select('al-acct', m.accounts.map(a => [a.id, a.label]), st.accountId || '', 'Select Account'), { required: true })}
+      ${card('<i class=fi-table></i> Account Ledger', `<div class="fin-grid">${field('Account', select('al-acct', m.accounts.map(a => [a.id, a.label]), st.accountId || '', 'Select Account'), { required: true })}
         ${field('From', FIN.input('al-from', { type: 'date', value: st.from || '' }))}${field('To', FIN.input('al-to', { type: 'date', value: st.to || '' }))}
         ${field('Session', select('al-session', [['', 'All'], ...[...new Set(m.sessions.map(s => s.sessionLabel))]], st.session || ''))}
-        <div><button class="fin-btn" onclick="FIN.books.alLoad()">🔍 View</button></div></div>`)}
-      <div id="al-out">${st.accountId ? '' : '<div class="fin-note" style="text-align:center">ⓘ<br>Select an Account to View Its Transaction Ledger</div>'}</div>`;
+        <div><button class="fin-btn" onclick="FIN.books.alLoad()"><i class=fi-search></i> View</button></div></div>`)}
+      <div id="al-out">${st.accountId ? '' : '<div class="fin-note" style="text-align:center"><i class=fi-info></i><br>Select an Account to View Its Transaction Ledger</div>'}</div>`;
     if (st.accountId) alLoad();
   });
   async function alLoad() {
@@ -486,8 +486,8 @@
     if (!st.accountId) return showToast('Select an account');
     const d = await FIN.get(`/api/admin/finance/account-ledger${FIN.qs(st)}`);
     document.getElementById('al-out').innerHTML = `<div class="fin-card"><div class="fin-card-body">${stats([
-        { label: 'Opening Balance', value: money(d.opening), icon: '▭', bg: 'var(--black-3)', color: 'var(--text-2)' }, { label: 'Money In', value: money(d.totalIn), icon: '↓', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
-        { label: 'Money Out', value: money(d.totalOut), icon: '↑', bg: 'var(--red-bg)', color: 'var(--red)', valueColor: 'var(--red)' }, { label: 'Closing Balance', value: money(d.closing), icon: '₦', bg: 'var(--blue-bg)', color: 'var(--blue)', valueColor: 'var(--blue)' }])}</div><div id="al-table"></div></div>`;
+        { label: 'Opening Balance', value: money(d.opening), icon: '<i class=fi-wallet></i>', bg: 'var(--black-3)', color: 'var(--text-2)' }, { label: 'Money In', value: money(d.totalIn), icon: '<i class=fi-arrow-down></i>', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' },
+        { label: 'Money Out', value: money(d.totalOut), icon: '<i class=fi-arrow-up></i>', bg: 'var(--red-bg)', color: 'var(--red)', valueColor: 'var(--red)' }, { label: 'Closing Balance', value: money(d.closing), icon: '₦', bg: 'var(--green-bg)', color: 'var(--green)', valueColor: 'var(--green)' }])}</div><div id="al-table"></div></div>`;
     table(document.getElementById('al-table'), {
       title: `Account Ledger — ${d.account.name}`, rows: d.rows, rowKey: 'k', perPage: 100,
       columns: [

@@ -17,8 +17,9 @@
     .sf-stat .v { font-size:18px; font-weight:700; font-family:'DM Mono',monospace; }
     .sf-stat .l { font-size:11px; color:var(--text-3); margin-top:2px; }
     .sf-pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; }
-    .sf-btn { border:1px solid var(--border-2); background:var(--black); color:var(--text-1); border-radius:var(--radius-sm); padding:6px 11px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
-    .sf-btn.primary { background:#0d6efd; border-color:#0d6efd; color:#fff; }
+    .sf-btn { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border-2); background:var(--black); color:var(--text-1); border-radius:var(--radius-sm); padding:6px 11px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .sf-btn.primary { background:var(--green); border-color:var(--green); color:#fff; }
+    .sf-btn.primary:hover { background:#15803d; opacity:1; }
     .sf-btn:hover { opacity:.85; }
     .sf-table-wrap { overflow-x:auto; }
     .sf-overlay { position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:1000; display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; }
@@ -29,20 +30,20 @@
     .sf-modal-foot { padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
     .sf-field { margin-bottom:12px; } .sf-field label { display:block; font-size:11px; font-weight:600; color:var(--text-2); margin-bottom:4px; }
     .sf-field input, .sf-field select, .sf-field textarea { width:100%; padding:8px 10px; border:1px solid var(--border-2); border-radius:var(--radius-sm); font-family:inherit; font-size:12px; background:var(--black); color:var(--text-1); box-sizing:border-box; }
-    .sf-note { background:var(--blue-bg); border:1px solid rgba(37,99,235,.2); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:var(--text-2); margin-bottom:12px; }
+    .sf-note { background:var(--green-bg); border:1px solid rgba(22,163,74,.2); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:var(--text-2); margin-bottom:12px; }
   </style>`);
 
   function modal(title, body, buttons = [], wide) {
     const ov = document.createElement('div');
     ov.className = 'sf-overlay';
-    ov.innerHTML = `<div class="sf-modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="sf-modal-head"><span>${title}</span><button class="sf-btn" aria-label="Close">✕</button></div><div class="sf-modal-body">${body}</div>${buttons.length ? '<div class="sf-modal-foot"></div>' : ''}</div>`;
+    ov.innerHTML = `<div class="sf-modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true"><div class="sf-modal-head"><span>${title}</span><button class="sf-btn" aria-label="Close"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div><div class="sf-modal-body">${body}</div>${buttons.length ? '<div class="sf-modal-foot"></div>' : ''}</div>`;
     const close = () => ov.remove();
     ov.querySelector('.sf-modal-head .sf-btn').onclick = close;
     ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
     buttons.forEach(b => {
       const btn = document.createElement('button');
       btn.className = `sf-btn ${b.primary ? 'primary' : ''}`;
-      btn.textContent = b.label;
+      btn.innerHTML = (b.icon || '') + esc(b.label);
       btn.onclick = async () => { if (!b.onClick) return close(); btn.disabled = true; try { await b.onClick(close); } catch (err) { showToast(err.message); } finally { btn.disabled = false; } };
       ov.querySelector('.sf-modal-foot').appendChild(btn);
     });
@@ -93,7 +94,7 @@
 
   function view(id) {
     const i = data.invoices.find(x => x.id === id);
-    modal(esc(i.title), invoiceHtml(i), [{ label: '🖶 Print', onClick: () => printInvoice(i) }, ...(i.balance > 0 ? [{ label: 'I Have Paid', primary: true, onClick: close => { close(); proof(id); } }] : [])], true);
+    modal(esc(i.title), invoiceHtml(i), [{ label: 'Print', icon: '<svg width=\"13\" height=\"13\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6V1.5h8V6M4 12H2.5V6.5h11V12H12M4 9.5h8v5H4z\"/></svg>', onClick: () => printInvoice(i) }, ...(i.balance > 0 ? [{ label: 'I Have Paid', primary: true, onClick: close => { close(); proof(id); } }] : [])], true);
   }
   function printInvoice(i) {
     const w = window.open('', '_blank', 'width=900,height=750');

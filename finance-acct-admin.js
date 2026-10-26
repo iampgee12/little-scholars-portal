@@ -9,8 +9,8 @@
   const S = { coa: { tab: 'coa', type: '', status: 'active' }, je: {}, al: {}, tb: {}, hub: { tab: 'contacts' }, bud: {}, rec: {}, tax: { tab: 'overview' }, fr: {} };
   const TYPE_COLOR = { asset: 'blue', liability: 'amber', equity: 'cyan', income: 'green', expense: 'red' };
   const ENTRY_LABEL = { manual: 'Manual', accrual: 'Accrual', opening_balance: 'Opening Balance', adjustment: 'Adjustment', fee_payment: 'Fee Payment', payroll: 'Payroll', storefront_sale: 'Storefront Sale', pos_sale: 'POS Sale', requisition: 'Requisition', vendor_invoice: 'Vendor Invoice', vendor_payment: 'Vendor Payment', bank_recon: 'Bank Recon', accrual_reversal: 'Accrual Reversal' };
-  const acts = items => menuButton('⋯', items.filter(Boolean));
-  const backToJournal = '<button class="fin-btn plain" onclick="FIN.goTab(\'journalEntries\')">← Back to Journal</button>';
+  const acts = items => menuButton('Actions', items.filter(Boolean));
+  const backToJournal = '<button class="fin-btn plain" onclick="FIN.goTab(\'journalEntries\')"><i class=fi-arrow-left></i> Back to Journal</button>';
   async function coaList(fresh) {
     if (fresh || !FIN.cache.coa) FIN.cache.coa = (await FIN.get('/api/admin/acct/accounts')).accounts;
     return FIN.cache.coa;
@@ -115,7 +115,7 @@
       <b>Fee Destination Accounts → General Ledger Account</b><p class="muted" style="margin:4px 0 10px">Map each fee destination account to its corresponding asset account in the Chart of Accounts. When a payment is received, the system will debit this CoA account.</p>
       <table class="fin-table"><thead><tr><th>Fee Destination Account</th><th>Type</th><th>Maps to CoA Account (DR when payment received)</th></tr></thead>
       <tbody>${d.accounts.map(a => `<tr><td><b>${esc(a.name)}</b></td><td>${FIN.cap(a.type)}</td><td><select class="ctrl-select" data-acc="${a.id}">${coaOptions(d.assetAccounts, a.coaAccountId || '', 'Default (cash / bank)')}</select></td></tr>`).join('')}</tbody></table>
-      <button class="fin-btn" style="margin-top:12px" onclick="FIN.acct.autoSave()">💾 Save Account Mapping</button></div>`;
+      <button class="fin-btn" style="margin-top:12px" onclick="FIN.acct.autoSave()"><i class=fi-save></i> Save Account Mapping</button></div>`;
   }
   async function autoToggle(on) { await FIN.put('/api/admin/acct/auto-posting', { enabled: on }); showToast(`Auto-Posting ${on ? 'enabled' : 'disabled'}`); coaDraw(); }
   async function autoSave() {
@@ -132,7 +132,7 @@
     S.periods = d.periods;
     const sessions = [...new Set(d.periods.map(p => p.sessionLabel))];
     box.innerHTML = `<div class="fin-card-body"><div class="fin-note">Lock accounting &amp; GL posting for academic periods that have been fully completed, balanced, and audited. This is a recommended practice to prevent accidental or backdated entries that can affect records of such periods. Locking a period prevents new journal entries, income/expense records, and payroll runs from being posted to dates in that period. Existing records remain readable.</div>
-      <div class="fin-grid" style="margin-top:12px">${field('Filter by Session', select('pm-sess', [['', 'All Sessions'], ...sessions], S.pmSess || '', null, 'onchange="FIN.acct.pmFilter()"'))}<div style="text-align:right"><button class="fin-btn" onclick="FIN.acct.pmLock()">🔒 Lock a Period</button></div></div></div><div id="pm-t"></div>`;
+      <div class="fin-grid" style="margin-top:12px">${field('Filter by Session', select('pm-sess', [['', 'All Sessions'], ...sessions], S.pmSess || '', null, 'onchange="FIN.acct.pmFilter()"'))}<div style="text-align:right"><button class="fin-btn" onclick="FIN.acct.pmLock()"><i class=fi-lock></i> Lock a Period</button></div></div></div><div id="pm-t"></div>`;
     pmFilter();
   }
   function pmFilter() {
@@ -141,7 +141,7 @@
       { key: '#', label: '#', sortable: false }, { key: 'sessionLabel', label: 'Session' }, { key: 'termLabel', label: 'Term' }, { key: 'datesOnFile', label: 'Dates on File', render: r => esc(r.datesOnFile || '—') },
       { key: 'fromDate', label: 'Locked Range', render: r => (r.fromDate ? `${date(r.fromDate)} – ${date(r.toDate)}` : '—') },
       { key: 'status', label: 'Status', render: r => (r.status === 'locked' ? badge('Locked', 'red') : badge('Open', 'green')) },
-      { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'locked' ? `<button class="fin-btn plain sm" onclick='FIN.acct.pmUnlock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'>🔓 Unlock</button>` : `<button class="fin-btn plain sm" onclick='FIN.acct.pmLock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'>🔒 Lock</button>`) }] });
+      { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'locked' ? `<button class="fin-btn plain sm" onclick='FIN.acct.pmUnlock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-unlock></i> Unlock</button>` : `<button class="fin-btn plain sm" onclick='FIN.acct.pmLock(${JSON.stringify(r.sessionLabel)},${JSON.stringify(r.termLabel)})'><i class=fi-lock></i> Lock</button>`) }] });
   }
   function pmLock(sess, term) {
     const list = S.periods;
@@ -149,7 +149,7 @@
     modal({ title: 'Lock a Period', body: `<div class="fin-grid two">${field('Session / Term', select('pl-period', list.map(x => [`${x.sessionLabel}|${x.termLabel}`, `${x.sessionLabel} — ${x.termLabel}`]), sess ? `${sess}|${term}` : '', 'Select'), { required: true, span: 2 })}
       ${field('From Date', FIN.input('pl-from', { type: 'date', value: p.fromDate || '' }), { required: true })}${field('To Date', FIN.input('pl-to', { type: 'date', value: p.toDate || '' }), { required: true })}</div>
       <div class="fin-note warn" style="margin-top:10px">No income, expense, journal entry or payroll can be recorded with a date inside this range until it is unlocked.</div>`,
-      buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '🔒 Lock Period', cls: 'warn', onClick: async (o, close) => {
+      buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '<i class=fi-lock></i> Lock Period', cls: 'warn', onClick: async (o, close) => {
         const [s, t] = val('pl-period').split('|');
         await FIN.post('/api/admin/acct/periods/lock', { sessionLabel: s, termLabel: t, fromDate: val('pl-from'), toDate: val('pl-to') }); showToast('Period locked'); close(); coaDraw();
       } }] });
@@ -177,7 +177,7 @@
   FIN.page('journalEntries', async el => {
     const st = S.je;
     el.innerHTML = `${FIN.header('Journal Entries')}
-      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">General Journal</div><div class="fin-actions"><button class="fin-btn plain" onclick="FIN.goTab('trialBalance')">⚖ Trial Balance</button>
+      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">General Journal</div><div class="fin-actions"><button class="fin-btn plain" onclick="FIN.goTab('trialBalance')"><i class=fi-scale></i> Trial Balance</button>
         ${menuButton('+ New Entry', [{ label: 'New Entry', onClick: () => jeEdit() }, { label: 'Import from Excel', onClick: jeImport }], '')}</div></div>
       <div class="fin-card-body"><div class="fin-grid">${field('Status', select('je-status', [['', 'All Statuses'], ['draft', 'Draft'], ['posted', 'Posted'], ['reversed', 'Reversed']], st.status || ''))}
         ${field('Type', select('je-type', [['', 'All Types'], ...Object.entries(ENTRY_LABEL)], st.type || ''))}${field('From Date', FIN.input('je-from', { type: 'date', value: st.from || '' }))}${field('To Date', FIN.input('je-to', { type: 'date', value: st.to || '' }))}
@@ -209,7 +209,7 @@
       <table class="fin-table" style="margin-top:12px"><thead><tr><th>Account</th><th>Line Description</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
       <tbody>${e.lines.map(l => `<tr><td>${esc(l.accountCode)} ${esc(l.accountName)}</td><td>${esc(l.description || '')}</td><td class="num">${l.debit ? money(l.debit) : ''}</td><td class="num">${l.credit ? money(l.credit) : ''}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td colspan="2">Total</td><td class="num">${money(e.totalDebit)}</td><td class="num">${money(e.totalCredit)}</td></tr></tfoot></table>`;
-    modal({ title: `Journal Entry ${esc(e.entryNo)}`, size: 'wide', body, buttons: [{ label: '🖶 Print', cls: 'plain', onClick: () => { FIN.print(e.entryNo, `${FIN.schoolHeader()}<h3>Journal Entry ${esc(e.entryNo)}</h3>${body}`); return false; } }, { label: 'Close', cls: 'plain' }] });
+    modal({ title: `Journal Entry ${esc(e.entryNo)}`, size: 'wide', body, buttons: [{ label: '<i class=fi-print></i> Print', cls: 'plain', onClick: () => { FIN.print(e.entryNo, `${FIN.schoolHeader()}<h3>Journal Entry ${esc(e.entryNo)}</h3>${body}`); return false; } }, { label: 'Close', cls: 'plain' }] });
   }
   async function jeEdit() {
     const list = postable(await coaList(true));
@@ -222,7 +222,7 @@
       buttons: [{ label: 'Cancel', cls: 'plain' }, { label: 'Save as Draft', cls: 'outline', onClick: (o, close) => jnSave(true, close) }, { label: 'Post Entry', onClick: (o, close) => jnSave(false, close) }] });
   }
   const jnLine = () => `<tr><td><select class="ctrl-select" data-k="accountId">${coaOptions(S.jeAccts, '')}</select></td><td><input class="field-input" data-k="description"></td>
-    <td><input class="field-input" type="number" min="0" step="0.01" data-k="debit" oninput="FIN.acct._jnTotals()"></td><td><input class="field-input" type="number" min="0" step="0.01" data-k="credit" oninput="FIN.acct._jnTotals()"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove();FIN.acct._jnTotals()">✕</button></td></tr>`;
+    <td><input class="field-input" type="number" min="0" step="0.01" data-k="debit" oninput="FIN.acct._jnTotals()"></td><td><input class="field-input" type="number" min="0" step="0.01" data-k="credit" oninput="FIN.acct._jnTotals()"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove();FIN.acct._jnTotals()"><i class=fi-x></i></button></td></tr>`;
   const jnRead = () => [...document.querySelectorAll('#jn-lines tr')].map(tr => Object.fromEntries([...tr.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
   function jnTotals() {
     const l = jnRead();
@@ -431,7 +431,7 @@
         id ? await FIN.put(`/api/admin/acct/budgets/${id}`, body) : await FIN.post('/api/admin/acct/budgets', body); showToast('Budget saved'); close(); budLoad();
       } }] });
   }
-  const budLine = (l = {}) => `<tr><td><select class="ctrl-select" data-k="accountId">${coaOptions(S.budAccts, l.accountId || '', 'Select account')}</select></td><td><input class="field-input" type="number" min="0" data-k="amount" value="${l.amount || ''}"></td><td><input class="field-input" data-k="notes" value="${esc(l.notes || '')}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+  const budLine = (l = {}) => `<tr><td><select class="ctrl-select" data-k="accountId">${coaOptions(S.budAccts, l.accountId || '', 'Select account')}</select></td><td><input class="field-input" type="number" min="0" data-k="amount" value="${l.amount || ''}"></td><td><input class="field-input" data-k="notes" value="${esc(l.notes || '')}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`;
 
   // ══ Bank Reconciliation ═══════════════════════════════════════════════
   FIN.page('bankReconciliation', async el => {
@@ -464,12 +464,12 @@
     const done = d.status === 'completed';
     const m = modal({ title: `Reconcile ${esc(d.accountName)} — ${FIN.monthLabel(d.period)}`, size: 'xwide', body: '<div id="rc-sum"></div><div id="rc-items"></div>', onClose: recLoad,
       buttons: done ? [{ label: 'Reopen', cls: 'warn', onClick: async (o, close) => { await FIN.post(`/api/admin/acct/reconciliations/${id}/reopen`); close(); recOpen(id); } }]
-        : [{ label: 'Edit Balances', cls: 'plain', onClick: () => { recBalances(d); return false; } }, { label: '✓ Complete Reconciliation', cls: 'green', onClick: async (o, close) => { await FIN.post(`/api/admin/acct/reconciliations/${id}/complete`); showToast('Reconciliation completed'); close(); } }] });
+        : [{ label: 'Edit Balances', cls: 'plain', onClick: () => { recBalances(d); return false; } }, { label: '<i class=fi-check></i> Complete Reconciliation', cls: 'green', onClick: async (o, close) => { await FIN.post(`/api/admin/acct/reconciliations/${id}/complete`); showToast('Reconciliation completed'); close(); } }] });
     const drawSum = x => { m.body.querySelector('#rc-sum').innerHTML = stats([{ label: 'Statement Opening', value: money(x.opening) }, { label: 'Cleared In', value: money(x.clearedIn), color: 'var(--green)' }, { label: 'Cleared Out', value: money(x.clearedOut), color: 'var(--red)' }, { label: 'Statement Closing', value: money(x.closing) }, { label: 'Difference', value: money(x.difference), valueColor: Math.abs(x.difference) > 0.01 ? 'var(--red)' : 'var(--green)' }]); };
     drawSum(d);
     S.recItems = d.items;
     m.body.querySelector('#rc-items').innerHTML = `<p class="muted" style="margin:6px 0">Tick each transaction that appears on the bank statement. When the difference is ₦0.00 the reconciliation can be completed.</p>
-      <table class="fin-table"><thead><tr><th style="width:30px">✓</th><th>Date</th><th>Description</th><th>Reference</th><th class="num">Money In</th><th class="num">Money Out</th></tr></thead>
+      <table class="fin-table"><thead><tr><th style="width:30px"><i class=fi-check></i></th><th>Date</th><th>Description</th><th>Reference</th><th class="num">Money In</th><th class="num">Money Out</th></tr></thead>
       <tbody>${d.items.map((i, n) => `<tr><td><input type="checkbox" data-n="${n}" ${i.cleared ? 'checked' : ''} ${done ? 'disabled' : ''}></td><td>${date(i.date)}</td><td>${esc(i.description || i.category || '')}</td><td>${esc(i.ref || '')}</td><td class="num">${i.inflow ? money(i.inflow) : ''}</td><td class="num">${i.outflow ? money(i.outflow) : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="fin-empty">No transactions on this account in the month.</td></tr>'}</tbody></table>`;
     m.body.querySelectorAll('input[data-n]').forEach(cb => { cb.onchange = async () => { const i = S.recItems[cb.dataset.n]; const r = await FIN.post(`/api/admin/acct/reconciliations/${id}/toggle`, { kind: i.kind, refId: i.id, cleared: cb.checked }); drawSum(r.reconciliation); }; });
   }
@@ -634,7 +634,7 @@
   async function frShow(kind) {
     const hub = document.getElementById('fr-hub'); const box = document.getElementById('fr-view');
     hub.style.display = 'none';
-    const back = '<button class="fin-btn plain" onclick="FIN.acct.frBack()">← Back to Reports</button>';
+    const back = '<button class="fin-btn plain" onclick="FIN.acct.frBack()"><i class=fi-arrow-left></i> Back to Reports</button>';
     const st = S.fr;
     if (kind === 'pnl') {
       const budgets = (await FIN.get('/api/admin/acct/budgets')).budgets;

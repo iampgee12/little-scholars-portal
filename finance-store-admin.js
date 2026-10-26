@@ -17,8 +17,8 @@
     S.sf = d;
     el.innerHTML = `${FIN.header('Visit Storefront')}
       <div class="fin-note" style="margin-bottom:14px">This is the shop as parents and pupils see it (published, non-private products only).${d.storeOpen ? '' : ' <b>The store is currently closed</b> (Store Settings).'}</div>
-      ${d.banners.map(b => `<div class="fin-hero" style="margin-bottom:12px;${b.imagePath || b.imageUrl ? `background:linear-gradient(90deg,rgba(13,110,253,.85),rgba(30,64,175,.4)),url('${b.imagePath ? img(b.imagePath) : esc(b.imageUrl)}') center/cover` : ''}"><h3 style="font-size:20px">${esc(b.title)}</h3><p>${esc(b.subtitle || '')}</p></div>`).join('')}
-      ${card(`🛍 ${esc(d.storeName)}`, `${d.about ? `<p class="muted" style="margin-bottom:12px">${esc(d.about)}</p>` : ''}
+      ${d.banners.map(b => `<div class="fin-hero" style="margin-bottom:12px;${b.imagePath || b.imageUrl ? `background:linear-gradient(90deg,rgba(22,163,74,.85),rgba(21,128,61,.4)),url('${b.imagePath ? img(b.imagePath) : esc(b.imageUrl)}') center/cover` : ''}"><h3 style="font-size:20px">${esc(b.title)}</h3><p>${esc(b.subtitle || '')}</p></div>`).join('')}
+      ${card(`<i class=fi-bag></i> ${esc(d.storeName)}`, `${d.about ? `<p class="muted" style="margin-bottom:12px">${esc(d.about)}</p>` : ''}
         ${d.sections.map(s => `<div class="fin-tile" style="margin-bottom:10px"><h4>${esc(s.title)}</h4><p>${esc(s.content || '')}</p></div>`).join('')}
         <div class="fin-grid" style="margin-bottom:12px">${field('Category', select('vs-cat', [['', 'All Categories'], ...d.categories.map(c => [c.id, c.name])], '', null, 'onchange="FIN.store.vsDraw()"'))}${field('Search', '<input class="field-input" id="vs-q" placeholder="Search products..." oninput="FIN.store.vsDraw()">')}</div>
         <div id="vs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px"></div>`)}`;
@@ -28,7 +28,7 @@
     const cat = val('vs-cat'); const q = val('vs-q').toLowerCase();
     const rows = S.sf.products.filter(p => (!cat || String(p.categoryId) === cat) && (!q || p.name.toLowerCase().includes(q)));
     document.getElementById('vs-grid').innerHTML = rows.map(p => `<div class="fin-tile"><div style="height:120px;border-radius:8px;background:var(--black-3) ${p.imagePath ? `url('${img(p.imagePath)}') center/cover` : ''};display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:11px">${p.imagePath ? '' : esc(p.categoryName || 'Product')}</div>
-      <h4>${esc(p.name)}</h4><div style="font-weight:800;color:#0d6efd">${money(p.salePrice)} ${p.discountPct ? `<s class="muted">${money(p.price)}</s> ${badge(`-${p.discountPct}%`, 'red')}` : ''}</div>
+      <h4>${esc(p.name)}</h4><div style="font-weight:800;color:var(--green)">${money(p.salePrice)} ${p.discountPct ? `<s class="muted">${money(p.price)}</s> ${badge(`-${p.discountPct}%`, 'red')}` : ''}</div>
       <div class="muted">${p.productType === 'digital' ? 'Digital' : p.stockQty > 0 ? 'In stock' : 'Out of stock'}</div></div>`).join('') || '<div class="fin-empty">No active products yet — add some under Products.</div>';
   }
 
@@ -37,13 +37,13 @@
     const [sh, pr, st] = await Promise.all([FIN.get('/api/admin/store/shifts'), FIN.get('/api/admin/store/products?status=published'), FIN.get('/api/admin/store/settings')]);
     S.pos.shift = sh.current; S.pos.products = pr.products; S.pos.settings = st;
     el.innerHTML = `${FIN.header('Point of Sale Terminal')}
-      <div class="fin-actions" style="justify-content:flex-end;margin-bottom:10px"><button class="fin-btn plain sm" onclick="FIN.store.posRecent()">⟲ Recent Sales</button><button class="fin-btn plain sm" onclick="FIN.store.posShifts()">⏱ Shifts</button><button class="fin-btn plain sm" onclick="FIN.goTab('ordersSales')">☰ All Orders</button>
-        ${sh.current ? `<button class="fin-btn warn sm" onclick="FIN.store.posClose()">■ Close Shift</button>` : ''}</div>
-      <div style="position:relative">${sh.current ? '' : `<div style="position:absolute;inset:0;background:rgba(255,255,255,.88);z-index:5;display:flex;align-items:center;justify-content:center;border-radius:var(--radius)"><div style="text-align:center"><div style="font-size:36px;color:var(--text-3)">◷</div><h3>No Active Shift</h3><p class="muted" style="margin:6px 0 14px">Open a shift before processing any sales.</p><button class="fin-btn" onclick="FIN.store.posOpen()">▶ Open Shift</button></div></div>`}
+      <div class="fin-actions" style="justify-content:flex-end;margin-bottom:10px"><button class="fin-btn plain sm" onclick="FIN.store.posRecent()"><i class=fi-history></i> Recent Sales</button><button class="fin-btn plain sm" onclick="FIN.store.posShifts()"><i class=fi-clock></i> Shifts</button><button class="fin-btn plain sm" onclick="FIN.goTab('ordersSales')"><i class=fi-list></i> All Orders</button>
+        ${sh.current ? `<button class="fin-btn warn sm" onclick="FIN.store.posClose()"><i class=fi-stop></i> Close Shift</button>` : ''}</div>
+      <div style="position:relative">${sh.current ? '' : `<div style="position:absolute;inset:0;background:rgba(255,255,255,.88);z-index:5;display:flex;align-items:center;justify-content:center;border-radius:var(--radius)"><div style="text-align:center"><div style="font-size:36px;color:var(--text-3)"><i class=fi-clock style="width:34px;height:34px"></i></div><h3>No Active Shift</h3><p class="muted" style="margin:6px 0 14px">Open a shift before processing any sales.</p><button class="fin-btn" onclick="FIN.store.posOpen()"><i class=fi-play></i> Open Shift</button></div></div>`}
         ${sh.current ? `<div class="fin-note" style="margin-bottom:10px">Shift #${sh.current.id} opened ${dateTime(sh.current.openedAt)} by ${esc(sh.current.openedBy || '')} · Opening cash ${money(sh.current.openingCash)} · Sales so far ${money(sh.current.totalSales)}</div>` : ''}
         <div id="pos-tabs" class="fin-actions" style="margin-bottom:10px"></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;align-items:start">
-          <div class="fin-card" style="margin:0"><div class="fin-card-body"><div class="fin-grid" style="margin-bottom:12px">${field('', '<input class="field-input" id="pos-scan" placeholder="📷 Scan barcode..." onkeydown="if(event.key===\'Enter\'){FIN.store.posScan(this.value);this.value=\'\'}">')}${field('', '<input class="field-input" id="pos-q" placeholder="🔍 Search by name or SKU..." oninput="FIN.store.posProducts()">')}</div>
+          <div class="fin-card" style="margin:0"><div class="fin-card-body"><div class="fin-grid" style="margin-bottom:12px">${field('', '<input class="field-input" id="pos-scan" placeholder="Scan barcode..." onkeydown="if(event.key===\'Enter\'){FIN.store.posScan(this.value);this.value=\'\'}">')}${field('', '<input class="field-input" id="pos-q" placeholder="Search by name or SKU..." oninput="FIN.store.posProducts()">')}</div>
             <div id="pos-products" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:520px;overflow-y:auto"></div></div></div>
           <div class="fin-card" style="margin:0"><div class="fin-card-head"><div class="fin-card-title">Current Sale</div></div><div class="fin-card-body" id="pos-cart"></div></div>
         </div></div>`;
@@ -53,7 +53,7 @@
     const q = val('pos-q').toLowerCase();
     const rows = S.pos.products.filter(p => !q || p.name.toLowerCase().includes(q) || String(p.sku || '').toLowerCase().includes(q));
     document.getElementById('pos-products').innerHTML = rows.map(p => `<button type="button" class="fin-tile" style="text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif" onclick="FIN.store.posAdd(${p.id})" ${p.productType !== 'digital' && p.stockQty <= 0 ? 'disabled' : ''}>
-      ${p.imagePath ? `<div style="height:70px;border-radius:6px;background:url('${img(p.imagePath)}') center/cover;margin-bottom:6px"></div>` : ''}<b style="font-size:12px">${esc(p.name)}</b><div class="muted">${esc(p.sku || '')}</div><div style="color:#0d6efd;font-weight:700">${money(p.salePrice)}</div><div class="muted">${p.productType === 'digital' ? 'Digital' : `${p.stockQty} in stock`}</div></button>`).join('') || '<div class="fin-empty">No products found.</div>';
+      ${p.imagePath ? `<div style="height:70px;border-radius:6px;background:url('${img(p.imagePath)}') center/cover;margin-bottom:6px"></div>` : ''}<b style="font-size:12px">${esc(p.name)}</b><div class="muted">${esc(p.sku || '')}</div><div style="color:var(--green);font-weight:700">${money(p.salePrice)}</div><div class="muted">${p.productType === 'digital' ? 'Digital' : `${p.stockQty} in stock`}</div></button>`).join('') || '<div class="fin-empty">No products found.</div>';
     const tabs = document.getElementById('pos-tabs');
     tabs.innerHTML = S.pos.sales.map((s, i) => `<button class="fin-btn ${i === S.pos.cur ? '' : 'plain'} sm" onclick="FIN.store.posSwitch(${i})">Sale ${s.id}${S.pos.sales.length > 1 ? ` <span onclick="event.stopPropagation();FIN.store.posDrop(${i})">×</span>` : ''}</button>`).join('') + '<button class="fin-btn outline sm" onclick="FIN.store.posNew()">+ New Sale</button>';
   }
@@ -65,11 +65,11 @@
     const total = Math.max(0, sub - (Number(s.discount) || 0));
     document.getElementById('pos-cart').innerHTML = `${field('Customer', `<input class="field-input" value="${esc(s.customer)}" oninput="FIN.store.posSet('customer', this.value)">`)}
       <table class="fin-table" style="margin:10px 0"><thead><tr><th>Item</th><th class="num">Unit Price</th><th>Quantity</th><th class="num">Sub Total</th><th></th></tr></thead>
-      <tbody>${s.items.map((i, n) => `<tr><td>${esc(i.name)}</td><td class="num">${money(i.price)}</td><td><input class="field-input" type="number" min="1" style="width:64px;padding:4px 6px" value="${i.qty}" onchange="FIN.store.posQty(${n}, this.value)"></td><td class="num">${money(i.price * i.qty)}</td><td><button class="fin-btn red sm" onclick="FIN.store.posQty(${n}, 0)">✕</button></td></tr>`).join('') || '<tr><td colspan="5" class="fin-empty">Cart is empty<br><span class="muted">Add products from the left panel</span></td></tr>'}</tbody></table>
-      <dl class="fin-kv"><dt>Subtotal</dt><dd class="num">${money(sub)}</dd><dt>Discount ✎</dt><dd><input class="field-input" type="number" min="0" style="width:120px;padding:4px 6px" value="${s.discount}" onchange="FIN.store.posSet('discount', this.value)"></dd>
+      <tbody>${s.items.map((i, n) => `<tr><td>${esc(i.name)}</td><td class="num">${money(i.price)}</td><td><input class="field-input" type="number" min="1" style="width:64px;padding:4px 6px" value="${i.qty}" onchange="FIN.store.posQty(${n}, this.value)"></td><td class="num">${money(i.price * i.qty)}</td><td><button class="fin-btn red sm" onclick="FIN.store.posQty(${n}, 0)"><i class=fi-x></i></button></td></tr>`).join('') || '<tr><td colspan="5" class="fin-empty">Cart is empty<br><span class="muted">Add products from the left panel</span></td></tr>'}</tbody></table>
+      <dl class="fin-kv"><dt>Subtotal</dt><dd class="num">${money(sub)}</dd><dt>Discount <i class=fi-edit></i></dt><dd><input class="field-input" type="number" min="0" style="width:120px;padding:4px 6px" value="${s.discount}" onchange="FIN.store.posSet('discount', this.value)"></dd>
         ${tax ? `<dt>Tax included (${S.pos.settings.taxRate}%)</dt><dd>${money(tax)}</dd>` : ''}<dt><b>Total</b></dt><dd style="font-size:18px">${money(total)}</dd></dl>
       <div class="fin-grid two" style="margin-top:10px">${field('Payment Method', select('pos-method', [['cash', 'Cash'], ['card', 'Card / POS'], ['transfer', 'Bank Transfer']], s.method || 'cash', null, 'onchange="FIN.store.posSet(\'method\', this.value)"'))}${field('Payment Note (optional)', `<input class="field-input" id="pos-note" value="${esc(s.note || '')}" oninput="FIN.store.posSet('note', this.value)">`)}</div>
-      <div class="fin-actions" style="margin-top:12px"><button class="fin-btn red" onclick="FIN.store.posVoid()">⊘ Void</button><button class="fin-btn green" style="flex:1;justify-content:center" onclick="FIN.store.posCharge()" ${s.items.length ? '' : 'disabled'}>✓ CHARGE ${money(total)}</button></div>`;
+      <div class="fin-actions" style="margin-top:12px"><button class="fin-btn red" onclick="FIN.store.posVoid()"><i class=fi-ban></i> Void</button><button class="fin-btn green" style="flex:1;justify-content:center" onclick="FIN.store.posCharge()" ${s.items.length ? '' : 'disabled'}><i class=fi-check></i> CHARGE ${money(total)}</button></div>`;
   }
   const POS = {
     posAdd(id) { const p = S.pos.products.find(x => x.id === id); const s = sale(); const ex = s.items.find(i => i.id === id); if (ex) ex.qty += 1; else s.items.push({ id, name: p.name, price: p.salePrice, qty: 1 }); posCart(); },
@@ -97,13 +97,13 @@
         <table>${s.items.map(i => `<tr><td>${esc(i.name)} × ${i.qty}</td><td class="num">${money(i.price * i.qty)}</td></tr>`).join('')}<tr><td>Subtotal</td><td class="num">${money(sub)}</td></tr>${s.discount ? `<tr><td>Discount</td><td class="num">-${money(s.discount)}</td></tr>` : ''}<tr><td><b>Total</b></td><td class="num"><b>${money(sub - (Number(s.discount) || 0))}</b></td></tr></table><hr><div style="text-align:center">${esc(S.pos.settings.receiptFooter || '')}</div>`, { pos: true });
     },
     posOpen() {
-      modal({ title: 'Open Shift', body: field('Opening Cash in Drawer (₦)', FIN.input('sh-open', { type: 'number', value: 0 })), buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '▶ Open Shift', onClick: async (o, close) => { await FIN.post('/api/admin/store/shifts/open', { openingCash: val('sh-open') }); showToast('Shift opened'); close(); FIN.open('posTerminal'); } }] });
+      modal({ title: 'Open Shift', body: field('Opening Cash in Drawer (₦)', FIN.input('sh-open', { type: 'number', value: 0 })), buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '<i class=fi-play></i> Open Shift', onClick: async (o, close) => { await FIN.post('/api/admin/store/shifts/open', { openingCash: val('sh-open') }); showToast('Shift opened'); close(); FIN.open('posTerminal'); } }] });
     },
     posClose() {
       const c = S.pos.shift;
       modal({ title: `Close Shift #${c.id}`, body: `<dl class="fin-kv"><dt>Opening cash</dt><dd>${money(c.openingCash)}</dd><dt>Cash sales</dt><dd>${money(c.cashSales)}</dd><dt>Expected cash in drawer</dt><dd>${money(c.expectedCash)}</dd><dt>All sales</dt><dd>${money(c.totalSales)} (${c.sales})</dd></dl>
         <div class="fin-grid two" style="margin-top:12px">${field('Counted Closing Cash (₦)', FIN.input('sh-close', { type: 'number', value: c.expectedCash }), { required: true })}${field('Notes', FIN.input('sh-notes'))}</div>`,
-        buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '■ Close Shift', cls: 'warn', onClick: async (o, close) => { const r = await FIN.post('/api/admin/store/shifts/close', { closingCash: val('sh-close'), notes: val('sh-notes') }); showToast(`Shift closed${r.shift.variance ? ` — variance ${FIN.plain(money(r.shift.variance))}` : ''}`); close(); FIN.open('posTerminal'); } }] });
+        buttons: [{ label: 'Cancel', cls: 'plain' }, { label: '<i class=fi-stop></i> Close Shift', cls: 'warn', onClick: async (o, close) => { const r = await FIN.post('/api/admin/store/shifts/close', { closingCash: val('sh-close'), notes: val('sh-notes') }); showToast(`Shift closed${r.shift.variance ? ` — variance ${FIN.plain(money(r.shift.variance))}` : ''}`); close(); FIN.open('posTerminal'); } }] });
     },
     async posShifts() {
       const d = await FIN.get('/api/admin/store/shifts');
@@ -133,7 +133,7 @@
     const st = S.ord;
     const sel = (id, list, v) => select(id, list, v || '');
     el.innerHTML = `${FIN.header('Storefront Orders')}
-      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">Storefront Orders</div><div class="fin-actions"><button class="fin-btn plain sm" onclick="FIN.goTab('posTerminal')">🛒 POS Terminal</button><button class="fin-btn plain sm" onclick="FIN.tableExport('ord-table','xlsx')">⤓ Export</button><button class="fin-btn plain sm" onclick="FIN.store.ordLoad()">⟳ Refresh</button></div></div>
+      <div class="fin-card"><div class="fin-card-head"><div class="fin-card-title">Storefront Orders</div><div class="fin-actions"><button class="fin-btn plain sm" onclick="FIN.goTab('posTerminal')"><i class=fi-cart></i> POS Terminal</button><button class="fin-btn plain sm" onclick="FIN.tableExport('ord-table','xlsx')"><i class=fi-download></i> Export</button><button class="fin-btn plain sm" onclick="FIN.store.ordLoad()"><i class=fi-refresh></i> Refresh</button></div></div>
       <div class="fin-card-body"><div class="fin-grid">
         ${field('Order Status', sel('ord-status', [['all', 'All statuses'], ['open', 'Open orders'], ['pending_payment', 'Pending payment'], ['paid', 'Paid'], ['processing', 'Processing'], ['shipped', 'Shipped / Out for delivery'], ['ready_for_pickup', 'Available for pickup'], ['return_requested', 'Return requested'], ['completed', 'Completed'], ['cancelled', 'Cancelled']], st.status))}
         ${field('Payment', sel('ord-pay', [['all', 'All payment statuses'], ['paid', 'Paid'], ['unpaid', 'Unpaid'], ['refunded', 'Refunded'], ['partially_refunded', 'Partially refunded'], ['exclude_refunded', 'Exclude refunded']], st.payment))}
@@ -142,7 +142,7 @@
         ${field('Channel', sel('ord-channel', [['all', 'All channels'], ['online', 'Online Store'], ['pos', 'POS Terminal']], st.channel))}
         ${field('From', FIN.input('ord-from', { type: 'date', value: st.from || '' }))}${field('To', FIN.input('ord-to', { type: 'date', value: st.to || '' }))}
         ${field('Search', FIN.input('ord-q', { value: st.search || '', placeholder: 'Search by order code, invoice, customer' }))}
-        <div><button class="fin-btn" onclick="FIN.store.ordLoad()">🔍</button> <button class="fin-btn plain" onclick="FIN.store.ordReset()">Reset</button></div></div></div>
+        <div><button class="fin-btn" onclick="FIN.store.ordLoad()"><i class=fi-search></i></button> <button class="fin-btn plain" onclick="FIN.store.ordReset()">Reset</button></div></div></div>
       <div id="ord-table"></div></div>`;
     ordLoad();
   });
@@ -151,7 +151,7 @@
     Object.assign(st, { status: val('ord-status'), payment: val('ord-pay'), fulfilment: val('ord-ful'), fulfilmentType: val('ord-ftype'), channel: val('ord-channel'), from: val('ord-from'), to: val('ord-to'), search: val('ord-q') });
     const d = await FIN.get(`/api/admin/store/orders${FIN.qs(st)}`);
     S.ordTable = table(document.getElementById('ord-table'), { title: 'Storefront Orders', rows: d.orders, selectable: true, perPage: 50,
-      toolbar: () => FIN.menuButton('☰ Bulk actions', [['processing', 'Mark as processing'], ['fulfilled', 'Mark as fulfilled'], ['cancel', 'Cancel orders'], ['refunded', 'Mark as refunded']].map(([a, l]) => ({ label: l, onClick: () => ordBulk(a) }))),
+      toolbar: () => FIN.menuButton('<i class=fi-list></i> Bulk actions', [['processing', 'Mark as processing'], ['fulfilled', 'Mark as fulfilled'], ['cancel', 'Cancel orders'], ['refunded', 'Mark as refunded']].map(([a, l]) => ({ label: l, onClick: () => ordBulk(a) }))),
       columns: [
         { key: 'orderNo', label: 'Order', render: r => `<b>${esc(r.orderNo)}</b><div class="muted">${esc(r.channel === 'pos' ? 'POS Terminal' : 'Online Store')}</div>` },
         { key: 'customerName', label: 'Customer' },
@@ -179,7 +179,7 @@
       <div class="fin-grid" style="margin-top:12px">${field('Order Status', select('ov-status', ['pending_payment', 'paid', 'processing', 'shipped', 'ready_for_pickup', 'return_requested', 'completed', 'cancelled'].map(s => [s, FIN.cap(s)]), o.status))}
         ${field('Payment Status', select('ov-pay', ['paid', 'unpaid', 'refunded', 'partially_refunded'].map(s => [s, FIN.cap(s)]), o.paymentStatus))}
         ${field('Fulfilment', select('ov-ful', ['pending', 'processing', 'shipped', 'ready_for_pickup', 'delivered', 'picked_up', 'return_requested', 'returned', 'cancelled'].map(s => [s, FIN.cap(s)]), o.fulfilmentStatus))}</div>`,
-      buttons: [{ label: '🖶 Receipt', cls: 'plain', onClick: () => { POS.posReceipt({ orderNo: o.orderNo, customer: o.customerName, discount: o.discount, items: d.items.map(i => ({ name: i.productName, price: i.unitPrice, qty: i.qty })) }); return false; } },
+      buttons: [{ label: '<i class=fi-print></i> Receipt', cls: 'plain', onClick: () => { POS.posReceipt({ orderNo: o.orderNo, customer: o.customerName, discount: o.discount, items: d.items.map(i => ({ name: i.productName, price: i.unitPrice, qty: i.qty })) }); return false; } },
         { label: 'Save', onClick: async (o2, close) => { await FIN.post('/api/admin/store/orders/bulk', { ids: [id], action: 'status', status: val('ov-status'), paymentStatus: val('ov-pay'), fulfilmentStatus: val('ov-ful') }); showToast('Order updated'); close(); if (document.getElementById('ord-table')) ordLoad(); } }] });
   }
 
@@ -195,8 +195,8 @@
         ${field('Type', select('pr-type', [['', 'All'], ['physical', 'Physical Products'], ['digital', 'Digital Products']], st.type || ''))}
         ${field('Category', select('pr-cat', [['', 'All categories'], ...cats.map(c => [c.id, c.name])], st.categoryId || ''))}
         ${field('Search', FIN.input('pr-q', { value: st.search || '', placeholder: 'Search by title, SKU, or slug' }))}
-        <div><button class="fin-btn" onclick="FIN.store.prLoad()">🔍</button> <button class="fin-btn plain" onclick="FIN.store.prReset()">Reset</button></div></div>
-        <div class="fin-actions" style="justify-content:flex-end;margin-top:12px"><button class="fin-btn" onclick="FIN.store.prEdit()">+ New Product</button><button class="fin-btn outline" onclick="FIN.store.prImport()">⤓ Bulk Import</button></div></div>
+        <div><button class="fin-btn" onclick="FIN.store.prLoad()"><i class=fi-search></i></button> <button class="fin-btn plain" onclick="FIN.store.prReset()">Reset</button></div></div>
+        <div class="fin-actions" style="justify-content:flex-end;margin-top:12px"><button class="fin-btn" onclick="FIN.store.prEdit()">+ New Product</button><button class="fin-btn outline" onclick="FIN.store.prImport()"><i class=fi-download></i> Bulk Import</button></div></div>
       <div id="pr-table"></div></div>`;
     prLoad();
   });
@@ -217,7 +217,7 @@
         { key: 'price', label: 'Price', num: true, render: r => `${money(r.salePrice)}${r.discountPct ? `<div class="muted"><s>${money(r.price)}</s></div>` : ''}`, exportValue: r => r.price },
         { key: 'categoryName', label: 'Categories', render: r => esc(r.categoryName || '—') },
         { key: 'updatedAt', label: 'Updated', render: r => `<span class="muted">${dateTime(r.updatedAt)}</span>` },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'Edit',onClick:()=>FIN.store.prEdit(${r.id})},{label:'Adjust Stock',onClick:()=>FIN.store.adjust(${r.id})},{label:'Delete / Archive',danger:true,onClick:()=>FIN.store.prDelete(${r.id})}])">⋯</button>` },
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.menu(this,[{label:'Edit',onClick:()=>FIN.store.prEdit(${r.id})},{label:'Adjust Stock',onClick:()=>FIN.store.adjust(${r.id})},{label:'Delete / Archive',danger:true,onClick:()=>FIN.store.prDelete(${r.id})}])"><i class=fi-dots></i></button>` },
       ] });
   }
   function prEdit(id) {
@@ -282,7 +282,7 @@
     el.innerHTML = `${FIN.header('Storefront Product Categories')}
       <div class="fin-card"><div class="fin-card-body"><div class="fin-grid">${field('Status', select('ca-status', [['active', 'Active (Draft | Published)'], ['draft', 'Draft only'], ['published', 'Published only'], ['archived', 'Archived only'], ['all', 'All statuses']], st.status))}
         ${field('Visibility', select('ca-vis', [['', 'All visibility options'], ['public', 'Public'], ['logged_in', 'Logged-In only'], ['private', 'Private']], st.visibility || ''))}
-        <div><button class="fin-btn" onclick="FIN.store.caLoad()">🔍</button></div></div><div class="fin-actions" style="justify-content:flex-end;margin-top:12px"><button class="fin-btn" onclick="FIN.store.caEdit()">+ New Category</button></div></div>
+        <div><button class="fin-btn" onclick="FIN.store.caLoad()"><i class=fi-search></i></button></div></div><div class="fin-actions" style="justify-content:flex-end;margin-top:12px"><button class="fin-btn" onclick="FIN.store.caEdit()">+ New Category</button></div></div>
       <div id="ca-table"></div></div>`;
     caLoad();
   });
@@ -292,10 +292,10 @@
     S.catRows = d.categories;
     table(document.getElementById('ca-table'), { title: 'Product Categories', rows: d.categories, perPage: 50, emptyText: 'No categories match the selected filters.<br><button class="fin-btn sm" style="margin-top:8px" onclick="FIN.store.caEdit()">+ Create your first category</button>',
       columns: [
-        { key: 'order', label: '⇕', sortable: false, noExport: true, render: (r, i) => `<button class="fin-btn plain sm" title="Move up" onclick="FIN.store.caMove(${r.id},-1)">↑</button><button class="fin-btn plain sm" title="Move down" onclick="FIN.store.caMove(${r.id},1)">↓</button>` },
+        { key: 'order', label: 'Order', sortable: false, noExport: true, render: (r, i) => `<button class="fin-btn plain sm" title="Move up" onclick="FIN.store.caMove(${r.id},-1)"><i class=fi-chevron-up></i></button><button class="fin-btn plain sm" title="Move down" onclick="FIN.store.caMove(${r.id},1)"><i class=fi-chevron-down></i></button>` },
         { key: 'name', label: 'Name', render: r => `<b>${esc(r.name)}</b><div class="muted">${esc(r.description || '')}</div>` }, { key: 'productCount', label: 'Products', num: true },
         { key: 'visibility', label: 'Visibility', render: r => badge(FIN.cap(r.visibility), statusColor(r.visibility)) }, { key: 'status', label: 'Status', render: r => badge(FIN.cap(r.status), statusColor(r.status)) },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.caEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.store.caDelete(${r.id})">✕</button>` }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.caEdit(${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.store.caDelete(${r.id})"><i class=fi-x></i></button>` }] });
   }
   function caEdit(id) {
     const c = id ? S.catRows.find(x => x.id === id) : { status: 'published', visibility: 'public' };
@@ -313,14 +313,14 @@
   async function caDelete(id) { if (!await FIN.confirm('Delete this category? Its products become uncategorised.')) return; await FIN.del(`/api/admin/store/categories/${id}`); showToast('Category deleted'); caLoad(); }
 
   // ══ Inventory & Supply ════════════════════════════════════════════════
-  const INV_TABS = [['movement', '⇄ Stock Movement'], ['valuation', '▤ Stock Valuation'], ['low', '⚠ Low Stock'], ['adjust', '⊙ Stock Adjustment'], ['po', '🗎 Purchase Orders'], ['grn', '⤓ Goods Received'], ['bills', '🗎 Vendor Bills'], ['vendors', '☷ Contacts (Vendors)']];
+  const INV_TABS = [['movement', '<i class=fi-swap></i> Stock Movement'], ['valuation', '<i class=fi-table></i> Stock Valuation'], ['low', '<i class=fi-warn></i> Low Stock'], ['adjust', '<i class=fi-target></i> Stock Adjustment'], ['po', '<i class=fi-doc></i> Purchase Orders'], ['grn', '<i class=fi-download></i> Goods Received'], ['bills', '<i class=fi-doc></i> Vendor Bills'], ['vendors', '<i class=fi-book></i> Contacts (Vendors)']];
   FIN.page('inventorySupply', async el => {
     el.innerHTML = `${FIN.header('Inventory Supply')}<div class="fin-side">${FIN.sideNav('inv', INV_TABS, S.inv.tab, k => { S.inv.tab = k; invDraw(); })}<div class="fin-card" style="margin:0"><div id="inv-body"></div></div></div>`;
     invDraw();
   });
   async function movementView(box, prefix, st) {
     box.innerHTML = `<div class="fin-card-body"><div class="fin-grid">${field('', FIN.input(`${prefix}-q`, { value: st.q || '', placeholder: 'Product, SKU, reason…' }))}${field('', select(`${prefix}-type`, MOVE_TYPES, st.type || ''))}
-      ${field('', FIN.input(`${prefix}-from`, { type: 'date', value: st.from || '' }))}${field('', FIN.input(`${prefix}-to`, { type: 'date', value: st.to || '' }))}<div><button class="fin-btn sm" onclick="FIN.store.mvLoad('${prefix}')">⟳</button></div></div></div><div id="${prefix}-table"></div>`;
+      ${field('', FIN.input(`${prefix}-from`, { type: 'date', value: st.from || '' }))}${field('', FIN.input(`${prefix}-to`, { type: 'date', value: st.to || '' }))}<div><button class="fin-btn sm" onclick="FIN.store.mvLoad('${prefix}')"><i class=fi-refresh></i></button></div></div></div><div id="${prefix}-table"></div>`;
     S[`${prefix}St`] = st;
     mvLoad(prefix);
   }
@@ -369,7 +369,7 @@
         { key: 'poCode', label: 'PO Code' }, { key: 'vendor', label: 'Vendor' }, { key: 'orderDate', label: 'Order Date', render: r => date(r.orderDate) }, { key: 'expectedDate', label: 'Expected Delivery', render: r => date(r.expectedDate) },
         { key: 'status', label: 'Status', render: r => badge(FIN.cap(r.status), { draft: 'grey', sent: 'blue', partially_received: 'amber', received: 'green', cancelled: 'red', closed: 'grey' }[r.status]) },
         { key: 'total', label: 'Total Value', num: true, render: r => money(r.total), exportValue: r => r.total, total: true },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.poMenu(this, ${r.id})">⋯</button>` }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.poMenu(this, ${r.id})"><i class=fi-dots></i></button>` }] });
     }
     if (tab === 'grn') {
       const d = await FIN.get('/api/admin/store/grns');
@@ -379,7 +379,7 @@
         { key: 'grnCode', label: 'GRN Code' }, { key: 'vendor', label: 'Vendor' }, { key: 'poCode', label: 'PO Reference', render: r => esc(r.poCode || '—') }, { key: 'receiptDate', label: 'Receipt Date', render: r => date(r.receiptDate) },
         { key: 'status', label: 'Status', render: r => badge(r.status === 'posted' ? 'Posted' : 'Draft', r.status === 'posted' ? 'green' : 'amber') },
         { key: 'total', label: 'Total Value', num: true, render: r => money(r.total), exportValue: r => r.total, total: true }, { key: 'postedAt', label: 'Posted At', render: r => (r.postedAt ? dateTime(r.postedAt) : '—') },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'posted' ? `<button class="fin-btn plain sm" onclick="FIN.store.grnView(${r.id})">View</button>` : `<button class="fin-btn green sm" onclick="FIN.store.grnPost(${r.id})">Post (Receive)</button> <button class="fin-btn red sm" onclick="FIN.store.grnDelete(${r.id})">✕</button>`) }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => (r.status === 'posted' ? `<button class="fin-btn plain sm" onclick="FIN.store.grnView(${r.id})">View</button>` : `<button class="fin-btn green sm" onclick="FIN.store.grnPost(${r.id})">Post (Receive)</button> <button class="fin-btn red sm" onclick="FIN.store.grnDelete(${r.id})"><i class=fi-x></i></button>`) }] });
     }
     if (tab === 'bills') { box.innerHTML = '<div id="inv-t"></div>'; return FIN.acct.billsView(document.getElementById('inv-t'), 'bill', () => invDraw()); }
     if (tab === 'vendors') { box.innerHTML = '<div id="inv-t"></div>'; return FIN.acct.contactsView(document.getElementById('inv-t'), 'vendor', () => invDraw()); }
@@ -389,7 +389,7 @@
     return { vendors: c.contacts.filter(v => v.status === 'active'), products: p.products.filter(x => x.productType !== 'digital') };
   }
   const lineRow = (products, l = {}) => `<tr><td><select class="ctrl-select" data-k="productId">${options(products.map(p => [p.id, `${p.name}${p.sku ? ` (${p.sku})` : ''}`]), l.productId || '', 'Product')}</select></td>
-    <td><input class="field-input" type="number" min="1" data-k="qty" value="${l.qty || ''}"></td><td><input class="field-input" type="number" min="0" step="0.01" data-k="unitCost" value="${l.unitCost || ''}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+    <td><input class="field-input" type="number" min="1" data-k="qty" value="${l.qty || ''}"></td><td><input class="field-input" type="number" min="0" step="0.01" data-k="unitCost" value="${l.unitCost || ''}"></td><td><button class="fin-btn red sm" onclick="this.closest('tr').remove()"><i class=fi-x></i></button></td></tr>`;
   const readLines = id => [...document.querySelectorAll(`#${id} tr`)].map(tr => ({ productId: tr.querySelector('[data-k=productId]').value, qty: tr.querySelector('[data-k=qty]').value, unitCost: tr.querySelector('[data-k=unitCost]').value })).filter(x => x.productId);
   async function poEdit(id) {
     const { vendors, products } = await vendorsAndProducts();
@@ -466,14 +466,14 @@
   // ══ Store Settings ════════════════════════════════════════════════════
   FIN.page('storeSettings', async el => {
     const s = await FIN.get('/api/admin/store/settings');
-    el.innerHTML = `${FIN.header('Store Settings')}${card('⚙ Store Settings', `<div class="fin-grid two">
+    el.innerHTML = `${FIN.header('Store Settings')}${card('<i class=fi-settings></i> Store Settings', `<div class="fin-grid two">
         ${field('Store Name', FIN.input('ss-name', { value: s.storeName }), { required: true })}${field('Currency', FIN.input('ss-cur', { value: s.currency }))}
         ${field('Store Status', select('ss-open', [['1', 'Open — taking orders'], ['0', 'Closed']], s.storeOpen ? '1' : '0'))}${field('Low Stock Threshold (default)', FIN.input('ss-low', { type: 'number', value: s.lowStockThreshold }))}
         ${field('Store Tax Rate (%)', FIN.input('ss-tax', { type: 'number', value: s.taxRate }), { hint: 'Shown as tax included on POS sales' })}${field('Contact Email', FIN.input('ss-email', { value: s.contactEmail }))}
         ${field('Contact Phone', FIN.input('ss-phone', { value: s.contactPhone }))}${field('Pickup', select('ss-pickup', [['1', 'Enabled'], ['0', 'Disabled']], s.pickupEnabled ? '1' : '0'))}
         ${field('Delivery', select('ss-deliv', [['1', 'Enabled'], ['0', 'Disabled']], s.deliveryEnabled ? '1' : '0'))}${field('Delivery Fee (₦)', FIN.input('ss-fee', { type: 'number', value: s.deliveryFee }))}
         ${field('About the Store (shown on the storefront)', `<textarea class="field-input" id="ss-about" rows="3">${esc(s.about)}</textarea>`, { span: 2 })}${field('Receipt Footer', FIN.input('ss-footer', { value: s.receiptFooter }), { span: 2 })}
-      </div><button class="fin-btn" style="margin-top:14px" onclick="FIN.store.ssSave()">💾 Save Settings</button>`)}`;
+      </div><button class="fin-btn" style="margin-top:14px" onclick="FIN.store.ssSave()"><i class=fi-save></i> Save Settings</button>`)}`;
   });
   async function ssSave() {
     await FIN.put('/api/admin/store/settings', { storeName: val('ss-name'), currency: val('ss-cur'), storeOpen: val('ss-open') === '1', lowStockThreshold: val('ss-low'), taxRate: val('ss-tax'), contactEmail: val('ss-email'), contactPhone: val('ss-phone'),
@@ -494,7 +494,7 @@
         { key: 'title', label: 'Title', render: r => `<b>${esc(r.title)}</b><div class="muted">${esc(isB ? r.subtitle || '' : r.content || '').slice(0, 120)}</div>` },
         ...(isB ? [{ key: 'linkUrl', label: 'Link', render: r => esc(r.linkUrl || '—') }] : [{ key: 'sectionType', label: 'Type', render: r => esc(FIN.cap(r.sectionType)) }]),
         { key: 'sortOrder', label: 'Sort Order', num: true }, { key: 'isActive', label: 'Status', render: r => badge(r.isActive ? 'Active' : 'Hidden', r.isActive ? 'green' : 'grey') },
-        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.contentEdit('${tab}','${kind}',${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.store.contentDelete('${tab}','${kind}',${r.id})">✕</button>` }] });
+        { key: 'a', label: 'Actions', sortable: false, noExport: true, render: r => `<button class="fin-btn plain sm" onclick="FIN.store.contentEdit('${tab}','${kind}',${r.id})">Edit</button> <button class="fin-btn red sm" onclick="FIN.store.contentDelete('${tab}','${kind}',${r.id})"><i class=fi-x></i></button>` }] });
     });
   }
   function contentEdit(tab, kind, id) {
