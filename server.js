@@ -8448,12 +8448,12 @@ function adminSetupPayload() {
       staffTypeLabel: STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff',
       // an accountant converted from a records-only entry has no password yet
       canSignIn: row.role !== 'staff' && !row.passwordUnset,
-      roleLabel: row.designation || (row.role === 'admin'
+      roleLabel: row.designation || (row.role === 'admin' && staffType !== 'accountant'
         ? 'Administrator'
         : row.role === 'teacher'
           ? (row.teacherType === 'subject_teacher' ? 'Subject Teacher' : 'Class Teacher')
           : STAFF_TYPES.find(([key]) => key === staffType)?.[1] || 'Staff'),
-      department: row.department || (row.role === 'admin' ? 'admin' : row.role === 'teacher' ? 'academic' : ''),
+      department: row.department || (row.role === 'admin' && staffType !== 'accountant' ? 'admin' : row.role === 'teacher' ? 'academic' : ''),
       active: !!row.active,
       archived: !!row.archived,
       employmentStatus: row.employmentStatus || 'Active',

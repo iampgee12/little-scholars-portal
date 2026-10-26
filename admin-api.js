@@ -978,7 +978,7 @@ function staffAssignments(staff) {
   return assignments
     .filter(assignment => assignment.teacherType === 'subject_teacher' && !classTeacherHandles(assignment.classCode, assignment.subjectId))
     .map(assignment => assignment.classCode + ' ' + assignment.subjectName)
-    .join(', ') || (staff.role === 'admin' ? 'All' : 'Not assigned');
+    .join(', ') || (isAdminAccount(staff) ? 'All' : staff.role === 'teacher' ? 'Not assigned' : '');
 }
 
 function staffCategory(staff) {
@@ -2317,8 +2317,12 @@ let staffProfileId = '';
 function staffLevelLabel(staff) {
   return staff.adminLevel === 'owner' ? 'Main Super Admin' : staff.adminLevel === 'super' ? 'Super Admin' : 'Administrator';
 }
+// Accountants / bursary officers sign in to the admin portal but are staff, not admins
+function isAdminAccount(staff) {
+  return !!staff && staff.role === 'admin' && staff.staffType !== 'accountant';
+}
 function canManageAccount(staff) {
-  if (!staff || staff.role !== 'admin') return true;
+  if (!isAdminAccount(staff)) return true;
   const mine = state.user?.adminLevel;
   if (staff.adminLevel === 'owner') return false;
   if (staff.adminLevel === 'super') return mine === 'owner';
@@ -2332,21 +2336,23 @@ function openStaffProfile(id) {
   const modal = document.getElementById('staff-profile-modal');
   if (!modal) return;
   document.getElementById('staff-profile-name').textContent = staff.name || staff.id;
-  document.getElementById('staff-profile-role').textContent = staff.roleLabel || (staff.role === 'admin' ? 'Administrator' : 'Staff');
+  const photo = document.getElementById('staff-profile-photo');
+  if (photo) photo.innerHTML = typeof slAvatar === 'function' ? slAvatar(staff) : '';
+  document.getElementById('staff-profile-role').textContent = staff.roleLabel || (isAdminAccount(staff) ? 'Administrator' : 'Staff');
   const self = staff.id === state.user?.id;
   const deleteTeacherButton = document.getElementById('staff-delete-teacher');
   if (deleteTeacherButton) {
     deleteTeacherButton.style.display = !self && canManageAccount(staff) ? '' : 'none';
-    deleteTeacherButton.textContent = staff.role === 'teacher' ? 'Delete Teacher' : staff.role === 'admin' ? 'Delete Admin' : 'Delete Staff';
+    deleteTeacherButton.textContent = staff.role === 'teacher' ? 'Delete Teacher' : isAdminAccount(staff) ? 'Delete Admin' : 'Delete Staff';
   }
   const editButton = document.getElementById('staff-edit-details');
   if (editButton) editButton.style.display = self || canManageAccount(staff) ? '' : 'none';
   const superButton = document.getElementById('staff-super-toggle');
   if (superButton) {
-    superButton.style.display = state.user?.adminLevel === 'owner' && staff.role === 'admin' && staff.adminLevel !== 'owner' ? '' : 'none';
+    superButton.style.display = state.user?.adminLevel === 'owner' && isAdminAccount(staff) && staff.adminLevel !== 'owner' ? '' : 'none';
     superButton.textContent = staff.adminLevel === 'super' ? 'Remove Super Admin' : 'Make Super Admin';
   }
-  if (staff.role === 'admin') document.getElementById('staff-profile-role').textContent = staffLevelLabel(staff);
+  if (isAdminAccount(staff)) document.getElementById('staff-profile-role').textContent = staffLevelLabel(staff);
   modal.style.display = 'flex';
   renderStaffProfileTab('profile');
 }
@@ -2355,7 +2361,7 @@ async function deleteTeacherAccount(id) {
   const staff = (state.setup.staff || []).find(item => item.id === id);
   if (!staff) return showToast('Staff account not found');
   if (!canManageAccount(staff)) return showToast('Only a higher admin can delete this account');
-  const what = staff.role === 'teacher' ? 'teacher account' : staff.role === 'admin' ? 'administrator account' : 'staff record';
+  const what = staff.role === 'teacher' ? 'teacher account' : isAdminAccount(staff) ? 'administrator account' : 'staff account';
   if (!await uiConfirm(`Delete ${what} “${staff.name}” (${staff.id})? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}`, { method: 'DELETE' });
@@ -2364,7 +2370,7 @@ async function deleteTeacherAccount(id) {
     populateStaff();
     populateAdminControls();
     populateClasses();
-    showToast(staff.role === 'teacher' ? 'Teacher account deleted' : staff.role === 'admin' ? 'Administrator account deleted' : 'Staff record deleted');
+    showToast(staff.role === 'teacher' ? 'Teacher account deleted' : isAdminAccount(staff) ? 'Administrator account deleted' : 'Staff record deleted');
   } catch (err) { showToast(err.message); }
 }
 

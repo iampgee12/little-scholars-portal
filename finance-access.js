@@ -29,8 +29,8 @@ const READ_ONLY = [
   /^\/api\/admin\/finance-home$/,
 ];
 
-// Their own account, whatever the method
-const OWN_ACCOUNT = [/^\/api\/session$/, /^\/api\/logout$/, /^\/api\/account$/, /^\/api\/account\/(password|profile)$/];
+// Their own account, whatever the method; signing in (as anyone) is never refused
+const OWN_ACCOUNT = [/^\/api\/session$/, /^\/api\/logout$/, /^\/api\/login(\/(code|change|resend))?$/, /^\/api\/account$/, /^\/api\/account\/(password|profile)$/];
 
 function isFinanceUser(user) {
   return !!user && user.role === 'admin' && (user.staff_type || user.staffType) === 'accountant';

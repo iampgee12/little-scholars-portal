@@ -208,7 +208,8 @@ module.exports = function createSecurity(ctx) {
   // The user chose this password themselves: store it and sign out elsewhere
   function setOwnPassword(userId, newPassword, keepToken = null) {
     run('UPDATE users SET password = ? WHERE id = ?', hashPassword(newPassword), userId);
-    run('UPDATE users SET password_self_set = 1 WHERE id = ?', userId);
+    // (password_unset: an accountant who had no password yet now has one)
+    run('UPDATE users SET password_self_set = 1, password_unset = 0 WHERE id = ?', userId);
     if (keepToken) run('DELETE FROM sessions WHERE user_id = ? AND token <> ?', userId, keepToken);
     else run('DELETE FROM sessions WHERE user_id = ?', userId);
   }

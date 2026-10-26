@@ -201,10 +201,10 @@ function populateStaff() {
   const pageRows = rows.slice(start, start + perPage);
   tbody.innerHTML = pageRows.length ? pageRows.map((staff, i) => {
     const category = staffCategory(staff);
-    const typeLabel = category === 'Teacher' ? 'Teacher' : category === 'General Staff / Others' ? (staff.role === 'admin' ? 'Admin' : 'Staff') : category.replace('Accountant/Bursary Officer', 'Accountant');
-    const designation = slValue(staff, 'designation') || (staff.role === 'admin' ? 'Administrator' : 'Staff');
+    const typeLabel = category === 'Teacher' ? 'Teacher' : category === 'General Staff / Others' ? (isAdminAccount(staff) ? 'Admin' : 'Staff') : category.replace('Accountant/Bursary Officer', 'Accountant');
+    const designation = slValue(staff, 'designation') || (isAdminAccount(staff) ? 'Administrator' : 'Staff');
     const badges = [
-      staff.role === 'admin' ? `<span class="staff-main-pill">${staffLevelLabel(staff)}</span>` : '',
+      isAdminAccount(staff) ? `<span class="staff-main-pill">${staffLevelLabel(staff)}</span>` : '',
       staff.archived ? '<span class="sl-badge sl-badge-muted">Archived</span>' : '',
       (staff.employmentStatus || 'Active') !== 'Active' ? `<span class="sl-badge sl-badge-warn">${escapeHtml(staff.employmentStatus)}</span>` : '',
     ].join('');
@@ -212,8 +212,8 @@ function populateStaff() {
       <td class="sl-check"><input type="checkbox" aria-label="Select ${escapeHtml(staff.name)}" ${slView.selected.has(staff.id) ? 'checked' : ''} onchange="slToggleOne(${jsArg(staff.id)}, this.checked)"></td>
       <td class="staff-index">${start + i + 1}</td>
       <td>
-        <div class="sl-name-cell">${slAvatar(staff)}<div>
-          <div class="staff-table-name">${escapeHtml(staff.name)}</div>
+        <div class="sl-name-cell"><button type="button" class="sl-open-profile" title="View profile" aria-label="View ${escapeHtml(staff.name)}'s profile" onclick="openStaffProfile(${jsArg(staff.id)})">${slAvatar(staff)}</button><div>
+          <button type="button" class="sl-open-profile staff-table-name" title="View profile" onclick="openStaffProfile(${jsArg(staff.id)})">${escapeHtml(staff.name)}</button>
           <div class="staff-table-sub">${escapeHtml(staff.email || staff.id)}</div>
           ${badges}
         </div></div>
