@@ -115,6 +115,8 @@ function sfpOpen(id, tab = 'profile') {
   SFP.tab = tab;
   try { sessionStorage.setItem('sfp_id', id); } catch {}
   switchTab('staffProfile', visibleNavItem(SFP.from) || visibleNavItem('staff'), 'Staff Profile', sfpName(s));
+  // the window keeps the staff list's scroll position: start the profile at the top
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 // switchTab hook: draws the page (or reopens the last staff member after a refresh)
