@@ -101,6 +101,8 @@
   .fin-hero { background:linear-gradient(135deg,#16a34a,#15803d); color:#fff; border-radius:var(--radius); padding:24px; }
   .fin-hero .chip { display:inline-block; border:1px solid rgba(255,255,255,.4); border-radius:20px; padding:5px 12px; font-size:11px; margin:4px 4px 0 0; font-style:italic; }
   .fin-tile { border:1px solid var(--border); border-radius:var(--radius); padding:14px; background:var(--black); }
+  button.fin-tile { transition:background .15s ease, border-color .15s ease; }
+  button.fin-tile:hover { background:var(--black-3); border-color:var(--border-2); }
   .fin-tile h4 { font-size:13px; margin:8px 0 4px; } .fin-tile p { font-size:11px; color:var(--text-2); line-height:1.5; }
   .fin-report-card { border:1px solid var(--border); border-left:3px solid var(--green); border-radius:var(--radius); padding:14px; background:var(--black); cursor:pointer; display:flex; gap:12px; align-items:flex-start; text-align:left; font-family:'DM Sans',sans-serif; }
   .fin-report-card:hover { box-shadow:0 6px 18px rgba(15,23,42,.08); }
