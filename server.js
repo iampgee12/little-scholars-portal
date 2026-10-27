@@ -8703,7 +8703,10 @@ function serveStatic(req, res, url) {
       '.svg': 'image/svg+xml',
       '.ttf': 'font/ttf',
     };
-    res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+    const headers = { 'Content-Type': types[ext] || 'application/octet-stream' };
+    // images rarely change: let the browser keep them for a day instead of fetching every visit
+    if (['.png', '.jpg', '.jpeg', '.svg', '.ico'].includes(ext)) headers['Cache-Control'] = 'public, max-age=86400';
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
