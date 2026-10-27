@@ -197,6 +197,10 @@
     if (name && !name.querySelector('.scope-label')) name.insertAdjacentHTML('beforeend', '<span class="scope-label">Bursary</span>');
     const sub = document.querySelector('.admin-user-card .u-sub');
     if (sub) sub.textContent = 'Accountant / Bursary';
+    // a bursar is staff, so the portal is labelled Staff Portal, not Admin Portal
+    const portal = document.querySelector('.admin-brand .logo-sub-sm');
+    if (portal) portal.textContent = 'Staff Portal';
+    document.title = document.title.replace('Admin Portal', 'Staff Portal');
     // the pupil card shows Profile and Fees only
     if (Array.isArray(window.SPF_TABS)) for (let i = SPF_TABS.length - 1; i >= 0; i--) if (!['profile', 'fees'].includes(SPF_TABS[i][0])) SPF_TABS.splice(i, 1);
     const blocked = blockedTabs();
