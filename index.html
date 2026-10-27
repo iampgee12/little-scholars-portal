@@ -39,6 +39,9 @@ body {
   background:var(--black-2);
   color:var(--text-1);
   min-height:100vh;
+  /* phones: 100vh ignores the address bar, so the page ran taller than the screen,
+     scrolled, and the card sat low; dvh is the height actually visible */
+  min-height:100dvh;
   display:flex;
   align-items:center;
   justify-content:center;
