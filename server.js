@@ -5942,6 +5942,9 @@ async function handleApi(req, res, url) {
       run('DELETE FROM report_publications WHERE student_id = ?', studentId);
       run('DELETE FROM student_skill_ratings WHERE student_id = ?', studentId);
       run("DELETE FROM attendance_records WHERE person_type = 'student' AND person_id = ?", studentId);
+      run('DELETE FROM cbt_scores WHERE student_id = ?', studentId);
+      // the admission application stays on file; it just no longer points at a student
+      run('UPDATE admission_applications SET converted_student_id = NULL WHERE converted_student_id = ?', studentId);
       run('DELETE FROM sessions WHERE user_id = ?', studentId);
       run('DELETE FROM students WHERE id = ?', studentId);
       run("DELETE FROM users WHERE id = ? AND role = 'student'", studentId);
