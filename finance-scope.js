@@ -12,7 +12,9 @@
 (function () {
   const HIDDEN_SECTIONS = ['academics', 'eclass', 'results', 'attendance', 'admin', 'admission'];
   const HIDDEN_PEOPLE_TABS = ['addStudent', 'pupilPhotos', 'studentTags', 'communicationBook', 'extracurricularGroups', 'classAllocation', 'selfRegistration'];
-  const PEOPLE_TABS = ['students', 'studentsRegistry', 'enrollmentHistory', 'parents', 'families', 'staff', 'studentProfile', 'staffProfile'];
+  // finance pages left out of the bursar's menu
+  const HIDDEN_FINANCE_TABS = ['visitStorefront'];
+  const PEOPLE_TABS =['students', 'studentsRegistry', 'enrollmentHistory', 'parents', 'families', 'staff', 'studentProfile', 'staffProfile'];
   // buttons and links that change People records
   const EDITING = /^(\+|create|add\b|edit|update|delete|remove|deactivate|activate|archive|restore|reset|bulk import|import|self registration|staff designations|manage wards|sync|promote|move|upload|assign|change|save|mark|reinstate|graduate|on$|off$|generate|regenerate|unlink|link\b|convert|enrol|action on selected)/i;
   let financeView = false;
@@ -108,15 +110,60 @@
       if (!HIDDEN_SECTIONS.includes(menu) && !HIDDEN_PEOPLE_TABS.includes(el.dataset.tab)) tabs.delete(el.dataset.tab);
     });
     tabs.delete('dashboard');
+    HIDDEN_FINANCE_TABS.forEach(t => tabs.add(t));
     return tabs;
   }
+  // Line icons (16×16, same stroke style as the group icons) for each finance page.
+  const LEDGER = '<path d="M2.5 2.5h4a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 0-1.5-1.5h-4z"/><path d="M13.5 2.5h-4A1.5 1.5 0 0 0 8 4v10a1.5 1.5 0 0 1 1.5-1.5h4z"/>';
+  const SLIDERS = '<line x1="1.5" y1="4.5" x2="14.5" y2="4.5"/><line x1="1.5" y1="11.5" x2="14.5" y2="11.5"/><circle cx="5.5" cy="4.5" r="1.8"/><circle cx="10.5" cy="11.5" r="1.8"/>';
+  const TAB_ICONS = {
+    invoiceList: '<path d="M4 1.5h5.5l3 3v10H4z"/><path d="M9.5 1.5v3h3"/><line x1="6" y1="8" x2="10.5" y2="8"/><line x1="6" y1="10.5" x2="10.5" y2="10.5"/>',
+    classInvoiceHistory: '<rect x="2" y="3.5" width="9" height="11" rx="1"/><path d="M5 1.5h8a1 1 0 0 1 1 1v10"/><line x1="4.5" y1="7.5" x2="8.5" y2="7.5"/><line x1="4.5" y1="10.5" x2="8.5" y2="10.5"/>',
+    familyFeesHistory: '<circle cx="5.5" cy="5" r="2.2"/><circle cx="11" cy="6" r="1.8"/><path d="M1.5 13.5a4 4 0 0 1 8 0"/><path d="M9.5 10a3.2 3.2 0 0 1 5 3"/>',
+    reviewPaymentProofs: '<path d="M4 1.5h5.5l3 3v10H4z"/><path d="M9.5 1.5v3h3"/><polyline points="6 9.5 7.7 11.2 10.7 8"/>',
+    verifyPaymentStatus: '<path d="M8 1.5l5.5 2v4c0 3.3-2.3 5.8-5.5 7-3.2-1.2-5.5-3.7-5.5-7v-4z"/><polyline points="5.5 8 7.3 9.8 10.5 6.5"/>',
+    successfulPayments: '<circle cx="8" cy="8" r="6.3"/><polyline points="5.2 8.2 7.2 10.2 10.8 6.3"/>',
+    allPaymentAttempts: '<line x1="5.5" y1="4" x2="14" y2="4"/><line x1="5.5" y1="8" x2="14" y2="8"/><line x1="5.5" y1="12" x2="14" y2="12"/><circle cx="2.5" cy="4" r=".8"/><circle cx="2.5" cy="8" r=".8"/><circle cx="2.5" cy="12" r=".8"/>',
+    feesDebtors: '<path d="M8 2l6.5 11.5h-13z"/><line x1="8" y1="6.5" x2="8" y2="9.5"/><line x1="8" y1="11.6" x2="8" y2="11.7"/>',
+    expenseRequests: '<rect x="3" y="2.5" width="10" height="12" rx="1.2"/><rect x="5.5" y="1.5" width="5" height="2.2" rx=".6"/><line x1="5.5" y1="7.5" x2="10.5" y2="7.5"/><line x1="5.5" y1="10.5" x2="9" y2="10.5"/>',
+    expenses: '<polyline points="1.5 4.5 6 9 9 6 14.5 11.5"/><polyline points="14.5 7.5 14.5 11.5 10.5 11.5"/>',
+    income: '<polyline points="1.5 11.5 6 7 9 10 14.5 4.5"/><polyline points="10.5 4.5 14.5 4.5 14.5 8.5"/>',
+    incomeExpensesAnalytics: '<path d="M8 1.7a6.3 6.3 0 1 0 6.3 6.3H8z"/><path d="M10 1.9a6.3 6.3 0 0 1 4.1 4.1H10z"/>',
+    bankBalanceReport: '<path d="M1.5 6L8 2l6.5 4z"/><line x1="3.5" y1="7.5" x2="3.5" y2="12"/><line x1="6.5" y1="7.5" x2="6.5" y2="12"/><line x1="9.5" y1="7.5" x2="9.5" y2="12"/><line x1="12.5" y1="7.5" x2="12.5" y2="12"/><line x1="1.5" y1="14" x2="14.5" y2="14"/>',
+    cashFlowStatement: '<line x1="2" y1="5" x2="13" y2="5"/><polyline points="10.5 2.5 13 5 10.5 7.5"/><line x1="14" y1="11" x2="3" y2="11"/><polyline points="5.5 8.5 3 11 5.5 13.5"/>',
+    ieAccountLedger: LEDGER,
+    monthlySalariesProcessing: '<rect x="1.5" y="4" width="13" height="8" rx="1.2"/><circle cx="8" cy="8" r="1.8"/><line x1="4" y1="8" x2="4.01" y2="8"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+    salaryPaymentSchedule: '<rect x="1.5" y="3" width="13" height="11.5" rx="1.2"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/><line x1="5" y1="1.5" x2="5" y2="4.5"/><line x1="11" y1="1.5" x2="11" y2="4.5"/>',
+    payrollSettings: SLIDERS,
+    staffLoansAdvances: '<ellipse cx="6.5" cy="5" rx="4.5" ry="2"/><path d="M2 5v3c0 1.1 2 2 4.5 2s4.5-.9 4.5-2V5"/><path d="M6 12.3c.6.5 1.9.9 3.5.9 2.5 0 4.5-.9 4.5-2V8"/>',
+    posTerminal: '<rect x="3" y="1.5" width="10" height="13" rx="1.2"/><rect x="5" y="3.5" width="6" height="3"/><line x1="5.5" y1="9" x2="5.51" y2="9"/><line x1="8" y1="9" x2="8.01" y2="9"/><line x1="10.5" y1="9" x2="10.51" y2="9"/><line x1="5.5" y1="11.8" x2="5.51" y2="11.8"/><line x1="8" y1="11.8" x2="8.01" y2="11.8"/><line x1="10.5" y1="11.8" x2="10.51" y2="11.8"/>',
+    ordersSales: '<circle cx="6" cy="13.5" r="1"/><circle cx="12" cy="13.5" r="1"/><path d="M1.5 2h2l1.6 8.2h8l1.4-5.7H4.2"/>',
+    products: '<path d="M8 1.5l6 3v7l-6 3-6-3v-7z"/><polyline points="2 4.5 8 7.5 14 4.5"/><line x1="8" y1="7.5" x2="8" y2="14.5"/>',
+    categories: '<path d="M1.5 8.3V2.5a1 1 0 0 1 1-1h5.8l6.2 6.2-6.8 6.8z"/><circle cx="5" cy="5" r="1.1"/>',
+    inventorySupply: '<rect x="1.5" y="3.5" width="8.5" height="7.5"/><path d="M10 6h2.6l1.9 2.5V11H10"/><circle cx="4.5" cy="12.5" r="1.3"/><circle cx="11.8" cy="12.5" r="1.3"/>',
+    inventoryReports: '<line x1="1.5" y1="14" x2="14.5" y2="14"/><rect x="2" y="9" width="3" height="5"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="3" width="3" height="11"/>',
+    storeSettings: SLIDERS,
+    storefrontBanners: '<rect x="1.5" y="2.5" width="13" height="11" rx="1.2"/><circle cx="5.5" cy="6" r="1.2"/><polyline points="14.5 10.5 10.5 7 3 13.5"/>',
+    storefrontHomepageSections: '<rect x="1.5" y="1.5" width="13" height="13" rx="1.2"/><line x1="1.5" y1="6" x2="14.5" y2="6"/><line x1="7" y1="6" x2="7" y2="14.5"/>',
+    internalRequisitions: '<path d="M5.5 3h-2a1 1 0 0 0-1 1v9.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-2"/><rect x="5.5" y="1.5" width="5" height="3" rx=".6"/><polyline points="5.5 9.5 7.2 11.2 10.5 7.8"/>',
+    chartOfAccounts: '<rect x="5.5" y="1.5" width="5" height="3.5" rx=".6"/><rect x="1.5" y="11" width="5" height="3.5" rx=".6"/><rect x="9.5" y="11" width="5" height="3.5" rx=".6"/><path d="M8 5v3M4 11V8h8v3"/>',
+    journalEntries: '<path d="M11 1.8l3.2 3.2L6 13.2l-3.7.5.5-3.7z"/><line x1="9.5" y1="3.3" x2="12.7" y2="6.5"/>',
+    accountLedger: LEDGER,
+    trialBalance: '<line x1="8" y1="2" x2="8" y2="14"/><line x1="5" y1="14" x2="11" y2="14"/><line x1="2.5" y1="4" x2="13.5" y2="4"/><path d="M2.5 4L1 8.5a1.6 1.6 0 0 0 3 0z"/><path d="M13.5 4L12 8.5a1.6 1.6 0 0 0 3 0z"/>',
+    contactsBillsInvoices: '<rect x="2.5" y="1.5" width="11" height="13" rx="1.2"/><circle cx="8" cy="6.5" r="2"/><path d="M4.8 12a3.3 3.3 0 0 1 6.4 0"/>',
+    budgets: '<path d="M2 4.5h11a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 4.5L10.5 2v2.5"/><circle cx="11" cy="9.3" r=".8"/>',
+    bankReconciliation: '<path d="M13.5 6A5.5 5.5 0 0 0 3 4.5"/><polyline points="2.5 1.5 2.5 5 6 5"/><path d="M2.5 10a5.5 5.5 0 0 0 10.5 1.5"/><polyline points="13.5 14.5 13.5 11 10 11"/>',
+    taxCompliance: '<circle cx="8" cy="8" r="6.3"/><line x1="5.5" y1="10.5" x2="10.5" y2="5.5"/><circle cx="6" cy="6" r=".8"/><circle cx="10" cy="10" r=".8"/>',
+    financialReports: '<path d="M4 1.5h5.5l3 3v10H4z"/><path d="M9.5 1.5v3h3"/><line x1="6.3" y1="12" x2="6.3" y2="10"/><line x1="8.3" y1="12" x2="8.3" y2="8"/><line x1="10.3" y1="12" x2="10.3" y2="9"/>',
+  };
+  const tabIcon = tab => `<span class="sub-nav-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${TAB_ICONS[tab] || '<circle cx="8" cy="8" r="1.6"/>'}</svg></span>`;
+
   // Each Finance folding group (Fees / Bursary, Accounting…) becomes its own main menu
   // item, and the pages inside it become that item's plain sub-menu.
   function splitFinanceMenu() {
     const rail = document.querySelector('.rail-item[data-section="finance"]');
     const menu = document.querySelector('.sub-menu[data-menu="finance"]');
     if (!rail || !menu) return;
-    const dot = '<span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="1.6"/></svg></span>';
     let after = rail;
     menu.querySelectorAll(':scope > .result-gradebook-children').forEach(group => {
       const toggle = group.previousElementSibling;
@@ -129,8 +176,9 @@
       sub.className = 'sub-menu';
       sub.dataset.menu = section;
       group.querySelectorAll('.sub-nav-item').forEach(item => {
+        if (HIDDEN_FINANCE_TABS.includes(item.dataset.tab)) return item.remove();
         item.classList.remove('result-child');
-        item.insertAdjacentHTML('afterbegin', dot);
+        item.insertAdjacentHTML('afterbegin', tabIcon(item.dataset.tab));
         sub.appendChild(item);
       });
       menu.parentElement.insertBefore(sub, menu);
