@@ -110,8 +110,40 @@
     tabs.delete('dashboard');
     return tabs;
   }
+  // Each Finance folding group (Fees / Bursary, Accounting…) becomes its own main menu
+  // item, and the pages inside it become that item's plain sub-menu.
+  function splitFinanceMenu() {
+    const rail = document.querySelector('.rail-item[data-section="finance"]');
+    const menu = document.querySelector('.sub-menu[data-menu="finance"]');
+    if (!rail || !menu) return;
+    const dot = '<span class="sub-nav-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="1.6"/></svg></span>';
+    let after = rail;
+    menu.querySelectorAll(':scope > .result-gradebook-children').forEach(group => {
+      const toggle = group.previousElementSibling;
+      const section = 'fin-' + group.id.replace(/-children$/, '');
+      const label = toggle.querySelector('span:not(.sub-nav-icon):not(.sub-chev)').textContent.trim();
+      const svg = toggle.querySelector('.sub-nav-icon svg').outerHTML.replace(/ width="\d+"| height="\d+"/g, '');
+      after.insertAdjacentHTML('afterend', `<button type="button" class="rail-item" data-section="${section}" onclick="showAdminSection('${section}', this)"><span class="rail-icon" aria-hidden="true">${svg}</span><span class="rail-label">${esc(label)}</span></button>`);
+      after = after.nextElementSibling;
+      const sub = document.createElement('div');
+      sub.className = 'sub-menu';
+      sub.dataset.menu = section;
+      group.querySelectorAll('.sub-nav-item').forEach(item => {
+        item.classList.remove('result-child');
+        item.insertAdjacentHTML('afterbegin', dot);
+        sub.appendChild(item);
+      });
+      menu.parentElement.insertBefore(sub, menu);
+    });
+    rail.style.display = 'none';
+    menu.remove();
+    // a page already open (reopened from the address) now lights up its new menu
+    if (activeTab() && activeTab() !== 'dashboard') syncSidebarForTab(activeTab());
+  }
+
   function applyFinanceView() {
     financeView = true;
+    splitFinanceMenu();
     document.body.classList.add('scope-finance');
     const name = document.getElementById('a-name');
     if (name && !name.querySelector('.scope-label')) name.insertAdjacentHTML('beforeend', '<span class="scope-label">Bursary</span>');
@@ -140,12 +172,14 @@
   // SPF_TABS is a top-level const in student-profile.js: reach it by name
   try { if (typeof SPF_TABS !== 'undefined') window.SPF_TABS = SPF_TABS; } catch {}
 
+  const reveal = () => document.documentElement.classList.remove('portal-pending');
   function whenUserKnown(fn, tries = 0) {
     if (me()) return fn();
-    if (tries < 200) setTimeout(() => whenUserKnown(fn, tries + 1), 100);
+    if (tries < 750) setTimeout(() => whenUserKnown(fn, tries + 1), 20);
+    else reveal();
   }
   whenUserKnown(() => {
-    if (me().scope === 'finance') applyFinanceView();
+    try { if (me().scope === 'finance') applyFinanceView(); } finally { reveal(); }
     refreshBadge();
     setInterval(refreshBadge, 60000);
     const baseSwitch = window.switchTab;
