@@ -1250,7 +1250,10 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .staff-profile-tabs { display:flex; gap:4px; padding:10px 24px 0; border-bottom:1px solid #e5e7eb; }
 .staff-profile-tab { border:0; background:transparent; color:#64748b; padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; }
 .staff-profile-tab.active { color:#2563eb; border-bottom-color:#2563eb; font-weight:700; }
-.staff-profile-body { padding:20px 24px 26px; }
+/* Same size on every tab: fixed height, only the body scrolls */
+.staff-profile-dialog { height:min(680px, 92vh); display:flex; flex-direction:column; overflow:hidden; }
+.staff-profile-head, .staff-profile-tabs { flex-shrink:0; }
+.staff-profile-body { padding:20px 24px 26px; flex:1; min-height:0; overflow:auto; }
 .staff-profile-details { border:1px solid #e5e7eb; border-radius:6px; overflow:hidden; }
 .staff-profile-detail { display:grid; grid-template-columns:220px 1fr; gap:16px; padding:11px 14px; border-bottom:1px solid #eef2f7; }
 .staff-profile-detail:last-child { border-bottom:0; }
