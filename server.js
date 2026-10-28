@@ -2274,6 +2274,64 @@ function setUpClassTeacherSubjects() {
   setMeta('class_teacher_subjects_seeded', '1');
 }
 
+// The school's subject lists for the nursery classes. Each entry is the name to use when
+// the subject doesn't exist yet, then other spellings that mean the same subject.
+const NURSERY_CLASS_SUBJECTS = {
+  RC: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Practical Life', 'Practical'], ['Sensorial Studies', 'Sensorial'],
+    ['Cultural Studies', 'Cultural', 'Culture'], ['Bible Knowledge'], ['Fine Art', 'Fine Arts'], ['Rhymes', 'Rhyme']],
+  PS1: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Social Studies'], ['Practical Life', 'Practical'],
+    ['Sensorial Studies', 'Sensorial'], ['Diction'], ['Bible Knowledge'], ['Computer'], ['Fine Art', 'Fine Arts'], ['Rhymes', 'Rhyme']],
+  PS2: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Social Studies'], ['Verbal Reasoning'],
+    ['Quantitative Reasoning', 'Quantitative Reason'], ['Health Education'], ['Diction'], ['Bible Knowledge'], ['Computer'],
+    ['Fine Art', 'Fine Arts'], ['Handwriting', 'Hand Writing'], ['Rhymes', 'Rhyme']],
+  KG: [['Numeracy'], ['Literacy'], ['Cultural Studies', 'Cultural', 'Culture'], ['News & Conversation'],
+    ['Practical Life', 'Practical'], ['Bible Knowledge'], ['Rhymes', 'Rhyme'], ['Fine Art', 'Fine Arts']],
+};
+
+// Once, at startup: each nursery class gets exactly its list. A subject the class had that
+// isn't on the list comes off, unless scores are already saved for it there.
+function applyNurseryClassSubjects() {
+  if (EXAM_MODE || valueFromMeta('nursery_class_subjects_v1', '')) return;
+  const hasScores = (classCode, subjectId) =>
+    one('SELECT id FROM result_batches WHERE class_code = ? AND subject_id = ? LIMIT 1', classCode, subjectId) ||
+    one(`SELECT sc.id FROM cbt_scores sc JOIN cbt_schedule_subjects ss ON ss.id = sc.schedule_subject_id
+         WHERE ss.class_code = ? AND ss.subject_id = ? LIMIT 1`, classCode, subjectId);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    Object.entries(NURSERY_CLASS_SUBJECTS).forEach(([classCode, list]) => {
+      if (!one('SELECT code FROM classes WHERE code = ?', classCode)) return;
+      const wanted = list.map(([label, ...aliases]) => {
+        const names = [label, ...aliases].map(normalizedSubjectName);
+        let subject = all('SELECT id, name FROM subjects').find(s => names.includes(normalizedSubjectName(s.name)));
+        if (!subject) {
+          run('INSERT INTO subjects (name) VALUES (?)', label);
+          subject = one('SELECT id FROM subjects WHERE name = ?', label);
+        }
+        if (!one('SELECT id FROM class_subjects WHERE class_code = ? AND subject_id = ? LIMIT 1', classCode, subject.id)) {
+          run('INSERT INTO class_subjects (subject_id, class_code) VALUES (?, ?)', subject.id, classCode);
+        }
+        return subject.id;
+      });
+      all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode)
+        .filter(({ id }) => !wanted.includes(id))
+        .forEach(({ id }) => {
+          if (hasScores(classCode, id)) {
+            console.log(`Nursery subjects: kept subject ${id} in ${classCode} because scores are saved for it`);
+            return;
+          }
+          run('DELETE FROM class_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
+          run('DELETE FROM class_teacher_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
+          run('DELETE FROM teacher_assignments WHERE class_code = ? AND subject_id = ?', classCode, id);
+        });
+    });
+    setMeta('nursery_class_subjects_v1', '1');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
 
 // The class teacher takes over a subject in their class: their own assignment is
@@ -8745,6 +8803,7 @@ if (EXAM_MODE) server.keepAliveTimeout = 120e3;
 
 // run here, once everything above (including the class teacher subject rules) is defined
 setUpClassTeacherSubjects();
+applyNurseryClassSubjects();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
