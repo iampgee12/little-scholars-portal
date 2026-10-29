@@ -2288,10 +2288,11 @@ const NURSERY_CLASS_SUBJECTS = {
     ['Practical Life', 'Practical'], ['Bible Knowledge'], ['Rhymes', 'Rhyme'], ['Fine Art', 'Fine Arts']],
 };
 
-// Once, at startup: each nursery class gets exactly its list. A subject the class had that
-// isn't on the list comes off, unless scores are already saved for it there.
-function applyNurseryClassSubjects() {
-  if (EXAM_MODE || valueFromMeta('nursery_class_subjects_v1', '')) return;
+// Once per metaKey, at startup: each nursery class gets exactly its list. A subject the class
+// had that isn't on the list comes off, unless scores are already saved for it there; with
+// removeScored it comes off the class's list anyway, and its saved scores and teacher stay.
+function applyNurseryClassSubjects(metaKey = 'nursery_class_subjects_v1', classCodes = Object.keys(NURSERY_CLASS_SUBJECTS), removeScored = false) {
+  if (EXAM_MODE || valueFromMeta(metaKey, '')) return;
   const hasScores = (classCode, subjectId) =>
     one('SELECT id FROM result_batches WHERE class_code = ? AND subject_id = ? LIMIT 1', classCode, subjectId) ||
     one(`SELECT sc.id FROM cbt_scores sc JOIN cbt_schedule_subjects ss ON ss.id = sc.schedule_subject_id
@@ -2299,7 +2300,7 @@ function applyNurseryClassSubjects() {
   db.exec('BEGIN IMMEDIATE');
   try {
     Object.entries(NURSERY_CLASS_SUBJECTS).forEach(([classCode, list]) => {
-      if (!one('SELECT code FROM classes WHERE code = ?', classCode)) return;
+      if (!classCodes.includes(classCode) || !one('SELECT code FROM classes WHERE code = ?', classCode)) return;
       const wanted = list.map(([label, ...aliases]) => {
         const names = [label, ...aliases].map(normalizedSubjectName);
         let subject = all('SELECT id, name FROM subjects').find(s => names.includes(normalizedSubjectName(s.name)));
@@ -2316,6 +2317,12 @@ function applyNurseryClassSubjects() {
         .filter(({ id }) => !wanted.includes(id))
         .forEach(({ id }) => {
           if (hasScores(classCode, id)) {
+            if (removeScored) {
+              run('DELETE FROM class_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
+              run('DELETE FROM class_teacher_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
+              console.log(`Nursery subjects: took subject ${id} off ${classCode}'s list; its saved scores stay`);
+              return;
+            }
             console.log(`Nursery subjects: kept subject ${id} in ${classCode} because scores are saved for it`);
             return;
           }
@@ -2324,7 +2331,7 @@ function applyNurseryClassSubjects() {
           run('DELETE FROM teacher_assignments WHERE class_code = ? AND subject_id = ?', classCode, id);
         });
     });
-    setMeta('nursery_class_subjects_v1', '1');
+    setMeta(metaKey, '1');
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
@@ -8856,6 +8863,7 @@ if (EXAM_MODE) server.keepAliveTimeout = 120e3;
 // run here, once everything above (including the class teacher subject rules) is defined
 setUpClassTeacherSubjects();
 applyNurseryClassSubjects();
+applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true);
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
