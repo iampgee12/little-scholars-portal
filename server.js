@@ -2199,7 +2199,7 @@ const CLASS_TEACHER_CORE_SUBJECT_RULES = [
   { label: 'Social Studies', aliases: ['social studies', 'social study'] },
   { label: 'Vocational Aptitude', aliases: ['vocational aptitude', 'vocational apt'], minYear: 2, maxYear: 6 },
   { label: 'Health Education', aliases: ['health education', 'health ed'], onlyYear: 1 },
-  { label: 'Verbal Reasoning', aliases: ['verbal reasoning'] },
+  { label: 'V.A.T', aliases: ['v a t', 'vat', 'verbal reasoning'] },
   { label: 'Bible Knowledge', aliases: ['bible knowledge'] },
   { label: 'Creative Writing', aliases: ['creative writing'] },
 ];
@@ -2281,8 +2281,8 @@ const NURSERY_CLASS_SUBJECTS = {
     ['Cultural Studies', 'Cultural', 'Culture'], ['Bible Knowledge'], ['Fine Art', 'Fine Arts'], ['Rhymes', 'Rhyme']],
   PS1: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Social Studies'], ['Practical Life', 'Practical'],
     ['Sensorial Studies', 'Sensorial'], ['Diction'], ['Bible Knowledge'], ['Computer'], ['Fine Art', 'Fine Arts'], ['Rhymes', 'Rhyme']],
-  PS2: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Social Studies'], ['Verbal Reasoning'],
-    ['Quantitative Reasoning', 'Quantitative Reason'], ['Health Education'], ['Diction'], ['Bible Knowledge'], ['Computer'],
+  PS2: [['Numeracy'], ['Literacy'], ['Elementary Science'], ['Social Studies'], ['V.A.T', 'VAT', 'Verbal Reasoning'],
+    ['Q.A.T', 'QAT', 'Quantitative Reasoning', 'Quantitative Reason'], ['Health Education'], ['Diction'], ['Bible Knowledge'], ['Computer'],
     ['Fine Art', 'Fine Arts'], ['Handwriting', 'Hand Writing'], ['Rhymes', 'Rhyme']],
   KG: [['Numeracy'], ['Literacy'], ['Cultural Studies', 'Cultural', 'Culture'], ['News & Conversation'],
     ['Practical Life', 'Practical'], ['Bible Knowledge'], ['Rhymes', 'Rhyme'], ['Fine Art', 'Fine Arts']],
@@ -2394,8 +2394,8 @@ function coveringClassSubject(subjectId, classCode, classArmId, term, exceptId =
 
 // Once, at startup: repeats of a class subject (saved before repeats were refused) fold into
 // the row that covers them; teachers allocated to a repeat move to the row kept
-function mergeRepeatedClassSubjects() {
-  if (EXAM_MODE || valueFromMeta('class_subject_repeats_merged_v1', '')) return;
+function mergeRepeatedClassSubjects(metaKey = 'class_subject_repeats_merged_v1') {
+  if (EXAM_MODE || valueFromMeta(metaKey, '')) return;
   db.exec('BEGIN IMMEDIATE');
   try {
     let merged = 0;
@@ -2410,12 +2410,67 @@ function mergeRepeatedClassSubjects() {
       merged++;
     });
     if (merged) console.log(`Class subjects: merged ${merged} repeated row${merged === 1 ? '' : 's'}`);
-    setMeta('class_subject_repeats_merged_v1', '1');
+    setMeta(metaKey, '1');
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
   }
+}
+
+// Subjects the school now teaches under one name: the first name is kept, the second is
+// another spelling of it, and a subject under any later name folds into it
+const COMBINED_SUBJECTS = [
+  ['V.A.T', 'VAT', 'Verbal Reasoning'],
+  ['Q.A.T', 'QAT', 'Quantitative Reasoning', 'Quantitative Reason'],
+];
+
+// Once, at startup: each combined subject's other names fold into the one kept. Its classes,
+// teachers, scores and CBT questions move across; a row the kept subject already has (same
+// class, arm and term, or same teacher and class) takes the moved one's place. The old
+// subject is removed once nothing points at it.
+function combineSubjects() {
+  if (EXAM_MODE || valueFromMeta('combined_subjects_vat_qat_v1', '')) return;
+  const tables = all("SELECT name FROM sqlite_master WHERE type = 'table'").map(t => t.name)
+    .filter(name => all(`PRAGMA table_info(${name})`).some(col => col.name === 'subject_id'));
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    COMBINED_SUBJECTS.forEach(([label, spelling, ...others]) => {
+      const keepNames = [label, spelling].map(normalizedSubjectName);
+      const otherNames = others.map(normalizedSubjectName);
+      const subjects = all('SELECT id, name FROM subjects ORDER BY id');
+      let keep = subjects.find(s => keepNames.includes(normalizedSubjectName(s.name)));
+      const olds = subjects.filter(s => otherNames.includes(normalizedSubjectName(s.name)));
+      if (!keep && !olds.length) return;
+      if (!keep) keep = olds.shift();
+      run('UPDATE subjects SET name = ? WHERE id = ?', label, keep.id);
+      olds.forEach(old => {
+        tables.forEach(t => run(`UPDATE OR IGNORE ${t} SET subject_id = ? WHERE subject_id = ?`, keep.id, old.id));
+        run('DELETE FROM class_teacher_subjects WHERE subject_id = ?', old.id);
+        all('SELECT * FROM class_subjects WHERE subject_id = ?', old.id).forEach(row => {
+          const same = one('SELECT id FROM class_subjects WHERE subject_id = ? AND class_code = ? AND class_arm_id IS ? AND term IS ?',
+            keep.id, row.class_code, row.class_arm_id, row.term);
+          run('UPDATE subject_teacher_allocations SET class_subject_id = ? WHERE class_subject_id = ?', same.id, row.id);
+          run('DELETE FROM class_subjects WHERE id = ?', row.id);
+        });
+        all('SELECT id, teacher_id, class_code FROM teacher_assignments WHERE subject_id = ?', old.id).forEach(row => {
+          const same = one('SELECT id FROM teacher_assignments WHERE teacher_id = ? AND class_code = ? AND subject_id = ?',
+            row.teacher_id, row.class_code, keep.id);
+          run('UPDATE OR IGNORE result_batches SET assignment_id = ? WHERE assignment_id = ?', same.id, row.id);
+          if (!assignmentHasResults(row.id)) run('DELETE FROM teacher_assignments WHERE id = ?', row.id);
+        });
+        const left = tables.filter(t => one(`SELECT COUNT(*) AS n FROM ${t} WHERE subject_id = ?`, old.id).n);
+        if (left.length) console.log(`Subjects: ${old.name} kept beside ${label}; both have saved ${left.join(', ')} for the same class`);
+        else run('DELETE FROM subjects WHERE id = ?', old.id);
+      });
+    });
+    setMeta('combined_subjects_vat_qat_v1', '1');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  mergeRepeatedClassSubjects('class_subject_repeats_merged_v2');
 }
 
 const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
@@ -8936,6 +8991,7 @@ applyNurseryClassSubjects();
 applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true, true);
 nurseryClassTeachersTakeTheirSubjects();
 mergeRepeatedClassSubjects();
+combineSubjects();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
