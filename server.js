@@ -2445,6 +2445,18 @@ function combineSubjects() {
       if (!keep) keep = olds.shift();
       run('UPDATE subjects SET name = ? WHERE id = ?', label, keep.id);
       olds.forEach(old => {
+        // scores saved under both names for the same class and exam would show twice, so
+        // such a subject stays as it is for the admin to sort out
+        const both = one(`SELECT a.class_code AS classCode FROM result_batches a JOIN result_batches b
+            ON b.class_code = a.class_code AND b.academic_id = a.academic_id AND b.exam_type = a.exam_type
+            WHERE a.subject_id = ? AND b.subject_id = ? LIMIT 1`, old.id, keep.id) ||
+          one(`SELECT a.class_code AS classCode FROM cbt_schedule_subjects a JOIN cbt_schedule_subjects b
+            ON b.schedule_id = a.schedule_id AND b.class_code = a.class_code AND b.class_arm_id IS a.class_arm_id
+            WHERE a.subject_id = ? AND b.subject_id = ? LIMIT 1`, old.id, keep.id);
+        if (both) {
+          console.log(`Subjects: ${old.name} not folded into ${label}; ${both.classCode} has scores saved under both for the same exam`);
+          return;
+        }
         tables.forEach(t => run(`UPDATE OR IGNORE ${t} SET subject_id = ? WHERE subject_id = ?`, keep.id, old.id));
         run('DELETE FROM class_teacher_subjects WHERE subject_id = ?', old.id);
         all('SELECT * FROM class_subjects WHERE subject_id = ?', old.id).forEach(row => {
