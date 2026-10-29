@@ -2332,6 +2332,18 @@ function applyNurseryClassSubjects() {
   }
 }
 
+// CBT questions and student scores saved for a subject, in one class or in all of them
+function subjectUsage(subjectId, classCode = null) {
+  const inClass = classCode ? ' AND class_code = ?' : '';
+  const args = classCode ? [subjectId, classCode] : [subjectId];
+  const questions = one(`SELECT COUNT(*) AS n FROM cbt_questions WHERE subject_id = ?${inClass}`, ...args).n;
+  const resultScores = one(`SELECT COUNT(*) AS n FROM result_entries re JOIN result_batches rb ON rb.id = re.batch_id
+                            WHERE rb.subject_id = ?${inClass.replace('class_code', 'rb.class_code')}`, ...args).n;
+  const cbtScores = one(`SELECT COUNT(*) AS n FROM cbt_scores sc JOIN cbt_schedule_subjects ss ON ss.id = sc.schedule_subject_id
+                         WHERE ss.subject_id = ?${inClass.replace('class_code', 'ss.class_code')}`, ...args).n;
+  return { questions, scores: resultScores + cbtScores };
+}
+
 const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
 
 // The class teacher takes over a subject in their class: their own assignment is
@@ -8130,7 +8142,36 @@ async function handleApi(req, res, url) {
   if (req.method === 'DELETE' && subjectMatch) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
-    run('DELETE FROM subjects WHERE id = ?', Number(subjectMatch[1]));
+    const id = Number(subjectMatch[1]);
+    const subject = one('SELECT id, name FROM subjects WHERE id = ?', id);
+    if (!subject) return sendJson(res, 404, { error: 'Subject not found' });
+    const usage = subjectUsage(id);
+    if ((usage.questions || usage.scores) && url.searchParams.get('force') !== '1') {
+      return sendJson(res, 409, { needsConfirm: true, ...usage });
+    }
+    // deleting regardless takes the subject's questions, scores and timetable entries with it
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      run('DELETE FROM result_batches WHERE subject_id = ?', id);
+      run('DELETE FROM teacher_assignments WHERE subject_id = ?', id);
+      run('DELETE FROM cbt_questions WHERE subject_id = ?', id);
+      run('DELETE FROM cbt_schedule_subjects WHERE subject_id = ?', id);
+      run('DELETE FROM exam_schedule WHERE subject_id = ?', id);
+      run('DELETE FROM class_teacher_subjects WHERE subject_id = ?', id);
+      run('UPDATE cbt_instruction_sets SET subject_id = NULL WHERE subject_id = ?', id);
+      run('UPDATE attendance_records SET subject_id = NULL WHERE subject_id = ?', id);
+      run('DELETE FROM subjects WHERE id = ?', id);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      if (String(err.message).includes('FOREIGN KEY')) {
+        return sendJson(res, 400, { error: 'This subject is still used elsewhere, so it could not be deleted' });
+      }
+      throw err;
+    }
+    if (usage.questions || usage.scores) {
+      security.audit(req, user, 'Deleted subject with questions/scores', `${subject.name}: ${usage.questions} questions, ${usage.scores} scores`);
+    }
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 
@@ -8242,7 +8283,14 @@ async function handleApi(req, res, url) {
   if (req.method === 'DELETE' && classSubjectMatch) {
     const user = requireUser(req, res, 'admin');
     if (!user) return;
-    run('DELETE FROM class_subjects WHERE id = ?', Number(classSubjectMatch[1]));
+    const cs = one('SELECT id, subject_id, class_code FROM class_subjects WHERE id = ?', Number(classSubjectMatch[1]));
+    if (!cs) return sendJson(res, 404, { error: 'Class subject not found' });
+    const usage = subjectUsage(cs.subject_id, cs.class_code);
+    if ((usage.questions || usage.scores) && url.searchParams.get('force') !== '1') {
+      return sendJson(res, 409, { needsConfirm: true, ...usage });
+    }
+    // only the class's link goes; its saved questions and scores stay
+    run('DELETE FROM class_subjects WHERE id = ?', cs.id);
     return sendJson(res, 200, { ok: true, setup: adminSetupPayload() });
   }
 

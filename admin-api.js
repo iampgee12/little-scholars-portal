@@ -86,7 +86,7 @@ async function apiFetch(url, options = {}) {
     throw new Error('Authentication required');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Request failed'), { status: res.status, data });
   return data;
 }
 
@@ -6184,10 +6184,29 @@ async function saveSubject() {
   }
 }
 
+// "12 CBT questions and 40 student scores" for the delete warnings
+function subjectUsageText({ questions, scores }) {
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  return [questions && plural(questions, 'CBT question'), scores && plural(scores, 'student score')].filter(Boolean).join(' and ');
+}
+
+// Deletes, but first asks again when the subject has questions or scores saved
+async function deleteWithUsageCheck(url, confirmText) {
+  try {
+    return await apiFetch(url, { method: 'DELETE' });
+  } catch (err) {
+    if (!err.data?.needsConfirm) throw err;
+    if (!await uiConfirm(confirmText(subjectUsageText(err.data)), { title: 'Please note', confirmLabel: 'Delete anyway', danger: true })) return null;
+    return apiFetch(`${url}?force=1`, { method: 'DELETE' });
+  }
+}
+
 async function deleteSubject(id) {
   if (!await uiConfirm('Delete this subject from the subject bank?')) return;
   try {
-    const data = await apiFetch(`/api/admin/subjects/${id}`, { method: 'DELETE' });
+    const data = await deleteWithUsageCheck(`/api/admin/subjects/${id}`, usage =>
+      `This subject has ${usage} attached. Deleting it will permanently delete them too. Do you want to delete it anyway?`);
+    if (!data) return;
     state.setup = data.setup;
     populateSubjects();
     showToast('Subject deleted');
@@ -6286,7 +6305,9 @@ async function saveClassSubject() {
 async function deleteClassSubject(id) {
   if (!await uiConfirm('Remove this subject from the class?')) return;
   try {
-    const data = await apiFetch(`/api/admin/class-subjects/${id}`, { method: 'DELETE' });
+    const data = await deleteWithUsageCheck(`/api/admin/class-subjects/${id}`, usage =>
+      `This subject has ${usage} attached in this class. They stay saved, but the subject will no longer be on the class's list. Do you want to remove it anyway?`);
+    if (!data) return;
     state.setup = data.setup;
     populateSubjects();
     showToast('Class subject removed');
