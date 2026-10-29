@@ -8176,6 +8176,10 @@ async function handleApi(req, res, url) {
     const subject = one('SELECT id FROM subjects WHERE id = ?', subjectId);
     const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
     if (!subject || !cls) return sendJson(res, 400, { error: 'Subject and class must be valid' });
+    // UNIQUE doesn't catch repeats when the arm or term is left as All (NULL)
+    if (one('SELECT id FROM class_subjects WHERE subject_id = ? AND class_code = ? AND class_arm_id IS ? AND term IS ?', subjectId, classCode, classArmId, term)) {
+      return sendJson(res, 409, { error: 'This subject is already assigned to that class/arm/term' });
+    }
     try {
       run(
         `INSERT INTO class_subjects

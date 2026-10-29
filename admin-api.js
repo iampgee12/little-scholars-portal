@@ -6048,8 +6048,9 @@ function renderClassSubjectsTable() {
   const search = (document.getElementById('cs-search')?.value || '').toLowerCase();
   const rows = (state.setup.classSubjects || []).filter(row => {
     if (classFilter && row.classCode !== classFilter) return false;
-    if (armFilter && String(row.classArmId || '') !== armFilter) return false;
-    if (termFilter && row.term !== termFilter) return false;
+    // a subject for all arms belongs to every arm; one for no particular term, to every term
+    if (armFilter && row.classArmId && String(row.classArmId) !== armFilter) return false;
+    if (termFilter && row.term && row.term !== termFilter) return false;
     if (search && !`${row.subjectName} ${row.subjectCode || ''} ${row.classLabel}`.toLowerCase().includes(search)) return false;
     return true;
   });
