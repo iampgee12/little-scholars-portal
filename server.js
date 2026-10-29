@@ -2383,6 +2383,41 @@ function nurseryClassTeachersTakeTheirSubjects() {
   }
 }
 
+// A class subject row that already covers this subject for the arm and term given
+// (a row for all arms or all terms covers each arm or term)
+function coveringClassSubject(subjectId, classCode, classArmId, term, exceptId = 0) {
+  return one(`SELECT id FROM class_subjects WHERE subject_id = ? AND class_code = ? AND id != ?
+                AND (class_arm_id IS NULL OR class_arm_id IS ?) AND (term IS NULL OR term = '' OR term IS ?)
+              ORDER BY class_arm_id IS NOT NULL, COALESCE(term, '') != '', id LIMIT 1`,
+  subjectId, classCode, exceptId, classArmId, term);
+}
+
+// Once, at startup: repeats of a class subject (saved before repeats were refused) fold into
+// the row that covers them; teachers allocated to a repeat move to the row kept
+function mergeRepeatedClassSubjects() {
+  if (EXAM_MODE || valueFromMeta('class_subject_repeats_merged_v1', '')) return;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    let merged = 0;
+    all(`SELECT * FROM class_subjects ORDER BY class_arm_id IS NULL, COALESCE(term, '') = '', id DESC`).forEach(row => {
+      const keep = coveringClassSubject(row.subject_id, row.class_code, row.class_arm_id, row.term || null, row.id);
+      if (!keep) return;
+      run(`UPDATE class_subjects SET teacher_in_charge_id = COALESCE(teacher_in_charge_id, ?), assisting_teacher_ids = COALESCE(assisting_teacher_ids, ?),
+             pass_mark = COALESCE(pass_mark, ?), full_mark = COALESCE(full_mark, ?), attributes = COALESCE(attributes, ?) WHERE id = ?`,
+      row.teacher_in_charge_id, row.assisting_teacher_ids, row.pass_mark, row.full_mark, row.attributes, keep.id);
+      run('UPDATE subject_teacher_allocations SET class_subject_id = ? WHERE class_subject_id = ?', keep.id, row.id);
+      run('DELETE FROM class_subjects WHERE id = ?', row.id);
+      merged++;
+    });
+    if (merged) console.log(`Class subjects: merged ${merged} repeated row${merged === 1 ? '' : 's'}`);
+    setMeta('class_subject_repeats_merged_v1', '1');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
 
 // The class teacher takes over a subject in their class: their own assignment is
@@ -8256,8 +8291,9 @@ async function handleApi(req, res, url) {
     const subject = one('SELECT id FROM subjects WHERE id = ?', subjectId);
     const cls = one('SELECT code FROM classes WHERE code = ?', classCode);
     if (!subject || !cls) return sendJson(res, 400, { error: 'Subject and class must be valid' });
-    // UNIQUE doesn't catch repeats when the arm or term is left as All (NULL)
-    if (one('SELECT id FROM class_subjects WHERE subject_id = ? AND class_code = ? AND class_arm_id IS ? AND term IS ?', subjectId, classCode, classArmId, term)) {
+    // UNIQUE doesn't catch repeats when the arm or term is left as All (NULL), nor a row
+    // for one arm or term when the class already has the subject for all of them
+    if (coveringClassSubject(subjectId, classCode, classArmId, term)) {
       return sendJson(res, 409, { error: 'This subject is already assigned to that class/arm/term' });
     }
     try {
@@ -8899,6 +8935,7 @@ setUpClassTeacherSubjects();
 applyNurseryClassSubjects();
 applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true, true);
 nurseryClassTeachersTakeTheirSubjects();
+mergeRepeatedClassSubjects();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
