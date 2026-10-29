@@ -2291,7 +2291,8 @@ const NURSERY_CLASS_SUBJECTS = {
 // Once per metaKey, at startup: each nursery class gets exactly its list. A subject the class
 // had that isn't on the list comes off, unless scores are already saved for it there; with
 // removeScored it comes off the class's list anyway, and its saved scores and teacher stay.
-function applyNurseryClassSubjects(metaKey = 'nursery_class_subjects_v1', classCodes = Object.keys(NURSERY_CLASS_SUBJECTS), removeScored = false) {
+// With toClassTeacher the class teacher takes every listed subject no subject teacher has there.
+function applyNurseryClassSubjects(metaKey = 'nursery_class_subjects_v1', classCodes = Object.keys(NURSERY_CLASS_SUBJECTS), removeScored = false, toClassTeacher = false) {
   if (EXAM_MODE || valueFromMeta(metaKey, '')) return;
   const hasScores = (classCode, subjectId) =>
     one('SELECT id FROM result_batches WHERE class_code = ? AND subject_id = ? LIMIT 1', classCode, subjectId) ||
@@ -2330,6 +2331,17 @@ function applyNurseryClassSubjects(metaKey = 'nursery_class_subjects_v1', classC
           run('DELETE FROM class_teacher_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
           run('DELETE FROM teacher_assignments WHERE class_code = ? AND subject_id = ?', classCode, id);
         });
+      if (toClassTeacher) {
+        const classTeacher = one("SELECT teacher_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode)?.id;
+        const offered = new Set(all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode).map(r => r.id));
+        const ticks = new Set(classTeacherSubjectIds(classCode).filter(id => offered.has(id)));
+        wanted.filter(id => !one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id))
+          .forEach(id => {
+            ticks.add(id);
+            if (classTeacher) giveSubjectToClassTeacher(classTeacher, classCode, id);
+          });
+        saveClassTeacherSubjectIds(classCode, [...ticks]);
+      }
     });
     setMeta(metaKey, '1');
     db.exec('COMMIT');
@@ -8863,7 +8875,7 @@ if (EXAM_MODE) server.keepAliveTimeout = 120e3;
 // run here, once everything above (including the class teacher subject rules) is defined
 setUpClassTeacherSubjects();
 applyNurseryClassSubjects();
-applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true);
+applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true, true);
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
