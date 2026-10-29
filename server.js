@@ -2331,17 +2331,7 @@ function applyNurseryClassSubjects(metaKey = 'nursery_class_subjects_v1', classC
           run('DELETE FROM class_teacher_subjects WHERE class_code = ? AND subject_id = ?', classCode, id);
           run('DELETE FROM teacher_assignments WHERE class_code = ? AND subject_id = ?', classCode, id);
         });
-      if (toClassTeacher) {
-        const classTeacher = one("SELECT teacher_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode)?.id;
-        const offered = new Set(all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode).map(r => r.id));
-        const ticks = new Set(classTeacherSubjectIds(classCode).filter(id => offered.has(id)));
-        wanted.filter(id => !one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id))
-          .forEach(id => {
-            ticks.add(id);
-            if (classTeacher) giveSubjectToClassTeacher(classTeacher, classCode, id);
-          });
-        saveClassTeacherSubjectIds(classCode, [...ticks]);
-      }
+      if (toClassTeacher) giveSubjectsToClassTeacher(classCode, wanted);
     });
     setMeta(metaKey, '1');
     db.exec('COMMIT');
@@ -2361,6 +2351,36 @@ function subjectUsage(subjectId, classCode = null) {
   const cbtScores = one(`SELECT COUNT(*) AS n FROM cbt_scores sc JOIN cbt_schedule_subjects ss ON ss.id = sc.schedule_subject_id
                          WHERE ss.subject_id = ?${inClass.replace('class_code', 'ss.class_code')}`, ...args).n;
   return { questions, scores: resultScores + cbtScores };
+}
+
+// The class teacher takes these subjects of the class (ticked for them, so a class teacher
+// assigned later gets them too), except any a subject teacher already teaches there
+function giveSubjectsToClassTeacher(classCode, subjectIds) {
+  const classTeacher = one("SELECT teacher_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode)?.id;
+  const offered = new Set(all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode).map(r => r.id));
+  const ticks = new Set(classTeacherSubjectIds(classCode).filter(id => offered.has(id)));
+  subjectIds.filter(id => offered.has(id) && !one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id))
+    .forEach(id => {
+      ticks.add(id);
+      if (classTeacher) giveSubjectToClassTeacher(classTeacher, classCode, id);
+    });
+  saveClassTeacherSubjectIds(classCode, [...ticks]);
+}
+
+// Once, at startup: in the other nursery classes the class teacher takes every subject on
+// the class's list, the ones the admin added included; nothing comes off
+function nurseryClassTeachersTakeTheirSubjects() {
+  if (EXAM_MODE || valueFromMeta('nursery_class_teacher_subjects_v1', '')) return;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    ['RC', 'PS1', 'PS2'].filter(code => one('SELECT code FROM classes WHERE code = ?', code)).forEach(code =>
+      giveSubjectsToClassTeacher(code, all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', code).map(r => r.id)));
+    setMeta('nursery_class_teacher_subjects_v1', '1');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 const assignmentHasResults = id => one('SELECT COUNT(*) AS n FROM result_batches WHERE assignment_id = ?', id).n > 0;
@@ -8261,6 +8281,8 @@ async function handleApi(req, res, url) {
       }
       throw err;
     }
+    // in the nursery classes the class teacher teaches everything, so a new subject goes to them
+    if (NURSERY_CLASS_SUBJECTS[classCode]) giveSubjectsToClassTeacher(classCode, [subjectId]);
     return sendJson(res, 201, { ok: true, setup: adminSetupPayload() });
   }
 
@@ -8876,6 +8898,7 @@ if (EXAM_MODE) server.keepAliveTimeout = 120e3;
 setUpClassTeacherSubjects();
 applyNurseryClassSubjects();
 applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true, true);
+nurseryClassTeachersTakeTheirSubjects();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
