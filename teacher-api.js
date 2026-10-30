@@ -602,7 +602,8 @@ async function init() {
       return;
     }
 
-    populateClassAndSubjectControls(state.contexts[0]);
+    // class is picked for them, but the subject starts on "Select subject..." so they choose it
+    populateClassAndSubjectControls({ classCode: state.contexts[0].classCode });
     await refreshAllResults();
     populateDashboard();
     populateStudents();
