@@ -5633,6 +5633,7 @@ function switchSubjectsView(view, trigger) {
     const el = document.getElementById(`subjects-view-${name}`);
     if (el) el.style.display = name === view ? '' : 'none';
   });
+  if (view !== 'assignSubjectTeacher' && subjectTeacherEdit) cancelSubjectTeacherEdit(false);
   if (view === 'subjectTeachers') renderSubjectTeachersTable();
   if (view === 'assignSubjectTeacher') populateSubjectAssignmentForm();
   if (view === 'subjectBank') renderSubjectBankTable();
@@ -6045,12 +6046,40 @@ function populateSubjectAssignmentForm() {
   renderSubjectClassChoices('st-assign-subject', 'st-assign-classes');
 }
 
+// The assignment being edited from the Subject Teachers list: { teacherId, subjectId, classCodes }
+let subjectTeacherEdit = null;
+
+function editSubjectTeacherAssignment(teacherId, subjectId) {
+  const classCodes = subjectTeacherRows().filter(row => row.teacherId === teacherId && Number(row.subjectId) === Number(subjectId)).map(row => row.classCode);
+  subjectTeacherEdit = { teacherId, subjectId: Number(subjectId), classCodes };
+  switchSubjectsView('assignSubjectTeacher', document.querySelector('.academics-subtab[data-view=assignSubjectTeacher]'));
+  document.getElementById('st-assign-teacher').value = teacherId;
+  const subjectSelect = document.getElementById('st-assign-subject');
+  subjectSelect.value = String(subjectId);
+  subjectSelect.disabled = true;
+  renderSubjectClassChoices('st-assign-subject', 'st-assign-classes');
+  document.querySelectorAll('#st-assign-classes .subject-class-one').forEach(input => { input.checked = classCodes.includes(input.value); });
+  syncAllSubjectClasses('st-assign-classes');
+  document.getElementById('st-assign-title').textContent = 'Edit Subject Teacher';
+  document.getElementById('st-assign-save').textContent = 'Save Changes';
+  document.getElementById('st-assign-cancel').style.display = '';
+}
+
+function cancelSubjectTeacherEdit(showList = true) {
+  subjectTeacherEdit = null;
+  document.getElementById('st-assign-subject').disabled = false;
+  document.getElementById('st-assign-title').textContent = 'Assign a Teacher to a Subject';
+  document.getElementById('st-assign-save').textContent = 'Assign Subject';
+  document.getElementById('st-assign-cancel').style.display = 'none';
+  if (showList) switchSubjectsView('subjectTeachers', document.querySelector('.academics-subtab[data-view=subjectTeachers]'));
+}
+
 async function saveSubjectTeacherAssignment() {
   const subjectId = Number(document.getElementById('st-assign-subject')?.value || 0);
   const teacherId = document.getElementById('st-assign-teacher')?.value || '';
   if (!subjectId || !teacherId) return showToast('Choose a subject and Subject Teacher');
   const classCodes = chosenSubjectClasses('st-assign-classes');
-  if (!classCodes.length) return showToast('Tick at least one class');
+  if (!classCodes.length) return showToast(subjectTeacherEdit ? 'Tick at least one class, or use Remove on the Subject Teachers list' : 'Tick at least one class');
 
   try {
     const data = await apiFetch('/api/admin/subject-teacher-assignments', {
@@ -6058,14 +6087,48 @@ async function saveSubjectTeacherAssignment() {
       body: JSON.stringify({ subjectId, teacherId, classCodes }),
     });
     state.setup = data.setup;
+    // editing: the classes unticked come off the teacher who had them (a new teacher took over the ticked ones)
+    const notes = [];
+    if (subjectTeacherEdit) {
+      for (const classCode of subjectTeacherEdit.classCodes.filter(code => !classCodes.includes(code))) {
+        try {
+          const removed = await apiFetch(`/api/admin/subject-teacher-assignments?teacherId=${encodeURIComponent(subjectTeacherEdit.teacherId)}&subjectId=${encodeURIComponent(subjectId)}&classCode=${encodeURIComponent(classCode)}`, { method: 'DELETE' });
+          state.setup = removed.setup;
+        } catch (err) {
+          notes.push(`${classLabelFor(classCode)}: ${err.message}`);
+        }
+      }
+    }
+    const editing = !!subjectTeacherEdit;
+    if (editing) cancelSubjectTeacherEdit();
     populateSubjects();
     renderClassSubjectsTable();
     renderSubjectTeachersTable();
-    showToast(`Subject Teacher assigned for ${data.classesAssigned} class${data.classesAssigned === 1 ? '' : 'es'}`);
+    if (notes.length) showToast(`Saved, but some classes could not be removed. ${notes.join(' ')}`, 'warn');
+    else showToast(editing ? 'Subject Teacher changes saved' : `Subject Teacher assigned for ${data.classesAssigned} class${data.classesAssigned === 1 ? '' : 'es'}`);
   } catch (err) {
     showToast(err.message);
   }
 }
+
+async function removeSubjectTeacherAssignment(teacherId, subjectId) {
+  const rows = subjectTeacherRows().filter(row => row.teacherId === teacherId && Number(row.subjectId) === Number(subjectId));
+  if (!rows.length) return;
+  if (!await uiConfirm(`Remove ${rows[0].teacherName} from ${rows[0].subjectName} in ${rows.map(row => row.classLabel).join(', ')}?`, { confirmLabel: 'Remove' })) return;
+  try {
+    const data = await apiFetch(`/api/admin/subject-teacher-assignments?teacherId=${encodeURIComponent(teacherId)}&subjectId=${encodeURIComponent(subjectId)}&classCode=`, { method: 'DELETE' });
+    state.setup = data.setup;
+    populateSubjects();
+    renderClassSubjectsTable();
+    renderSubjectTeachersTable();
+    showToast('Subject Teacher removed');
+  } catch (err) {
+    showToast(err.message, 'warn');
+  }
+}
+
+const classLabelFor = code => (state.setup.classes || []).find(c => c.code === code)?.label || code;
+const subjectTeacherRows = () => (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' && !classTeacherHandles(row.classCode, row.subjectId));
 
 function renderClassSubjectsTable() {
   const tbody = document.getElementById('class-subjects-tbody');
@@ -6109,10 +6172,17 @@ function renderSubjectTeachersTable() {
   const tbody = document.getElementById('subject-teachers-tbody');
   if (!tbody) return;
   const search = (document.getElementById('st-search')?.value || '').toLowerCase();
-  const filtered = (state.setup.assignments || []).filter(row => row.teacherType === 'subject_teacher' && !classTeacherHandles(row.classCode, row.subjectId) &&
-    (!search || `${row.teacherName} ${row.teacherId} ${row.subjectName} ${row.classLabel}`.toLowerCase().includes(search)));
+  // one row per teacher and subject, with every class they take it in
+  const groups = new Map();
+  subjectTeacherRows().forEach(row => {
+    const key = `${row.teacherId}|${row.subjectId}`;
+    if (!groups.has(key)) groups.set(key, { ...row, classLabels: [] });
+    if (!groups.get(key).classLabels.includes(row.classLabel)) groups.get(key).classLabels.push(row.classLabel);
+  });
+  const filtered = [...groups.values()].filter(row =>
+    !search || `${row.teacherName} ${row.teacherId} ${row.subjectName} ${row.classLabels.join(' ')}`.toLowerCase().includes(search));
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:var(--text-3);">No Subject Teachers assigned yet. Use the Assign Teacher tab to assign a subject across levels.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:18px;color:var(--text-3);">No Subject Teachers assigned yet. Use the Assign Teacher tab to assign a subject across levels.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map((row, i) => `
@@ -6121,8 +6191,12 @@ function renderSubjectTeachersTable() {
       <td><strong>${escapeHtml(row.teacherName)}</strong><div style="font-size:10px;color:var(--text-3);">${escapeHtml(row.teacherId)}</div></td>
       <td>Subject Teacher</td>
       <td>${escapeHtml(row.subjectName)}</td>
-      <td>${escapeHtml(row.classLabel)}</td>
+      <td>${row.classLabels.map(escapeHtml).join(', ')}</td>
       <td>All arms</td>
+      <td style="white-space:nowrap;">
+        <button class="post-btn" style="padding:6px 10px;" onclick="editSubjectTeacherAssignment(${jsArg(row.teacherId)}, ${Number(row.subjectId)})">Edit</button>
+        <button class="ann-del" style="color:var(--red);margin-left:6px;" onclick="removeSubjectTeacherAssignment(${jsArg(row.teacherId)}, ${Number(row.subjectId)})">Remove</button>
+      </td>
     </tr>`).join('');
 }
 
