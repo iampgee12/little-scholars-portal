@@ -71,6 +71,43 @@ function escapeHtml(value) {
   }[char]));
 }
 
+// Typing scores doesn't reach the server, so while the teacher is busy on the page it tells
+// the server now and then, and they aren't signed out for "no activity" in the middle of a class
+let lastKeepAlive = Date.now();
+['input', 'keydown', 'click'].forEach(type => document.addEventListener(type, () => {
+  if (Date.now() - lastKeepAlive < 5 * 60e3) return;
+  lastKeepAlive = Date.now();
+  fetch('/api/session', { credentials: 'same-origin' }).catch(() => {});
+}, { passive: true }));
+
+// Scores typed but not saved yet, kept on this device so a sign-out, a reload or a search
+// doesn't lose them: { studentId: { ca, ex } } for one class subject and exam
+function draftKey() {
+  return `scoreDraft:${state.user?.id || ''}:${state.currentContext?.id}:${state.currentExam}`;
+}
+function readDraft() {
+  try { return JSON.parse(localStorage.getItem(draftKey()) || '{}') || {}; } catch { return {}; }
+}
+function writeDraft(draft) {
+  try {
+    if (Object.keys(draft).length) localStorage.setItem(draftKey(), JSON.stringify(draft));
+    else localStorage.removeItem(draftKey());
+  } catch { /* storage turned off: nothing is kept */ }
+}
+// a box back to its saved score drops out of the draft
+function rememberDraft(stuId, ca, ex) {
+  const rec = resultFor(state.currentContext.id, state.currentExam).entries?.[stuId];
+  const draft = readDraft();
+  if (String(rec?.ca ?? '') === ca && String(rec?.exam ?? '') === ex) delete draft[stuId];
+  else draft[stuId] = { ca, ex };
+  writeDraft(draft);
+}
+function forgetDraft(stuId) {
+  const draft = readDraft();
+  delete draft[stuId];
+  writeDraft(draft);
+}
+
 async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
     credentials: 'same-origin',
@@ -811,12 +848,14 @@ function renderResultsGrid() {
   const filtered = q
     ? students.filter(student => student.name.toLowerCase().includes(q) || student.id.toLowerCase().includes(q))
     : students;
+  const draft = saved.published ? {} : readDraft();
 
   const rows = filtered.map(student => {
     const idx = students.indexOf(student);
     const rec = saved.entries?.[student.id];
-    const caV = rec ? rec.ca ?? '' : '';
-    const exV = rec ? rec.exam ?? '' : '';
+    const typed = draft[student.id];
+    const caV = typed ? escapeHtml(typed.ca) : rec ? rec.ca ?? '' : '';
+    const exV = typed ? escapeHtml(typed.ex) : rec ? rec.exam ?? '' : '';
     const total = rec ? rec.total : null;
     const scorePct = pctForExam(total, state.currentExam);
     const grade = scorePct != null ? scoreToGrade(scorePct) : '-';
@@ -843,6 +882,7 @@ function renderResultsGrid() {
         <span class="${saved.savedAt ? 'chip-green' : 'chip-amber'}">${saved.savedAt ? `Saved - ${escapeHtml(saved.savedAt)}` : 'Not yet saved'}</span>
       </div>
       <div class="card-body">
+        ${Object.keys(draft).length ? `<div class="chip-amber" style="display:block;margin-bottom:14px;padding:10px 12px;font-size:12px;line-height:1.5;">Scores you typed earlier but did not save are back in the boxes. Check them, then press Save All.</div>` : ''}
         <div class="prog-track" style="margin-bottom:16px;"><div class="prog-fill" style="width:${pct}%;"></div></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
           <span style="font-size:11px;color:var(--text-3);">${filtered.length} student${filtered.length !== 1 ? 's' : ''}</span>
@@ -865,6 +905,8 @@ function renderResultsGrid() {
         <div class="tbl-actions"><button class="act-btn btn-clear" onclick="clearSheet()">Clear All</button><button class="act-btn btn-exp" onclick="exportResultsCsv()">Export CSV</button><button class="act-btn btn-save" onclick="saveResults()">Save All</button></div>
       </div>
     </div>`;
+  // rows brought back from the draft show their total, grade and "Unsaved"
+  filtered.filter(student => draft[student.id]).forEach(student => calcRow(student.id, isCA ? 'ca' : 'both'));
   applyResultLock();
 }
 
@@ -896,8 +938,9 @@ function renderStudentPanel() {
   const isCA = state.currentExam !== 'Final Exam';
   const caMax = caMaxForExamType(state.currentExam);
   const caLabel = isCA ? 'Mid-Term Score' : 'Continuous Assessment';
-  const caVal = rec ? rec.ca ?? '' : '';
-  const exVal = rec ? rec.exam ?? '' : '';
+  const typed = saved.published ? null : readDraft()[student.id];
+  const caVal = typed ? escapeHtml(typed.ca) : rec ? rec.ca ?? '' : '';
+  const exVal = typed ? escapeHtml(typed.ex) : rec ? rec.exam ?? '' : '';
   const total = rec ? rec.total : null;
   const scorePct = pctForExam(total, state.currentExam);
   const grade = scorePct != null ? scoreToGrade(scorePct) : '-';
@@ -946,6 +989,7 @@ function renderStudentPanel() {
         <button class="ep-save-btn" onclick="epSave(${jsArg(student.id)}, ${jsArg(isCA ? 'ca' : 'both')})">Save Score</button>
       </div>
     </div>`;
+  if (typed) epCalc(student.id, isCA ? 'ca' : 'both');
   applyResultLock();
 }
 
@@ -996,6 +1040,7 @@ function epCalc(stuId, mode) {
   const ca = caEl ? parseInt(caEl.value, 10) : NaN;
   const ex = exEl ? parseInt(exEl.value, 10) : NaN;
   const caMax = caMaxForExamType(state.currentExam);
+  if (caEl) rememberDraft(stuId, caEl.value, exEl ? exEl.value : '');
 
   if (caEl) {
     caEl.classList.toggle('err-val', caEl.value !== '' && (Number.isNaN(ca) || ca < 0 || ca > caMax));
@@ -1058,6 +1103,7 @@ async function epSave(stuId, mode) {
       }),
     });
     state.resultsByKey[entryKey(state.currentContext.id, state.currentExam)] = data.result;
+    forgetDraft(stuId);
     showToast(`Score saved for ${state.students[state.currentStudentIndex].name}`);
     populateDashboard();
     renderPublished();
@@ -1159,6 +1205,7 @@ function calcRow(stuId, mode) {
   const ca = caEl ? parseInt(caEl.value, 10) : NaN;
   const ex = exEl ? parseInt(exEl.value, 10) : NaN;
   const caMax = caMaxForExamType(state.currentExam);
+  if (caEl) rememberDraft(stuId, caEl.value, exEl ? exEl.value : '');
 
   if (caEl) {
     caEl.classList.toggle('err-val', caEl.value !== '' && (Number.isNaN(ca) || ca < 0 || ca > caMax));
@@ -1193,15 +1240,21 @@ function calcRow(stuId, mode) {
 }
 
 async function saveResults() {
+  // Save All replaces the whole sheet, so a pupil hidden by the search keeps their typed
+  // or saved score instead of losing it
+  const draft = readDraft();
+  const saved = resultFor(state.currentContext.id, state.currentExam).entries || {};
   const entries = [];
   for (const student of state.students) {
     const caEl = document.getElementById(`ca-${student.id}`);
     const exEl = document.getElementById(`ex-${student.id}`);
-    if (!caEl || caEl.value === '') continue;
+    const fromBoxes = caEl ? { ca: caEl.value, ex: exEl ? exEl.value : '' } : null;
+    const scores = fromBoxes || draft[student.id] || { ca: String(saved[student.id]?.ca ?? ''), ex: String(saved[student.id]?.exam ?? '') };
+    if (scores.ca === '') continue;
     entries.push({
       studentId: student.id,
-      ca: parseInt(caEl.value, 10),
-      exam: exEl && exEl.value !== '' ? parseInt(exEl.value, 10) : null,
+      ca: parseInt(scores.ca, 10),
+      exam: scores.ex !== '' ? parseInt(scores.ex, 10) : null,
     });
   }
   if (!entries.length) return showToast('Enter at least one score before saving');
@@ -1216,6 +1269,7 @@ async function saveResults() {
       }),
     });
     state.resultsByKey[entryKey(state.currentContext.id, state.currentExam)] = data.result;
+    writeDraft({});
     populateDashboard();
     renderPublished();
     showToast(`${entries.length} result${entries.length === 1 ? '' : 's'} saved successfully`);
@@ -1234,6 +1288,7 @@ function clearSheet() {
         el.classList.remove('has-val', 'err-val');
       }
     });
+    if (document.getElementById(`ca-${student.id}`)) rememberDraft(student.id, '', '');
     const rowEl = document.getElementById(`row-${student.id}`);
     if (rowEl) rowEl.classList.remove('row-saved');
     const totalEl = document.getElementById(`tot-${student.id}`);
