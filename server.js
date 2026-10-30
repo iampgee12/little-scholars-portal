@@ -2359,12 +2359,51 @@ function giveSubjectsToClassTeacher(classCode, subjectIds) {
   const classTeacher = one("SELECT teacher_id AS id FROM teacher_assignments WHERE class_code = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode)?.id;
   const offered = new Set(all('SELECT DISTINCT subject_id AS id FROM class_subjects WHERE class_code = ?', classCode).map(r => r.id));
   const ticks = new Set(classTeacherSubjectIds(classCode).filter(id => offered.has(id)));
-  subjectIds.filter(id => offered.has(id) && !one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id))
+  subjectIds.filter(id => offered.has(id) && !subjectTeacherOnlySubjectIds(classCode).includes(id) && !one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'subject_teacher' LIMIT 1", classCode, id))
     .forEach(id => {
       ticks.add(id);
       if (classTeacher) giveSubjectToClassTeacher(classTeacher, classCode, id);
     });
   saveClassTeacherSubjectIds(classCode, [...ticks]);
+}
+
+// Nursery subjects a subject teacher takes, so they never go to the class teacher
+const NURSERY_SUBJECT_TEACHER_SUBJECTS = { PS1: ['diction'], PS2: ['diction'] };
+
+function subjectTeacherOnlySubjectIds(classCode) {
+  const names = NURSERY_SUBJECT_TEACHER_SUBJECTS[classCode] || [];
+  return names.length ? all('SELECT id, name FROM subjects').filter(s => names.includes(normalizedSubjectName(s.name))).map(s => s.id) : [];
+}
+
+// Once, at startup: those subjects come off the class teacher in their classes, so the
+// admin can give them to a subject teacher and that teacher sees them. The class teacher
+// keeps one only if they already saved results for it.
+function nurserySubjectTeacherSubjectsOffClassTeacher() {
+  if (EXAM_MODE || valueFromMeta('nursery_subject_teacher_subjects_v1', '')) return;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    Object.keys(NURSERY_SUBJECT_TEACHER_SUBJECTS).filter(code => one('SELECT code FROM classes WHERE code = ?', code)).forEach(classCode => {
+      const ids = subjectTeacherOnlySubjectIds(classCode);
+      const kept = [];
+      ids.forEach(id => {
+        const row = one("SELECT id FROM teacher_assignments WHERE class_code = ? AND subject_id = ? AND teacher_type = 'class_teacher' LIMIT 1", classCode, id);
+        if (row && assignmentHasResults(row.id)) {
+          kept.push(id);
+          console.log(`Nursery subjects: subject ${id} stays with ${classCode}'s class teacher; they have saved results for it`);
+        } else if (row) {
+          run('DELETE FROM teacher_assignments WHERE id = ?', row.id);
+        }
+      });
+      if (classTeacherSubjectsSetUp().has(classCode)) {
+        saveClassTeacherSubjectIds(classCode, classTeacherSubjectIds(classCode).filter(id => !ids.includes(id) || kept.includes(id)));
+      }
+    });
+    setMeta('nursery_subject_teacher_subjects_v1', '1');
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 // Once, at startup: in the other nursery classes the class teacher takes every subject on
@@ -9004,6 +9043,7 @@ applyNurseryClassSubjects('kg_class_subjects_v2', ['KG'], true, true);
 nurseryClassTeachersTakeTheirSubjects();
 mergeRepeatedClassSubjects();
 combineSubjects();
+nurserySubjectTeacherSubjectsOffClassTeacher();
 
 server.listen(PORT, () => {
   console.log(`Unique Children's School portal running at http://localhost:${PORT}`);
