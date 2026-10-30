@@ -2476,19 +2476,32 @@ function subjectTeacherSubjects() {
   return (state.setup.subjects || []).filter(subject => subjectOfferedClasses(subject.id).some(c => !classTeacherHandles(c.code, subject.id)));
 }
 
-// Tick boxes for the classes to give a subject teacher: every class offering the
-// subject, ticked; classes where the class teacher handles it can't be picked
+// Tick boxes for the classes to give a subject teacher: an "All classes" box, then one per
+// class offering the subject, none ticked; classes where the class teacher handles it can't be picked
 function renderSubjectClassChoices(selectId, boxId) {
   const box = document.getElementById(boxId);
   if (!box) return;
   const subjectId = Number(document.getElementById(selectId)?.value || 0);
-  if (!subjectId) { box.innerHTML = ''; return; }
-  box.innerHTML = `<label class="field-label">Classes</label><div class="subject-class-choices">${subjectOfferedClasses(subjectId).map(c => {
+  if (!subjectId) { box.innerHTML = '<label class="field-label">Classes</label><div class="en-hint">Choose a subject first, then tick the classes.</div>'; return; }
+  const classes = subjectOfferedClasses(subjectId);
+  if (!classes.length) { box.innerHTML = '<label class="field-label">Classes</label><div class="en-hint">No class offers this subject yet.</div>'; return; }
+  box.innerHTML = `<label class="field-label">Classes</label>
+    <label class="en-check" style="font-weight:600;"><input type="checkbox" class="subject-class-all" onchange="tickAllSubjectClasses(${jsArg(boxId)}, this.checked)"> All classes</label>
+    <div class="subject-class-choices">${classes.map(c => {
     const ct = classTeacherHandles(c.code, subjectId);
-    return `<label class="en-check"${ct ? ' title="The class teacher handles this subject in this class"' : ''}><input type="checkbox" value="${escapeHtml(c.code)}" ${ct ? 'disabled' : 'checked'}> ${escapeHtml(c.label)}${ct ? ' <span class="en-hint">(class teacher)</span>' : ''}</label>`;
+    return `<label class="en-check"${ct ? ' title="The class teacher handles this subject in this class"' : ''}><input type="checkbox" class="subject-class-one" value="${escapeHtml(c.code)}" onchange="syncAllSubjectClasses(${jsArg(boxId)})" ${ct ? 'disabled' : ''}> ${escapeHtml(c.label)}${ct ? ' <span class="en-hint">(class teacher)</span>' : ''}</label>`;
   }).join('')}</div>`;
 }
-const chosenSubjectClasses = boxId => [...document.querySelectorAll(`#${boxId} input:checked`)].map(input => input.value);
+function tickAllSubjectClasses(boxId, checked) {
+  document.querySelectorAll(`#${boxId} .subject-class-one:not(:disabled)`).forEach(input => { input.checked = checked; });
+}
+// "All classes" stays ticked only while every class that can be picked is ticked
+function syncAllSubjectClasses(boxId) {
+  const ones = [...document.querySelectorAll(`#${boxId} .subject-class-one:not(:disabled)`)];
+  const all = document.querySelector(`#${boxId} .subject-class-all`);
+  if (all) all.checked = ones.length > 0 && ones.every(input => input.checked);
+}
+const chosenSubjectClasses = boxId => [...document.querySelectorAll(`#${boxId} .subject-class-one:checked`)].map(input => input.value);
 
 // into the staff profile pop-up, or the Staff Profile page's Classes & Subjects
 function renderStaffProfileSubjects(staff, body = document.getElementById('staff-profile-body')) {
