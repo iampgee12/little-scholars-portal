@@ -262,7 +262,15 @@ body { font-family:'DM Sans',sans-serif; background:var(--black); color:var(--te
 .cc-edit textarea:disabled, .cc-edit select:disabled { background:var(--black-3); color:var(--text-2); }
 .cc-head { font-size:11px; color:var(--text-3); }
 .cc-head strong { color:var(--text-2); font-weight:600; }
-@media (max-width:760px) { .cc-row { grid-template-columns:1fr; } }
+.cc-edit-foot { display:flex; align-items:center; gap:10px; }
+.cc-edit-foot .cc-head { flex:1; min-width:0; }
+.cc-save-one { flex-shrink:0; min-width:84px; justify-content:center; }
+.cc-save-one:disabled { opacity:.55; cursor:default; }
+@media (max-width:760px) {
+  .cc-row { grid-template-columns:1fr; }
+  .cc-edit-foot { flex-direction:column; align-items:stretch; }
+  .cc-save-one { width:100%; min-height:42px; font-size:14px; }
+}
 .result-locked-note { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:var(--radius); padding:11px 14px; font-size:12.5px; font-weight:600; margin-bottom:14px; line-height:1.5; }
 
 /* Profile page open: highlight the sidebar user card (it is that page's menu entry) */

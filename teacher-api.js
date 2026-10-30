@@ -458,7 +458,10 @@ function ccRender() {
           <button type="button" class="act-btn btn-exp" onclick="ccAuto(${jsArg(st.id)})" ${locked || !scored ? 'disabled' : ''} title="Pick a suitable comment from this pupil's score">&#x21bb; Auto</button>
         </div>
         <textarea id="cc-text-${escapeHtml(st.id)}" rows="2" maxlength="500" placeholder="Type the class teacher's comment for ${escapeHtml(st.name)}…" oninput="ccMarkDirty(${jsArg(st.id)})" ${locked ? 'disabled' : ''}>${escapeHtml(st.savedTeacherComment || '')}</textarea>
-        <div class="cc-head"><strong>Head of School's comment:</strong> ${escapeHtml(st.headComment || '—')}</div>
+        <div class="cc-edit-foot">
+          <div class="cc-head"><strong>Head of School's comment:</strong> ${escapeHtml(st.headComment || '—')}</div>
+          ${locked ? '' : `<button type="button" class="act-btn btn-save cc-save-one" id="cc-save-${escapeHtml(st.id)}" onclick="ccSaveOne(${jsArg(st.id)}, this)" disabled>Saved</button>`}
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -481,7 +484,17 @@ function ccRender() {
 function ccMarkDirty(studentId) {
   cc.dirty.add(studentId);
   document.getElementById(`cc-row-${studentId}`)?.classList.add('dirty');
+  ccSetRowSaved(studentId, false);
   ccUpdateDirty();
+}
+
+// Each pupil's own Save button: "Save" while there are unsaved changes, "Saved" once stored.
+function ccSetRowSaved(studentId, saved) {
+  document.getElementById(`cc-row-${studentId}`)?.classList.toggle('dirty', !saved);
+  const btn = document.getElementById(`cc-save-${studentId}`);
+  if (!btn) return;
+  btn.disabled = saved;
+  btn.textContent = saved ? 'Saved' : 'Save';
 }
 
 function ccUpdateDirty() {
@@ -525,22 +538,44 @@ function ccAutoFillEmpty() {
   showToast(filled ? `Filled ${filled} comment${filled === 1 ? '' : 's'} — review them, then Save All` : 'No empty comments to fill for pupils with scores');
 }
 
+async function ccSaveComments(studentIds) {
+  const comments = studentIds.map(studentId => ({ studentId, comment: document.getElementById(`cc-text-${studentId}`)?.value || '' }));
+  await apiFetch('/api/teacher/class-comments', {
+    method: 'POST',
+    body: JSON.stringify({ classCode: cc.data.classCode, examType: cc.data.examType, comments }),
+  });
+  comments.forEach(({ studentId, comment }) => {
+    const st = cc.data.students.find(s => s.id === studentId);
+    if (st) st.savedTeacherComment = comment;
+    // Only mark saved if nothing was typed while the save was in flight.
+    if ((document.getElementById(`cc-text-${studentId}`)?.value || '') === comment) {
+      cc.dirty.delete(studentId);
+      ccSetRowSaved(studentId, true);
+    }
+  });
+  ccUpdateDirty();
+  return comments;
+}
+
+async function ccSaveOne(studentId, btn) {
+  if (!cc.dirty.has(studentId)) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await ccSaveComments([studentId]);
+    const st = cc.data.students.find(s => s.id === studentId);
+    showToast(`Comment saved for ${st?.name || studentId}`);
+  } catch (err) {
+    ccSetRowSaved(studentId, false);
+    showToast(err.message);
+  }
+}
+
 async function ccSaveAll(btn) {
   if (!cc.dirty.size) return showToast('Nothing to save — all comments are up to date');
-  const comments = [...cc.dirty].map(studentId => ({ studentId, comment: document.getElementById(`cc-text-${studentId}`)?.value || '' }));
   btn.disabled = true;
   try {
-    await apiFetch('/api/teacher/class-comments', {
-      method: 'POST',
-      body: JSON.stringify({ classCode: cc.data.classCode, examType: cc.data.examType, comments }),
-    });
-    comments.forEach(({ studentId, comment }) => {
-      const st = cc.data.students.find(s => s.id === studentId);
-      if (st) st.savedTeacherComment = comment;
-      document.getElementById(`cc-row-${studentId}`)?.classList.remove('dirty');
-    });
-    cc.dirty.clear();
-    ccUpdateDirty();
+    const comments = await ccSaveComments([...cc.dirty]);
     showToast(`Saved ${comments.length} comment${comments.length === 1 ? '' : 's'}`);
   } catch (err) {
     showToast(err.message);
