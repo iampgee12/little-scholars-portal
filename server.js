@@ -7774,6 +7774,29 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { ok: true, adminLevel: adminLevel(targetId), setup: adminSetupPayload() });
   }
 
+  // Reset a staff member's password: a new one is made and shown to the admin once; the
+  // staff member is signed out and chooses their own when they next sign in
+  const resetPasswordMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)\/reset-password$/);
+  if (req.method === 'POST' && resetPasswordMatch) {
+    const user = requireUser(req, res, 'admin');
+    if (!user) return;
+    const targetId = decodeURIComponent(resetPasswordMatch[1]).trim().toUpperCase();
+    const target = one("SELECT id, role, name FROM users WHERE id = ? AND role <> 'student'", targetId);
+    if (!target) return sendJson(res, 404, { error: 'Staff account not found' });
+    if (targetId === user.id) return sendJson(res, 400, { error: 'Change your own password under My Account' });
+    if (target.role === 'staff') return sendJson(res, 400, { error: "This staff member doesn't sign in, so they have no password" });
+    const guard = adminGuard(user, targetId);
+    if (guard) return sendJson(res, 403, { error: guard });
+    // no 0/O or 1/l/I, so it reads out clearly
+    const letters = 'abcdefghjkmnpqrstuvwxyz', digits = '23456789';
+    const password = Array.from({ length: 4 }, () => letters[crypto.randomInt(letters.length)]).join('') +
+      Array.from({ length: 4 }, () => digits[crypto.randomInt(digits.length)]).join('');
+    run('UPDATE users SET password = ?, password_unset = 0, reset_token = NULL, reset_token_expires = NULL WHERE id = ?', hashPassword(password), targetId);
+    run('DELETE FROM sessions WHERE user_id = ?', targetId);
+    security.audit(req, user, 'Reset a staff password', `${target.name} (${targetId})`);
+    return sendJson(res, 200, { ok: true, password, setup: adminSetupPayload() });
+  }
+
   const staffDeleteMatch = url.pathname.match(/^\/api\/admin\/staff\/([^/]+)$/);
   if (req.method === 'DELETE' && staffDeleteMatch) {
     const user = requireUser(req, res, 'admin');

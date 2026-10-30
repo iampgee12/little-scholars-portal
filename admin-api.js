@@ -2349,6 +2349,8 @@ function openStaffProfile(id) {
   }
   const editButton = document.getElementById('staff-edit-details');
   if (editButton) editButton.style.display = self || canManageAccount(staff) ? '' : 'none';
+  const resetButton = document.getElementById('staff-reset-password');
+  if (resetButton) resetButton.style.display = !self && staff.role !== 'staff' && canManageAccount(staff) ? '' : 'none';
   const superButton = document.getElementById('staff-super-toggle');
   if (superButton) {
     superButton.style.display = state.user?.adminLevel === 'owner' && isAdminAccount(staff) && staff.adminLevel !== 'owner' ? '' : 'none';
@@ -2373,6 +2375,19 @@ async function deleteTeacherAccount(id) {
     populateAdminControls();
     populateClasses();
     showToast(staff.role === 'teacher' ? 'Teacher account deleted' : isAdminAccount(staff) ? 'Administrator account deleted' : 'Staff record deleted');
+  } catch (err) { showToast(err.message); }
+}
+
+async function resetStaffPassword(id) {
+  const staff = (state.setup.staff || []).find(item => item.id === id);
+  if (!staff) return showToast('Staff account not found');
+  if (!await uiConfirm(`Reset the password for “${staff.name}” (${staff.id})? Their old password stops working and they are signed out. You will get a new password to give them, and they choose their own when they next sign in.`, { confirmLabel: 'Reset Password' })) return;
+  try {
+    const data = await apiFetch(`/api/admin/staff/${encodeURIComponent(staff.id)}/reset-password`, { method: 'POST' });
+    state.setup = data.setup;
+    populateStaff();
+    // shown once, so the admin can pass it on
+    await uiNotice('New password', `Staff ID: ${staff.id}\nPassword: ${data.password}\n\nGive these to ${staff.name}. The password is not shown again, and they will choose their own when they next sign in.`);
   } catch (err) { showToast(err.message); }
 }
 
