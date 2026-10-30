@@ -652,6 +652,8 @@ async function init() {
 function populateDashboard() {
   const assignedStudents = uniqueStudents();
   document.getElementById('d-students').textContent = assignedStudents.length;
+  const classCount = uniqueContextClasses().length;
+  document.getElementById('d-class-count').textContent = `${classCount} class${classCount === 1 ? '' : 'es'}`;
 
   let pending = 0;
   let published = 0;
