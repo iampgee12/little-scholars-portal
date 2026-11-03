@@ -2944,7 +2944,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 </style>
 <link rel="stylesheet" href="ui-buttons.css?v=3">
 <link rel="stylesheet" href="enrol.css">
-<link rel="stylesheet" href="mobile.css">
+<link rel="stylesheet" href="mobile.css?v=3">
 <link rel="stylesheet" href="/no-select.css">
 <!-- Menus and page stay hidden until the signed-in user is known, so a bursar never sees the full admin menu flash first (finance-scope.js lifts this). -->
 <style>html.portal-pending .admin-sidebar-body, html.portal-pending .main .content { visibility:hidden; }</style>
@@ -3189,6 +3189,7 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
           <div class="tsi-row"><span class="tsi-label">Active Term</span><span class="tsi-val tsi-term" id="tsi-term">—</span></div>
         </div>
         <div class="icon-btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5a5 5 0 0 0-5 5v2.8l-1 1.7h12l-1-1.7V6.5a5 5 0 0 0-5-5z"/><line x1="6.5" y1="13" x2="9.5" y2="13"/></svg><span class="notif-dot"></span></div>
+        <button class="mob-signout" type="button" onclick="signOut()" aria-label="Sign out"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6"/><polyline points="10.5,5 13.5,8 10.5,11"/><line x1="13.5" y1="8" x2="6" y2="8"/></svg><span class="mob-signout-text">Sign Out</span></button>
       </div>
     </div>
 

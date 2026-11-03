@@ -79,3 +79,33 @@
 @media (max-width: 480px) {
   .gb-filter-grid, .bs-filter-grid { grid-template-columns: 1fr !important; }
 }
+
+/* Sign Out on phones. The top bar carries its own Sign Out button, so nobody
+   has to open the menu to leave. The menu drawer is also sized to the screen
+   you can actually see (dvh, not vh, which reaches behind the browser's own
+   bars), only the menu list scrolls, and Sign Out stays pinned at the bottom. */
+.mob-signout { display: none; }
+@media (max-width: 768px) {
+  .mob-signout {
+    display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    height: 32px; padding: 0 10px; border-radius: 8px;
+    border: 1px solid #fecaca; background: #fff5f5; color: #dc2626;
+    font: 600 12px 'DM Sans', sans-serif; white-space: nowrap; cursor: pointer;
+  }
+  .mob-signout:active { background: #fee2e2; }
+  .mob-signout svg { display: block; }
+
+  #main-sidebar {
+    display: flex !important; flex-direction: column !important;
+    min-height: 0 !important; height: 100vh !important; height: 100dvh !important;
+    overflow: hidden !important;
+  }
+  #main-sidebar > .nav-group { flex: 1 1 auto !important; min-height: 0 !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+  #main-sidebar > :not(.nav-group) { flex-shrink: 0 !important; }
+  #main-sidebar .sidebar-footer { padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px)) !important; }
+  #main-sidebar .signout-btn { min-height: 42px; font-size: 14px !important; }
+}
+@media (max-width: 340px) {
+  .mob-signout .mob-signout-text { display: none; }
+  .mob-signout { padding: 0 9px; }
+}
