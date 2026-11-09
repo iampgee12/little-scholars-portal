@@ -801,6 +801,18 @@ function createSchema() {
     CREATE INDEX IF NOT EXISTS idx_attendance_lookup
       ON attendance_records (person_type, session_type, record_date, class_code);
 
+    CREATE TABLE IF NOT EXISTS attendance_summaries (
+      id INTEGER PRIMARY KEY,
+      academic_id INTEGER NOT NULL REFERENCES academic_terms(id),
+      student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      exam_type TEXT NOT NULL,
+      school_days INTEGER NOT NULL,
+      days_absent INTEGER NOT NULL,
+      updated_by TEXT NOT NULL REFERENCES users(id),
+      updated_at TEXT NOT NULL,
+      UNIQUE(academic_id, student_id, exam_type)
+    );
+
     CREATE TABLE IF NOT EXISTS teacher_assignments (
       id INTEGER PRIMARY KEY,
       teacher_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2130,14 +2142,15 @@ function seedHolidaysForRange(academicId, startDate, endDate) {
 
 // Counts weekdays (Mon-Fri) in [startDate, endDate] minus any that are
 // marked as a holiday. Returns null if the term has no date range set yet.
-function computeSchoolDays(academicId) {
+// uptoDate (YYYY-MM-DD, optional): count only up to that day, e.g. mid-term so far
+function computeSchoolDays(academicId, uptoDate = null) {
   const term = one('SELECT start_date AS startDate, end_date AS endDate FROM academic_terms WHERE id = ?', academicId);
   if (!term || !term.startDate || !term.endDate) return null;
   const holidays = new Set(all('SELECT holiday_date AS d FROM term_holidays WHERE academic_id = ?', academicId).map(r => r.d));
   termSetup.holidayDates(term.startDate, term.endDate).forEach(d => holidays.add(d));
   let count = 0;
   const cursor = new Date(`${term.startDate}T00:00:00Z`);
-  const end = new Date(`${term.endDate}T00:00:00Z`);
+  const end = new Date(`${uptoDate && uptoDate < term.endDate ? uptoDate : term.endDate}T00:00:00Z`);
   while (cursor <= end) {
     const dow = cursor.getUTCDay();
     if (dow !== 0 && dow !== 6 && !holidays.has(isoDate(cursor))) count++;
@@ -3387,9 +3400,17 @@ function reportContext({ studentId, classCode, examType, allowEmpty = false }) {
   const subjectMax = maxScoreForExamType(examType);
   const average = countedRows.length ? Math.round((totalScore / (countedRows.length * subjectMax)) * 100) : 0;
 
+  // the class teacher's attendance for this term and exam when they've saved it;
+  // otherwise the figures the report has always used
+  const savedAttendance = one(
+    'SELECT school_days AS schoolDays, days_absent AS daysAbsent FROM attendance_summaries WHERE academic_id = ? AND student_id = ? AND exam_type = ?',
+    academic.id, student.id, examType
+  );
   const computedSchoolDays = computeSchoolDays(academic.id);
-  const schoolDays = computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
-  const present = Math.round((Number(student.att || 0) / 100) * schoolDays);
+  const schoolDays = savedAttendance ? savedAttendance.schoolDays
+    : computedSchoolDays != null ? computedSchoolDays : Number(valueFromMeta('school_days', 102));
+  const present = savedAttendance ? Math.max(0, schoolDays - savedAttendance.daysAbsent)
+    : Math.round((Number(student.att || 0) / 100) * schoolDays);
   const absent = Math.max(0, schoolDays - present);
   // Form Teacher = the form teacher of the pupil's arm, else the class's class
   // teacher (one who has signed first); otherwise a subject teacher (never the
@@ -4408,72 +4429,71 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { records: all(sql, ...params) });
   }
 
-  // ── TEACHER ATTENDANCE ───────────────────────────────────────────────
-  // A class teacher marks the daily register for their own class; any teacher
-  // marks lesson attendance for a class and subject they teach. This only ever
-  // touches attendance_records: no result, score or report table is read or written.
-  if (url.pathname === '/api/teacher/attendance' || url.pathname === '/api/teacher/attendance/mark') {
+  // ── CLASS TEACHER ATTENDANCE ─────────────────────────────────────────
+  // The class teacher types how many days each pupil missed, for mid-term or
+  // end of term; the report sheet prints these numbers. Only the
+  // attendance_summaries table is written: no result, score or report data.
+  if (url.pathname === '/api/teacher/attendance-summary') {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;
     const src = req.method === 'POST' ? await readJson(req) : Object.fromEntries(url.searchParams);
-    const date = cleanText(src.date);
-    const sessionType = cleanText(src.sessionType) || 'daily';
     const classCode = cleanText(src.classCode).toUpperCase();
-    const subjectId = sessionType === 'lesson' ? Number(src.subjectId) || null : null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) return sendJson(res, 400, { error: 'Choose a valid date' });
-    // a day's grace for time zones; no marking further ahead than tomorrow
-    if (Date.parse(date) > Date.now() + 86400000) return sendJson(res, 400, { error: "You can't mark attendance for a future date" });
-    if (!['daily', 'lesson'].includes(sessionType)) return sendJson(res, 400, { error: 'Choose daily or lesson attendance' });
+    const examType = cleanText(src.examType);
     if (!classCode) return sendJson(res, 400, { error: 'Choose a class' });
-    if (sessionType === 'lesson' && !subjectId) return sendJson(res, 400, { error: 'Choose a subject' });
-    const contexts = teacherContexts(user.id);
-    const allowed = sessionType === 'daily'
-      ? contexts.some(c => c.teacherType === 'class_teacher' && c.classCode === classCode)
-      : contexts.some(c => c.classCode === classCode && Number(c.subjectId) === subjectId);
-    if (!allowed) {
-      return sendJson(res, 403, { error: sessionType === 'daily'
-        ? 'Only the class teacher can mark the daily register for this class'
-        : 'You can only mark lesson attendance for a class and subject you teach' });
+    if (!EXAM_TYPES.includes(examType)) return sendJson(res, 400, { error: 'Choose mid-term or end of term' });
+    if (!teacherContexts(user.id).some(c => c.teacherType === 'class_teacher' && c.classCode === classCode)) {
+      return sendJson(res, 403, { error: 'Only the class teacher can fill in attendance for this class' });
     }
+    const academic = activeAcademic();
     const students = studentRowsForClass(classCode).map(s => ({ id: s.id, name: s.name, classArmName: s.classArmName || '' }));
 
-    if (req.method === 'GET' && url.pathname === '/api/teacher/attendance') {
-      const records = all(
-        `SELECT person_id AS personId, status, marked_at AS markedAt FROM attendance_records
-         WHERE person_type = 'student' AND record_date = ? AND session_type = ? AND class_code = ? AND subject_id IS ?`,
-        date, sessionType, classCode, subjectId
+    if (req.method === 'GET') {
+      const saved = all(
+        `SELECT student_id AS studentId, school_days AS schoolDays, days_absent AS daysAbsent, updated_at AS updatedAt
+         FROM attendance_summaries WHERE academic_id = ? AND exam_type = ? AND student_id IN (SELECT id FROM students WHERE class_code = ?)`,
+        academic.id, examType, classCode
       );
-      return sendJson(res, 200, { students, records });
+      const today = isoDate(new Date());
+      return sendJson(res, 200, {
+        students,
+        saved,
+        // a suggestion from the school calendar: up to today for mid-term, the whole term for end of term
+        suggestedSchoolDays: computeSchoolDays(academic.id, examType === 'Final Exam' ? null : today),
+      });
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/teacher/attendance/mark') {
+    if (req.method === 'POST') {
+      const schoolDays = Number(src.schoolDays);
+      if (!Number.isInteger(schoolDays) || schoolDays < 1 || schoolDays > 200) return sendJson(res, 400, { error: 'Days school opened must be a whole number from 1 to 200' });
       const inClass = new Set(students.map(s => s.id));
-      const records = (Array.isArray(src.records) ? src.records : [])
-        .map(r => ({ personId: cleanText(r.personId).toUpperCase(), status: cleanText(r.status).toLowerCase() }))
-        .filter(r => inClass.has(r.personId) && ATTENDANCE_STATUSES.includes(r.status));
-      if (!records.length) return sendJson(res, 400, { error: 'No attendance to save' });
-      const markedAt = new Date().toISOString();
+      const rows = [];
+      for (const r of Array.isArray(src.records) ? src.records : []) {
+        const studentId = cleanText(r.studentId).toUpperCase();
+        if (!inClass.has(studentId)) continue;
+        const daysAbsent = Number(r.daysAbsent);
+        if (!Number.isInteger(daysAbsent) || daysAbsent < 0 || daysAbsent > schoolDays) {
+          return sendJson(res, 400, { error: `Days absent must be a whole number from 0 to ${schoolDays}` });
+        }
+        rows.push({ studentId, daysAbsent });
+      }
+      if (!rows.length) return sendJson(res, 400, { error: 'No attendance to save' });
+      const updatedAt = new Date().toISOString();
       db.exec('BEGIN IMMEDIATE');
       try {
-        // only the pupils sent are replaced; anyone else's mark for the day stays
-        records.forEach(r => {
-          run(
-            `DELETE FROM attendance_records
-             WHERE person_type = 'student' AND person_id = ? AND record_date = ? AND session_type = ? AND class_code = ? AND subject_id IS ?`,
-            r.personId, date, sessionType, classCode, subjectId
-          );
-          run(
-            `INSERT INTO attendance_records (record_date, person_type, person_id, class_code, session_type, subject_id, status, marked_by, marked_at)
-             VALUES (?, 'student', ?, ?, ?, ?, ?, ?, ?)`,
-            date, r.personId, classCode, sessionType, subjectId, r.status, user.id, markedAt
-          );
-        });
+        rows.forEach(r => run(
+          `INSERT INTO attendance_summaries (academic_id, student_id, exam_type, school_days, days_absent, updated_by, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(academic_id, student_id, exam_type) DO UPDATE SET
+             school_days = excluded.school_days, days_absent = excluded.days_absent,
+             updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+          academic.id, r.studentId, examType, schoolDays, r.daysAbsent, user.id, updatedAt
+        ));
         db.exec('COMMIT');
       } catch (err) {
         db.exec('ROLLBACK');
         throw err;
       }
-      return sendJson(res, 200, { ok: true, saved: records.length });
+      return sendJson(res, 200, { ok: true, saved: rows.length });
     }
   }
 
