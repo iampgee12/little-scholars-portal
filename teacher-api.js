@@ -654,7 +654,6 @@ async function init() {
     document.getElementById('t-name').textContent = teacher.name;
     const chipEl = document.getElementById('t-chip'); if (chipEl) chipEl.textContent = teacher.chip || teacher.name.toUpperCase();
     document.getElementById('t-greeting').textContent = `${greeting()}, ${teacher.firstName}.`;
-    document.title = `Unique Children's School - ${teacher.name}`;
     loadTopbarSession();
 
     document.getElementById('t-subj').textContent = teacherCardLabel(state.contexts);

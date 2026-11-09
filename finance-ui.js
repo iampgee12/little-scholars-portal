@@ -419,7 +419,7 @@
   }
   function schoolHeader() {
     const s = FIN.cache.school || {};
-    const name = s.name || document.title.split('—')[0].trim();
+    const name = s.name || "Unique Children's School";
     return `<div style="text-align:center;margin-bottom:12px"><img src="/report_assets/school-logo.png" onerror="this.remove()" style="height:56px"><div style="font-size:16px;font-weight:800">${esc(name)}</div></div>`;
   }
   function print(title, html, { pos = false } = {}) {

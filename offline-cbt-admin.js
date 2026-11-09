@@ -67,7 +67,7 @@ function ocPrintKeys() {
   const w = window.open('', '_blank', 'width=640,height=480');
   if (!w) return showToast('Allow pop-ups to print');
   w.document.write(`<!DOCTYPE html><title>School API keys</title><body style="font-family:'DM Sans',Arial,sans-serif;padding:32px;">
-    <h2 style="margin:0 0 6px;">${escapeHtml(document.title.split(' - ')[0] || 'School')} — UCS Exam Server API keys</h2><p style="color:#555;">Printed ${new Date().toLocaleString('en-GB')}. Keep this somewhere safe.</p>
+    <h2 style="margin:0 0 6px;">${escapeHtml("Unique Children's School")} — UCS Exam Server API keys</h2><p style="color:#555;">Printed ${new Date().toLocaleString('en-GB')}. Keep this somewhere safe.</p>
     <table style="font-size:15px;border-collapse:collapse;">${[['API Number', 'oc-k1'], ['API Authentication Key', 'oc-k2'], ['API Secret Key', 'oc-k3']].map(([l, id]) => `<tr><td style="padding:8px 16px 8px 0;color:#555;">${l}</td><td style="padding:8px 0;font-family:monospace;font-size:16px;">${v(id)}</td></tr>`).join('')}</table>
     <script>window.print()<\/script></body>`);
   w.document.close();
