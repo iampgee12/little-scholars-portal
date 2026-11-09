@@ -1841,6 +1841,7 @@ async function attLoad() {
   attState.dirty = false;
   attState.loaded = null;
   card.style.display = 'none';
+  document.getElementById('att-days-box').style.display = 'none';
   if (!classCode) { empty.textContent = 'Only class teachers fill in attendance. You are not a class teacher for any class yet.'; return; }
   empty.textContent = 'Loading…';
   try {
@@ -1852,15 +1853,16 @@ async function attLoad() {
     const saved = new Map((data.saved || []).map(r => [r.studentId, r]));
     const savedDays = (data.saved || [])[0]?.schoolDays;
     document.getElementById('att-days').value = savedDays || data.suggestedSchoolDays || '';
-    document.getElementById('att-days-note').textContent = savedDays
+    attState.daysNote = savedDays
       ? 'This is the number you saved before. Change it if it is wrong.'
       : data.suggestedSchoolDays
         ? `Filled in from the school calendar (${examType === 'Final Exam' ? 'the whole term' : 'term start to today'}). Change it if it is wrong.`
-        : 'Type how many days school opened.';
+        : '';
+    document.getElementById('att-days-box').style.display = '';
     document.getElementById('att-tbody').innerHTML = attState.students.map((s, i) => `<tr>
       <td>${i + 1}</td>
       <td style="font-weight:500;">${escapeHtml(s.name)}${s.classArmName ? ` <span style="color:var(--text-3);font-size:11px;">${escapeHtml(s.classArmName)}</span>` : ''}</td>
-      <td style="text-align:center;"><input type="number" class="ctrl-select att-absent" data-id="${escapeHtml(s.id)}" min="0" step="1" value="${saved.get(s.id)?.daysAbsent ?? 0}" style="width:70px;text-align:center;" aria-label="Days absent for ${escapeHtml(s.name)}" oninput="attCalc();attMarkDirty()"></td>
+      <td style="text-align:center;"><input type="text" inputmode="numeric" autocomplete="off" class="ctrl-select att-absent score-field" data-col="absent" data-id="${escapeHtml(s.id)}" value="${saved.get(s.id)?.daysAbsent ?? 0}" style="width:70px;text-align:center;" aria-label="Days absent for ${escapeHtml(s.name)}" oninput="attCalc();attMarkDirty()"></td>
       <td style="text-align:center;" class="att-present"></td>
       <td style="text-align:center;font-weight:600;" class="att-pct"></td>
     </tr>`).join('');
@@ -1877,12 +1879,22 @@ async function attLoad() {
 
 function attCalc() {
   const days = Math.max(0, Math.round(Number(document.getElementById('att-days').value) || 0));
+  // with no "days school opened" nothing can be worked out: say so loudly
+  document.getElementById('att-days-box').classList.toggle('att-missing', !days);
+  document.getElementById('att-days-note').textContent = days
+    ? (attState.daysNote || 'Days present and the percentage are worked out from this number.')
+    : 'Type the days school opened first. Days present and the percentage fill in from it.';
   document.querySelectorAll('#att-tbody tr').forEach(row => {
-    const absent = Math.max(0, Math.round(Number(row.querySelector('.att-absent').value) || 0));
-    row.querySelector('.att-absent').style.borderColor = absent > days ? 'var(--red)' : '';
+    const box = row.querySelector('.att-absent');
+    if (days) box.dataset.max = days; else delete box.dataset.max;
+    const absent = Math.max(0, Math.round(Number(box.value) || 0));
+    box.style.borderColor = days && absent > days ? 'var(--red)' : '';
     const present = Math.max(0, days - absent);
     const pct = days ? Math.round((present / days) * 100) : 0;
-    row.querySelector('.att-present').textContent = days ? present : '-';
+    const presentEl = row.querySelector('.att-present');
+    presentEl.textContent = days ? present : 'Type days school opened';
+    presentEl.style.color = days ? '' : 'var(--amber)';
+    presentEl.style.fontSize = days ? '' : '11.5px';
     const pctEl = row.querySelector('.att-pct');
     pctEl.textContent = days ? `${pct}%` : '-';
     pctEl.style.color = !days ? '' : pct >= 90 ? 'var(--green)' : pct >= 75 ? '' : 'var(--red)';
@@ -1908,7 +1920,8 @@ async function attSave() {
     const data = await apiFetch('/api/teacher/attendance-summary', { method: 'POST', body: JSON.stringify({ ...loaded, schoolDays, records }) });
     attState.dirty = false;
     document.getElementById('att-status').textContent = `Saved for ${data.saved} pupils.`;
-    document.getElementById('att-days-note').textContent = 'Saved. These numbers will print on the report sheets.';
+    attState.daysNote = 'Saved. These numbers will print on the report sheets.';
+    attCalc();
     showToast('Attendance saved', 'success');
   } catch (err) {
     showToast(err.message);

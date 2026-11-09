@@ -313,6 +313,13 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
 .load-btn:hover { background:#16a34a; }
 
 /* ── CONTEXT BANNER ── */
+.att-days-box { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:18px; }
+.att-days-label { font-size:14px; font-weight:700; color:var(--text-1); }
+#att-days { width:110px; font-size:16px; font-weight:600; text-align:center; }
+.att-days-note { font-size:12.5px; color:var(--text-3); flex-basis:100%; }
+.att-days-box.att-missing { border:2px solid var(--amber); background:rgba(245,158,11,.08); }
+.att-days-box.att-missing #att-days { border:2px solid var(--amber); }
+.att-days-box.att-missing .att-days-note { color:var(--amber); font-weight:600; }
 .ctx-banner { background:var(--black-2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; margin-bottom:18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .ctx-label  { font-size:9px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; font-family:'DM Mono',monospace; margin-right:2px; }
 .ctx-chip   { display:inline-flex; align-items:center; gap:5px; background:var(--black-3); border:1px solid var(--border-2); border-radius:4px; padding:4px 10px; font-size:11px; font-weight:600; color:var(--text-2); font-family:'DM Mono',monospace; }
@@ -771,11 +778,12 @@ body .user-pill.pill-active { border-color:#2563eb; box-shadow:inset 0 0 0 1px #
             <option value="Mid-Term Exam">Mid-term</option>
             <option value="Final Exam">End of term</option>
           </select>
-          <span class="ctx-sep">·</span>
-          <span class="ctx-label">Days school opened</span>
-          <input type="number" class="ctrl-select" id="att-days" min="1" max="200" step="1" style="width:90px;" oninput="attCalc();attMarkDirty()">
         </div>
-        <div id="att-days-note" style="font-size:12px;color:var(--text-3);margin:-8px 2px 14px;"></div>
+        <div class="att-days-box" id="att-days-box" style="display:none;">
+          <label for="att-days" class="att-days-label">Days school opened</label>
+          <input type="text" inputmode="numeric" autocomplete="off" class="ctrl-select score-field" data-max="200" id="att-days" placeholder="e.g. 45" oninput="attCalc();attMarkDirty()">
+          <div id="att-days-note" class="att-days-note"></div>
+        </div>
         <div class="card" id="att-card" style="display:none;">
           <div class="card-head" style="flex-wrap:wrap;gap:10px;">
             <span class="card-title" id="att-title">Attendance</span>
