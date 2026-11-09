@@ -4408,6 +4408,75 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { records: all(sql, ...params) });
   }
 
+  // ── TEACHER ATTENDANCE ───────────────────────────────────────────────
+  // A class teacher marks the daily register for their own class; any teacher
+  // marks lesson attendance for a class and subject they teach. This only ever
+  // touches attendance_records: no result, score or report table is read or written.
+  if (url.pathname === '/api/teacher/attendance' || url.pathname === '/api/teacher/attendance/mark') {
+    const user = requireUser(req, res, 'teacher');
+    if (!user) return;
+    const src = req.method === 'POST' ? await readJson(req) : Object.fromEntries(url.searchParams);
+    const date = cleanText(src.date);
+    const sessionType = cleanText(src.sessionType) || 'daily';
+    const classCode = cleanText(src.classCode).toUpperCase();
+    const subjectId = sessionType === 'lesson' ? Number(src.subjectId) || null : null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) return sendJson(res, 400, { error: 'Choose a valid date' });
+    // a day's grace for time zones; no marking further ahead than tomorrow
+    if (Date.parse(date) > Date.now() + 86400000) return sendJson(res, 400, { error: "You can't mark attendance for a future date" });
+    if (!['daily', 'lesson'].includes(sessionType)) return sendJson(res, 400, { error: 'Choose daily or lesson attendance' });
+    if (!classCode) return sendJson(res, 400, { error: 'Choose a class' });
+    if (sessionType === 'lesson' && !subjectId) return sendJson(res, 400, { error: 'Choose a subject' });
+    const contexts = teacherContexts(user.id);
+    const allowed = sessionType === 'daily'
+      ? contexts.some(c => c.teacherType === 'class_teacher' && c.classCode === classCode)
+      : contexts.some(c => c.classCode === classCode && Number(c.subjectId) === subjectId);
+    if (!allowed) {
+      return sendJson(res, 403, { error: sessionType === 'daily'
+        ? 'Only the class teacher can mark the daily register for this class'
+        : 'You can only mark lesson attendance for a class and subject you teach' });
+    }
+    const students = studentRowsForClass(classCode).map(s => ({ id: s.id, name: s.name, classArmName: s.classArmName || '' }));
+
+    if (req.method === 'GET' && url.pathname === '/api/teacher/attendance') {
+      const records = all(
+        `SELECT person_id AS personId, status, marked_at AS markedAt FROM attendance_records
+         WHERE person_type = 'student' AND record_date = ? AND session_type = ? AND class_code = ? AND subject_id IS ?`,
+        date, sessionType, classCode, subjectId
+      );
+      return sendJson(res, 200, { students, records });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/teacher/attendance/mark') {
+      const inClass = new Set(students.map(s => s.id));
+      const records = (Array.isArray(src.records) ? src.records : [])
+        .map(r => ({ personId: cleanText(r.personId).toUpperCase(), status: cleanText(r.status).toLowerCase() }))
+        .filter(r => inClass.has(r.personId) && ATTENDANCE_STATUSES.includes(r.status));
+      if (!records.length) return sendJson(res, 400, { error: 'No attendance to save' });
+      const markedAt = new Date().toISOString();
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        // only the pupils sent are replaced; anyone else's mark for the day stays
+        records.forEach(r => {
+          run(
+            `DELETE FROM attendance_records
+             WHERE person_type = 'student' AND person_id = ? AND record_date = ? AND session_type = ? AND class_code = ? AND subject_id IS ?`,
+            r.personId, date, sessionType, classCode, subjectId
+          );
+          run(
+            `INSERT INTO attendance_records (record_date, person_type, person_id, class_code, session_type, subject_id, status, marked_by, marked_at)
+             VALUES (?, 'student', ?, ?, ?, ?, ?, ?, ?)`,
+            date, r.personId, classCode, sessionType, subjectId, r.status, user.id, markedAt
+          );
+        });
+        db.exec('COMMIT');
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+      return sendJson(res, 200, { ok: true, saved: records.length });
+    }
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/teacher/result-contexts') {
     const user = requireUser(req, res, 'teacher');
     if (!user) return;

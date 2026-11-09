@@ -1812,6 +1812,155 @@ async function cogSave() {
   }
 }
 
+// ── ATTENDANCE ──
+// Daily register: the class teacher's own classes. Lesson attendance: any class
+// and subject the teacher is assigned. Saving only writes attendance marks.
+const ATT_STATUSES = ['present', 'absent', 'late', 'permission'];
+const attState = { students: [], dirty: false };
+
+function attToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function attInit() {
+  const typeSel = document.getElementById('att-type');
+  const current = typeSel.value;
+  const canDaily = classTeacherClasses().length > 0;
+  typeSel.innerHTML = (canDaily ? '<option value="daily">Daily Register</option>' : '') + '<option value="lesson">Lesson Attendance</option>';
+  typeSel.value = [...typeSel.options].some(o => o.value === current) ? current : typeSel.options[0].value;
+  const dateEl = document.getElementById('att-date');
+  if (!dateEl.value) dateEl.value = attToday();
+  dateEl.max = attToday();
+  attTypeChanged();
+}
+
+function attTypeChanged() {
+  const type = document.getElementById('att-type').value;
+  document.querySelectorAll('.att-lesson-only').forEach(el => { el.style.display = type === 'lesson' ? '' : 'none'; });
+  const classSel = document.getElementById('att-class');
+  const current = classSel.value;
+  const seen = new Map();
+  (state.contexts || [])
+    .filter(c => type === 'lesson' || c.teacherType === 'class_teacher')
+    .forEach(c => { if (!seen.has(c.classCode)) seen.set(c.classCode, c.classLabel || c.classCode); });
+  classSel.innerHTML = '<option value="">Select class…</option>' +
+    [...seen].map(([code, label]) => `<option value="${escapeHtml(code)}">${escapeHtml(label)}</option>`).join('');
+  if (seen.has(current)) classSel.value = current;
+  else if (seen.size === 1) classSel.value = [...seen.keys()][0];
+  attClassChanged();
+}
+
+function attClassChanged() {
+  const classCode = document.getElementById('att-class').value;
+  const subjSel = document.getElementById('att-subject');
+  const current = subjSel.value;
+  const subjects = (state.contexts || []).filter(c => c.classCode === classCode);
+  subjSel.innerHTML = '<option value="">Select subject…</option>' +
+    subjects.map(c => `<option value="${escapeHtml(String(c.subjectId))}">${escapeHtml(c.subjectName)}</option>`).join('');
+  if (subjects.some(c => String(c.subjectId) === current)) subjSel.value = current;
+  else if (subjects.length === 1) subjSel.value = String(subjects[0].subjectId);
+  attLoad();
+}
+
+function attParams() {
+  return {
+    sessionType: document.getElementById('att-type').value,
+    classCode: document.getElementById('att-class').value,
+    subjectId: document.getElementById('att-subject').value,
+    date: document.getElementById('att-date').value,
+  };
+}
+
+async function attLoad() {
+  const p = attParams();
+  const card = document.getElementById('att-card');
+  const empty = document.getElementById('att-empty');
+  if (attState.dirty && !confirm('You have attendance marks that are not saved yet. Leave them?')) {
+    // the open register stays; Save still saves it for the class and date it was opened for
+    if (attState.loaded) document.getElementById('att-date').value = attState.loaded.date;
+    return;
+  }
+  attState.dirty = false;
+  attState.loaded = null;
+  card.style.display = 'none';
+  if (!p.classCode || !p.date || (p.sessionType === 'lesson' && !p.subjectId)) {
+    empty.textContent = (state.contexts || []).length
+      ? 'Choose a class' + (p.sessionType === 'lesson' ? ', subject' : '') + ' and date to open the register.'
+      : 'You have no classes assigned yet. Ask the admin to assign your classes.';
+    return;
+  }
+  empty.textContent = 'Loading…';
+  try {
+    const q = new URLSearchParams({ sessionType: p.sessionType, classCode: p.classCode, date: p.date });
+    if (p.sessionType === 'lesson') q.set('subjectId', p.subjectId);
+    const data = await apiFetch(`/api/teacher/attendance?${q}`);
+    attState.students = data.students || [];
+    attState.loaded = p;
+    const byId = new Map((data.records || []).map(r => [r.personId, r.status]));
+    const marked = byId.size;
+    const tbody = document.getElementById('att-tbody');
+    if (!attState.students.length) {
+      empty.textContent = 'There are no pupils in this class yet.';
+      return;
+    }
+    tbody.innerHTML = attState.students.map((s, i) => `<tr>
+      <td>${i + 1}</td>
+      <td style="font-weight:500;">${escapeHtml(s.name)}${s.classArmName ? ` <span style="color:var(--text-3);font-size:11px;">${escapeHtml(s.classArmName)}</span>` : ''}</td>
+      <td class="att-id" style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(s.id)}</td>
+      ${ATT_STATUSES.map(st => `<td style="text-align:center;"><input type="radio" name="tatt-${escapeHtml(s.id)}" value="${st}" aria-label="${st}"${(byId.get(s.id) || 'present') === st ? ' checked' : ''} onchange="attMarkDirty()"></td>`).join('')}
+    </tr>`).join('');
+    const classLabel = document.getElementById('att-class').selectedOptions[0]?.textContent || p.classCode;
+    const subjLabel = p.sessionType === 'lesson' ? ` · ${document.getElementById('att-subject').selectedOptions[0]?.textContent || ''}` : '';
+    document.getElementById('att-title').textContent = `${classLabel}${subjLabel} · ${new Date(p.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}`;
+    document.getElementById('att-status').textContent = marked
+      ? `Already marked for ${marked} of ${attState.students.length} pupils. Saving updates it.`
+      : 'Not marked yet. Everyone starts as Present.';
+    empty.textContent = '';
+    card.style.display = '';
+  } catch (err) {
+    empty.textContent = err.message;
+  }
+}
+
+function attMarkDirty() {
+  attState.dirty = true;
+  document.getElementById('att-status').textContent = 'Changes not saved yet.';
+}
+
+function attMarkAll(status) {
+  attState.students.forEach(s => {
+    const el = document.querySelector(`input[name="tatt-${CSS.escape(s.id)}"][value="${status}"]`);
+    if (el) el.checked = true;
+  });
+  attMarkDirty();
+}
+
+async function attSave() {
+  const p = attState.loaded;
+  if (!p) return showToast('Open a register first');
+  const records = attState.students.map(s => {
+    const el = document.querySelector(`input[name="tatt-${CSS.escape(s.id)}"]:checked`);
+    return el ? { personId: s.id, status: el.value } : null;
+  }).filter(Boolean);
+  if (!records.length) return showToast('Nothing to save');
+  const btn = document.getElementById('att-save');
+  btn.disabled = true;
+  try {
+    const body = { ...p, records };
+    if (p.sessionType !== 'lesson') delete body.subjectId;
+    const data = await apiFetch('/api/teacher/attendance/mark', { method: 'POST', body: JSON.stringify(body) });
+    attState.dirty = false;
+    const counts = ATT_STATUSES.map(st => [st, records.filter(r => r.status === st).length]).filter(([, n]) => n);
+    document.getElementById('att-status').textContent = `Saved for ${data.saved} pupils (${counts.map(([st, n]) => `${n} ${st}`).join(', ')}).`;
+    showToast('Attendance saved', 'success');
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 const TAB_META = {
   reviewResults: { title: 'Review Results', sub: 'Your class broadsheet (read-only)' },
   classComments: { title: 'Class Comments', sub: "Class teacher's comments" },
@@ -1819,6 +1968,7 @@ const TAB_META = {
   profile: { title: 'My Profile', sub: 'Your account' },
   dashboard: { title: 'Dashboard', get sub() { return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); } },
   students: { title: 'Students', sub: 'Class Roster' },
+  attendance: { title: 'Attendance', sub: 'Mark Daily & Lesson Attendance' },
   results: { title: 'Results Entry', sub: 'Enter Examination Scores' },
   published: { title: 'Published Results', sub: 'Saved Exam Records' },
   studentResultChecker: { title: 'Student Result Checker', sub: 'Look Up a Published Result' },
@@ -1873,6 +2023,7 @@ function switchTab(tab, trigger) {
   const meta = TAB_META[tab] || {};
   document.getElementById('topbar-title').textContent = meta.title || tab;
   document.getElementById('topbar-sub').textContent = meta.sub || '';
+  if (tab === 'attendance') attInit();
   if (tab === 'published') renderPublished();
   if (tab === 'studentResultChecker') srcInit();
   if (tab === 'classResultChecker') crcInit();
