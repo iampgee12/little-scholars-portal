@@ -1574,7 +1574,8 @@ function gbRenderClassOverview(classCode, examType, contexts) {
   const students = (contexts[0]?.students || [])
     .filter(student => !classArmId || String(student.classArmId) === String(classArmId))
     .slice().sort((a, b) => a.name.localeCompare(b.name));
-  const subjectCols = contexts.slice().sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+  // the server sends each class's subjects in the school's order
+  const subjectCols = contexts.slice();
   const max = totalMaxForExamType(examType);
 
   const rows = students.map(student => {

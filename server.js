@@ -2191,7 +2191,11 @@ function teacherContexts(teacherId) {
      ORDER BY c.code, s.name`,
     teacherId
   );
-  return rows.filter(row => teacher && row.teacherType === teacher.teacherType &&
+  // each class keeps its place; within a primary class the subjects follow the school's order
+  const byClass = new Map();
+  rows.forEach(row => byClass.set(row.classCode, [...(byClass.get(row.classCode) || []), row]));
+  const ordered = [...byClass.entries()].flatMap(([classCode, list]) => sortSubjectsForClass(classCode, list));
+  return ordered.filter(row => teacher && row.teacherType === teacher.teacherType &&
     (row.teacherType !== 'subject_teacher' || !isClassTeacherSubject(row.classCode, row.subjectId))).map(row => ({
     ...row,
     academicId: academic.id,
@@ -2219,6 +2223,38 @@ const CLASS_TEACHER_CORE_SUBJECT_RULES = [
 
 function normalizedSubjectName(value) {
   return String(value || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// The order the school lists primary (Year 1–6) subjects in, on the report sheet and
+// when results are entered. Each entry is the subject's name, then other spellings.
+// A subject not on the list comes after these, A–Z. Other classes stay A–Z.
+const PRIMARY_SUBJECT_ORDER = [
+  ['English Language', 'English'], ['Mathematics', 'Maths', 'Math'], ['Primary Science', 'Basic Science'],
+  ['Social Studies', 'Social Studies/Civic', 'Civic Education'], ['Q.A.T', 'QAT'], ['V.A.T', 'VAT'],
+  ['Fine Art', 'Fine Arts'], ['Yoruba Language', 'Yoruba'], ['Diction'], ['Computer', 'ICT'], ['French'],
+  ['Igbo Language', 'Igbo'], ['Music'], ['Vocational Aptitude'], ['Hand Writing', 'Handwriting'],
+  ['Creative Writing'], ['History'], ['C.R.K/I.R.K', 'CRK', 'C.R.K', 'IRK'],
+].map(names => names.map(normalizedSubjectName));
+
+function isPrimaryClass(classCode) {
+  return one('SELECT category FROM classes WHERE code = ?', classCode)?.category === 'Primary';
+}
+
+function primarySubjectRank(name) {
+  const key = normalizedSubjectName(name);
+  const rank = PRIMARY_SUBJECT_ORDER.findIndex(names => names.includes(key));
+  return rank === -1 ? PRIMARY_SUBJECT_ORDER.length : rank;
+}
+
+// Puts a primary class's subjects in the school's order; anything else is left as it is.
+// The list's rows only move; nothing in them changes.
+function sortSubjectsForClass(classCode, list, nameOf = row => row.subjectName) {
+  if (!isPrimaryClass(classCode)) return list;
+  return list
+    .map((row, i) => ({ row, i, rank: primarySubjectRank(nameOf(row)) }))
+    .sort((a, b) => a.rank - b.rank || (a.rank === PRIMARY_SUBJECT_ORDER.length
+      ? String(nameOf(a.row)).localeCompare(String(nameOf(b.row))) : 0) || a.i - b.i)
+    .map(item => item.row);
 }
 
 function classYearNumber(classCode) {
@@ -3090,7 +3126,7 @@ function sessionHeadingLabel(sessionLabel) {
 }
 
 function classReportRows(classCode, examType, studentId) {
-  return all(
+  const rows = all(
     `SELECT
        rb.id AS batchId,
        rb.vetted_at AS vettedAt,
@@ -3117,6 +3153,7 @@ function classReportRows(classCode, examType, studentId) {
     examType,
     studentId
   ).map(row => ({ ...row, isAbsent: !!row.isAbsent }));
+  return sortSubjectsForClass(classCode, rows);
 }
 
 function classBatches(classCode, examType) {
@@ -3188,6 +3225,8 @@ function adminGradebook(classCode, examType) {
     subjects.push({ id: sub.id, name: sub.name, code: sub.code, teacherName: '', batchId: null, vettedAt: null });
   });
   subjects.sort((a, b) => a.name.localeCompare(b.name));
+  const orderedSubjects = sortSubjectsForClass(classCode, subjects, subject => subject.name);
+  subjects.splice(0, subjects.length, ...orderedSubjects);
 
   const students = all(
     `SELECT st.id, st.name, st.initials, st.class_code AS classCode, st.class_arm_id AS classArmId,
