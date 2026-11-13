@@ -495,11 +495,49 @@ function attendanceCounts(studentId, sessionType) {
 
 function commentBankMatch(avgPct) {
   if (avgPct === null || avgPct === undefined) return null;
+  // "< max + 1" so an average like 79.5 still counts in a 65–79 range
+  // instead of falling in the gap before the 80–100 range.
   const row = one(
-    'SELECT comment FROM comment_bank WHERE ? >= min_score AND ? <= max_score ORDER BY min_score DESC LIMIT 1',
+    'SELECT comment FROM comment_bank WHERE ? >= min_score AND ? < max_score + 1 ORDER BY min_score DESC, id ASC LIMIT 1',
     avgPct, avgPct
   );
   return row ? row.comment : null;
+}
+
+// Starter Comments Bank, one set per grade band (A 80–100, B 65–79, C 55–64,
+// D 45–54, F 0–44). Added once (schema_meta flag) and only adds rows, so the
+// school's own comments are kept and anything they delete later stays deleted.
+// The first line in each band is the one used automatically on the report.
+const STARTER_COMMENTS = [
+  [80, 100, 'An excellent result. Keep up the outstanding work.'],
+  [80, 100, 'Outstanding performance this term. You are a joy to teach. Keep it up!'],
+  [80, 100, 'A brilliant result. Your hard work and good conduct are commendable.'],
+  [80, 100, 'Exceptional work. Keep aiming high and stay humble.'],
+  [65, 79, 'A very good result. With a little more effort you can reach the top.'],
+  [65, 79, 'Very good performance. Keep working hard and you will do even better.'],
+  [65, 79, 'You have done very well this term. Aim for excellence next term.'],
+  [65, 79, 'A commendable result. Stay focused and keep improving.'],
+  [55, 64, 'A good result. More effort will bring even better results.'],
+  [55, 64, 'Good performance. Pay more attention in class to improve further.'],
+  [55, 64, 'You can do better than this. Keep practising and stay focused.'],
+  [55, 64, 'A fair effort this term. Reading more at home will help you improve.'],
+  [45, 54, 'A fair result. You need to work harder next term.'],
+  [45, 54, 'There is room for improvement. Put in more effort and attention.'],
+  [45, 54, 'You need to be more serious with your studies to improve.'],
+  [45, 54, 'Fair performance. More practice and reading at home will help.'],
+  [0, 44, 'A weak result. You need to put in much more effort next term.'],
+  [0, 44, 'Needs serious improvement. Extra support at home and in school is advised.'],
+  [0, 44, 'You can do much better. Be more attentive and study harder.'],
+  [0, 44, 'This result is below expectation. Parents are advised to see the class teacher.'],
+];
+
+function seedStarterComments() {
+  if (valueFromMeta('comment_bank_starter_version') === '1') return;
+  for (const [min, max, text] of STARTER_COMMENTS) {
+    const exists = one('SELECT id FROM comment_bank WHERE comment = ?', text);
+    if (!exists) run('INSERT INTO comment_bank (min_score, max_score, comment) VALUES (?, ?, ?)', min, max, text);
+  }
+  setMeta('comment_bank_starter_version', '1');
 }
 
 // A student's report always needs a Form Teacher's and Head of School's
@@ -1892,6 +1930,7 @@ if (EXAM_MODE) {
 }
 migratePlaintextPasswords();
 backfillMissingStudentUsers();
+if (!EXAM_MODE) seedStarterComments();
 loadGradeScale();
 // Enroll Students (wizard, families, bulk enrol, self registration)
 const enrolment = createEnrolment({
